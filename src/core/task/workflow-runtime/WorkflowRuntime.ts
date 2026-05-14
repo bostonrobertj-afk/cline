@@ -4676,7 +4676,12 @@ export class WorkflowRuntime {
 			return selectorOptions
 		}
 
-		return this.loadWorkflowFormJsonOptions(args)
+		const jsonOptions = await this.loadWorkflowFormJsonOptions(args)
+		if (jsonOptions !== undefined) {
+			return jsonOptions
+		}
+
+		return this.resolveWorkflowFormWorkflowValueOptions(args)
 	}
 
 	private async discoverWorkflowFormSelectorOptions(args: {
@@ -4922,7 +4927,50 @@ export class WorkflowRuntime {
 		})
 	}
 
-	private isWorkflowFormJsonOptionsSourceFieldKind(kind: WorkflowFormFieldDefinition["kind"]): boolean {
+	private resolveWorkflowFormWorkflowValueOptions(args: {
+		taskState: TaskState
+		field: WorkflowFormFieldDefinition
+	}): WorkflowFormOptionDefinition[] | undefined {
+		const sourceConfig = args.field.workflowValueOptionsSource
+		if (sourceConfig === undefined) {
+			return undefined
+		}
+
+		if (this.isWorkflowFormDynamicOptionsSourceFieldKind(args.field.kind) === false) {
+			throw new Error(
+				`Workflow form field ${args.field.key} workflowValueOptionsSource is only supported for dropdown, radio_group, multi_select, or checkbox_group fields.`,
+			)
+		}
+
+		const session = args.taskState.activeWorkflowSession
+		if (session === undefined) {
+			throw new Error(
+				`Workflow form field ${args.field.key} workflowValueOptionsSource requires an active workflow session.`,
+			)
+		}
+
+		const workflowValue = session.workflowValues[sourceConfig.workflowValueKey]
+		if (Array.isArray(workflowValue) === false) {
+			throw new Error(
+				`Workflow form field ${args.field.key} workflowValueOptionsSource workflow value ${sourceConfig.workflowValueKey} must be a string array.`,
+			)
+		}
+
+		return workflowValue.map((entry, index) => {
+			if (typeof entry !== "string") {
+				throw new Error(
+					`Workflow form field ${args.field.key} workflowValueOptionsSource workflow value ${sourceConfig.workflowValueKey}[${index}] must be a string.`,
+				)
+			}
+
+			return {
+				value: entry,
+				label: entry,
+			}
+		})
+	}
+
+	private isWorkflowFormDynamicOptionsSourceFieldKind(kind: WorkflowFormFieldDefinition["kind"]): boolean {
 		switch (kind) {
 			case "dropdown":
 			case "radio_group":
@@ -4932,6 +4980,10 @@ export class WorkflowRuntime {
 			default:
 				return false
 		}
+	}
+
+	private isWorkflowFormJsonOptionsSourceFieldKind(kind: WorkflowFormFieldDefinition["kind"]): boolean {
+		return this.isWorkflowFormDynamicOptionsSourceFieldKind(kind)
 	}
 
 	private validateWorkflowFormJsonOptionsSourceString(args: {
@@ -5007,6 +5059,61 @@ export class WorkflowRuntime {
 			})
 			if (validation.valid === false) {
 				return validation
+			}
+		}
+
+		return { valid: true }
+	}
+
+	private validateWorkflowFormWorkflowValueOptionsSourceConfig(args: {
+		workflowFormId: string
+		field: WorkflowFormFieldDefinition
+		workflowValueKeys: Set<string>
+	}): WorkflowValidationResult {
+		const sourceConfig = args.field.workflowValueOptionsSource
+		if (sourceConfig === undefined) {
+			return { valid: true }
+		}
+
+		if (args.field.selectorDiscovery !== undefined) {
+			return {
+				valid: false,
+				errorMessage: `Workflow form ${args.workflowFormId} field ${args.field.key} must not define both selectorDiscovery and workflowValueOptionsSource.`,
+			}
+		}
+
+		if (args.field.jsonOptionsSource !== undefined) {
+			return {
+				valid: false,
+				errorMessage: `Workflow form ${args.workflowFormId} field ${args.field.key} must not define both jsonOptionsSource and workflowValueOptionsSource.`,
+			}
+		}
+
+		if (this.isWorkflowFormDynamicOptionsSourceFieldKind(args.field.kind) === false) {
+			return {
+				valid: false,
+				errorMessage: `Workflow form ${args.workflowFormId} field ${args.field.key} workflowValueOptionsSource is only supported for dropdown, radio_group, multi_select, or checkbox_group fields.`,
+			}
+		}
+
+		if (sourceConfig.workflowValueKey.trim() === "") {
+			return {
+				valid: false,
+				errorMessage: `Workflow form ${args.workflowFormId} field ${args.field.key} workflowValueOptionsSource.workflowValueKey must not be empty.`,
+			}
+		}
+
+		if (sourceConfig.workflowValueKey.trim() !== sourceConfig.workflowValueKey) {
+			return {
+				valid: false,
+				errorMessage: `Workflow form ${args.workflowFormId} field ${args.field.key} workflowValueOptionsSource.workflowValueKey ${sourceConfig.workflowValueKey} must already be trimmed.`,
+			}
+		}
+
+		if (!args.workflowValueKeys.has(sourceConfig.workflowValueKey)) {
+			return {
+				valid: false,
+				errorMessage: `Workflow form ${args.workflowFormId} field ${args.field.key} workflowValueOptionsSource.workflowValueKey ${sourceConfig.workflowValueKey} must be declared in workflowValueKeys.`,
 			}
 		}
 
@@ -7100,6 +7207,15 @@ export class WorkflowRuntime {
 					})
 					if (jsonOptionsSourceValidation.valid === false) {
 						return jsonOptionsSourceValidation
+					}
+
+					const workflowValueOptionsSourceValidation = this.validateWorkflowFormWorkflowValueOptionsSourceConfig({
+						workflowFormId,
+						field,
+						workflowValueKeys,
+					})
+					if (workflowValueOptionsSourceValidation.valid === false) {
+						return workflowValueOptionsSourceValidation
 					}
 
 					for (const targetPathSegment of field.selectorDiscovery?.targetPathSegments ?? []) {

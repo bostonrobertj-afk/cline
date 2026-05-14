@@ -491,6 +491,12 @@ export interface WorkflowFormJsonOptionsSourceConfig {
 	descriptionTemplate?: string
 }
 
+export interface WorkflowFormWorkflowValueOptionsSourceConfig {
+	workflowValueKey: string
+	valueSource: "array_string_entry"
+	labelSource: "array_string_entry"
+}
+
 export interface WorkflowFormFieldDefinition {
 	key: string
 	workflowValueKey?: string
@@ -520,6 +526,7 @@ export interface WorkflowFormFieldDefinition {
 	presentation?: WorkflowFormFieldPresentation
 	selectorDiscovery?: WorkflowFormSelectorDiscoveryConfig
 	jsonOptionsSource?: WorkflowFormJsonOptionsSourceConfig
+	workflowValueOptionsSource?: WorkflowFormWorkflowValueOptionsSourceConfig
 }
 
 export type WorkflowFormTransitionDefinition =

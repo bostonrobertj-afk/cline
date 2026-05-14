@@ -243,6 +243,39 @@ describe("WorkflowRuntime", () => {
 		return field
 	}
 
+	function createWorkflowValueOptionsSource(args?: {
+		workflowValueKey?: string
+	}): NonNullable<WorkflowFormFieldDefinition["workflowValueOptionsSource"]> {
+		return {
+			workflowValueKey: args?.workflowValueKey ?? "available_options",
+			valueSource: "array_string_entry",
+			labelSource: "array_string_entry",
+		}
+	}
+
+	function createWorkflowValueOptionsField(args: {
+		key: string
+		kind: JsonOptionsFieldKind
+		workflowValueKey: string | undefined
+		workflowValueOptionsSource?: NonNullable<WorkflowFormFieldDefinition["workflowValueOptionsSource"]>
+	}): WorkflowFormFieldDefinition {
+		const allowsMultipleValues = args.kind === "multi_select" || args.kind === "checkbox_group"
+		const field: WorkflowFormFieldDefinition = {
+			key: args.key,
+			kind: args.kind,
+			label: "Workflow value options",
+			required: true,
+			allowedValueType: allowsMultipleValues ? "array" : "string",
+			workflowValueOptionsSource: args.workflowValueOptionsSource ?? createWorkflowValueOptionsSource(),
+			valueSchema: allowsMultipleValues ? { type: "array", items: { type: "string" } } : { type: "string" },
+		}
+		if (args.workflowValueKey !== undefined) {
+			field.workflowValueKey = args.workflowValueKey
+		}
+
+		return field
+	}
+
 	function createJsonOptionsWorkflowForm(args: {
 		workflowFormId: string
 		fields: WorkflowFormFieldDefinition[]
@@ -6669,6 +6702,195 @@ describe("WorkflowRuntime", () => {
 			expect(renderFormAction.payload.panel?.fields.find((field) => field.key === fieldKey)?.options).to.deep.equal(
 				expectedOptions,
 			)
+		}
+	})
+
+	it("renders checkbox group options from workflow-value string arrays", async () => {
+		const workflowFormId = "workflow-value-options-checkbox-form"
+		const sourceValueKey = "unpermitted_file_paths"
+		const selectedValueKey = "selected_unpermitted_file_paths"
+		const fieldKey = "selected_paths"
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [sourceValueKey, selectedValueKey],
+			workflowForms: {
+				[workflowFormId]: createJsonOptionsWorkflowForm({
+					workflowFormId,
+					fields: [
+						createWorkflowValueOptionsField({
+							key: fieldKey,
+							kind: "checkbox_group",
+							workflowValueKey: selectedValueKey,
+							workflowValueOptionsSource: createWorkflowValueOptionsSource({ workflowValueKey: sourceValueKey }),
+						}),
+					],
+				}),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({ workflowFormId }),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		getActiveWorkflowSession(taskState).workflowValues[sourceValueKey] = ["src/alpha.ts", "docs/story.md"]
+		const renderFormAction = await submitNewProjectSelection(taskState, "Workflow Value Options Project")
+
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+
+		const expectedOptions = [
+			{ value: "src/alpha.ts", label: "src/alpha.ts" },
+			{ value: "docs/story.md", label: "docs/story.md" },
+		]
+		expect(renderFormAction.payload.panel?.fields.find((field) => field.key === fieldKey)?.options).to.deep.equal(
+			expectedOptions,
+		)
+		expect(
+			renderFormAction.formSession.definitionPayload.panels["json-options"].fields.find((field) => field.key === fieldKey)
+				?.options,
+		).to.deep.equal(expectedOptions)
+	})
+
+	it("rejects non-string-array workflow-value options during render", async () => {
+		const workflowFormId = "workflow-value-options-invalid-array-form"
+		const sourceValueKey = "unpermitted_file_paths"
+		const selectedValueKey = "selected_unpermitted_file_paths"
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [sourceValueKey, selectedValueKey],
+			workflowForms: {
+				[workflowFormId]: createJsonOptionsWorkflowForm({
+					workflowFormId,
+					fields: [
+						createWorkflowValueOptionsField({
+							key: "selected_paths",
+							kind: "checkbox_group",
+							workflowValueKey: selectedValueKey,
+							workflowValueOptionsSource: createWorkflowValueOptionsSource({ workflowValueKey: sourceValueKey }),
+						}),
+					],
+				}),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({ workflowFormId }),
+				}),
+			},
+		})
+
+		const invalidState = new TaskState()
+		await activateWorkflow(invalidState, workflow)
+		getActiveWorkflowSession(invalidState).workflowValues[sourceValueKey] = ["src/alpha.ts", 42]
+
+		let thrownError: Error | undefined
+		try {
+			await submitNewProjectSelection(invalidState, "Invalid Workflow Value Options Project")
+		} catch (error) {
+			if (error instanceof Error) {
+				thrownError = error
+			}
+		}
+
+		expect(thrownError).to.not.equal(undefined)
+		if (thrownError === undefined) {
+			throw new Error("Expected non-string-array workflowValueOptionsSource rendering to fail.")
+		}
+		expect(thrownError.message).to.contain(
+			"workflowValueOptionsSource workflow value unpermitted_file_paths[1] must be a string",
+		)
+	})
+
+	it("rejects invalid workflow-value option source definitions before activation", async () => {
+		const sourceValueKey = "available_options"
+		const selectedValueKey = "selected_options"
+		const createWorkflowWithField = (args: {
+			field: WorkflowFormFieldDefinition
+			workflowValueKeys: readonly string[]
+		}): WorkflowDefinition => {
+			const workflowFormId = `invalid-${args.field.key}-workflow-value-options-form`
+			return createWorkflowDefinition({
+				workflowValueKeys: args.workflowValueKeys,
+				workflowForms: {
+					[workflowFormId]: createJsonOptionsWorkflowForm({
+						workflowFormId,
+						fields: [args.field],
+					}),
+				},
+			})
+		}
+		const createCheckboxField = (
+			workflowValueOptionsSource: NonNullable<WorkflowFormFieldDefinition["workflowValueOptionsSource"]>,
+		): WorkflowFormFieldDefinition =>
+			createWorkflowValueOptionsField({
+				key: "selected_paths",
+				kind: "checkbox_group",
+				workflowValueKey: selectedValueKey,
+				workflowValueOptionsSource,
+			})
+		const declaredWorkflowValueKeys = [sourceValueKey, selectedValueKey]
+
+		const invalidFieldCases: Array<{
+			readonly label: string
+			readonly field: WorkflowFormFieldDefinition
+			readonly workflowValueKeys: readonly string[]
+		}> = [
+			{
+				label: "undeclared source key",
+				field: createCheckboxField(createWorkflowValueOptionsSource({ workflowValueKey: sourceValueKey })),
+				workflowValueKeys: [selectedValueKey],
+			},
+			{
+				label: "empty source key",
+				field: createCheckboxField(createWorkflowValueOptionsSource({ workflowValueKey: "" })),
+				workflowValueKeys: declaredWorkflowValueKeys,
+			},
+			{
+				label: "untrimmed source key",
+				field: createCheckboxField(createWorkflowValueOptionsSource({ workflowValueKey: " available_options" })),
+				workflowValueKeys: declaredWorkflowValueKeys,
+			},
+			{
+				label: "selectorDiscovery conflict",
+				field: {
+					...createCheckboxField(createWorkflowValueOptionsSource({ workflowValueKey: sourceValueKey })),
+					selectorDiscovery: {
+						root: {
+							kind: "selected_project_root",
+						},
+						entryType: "file",
+						immediateChildrenOnly: true,
+						sort: "alpha_asc",
+					},
+				},
+				workflowValueKeys: declaredWorkflowValueKeys,
+			},
+			{
+				label: "jsonOptionsSource conflict",
+				field: {
+					...createCheckboxField(createWorkflowValueOptionsSource({ workflowValueKey: sourceValueKey })),
+					jsonOptionsSource: createEpicsJsonOptionsSource(),
+				},
+				workflowValueKeys: declaredWorkflowValueKeys,
+			},
+		]
+
+		for (const invalidFieldCase of invalidFieldCases) {
+			const invalidState = new TaskState()
+			const result = await activateWorkflow(
+				invalidState,
+				createWorkflowWithField({
+					field: invalidFieldCase.field,
+					workflowValueKeys: invalidFieldCase.workflowValueKeys,
+				}),
+			)
+
+			expect(result, invalidFieldCase.label).to.deep.equal({ kind: "no_op" })
+			expect(invalidState.activeWorkflowName, invalidFieldCase.label).to.be.undefined
+			expect(invalidState.activeWorkflowSession, invalidFieldCase.label).to.be.undefined
 		}
 	})
 

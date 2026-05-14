@@ -506,6 +506,29 @@ If a changed file is already staged before Step 4 begins and it is not an allowe
 
 If no stageable files are found after project-record updates and allowed/user-selected file processing, Step 4 must route to `terminal_error` rather than creating an empty commit or reporting successful staging. The terminal error must identify the failed operation as staging and state that no allowed, selected, or required project-record files were stageable.
 
+### Step 4 Git Finalization Status Definitions
+
+The `prepare_staging` `WorkflowStepResolutionStatusDefinition` must use exactly:
+
+- `title`: `Prepare Staging`
+- `pendingLabel`: `Preparing staged files`
+- `successLabel`: `Prepared staged files`
+- `failureLabel`: `Failed to prepare staged files`
+
+The `stage_selected_unpermitted` `WorkflowStepResolutionStatusDefinition` must use exactly:
+
+- `title`: `Stage Selected Unpermitted Files`
+- `pendingLabel`: `Staging selected unpermitted files`
+- `successLabel`: `Staged selected unpermitted files`
+- `failureLabel`: `Failed to stage selected unpermitted files`
+
+The `commit_staged` `WorkflowStepResolutionStatusDefinition` must use exactly:
+
+- `title`: `Commit Staged Files`
+- `pendingLabel`: `Committing staged files`
+- `successLabel`: `Committed staged files`
+- `failureLabel`: `Failed to commit staged files`
+
 ### Step 4 Workflow Form
 
 Step 4 must use one same-session workflow form for final staging/commit confirmation.

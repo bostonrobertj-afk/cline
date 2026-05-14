@@ -371,88 +371,119 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DevStoryGitFinalizeToolHandler.test.ts`
 
+### Phase 3.5 - Workflow-Value Form Options Source
+
+After completing this phase, pause for QA review before moving to Phase 4.
+
+[x] Task 7. Add workflow-value-backed dynamic options for workflow forms.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 7.1. In `ExtensionMessage.ts`, add `workflowValueOptionsSource` to `WorkflowFormFieldDefinition` with exact shape `{ workflowValueKey: string; valueSource: "array_string_entry"; labelSource: "array_string_entry" }`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/shared/ExtensionMessage.ts`
+
+[x] Subtask 7.2. In `WorkflowRuntime.ts`, extend dynamic workflow-form option resolution so `workflowValueOptionsSource` is supported only for `dropdown`, `radio_group`, `multi_select`, and `checkbox_group`; reads the named workflow value from the active workflow session; requires a string array; and returns options whose `value` and `label` both equal each string entry with no `description`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 7.3. In `WorkflowRuntime.ts`, update workflow-definition validation so `workflowValueOptionsSource.workflowValueKey` must be non-empty, trimmed, declared in `workflowValueKeys`, and must not be combined with `selectorDiscovery` or `jsonOptionsSource`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 7.4. In `WorkflowRuntime.test.ts`, add coverage proving a checkbox group renders options from a workflow-value string array, rejects non-string-array workflow values during render, rejects undeclared workflow-value option keys during validation, and rejects combining `workflowValueOptionsSource` with `selectorDiscovery` or `jsonOptionsSource`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
 ### Phase 4 - Dev-Story Workflow Module
 
 After completing this phase, pause for QA review before moving to Phase 5.
 
-[ ] Task 7. Add the dev-story workflow module files.
+[ ] Task 8. Add the dev-story workflow module files.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryWorkflow.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/index.ts`
 
-[ ] Subtask 7.1. Create `devStoryWorkflow.ts` exporting the dev-story workflow definition, workflow value key constants, prerequisite constants, form constants, persona constants, and deterministic helper functions used by the module tests.
+[ ] Subtask 8.1. Create `devStoryWorkflow.ts` exporting the dev-story workflow definition, workflow value key constants, prerequisite constants, form constants, persona constants, and deterministic helper functions used by the module tests.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryWorkflow.ts`
 
-[ ] Subtask 7.2. In `devStoryWorkflow.ts`, define workflow identity exactly as `name: "dev-story"`, `slashCommandName: "dev-story"`, `useSkillName: "dev-story"`, `displayName: "dev-story"`, `projectSubfolder: "implementation"`, and `description: "In this workflow, a story's tasks and subtasks will be implemented through structured task execution. At the end of the workflow, the files touched during implementation will be staged and committed."`.
+[ ] Subtask 8.2. In `devStoryWorkflow.ts`, define workflow identity exactly as `name: "dev-story"`, `slashCommandName: "dev-story"`, `useSkillName: "dev-story"`, `displayName: "dev-story"`, `projectSubfolder: "implementation"`, and `description: "In this workflow, a story's tasks and subtasks will be implemented through structured task execution. At the end of the workflow, the files touched during implementation will be staged and committed."`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryWorkflow.ts`
 
-[ ] Subtask 7.3. In `devStoryWorkflow.ts`, define a module-owned developer persona with exactly these field values from `dev-story-requirements.md`: `name: "Amelia"`, `role: "Developer Agent"`, `identity: "describe executing approved stories precisely and following team standards"`, `communicationStyle: "ultra-succinct, using file paths and acceptance-criteria or task IDs with no fluff"`, `capabilities: ["story execution and code implementation"]`, and `principles: ["all tests must pass before review and that every task and subtask must be covered with unit tests before being marked complete"]`. Do not read legacy agent or workflow markdown files at runtime.
+[ ] Subtask 8.3. In `devStoryWorkflow.ts`, define a module-owned developer persona with exactly these field values from `dev-story-requirements.md`: `name: "Amelia"`, `role: "Developer Agent"`, `identity: "describe executing approved stories precisely and following team standards"`, `communicationStyle: "ultra-succinct, using file paths and acceptance-criteria or task IDs with no fluff"`, `capabilities: ["story execution and code implementation"]`, and `principles: ["all tests must pass before review and that every task and subtask must be covered with unit tests before being marked complete"]`. Do not read legacy agent or workflow markdown files at runtime.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryWorkflow.ts`
 
-[ ] Subtask 7.4. In `devStoryWorkflow.ts`, declare the full `workflowValueKeys` inventory from the requirements and `entryProjectValueKeys` for `projectMode`, `projectTitle`, and `projectFolderName`.
+[ ] Subtask 8.4. In `devStoryWorkflow.ts`, declare the full `workflowValueKeys` inventory from the requirements and `entryProjectValueKeys` for `projectMode`, `projectTitle`, and `projectFolderName`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryWorkflow.ts`
 
-[ ] Subtask 7.5. In `devStoryWorkflow.ts`, declare the single `target_story` prerequisite under `implementation/stories-backlog` using the approved story filename pattern and `outputDocumentReference: "none"`.
+[ ] Subtask 8.5. In `devStoryWorkflow.ts`, declare the single `target_story` prerequisite under `implementation/stories-backlog` using the approved story filename pattern and `outputDocumentReference: "none"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryWorkflow.ts`
 
-[ ] Subtask 7.6. In `devStoryWorkflow.ts`, implement Step 1 to resolve `target_story`, derive `target_story_filename`, `selected_story_identity`, `selected_story_type`, `epic_identity`, and `stories_index`, parse story sections and task inventory, persist workflow values, set `current_story_task_id` to the first incomplete task ID, and route parser/setup failures or a story with no incomplete tasks to `terminal_error`.
+[ ] Subtask 8.6. In `devStoryWorkflow.ts`, implement Step 1 to resolve `target_story`, derive `target_story_filename`, `selected_story_identity`, `selected_story_type`, `epic_identity`, and `stories_index`, parse story sections and task inventory, persist workflow values, set `current_story_task_id` to the first incomplete task ID, and route parser/setup failures or a story with no incomplete tasks to `terminal_error`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryWorkflow.ts`
 
-[ ] Subtask 7.7. In `devStoryWorkflow.ts`, implement Step 2 with two branch IDs: `step-2-initial-prompt` and `step-2-task-loop`. The `step-2-initial-prompt` branch must route `model_tool_succeeded` for `story_task_complete` to Step 3 when `story_task_inventory` is all complete, route the same event to `project_prompt` with `followingBranchId: "step-2-task-loop"` when incomplete tasks remain, and otherwise use an `always` route to project the initial full Step 2 prompt. The `step-2-task-loop` branch must route `model_tool_succeeded` for `story_task_complete` to Step 3 when all complete and to `project_prompt` when incomplete tasks remain. `buildPromptSource` must render the full approved Step 2 prompt plus current task detail when `activeBranchId` is `step-2-initial-prompt`, and render only the current task detail when `activeBranchId` is `step-2-task-loop`. Both current-task renderings must use the same formatter as `story_task_reminder`.
+[ ] Subtask 8.7. In `devStoryWorkflow.ts`, implement Step 2 with two branch IDs: `step-2-initial-prompt` and `step-2-task-loop`. The `step-2-initial-prompt` branch must route `model_tool_succeeded` for `story_task_complete` to Step 3 when `story_task_inventory` is all complete, route the same event to `project_prompt` with `followingBranchId: "step-2-task-loop"` when incomplete tasks remain, and otherwise use an `always` route to project the initial full Step 2 prompt. The `step-2-task-loop` branch must route `model_tool_succeeded` for `story_task_complete` to Step 3 when all complete and to `project_prompt` when incomplete tasks remain. `buildPromptSource` must render the full approved Step 2 prompt plus current task detail when `activeBranchId` is `step-2-initial-prompt`, and render only the current task detail when `activeBranchId` is `step-2-task-loop`. Both current-task renderings must use the same formatter as `story_task_reminder`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryWorkflow.ts`
 
-[ ] Subtask 7.8. In `devStoryWorkflow.ts`, implement Step 3 as model-driven final recap using the exact approved Step 3 prompt text from `dev-story-requirements.md`, with `attempt_completion` exposure and explicit `attempt_completion_succeeded` transition to Step 4.
+[ ] Subtask 8.8. In `devStoryWorkflow.ts`, implement Step 3 as model-driven final recap using the exact approved Step 3 prompt text from `dev-story-requirements.md`, with `attempt_completion` exposure and explicit `attempt_completion_succeeded` transition to Step 4.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryWorkflow.ts`
 
-[ ] Subtask 7.9. In `devStoryWorkflow.ts`, implement Step 4 routes in this order: validate derived story index, move story from `stories-backlog` to `stories-review`, update story index status to `review` with `expected_current_status: "backlog"`, run `dev_story_git_finalize` through `execute_tool_backed_operation` with `toolParams.operation = "prepare_staging"`, render the same-session Step 4 form at Panel A when unpermitted files exist or Panel B when none exist, run `dev_story_git_finalize` with `toolParams.operation = "stage_selected_unpermitted"` after Panel A submit, continue the same Step 4 workflow form session to Panel B after successful `stage_selected_unpermitted`, run `dev_story_git_finalize` with `toolParams.operation = "commit_staged"` after Panel B submit, complete the workflow after selected procedures finish, and route every failed move/status/git operation to `terminal_error`. Each `execute_tool_backed_operation` route for `dev_story_git_finalize` must use a complete `WorkflowToolBackedActionInstruction` with `toolName: ClineDefaultTool.DEV_STORY_GIT_FINALIZE`, `buildToolExecutionRequest(...)` returning `{ toolName: ClineDefaultTool.DEV_STORY_GIT_FINALIZE, toolInput: {}, toolParams: { operation: "<operation>" } }`, and `evaluateToolExecutionResult(...)` returning `{ succeeded: true }` when the handler result reaches evaluation. `buildStatusDefinition(...)` must use exact user-approved `WorkflowStepResolutionStatusDefinition` strings from `dev-story-requirements.md`; if those exact status strings are absent when implementing this subtask, stop and report the missing requirement instead of inventing UI-visible title, pending, success, or failure labels.
+[ ] Subtask 8.9. In `devStoryWorkflow.ts`, implement Step 4 routes in this order: validate derived story index, move story from `stories-backlog` to `stories-review`, update story index status to `review` with `expected_current_status: "backlog"`, run `dev_story_git_finalize` through `execute_tool_backed_operation` with `toolParams.operation = "prepare_staging"`, render the same-session Step 4 form at Panel A when unpermitted files exist or Panel B when none exist, run `dev_story_git_finalize` with `toolParams.operation = "stage_selected_unpermitted"` after Panel A submit, continue the same Step 4 workflow form session to Panel B after successful `stage_selected_unpermitted`, run `dev_story_git_finalize` with `toolParams.operation = "commit_staged"` after Panel B submit, complete the workflow after selected procedures finish, and route every failed move/status/git operation to `terminal_error`. Each `execute_tool_backed_operation` route for `dev_story_git_finalize` must use a complete `WorkflowToolBackedActionInstruction` with `toolName: ClineDefaultTool.DEV_STORY_GIT_FINALIZE`, `buildToolExecutionRequest(...)` returning `{ toolName: ClineDefaultTool.DEV_STORY_GIT_FINALIZE, toolInput: {}, toolParams: { operation: "<operation>" } }`, and `evaluateToolExecutionResult(...)` returning `{ succeeded: true }` when the handler result reaches evaluation. `buildStatusDefinition(...)` must use exact user-approved `WorkflowStepResolutionStatusDefinition` strings from `dev-story-requirements.md`; if those exact status strings are absent when implementing this subtask, stop and report the missing requirement instead of inventing UI-visible title, pending, success, or failure labels.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryWorkflow.ts`
 
-[ ] Subtask 7.10. In `devStoryWorkflow.ts`, configure Step 4 Panel A exactly as required: title `Unpermitted File Changes Detected`, `promptMarkdown: "The following file(s) were created or modified, and are not included in the target story's allowed files list. Please select any files below which should be included in the story's commit."`, one `checkbox_group` field with `key: "selected_unpermitted_file_paths"`, `workflowValueKey: "selected_unpermitted_file_paths"`, label `unpermitted files`, `required: false`, `allowedValueType: "array"`, unbounded selection, options from `unpermitted_file_paths`, option values equal to normalized git paths, option labels equal to the same normalized git paths, no descriptions, and submit action label `submit`.
+[ ] Subtask 8.10. In `devStoryWorkflow.ts`, configure Step 4 Panel A exactly as required: title `Unpermitted File Changes Detected`, `promptMarkdown: "The following file(s) were created or modified, and are not included in the target story's allowed files list. Please select any files below which should be included in the story's commit."`, one `checkbox_group` field with `key: "selected_unpermitted_file_paths"`, `workflowValueKey: "selected_unpermitted_file_paths"`, label `unpermitted files`, `required: false`, `allowedValueType: "array"`, unbounded selection, `workflowValueOptionsSource: { workflowValueKey: "unpermitted_file_paths", valueSource: "array_string_entry", labelSource: "array_string_entry" }`, option values equal to normalized git paths, option labels equal to the same normalized git paths, no descriptions, and submit action label `submit`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryWorkflow.ts`
 
-[ ] Subtask 7.11. In `devStoryWorkflow.ts`, configure Step 4 Panel B exactly as required: title `Commit Confirmation`, empty `promptMarkdown`, one boolean field with `key: "commit_staged_files"`, `workflowValueKey: "commit_staged_files"`, label `Would you like to commit the staged files?`, `required: true`, `allowedValueType: "boolean"`, `trueLabel: "Yes"`, `falseLabel: "No"`, and submit action label `submit`.
+[ ] Subtask 8.11. In `devStoryWorkflow.ts`, configure Step 4 Panel B exactly as required: title `Commit Confirmation`, empty `promptMarkdown`, one boolean field with `key: "commit_staged_files"`, `workflowValueKey: "commit_staged_files"`, label `Would you like to commit the staged files?`, `required: true`, `allowedValueType: "boolean"`, `trueLabel: "Yes"`, `falseLabel: "No"`, and submit action label `submit`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryWorkflow.ts`
 
-[ ] Subtask 7.12. Create `devStoryToolSchemas.ts` so Step 1 and Step 4 expose empty model-facing schemas; Step 2 exposes exactly `read_file`, `read_file_range`, `list_files`, `search_files`, `list_code_definition_names`, `apply_patch`, `execute_command`, `story_task_complete`, `request_task_detail`, `show_incomplete_tasks`, `ask_followup_question`, and `send_user_message`; Step 2 `story_task_complete` requires string `storyItemId` whose description states that it may identify a task or subtask from the target story document; Step 2 `request_task_detail` requires string `storyTaskId`; Step 2 `show_incomplete_tasks` has no parameters; and Step 3 exposes exactly `read_file`, `read_file_range`, `list_files`, `search_files`, `ask_followup_question`, `send_user_message`, and `attempt_completion`.
+[ ] Subtask 8.12. Create `devStoryToolSchemas.ts` so Step 1 and Step 4 expose empty model-facing schemas; Step 2 exposes exactly `read_file`, `read_file_range`, `list_files`, `search_files`, `list_code_definition_names`, `apply_patch`, `execute_command`, `story_task_complete`, `request_task_detail`, `show_incomplete_tasks`, `ask_followup_question`, and `send_user_message`; Step 2 `story_task_complete` requires string `storyItemId` whose description states that it may identify a task or subtask from the target story document; Step 2 `request_task_detail` requires string `storyTaskId`; Step 2 `show_incomplete_tasks` has no parameters; and Step 3 exposes exactly `read_file`, `read_file_range`, `list_files`, `search_files`, `ask_followup_question`, `send_user_message`, and `attempt_completion`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryToolSchemas.ts`
 
-[ ] Subtask 7.13. In `devStoryToolSchemas.ts`, explicitly exclude `set_workflow_values`, `update_story_index_status`, `move_workflow_project_file`, `dev_story_git_finalize`, `story_notes_update`, `story_testing_complete`, and workflow artifact tools from every dev-story model-facing schema.
+[ ] Subtask 8.13. In `devStoryToolSchemas.ts`, explicitly exclude `set_workflow_values`, `update_story_index_status`, `move_workflow_project_file`, `dev_story_git_finalize`, `story_notes_update`, `story_testing_complete`, and workflow artifact tools from every dev-story model-facing schema.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryToolSchemas.ts`
 
-[ ] Subtask 7.14. Create `index.ts` exporting the workflow definition, schema builders, value keys, prerequisite IDs, and form constants required by tests and registry wiring.
+[ ] Subtask 8.14. Create `index.ts` exporting the workflow definition, schema builders, value keys, prerequisite IDs, and form constants required by tests and registry wiring.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/index.ts`
 
-[ ] Task 8. Register the dev-story module and prompt projection.
+[ ] Task 9. Register the dev-story module and prompt projection.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
@@ -460,22 +491,22 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/__tests__/devStoryWorkflow.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/__tests__/devStoryToolSchemas.test.ts`
 
-[ ] Subtask 8.1. In `WorkflowRegistry.ts`, import the dev-story workflow module and add it to `shippedWorkflowDefinitions`.
+[ ] Subtask 9.1. In `WorkflowRegistry.ts`, import the dev-story workflow module and add it to `shippedWorkflowDefinitions`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 
-[ ] Subtask 8.2. Create `devStoryWorkflow.test.ts` covering workflow identity, entry panel description shape, registry resolution by `dev-story`, registry rejection of `dev-story.md`, prerequisite declaration, value inventory, Step 1 setup routes, story metadata derivation, Step 2 progression, Step 3 completion route, Step 4 move/status/git/final-form routes, Panel A/B field shapes, and terminal-error routing. Test helpers must return explicit `ActiveWorkflowSession`, `WorkflowPromptBuilderInput`, and `WorkflowBranchTriggerEvent` values; do not use `as never` or incomplete event objects. Any `workflow_form_panel_submitted` event fixture must include `workflowFormId`, `panelId`, `action`, `submittedValueKeys`, and `clearedValueKeys`. Any `tool_backed_operation_succeeded` or `tool_backed_operation_failed` event fixture must include a complete `sourceRoute: { branchId, routeId }`; failed events must include `errorMessage` when the test asserts terminal-error content. Include Step 2 routing tests proving `step-2-initial-prompt` projects a non-empty full Step 2 prompt plus current task detail without asserting exact prompt prose, ordinary subtask completion that leaves the parent incomplete does not project task detail, parent completion with remaining tasks switches to `step-2-task-loop` and renders only the next unlocked task and that task's subtasks without asserting exact prompt prose or resending the full Step 2 prompt, repeated task-loop parent completions continue rendering task-detail-only prompts while incomplete tasks remain, and all-complete state transitions to Step 3.
+[ ] Subtask 9.2. Create `devStoryWorkflow.test.ts` covering workflow identity, entry panel description shape, registry resolution by `dev-story`, registry rejection of `dev-story.md`, prerequisite declaration, value inventory, Step 1 setup routes, story metadata derivation, Step 2 progression, Step 3 completion route, Step 4 move/status/git/final-form routes, Panel A/B field shapes, and terminal-error routing. Test helpers must return explicit `ActiveWorkflowSession`, `WorkflowPromptBuilderInput`, and `WorkflowBranchTriggerEvent` values; do not use `as never` or incomplete event objects. Any `workflow_form_panel_submitted` event fixture must include `workflowFormId`, `panelId`, `action`, `submittedValueKeys`, and `clearedValueKeys`. Any `tool_backed_operation_succeeded` or `tool_backed_operation_failed` event fixture must include a complete `sourceRoute: { branchId, routeId }`; failed events must include `errorMessage` when the test asserts terminal-error content. Include Step 2 routing tests proving `step-2-initial-prompt` projects a non-empty full Step 2 prompt plus current task detail without asserting exact prompt prose, ordinary subtask completion that leaves the parent incomplete does not project task detail, parent completion with remaining tasks switches to `step-2-task-loop` and renders only the next unlocked task and that task's subtasks without asserting exact prompt prose or resending the full Step 2 prompt, repeated task-loop parent completions continue rendering task-detail-only prompts while incomplete tasks remain, and all-complete state transitions to Step 3.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/__tests__/devStoryWorkflow.test.ts`
 
-[ ] Subtask 8.3. Create `devStoryToolSchemas.test.ts` covering Step 2 required tool exposure, Step 2 story-tool parameter schemas, Step 3 `attempt_completion` exposure, empty Step 1/Step 4 schemas, and forbidden tool absence from every model-facing dev-story schema.
+[ ] Subtask 9.3. Create `devStoryToolSchemas.test.ts` covering Step 2 required tool exposure, Step 2 story-tool parameter schemas, Step 3 `attempt_completion` exposure, empty Step 1/Step 4 schemas, and forbidden tool absence from every model-facing dev-story schema.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/__tests__/devStoryToolSchemas.test.ts`
 
-[ ] Subtask 8.4. In `integration.test.ts`, add dev-story prompt-projection coverage that asserts active dev-story projects current step details in the input workflow block, projects Step 2 tool names only while dev-story Step 2 is active, and does not assert exact editable prompt prose.
+[ ] Subtask 9.4. In `integration.test.ts`, add dev-story prompt-projection coverage that asserts active dev-story projects current step details in the input workflow block, projects Step 2 tool names only while dev-story Step 2 is active, and does not assert exact editable prompt prose.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
@@ -484,7 +515,7 @@ Allowed files:
 
 After completing this phase, pause for QA review before treating the dev-story module build as complete.
 
-[ ] Task 9. Delete retired legacy dev-story package files.
+[ ] Task 10. Delete retired legacy dev-story package files.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-dev-story/SKILL.md`
@@ -492,27 +523,27 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-dev-story/workflow.md`
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-dev-story/bmad-skill-manifest.yaml`
 
-[ ] Subtask 9.1. Delete `.cline/skills/bmad-dev-story/SKILL.md`.
+[ ] Subtask 10.1. Delete `.cline/skills/bmad-dev-story/SKILL.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-dev-story/SKILL.md`
 
-[ ] Subtask 9.2. Delete `.cline/skills/bmad-dev-story/checklist.md`.
+[ ] Subtask 10.2. Delete `.cline/skills/bmad-dev-story/checklist.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-dev-story/checklist.md`
 
-[ ] Subtask 9.3. Delete `.cline/skills/bmad-dev-story/workflow.md`.
+[ ] Subtask 10.3. Delete `.cline/skills/bmad-dev-story/workflow.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-dev-story/workflow.md`
 
-[ ] Subtask 9.4. Delete `.cline/skills/bmad-dev-story/bmad-skill-manifest.yaml`.
+[ ] Subtask 10.4. Delete `.cline/skills/bmad-dev-story/bmad-skill-manifest.yaml`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-dev-story/bmad-skill-manifest.yaml`
 
-[ ] Task 10. Add final regression guards for retired dev-story runtime assets.
+[ ] Task 11. Add final regression guards for retired dev-story runtime assets.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/__tests__/devStoryWorkflow.test.ts`
@@ -520,32 +551,32 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/story-tools/__tests__/storyTaskDocument.test.ts`
 
-[ ] Subtask 10.1. In `devStoryWorkflow.test.ts`, add negative coverage proving the dev-story workflow does not reference legacy BMAD package paths, `## Tasks / Subtasks`, retired prompt-state fields, or `stories_index` as a prerequisite. Retired prompt-state checks must use string-literal key scans or serialized workflow-definition checks; do not import deleted or migrated runtime fields.
+[ ] Subtask 11.1. In `devStoryWorkflow.test.ts`, add negative coverage proving the dev-story workflow does not reference legacy BMAD package paths, `## Tasks / Subtasks`, retired prompt-state fields, or `stories_index` as a prerequisite. Retired prompt-state checks must use string-literal key scans or serialized workflow-definition checks; do not import deleted or migrated runtime fields.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/__tests__/devStoryWorkflow.test.ts`
 
-[ ] Subtask 10.2. In `devStoryToolSchemas.test.ts`, add negative coverage proving `story_notes_update`, `story_testing_complete`, `set_workflow_values`, `update_story_index_status`, `move_workflow_project_file`, and `dev_story_git_finalize` are absent from model-facing dev-story schemas. Retired tool checks must use string literals for deleted enum members and must not import enum members removed in Phase 2.
+[ ] Subtask 11.2. In `devStoryToolSchemas.test.ts`, add negative coverage proving `story_notes_update`, `story_testing_complete`, `set_workflow_values`, `update_story_index_status`, `move_workflow_project_file`, and `dev_story_git_finalize` are absent from model-facing dev-story schemas. Retired tool checks must use string literals for deleted enum members and must not import enum members removed in Phase 2.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/dev-story/__tests__/devStoryToolSchemas.test.ts`
 
-[ ] Subtask 10.3. In `DevStoryStoryTools.test.ts`, add negative coverage proving retired story tools cannot be executed through registered handlers. Because `story_notes_update` and `story_testing_complete` enum members are deleted in Phase 2, tests must use the string literals `"story_notes_update"` and `"story_testing_complete"` with registry/coordinator lookup APIs that accept string tool names, not deleted enum references. Do not construct `ToolUse` objects for retired tool names because `ToolUse.name` is typed as `ClineDefaultTool`.
+[ ] Subtask 11.3. In `DevStoryStoryTools.test.ts`, add negative coverage proving retired story tools cannot be executed through registered handlers. Because `story_notes_update` and `story_testing_complete` enum members are deleted in Phase 2, tests must use the string literals `"story_notes_update"` and `"story_testing_complete"` with registry/coordinator lookup APIs that accept string tool names, not deleted enum references. Do not construct `ToolUse` objects for retired tool names because `ToolUse.name` is typed as `ClineDefaultTool`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts`
 
-[ ] Subtask 10.4. In `storyTaskDocument.test.ts`, add negative coverage proving a story document with only `## Tasks / Subtasks` is rejected.
+[ ] Subtask 11.4. In `storyTaskDocument.test.ts`, add negative coverage proving a story document with only `## Tasks / Subtasks` is rejected.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/story-tools/__tests__/storyTaskDocument.test.ts`
 
-[ ] Task 11. Retire stale dev-story implementation planning notes.
+[ ] Task 12. Retire stale dev-story implementation planning notes.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/dev-story/dev-story-implementation.md`
 
-[ ] Subtask 11.1. Replace the contents of `dev-story-implementation.md` with a short supersession note that points to `dev-story-requirements.md` and `action-plan.md` as the controlling dev-story module-build documents and does not include retired tool names, retired prompt-state field names, legacy package paths, or the source markdown path.
+[ ] Subtask 12.1. Replace the contents of `dev-story-implementation.md` with a short supersession note that points to `dev-story-requirements.md` and `action-plan.md` as the controlling dev-story module-build documents and does not include retired tool names, retired prompt-state field names, legacy package paths, or the source markdown path.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/dev-story/dev-story-implementation.md`
@@ -568,6 +599,12 @@ Phase 2 validation:
 Phase 3 validation:
 
 1. Run `npm run test:unit -- src/core/task/tools/handlers/__tests__/DevStoryGitFinalizeToolHandler.test.ts`.
+2. Run `npm run check-types`.
+3. Run `npm run lint`.
+
+Phase 3.5 validation:
+
+1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`.
 2. Run `npm run check-types`.
 3. Run `npm run lint`.
 
