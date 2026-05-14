@@ -1,232 +1,290 @@
 import { expect } from "chai"
 import { describe, it } from "mocha"
 import {
-	appendStorySectionEntry,
+	areAllStoryTasksComplete,
 	buildCurrentStoryTaskPrompt,
-	buildDevStoryWorkflowStartPrompt,
 	completeStoryChecklistItem,
-	markStoryStatusReview,
+	DevStoryParseFailureReason,
+	DevStorySectionKey,
+	formatStoryTaskDetail,
+	getAllowedFileEntriesForCompletedStory,
+	getFirstIncompleteStoryTaskDetail,
+	getIncompleteStoryTaskSummaries,
+	getStoryTaskDetailById,
+	parseDevStoryDocument,
+	parseDevStoryRequiredSections,
+	parseDevStoryTasks,
 } from "../storyTaskDocument"
 
-describe("storyTaskDocument", () => {
-	it("extracts only acceptance criteria and latest review findings for workflow-start context", () => {
-		const storyMarkdown = `# Story 1.0
+const storyFrontmatter = `# Story 1.2
 Status: ready-for-dev
 
-## Acceptance Criteria
-- AC 1
-- AC 2
+## General Instructions
+Follow the repo plan.
+Keep edits scoped.
 
-## Tasks / Subtasks
-- [ ] First task
+## Objective
+Implement the parser.
 
-## Latest Review Findings
-- Fix the edge case
+## Scope
+- Runtime parser
+- Tool helpers
 
-## Testing Requirements
-- Run the tests
+## Scope Boundary
+- Do not edit workflow source.
+
+## Requirements
+- Preserve raw task lines.
+
+## Known Issues/ Risks/ Technical Debt
+- Existing legacy handlers remain until Phase 2.
 `
 
-		expect(buildDevStoryWorkflowStartPrompt(storyMarkdown)).to.equal(`### WORKFLOW START CONTEXT
+function buildStoryMarkdown(tasks: string): string {
+	return `${storyFrontmatter}
+${tasks}`
+}
 
-## Acceptance Criteria
-- AC 1
-- AC 2
+describe("storyTaskDocument", () => {
+	it("extracts required dev-story sections as raw content strings", () => {
+		const result = parseDevStoryRequiredSections(
+			buildStoryMarkdown(`## Tasks
+- [ ] Task 1. Implement parser
+`),
+		)
 
-## Latest Review Findings
-- Fix the edge case`)
+		expect(result.ok).to.equal(true)
+		if (!result.ok) {
+			throw new Error(result.message)
+		}
+
+		expect(result.sections).to.deep.equal({
+			[DevStorySectionKey.GeneralInstructions]: "Follow the repo plan.\nKeep edits scoped.",
+			[DevStorySectionKey.Objective]: "Implement the parser.",
+			[DevStorySectionKey.Scope]: "- Runtime parser\n- Tool helpers",
+			[DevStorySectionKey.ScopeBoundary]: "- Do not edit workflow source.",
+			[DevStorySectionKey.Requirements]: "- Preserve raw task lines.",
+			[DevStorySectionKey.Issues]: "- Existing legacy handlers remain until Phase 2.",
+		})
 	})
 
-	it("builds the first incomplete task prompt with 1-based runtime ids", () => {
-		const storyMarkdown = `# Story 1.0
-Status: ready-for-dev
+	it("parses only ## Tasks and preserves explicit IDs, raw lines, completion state, and allowed files", () => {
+		const result = parseDevStoryDocument(
+			buildStoryMarkdown(`## Tasks / Subtasks
+- [ ] Task 9. Legacy heading must not be parsed
 
-## Tasks / Subtasks
-- [x] Completed task
-  - [x] Completed subtask
-- [ ] Implement prompt injection
-  - [ ] Parse the story file
-  - [x] Preserve runtime-only ids
-- [ ] Later task
-  - [ ] Do not include this subtask
-`
+## Tasks
+- [x] Task 1. Build parser
+  Allowed files:
+  - \`src/core/task/story-tools/storyTaskDocument.ts\`
+  - [x] Subtask 1.1. Read only tasks
+    Allowed files:
+    - \`src/core/task/story-tools/storyTaskDocument.ts\`
+  - [ ] Subtask 1.2. Preserve raw subtask line
+    Allowed files:
+    - "src/core/task/story-tools/__tests__/storyTaskDocument.test.ts"
+- [ ] Task 2. Add handlers
+  - [ ] Subtask 2.1. Use target_story
+`),
+		)
 
-		const result = buildCurrentStoryTaskPrompt(storyMarkdown)
+		expect(result.ok).to.equal(true)
+		if (!result.ok) {
+			throw new Error(result.message)
+		}
 
-		expect(result).to.deep.equal({
-			storyTaskId: "2",
-			storySubtaskIds: ["1", "2"],
-			promptKey: "2:1,2:- [ ] Implement prompt injection",
-			promptText: `### CURRENT TASKS / SUBTASKS
+		expect(result.document.tasks).to.have.length(2)
+		expect(result.document.tasks[0]).to.deep.include({
+			id: "1",
+			rawLine: "- [x] Task 1. Build parser",
+			completed: true,
+		})
+		expect(result.document.tasks[0].subtasks[0]).to.deep.include({
+			id: "1.1",
+			rawLine: "  - [x] Subtask 1.1. Read only tasks",
+			completed: true,
+		})
+		expect(result.document.tasks[0].subtasks[1]).to.deep.include({
+			id: "1.2",
+			rawLine: "  - [ ] Subtask 1.2. Preserve raw subtask line",
+			completed: false,
+		})
+		expect(result.document.tasks[0].allowedFiles.map((entry) => entry.path)).to.deep.equal([
+			"src/core/task/story-tools/storyTaskDocument.ts",
+		])
+		expect(result.document.tasks[0].subtasks[1].allowedFiles.map((entry) => entry.path)).to.deep.equal([
+			"src/core/task/story-tools/__tests__/storyTaskDocument.test.ts",
+		])
+	})
+
+	it("returns a typed parser failure with the invalid raw task line when an explicit task ID is missing", () => {
+		const result = parseDevStoryTasks(`## Tasks
+- [ ] Implement parser without an ID
+`)
+
+		expect(result.ok).to.equal(false)
+		if (result.ok) {
+			throw new Error("Expected parser failure.")
+		}
+
+		expect(result.reason).to.equal(DevStoryParseFailureReason.InvalidTaskId)
+		if (result.reason !== DevStoryParseFailureReason.InvalidTaskId) {
+			throw new Error(`Expected ${DevStoryParseFailureReason.InvalidTaskId}.`)
+		}
+		expect(result.invalidRawLine).to.equal("- [ ] Implement parser without an ID")
+	})
+
+	it("returns a typed parser failure with the invalid raw subtask line when an explicit subtask ID is missing", () => {
+		const result = parseDevStoryTasks(`## Tasks
+- [ ] Task 1. Implement parser
+  - [ ] Missing subtask ID
+`)
+
+		expect(result.ok).to.equal(false)
+		if (result.ok) {
+			throw new Error("Expected parser failure.")
+		}
+
+		expect(result.reason).to.equal(DevStoryParseFailureReason.InvalidSubtaskId)
+		if (result.reason !== DevStoryParseFailureReason.InvalidSubtaskId) {
+			throw new Error(`Expected ${DevStoryParseFailureReason.InvalidSubtaskId}.`)
+		}
+		expect(result.invalidRawLine).to.equal("  - [ ] Missing subtask ID")
+	})
+
+	it("returns the first incomplete task detail and formats the same raw task and subtask lines", () => {
+		const storyMarkdown = buildStoryMarkdown(`## Tasks
+- [x] Task 1. Completed parser setup
+  - [x] Subtask 1.1. Already done
+- [ ] Task 2. Implement handlers
+  - [ ] Subtask 2.1. Use target_story
+  - [x] Subtask 2.2. Preserve completed subtasks
+`)
+		const parsed = parseDevStoryDocument(storyMarkdown)
+
+		expect(parsed.ok).to.equal(true)
+		if (!parsed.ok) {
+			throw new Error(parsed.message)
+		}
+
+		const detail = getFirstIncompleteStoryTaskDetail(parsed.document)
+		expect(detail).to.deep.include({
+			taskId: "2",
+			rawTaskLine: "- [ ] Task 2. Implement handlers",
+			completed: false,
+		})
+		if (detail === undefined) {
+			throw new Error("Expected first incomplete task detail.")
+		}
+
+		expect(formatStoryTaskDetail(detail)).to.equal(`### CURRENT STORY TASK
 
 storyTaskId: 2
-- [ ] Implement prompt injection
+- [ ] Task 2. Implement handlers
 
-storySubtaskId: 1
-  - [ ] Parse the story file
+storySubtaskId: 2.1
+  - [ ] Subtask 2.1. Use target_story
 
-storySubtaskId: 2
-  - [x] Preserve runtime-only ids`,
-		})
-	})
-
-	it("auto-completes the parent task after the last incomplete subtask is completed", () => {
-		const storyMarkdown = `# Story 1.0
-Status: ready-for-dev
-
-## Tasks / Subtasks
-- [ ] Implement prompt injection
-  - [x] Parse the story file
-  - [ ] Preserve runtime-only ids
-`
-
-		const result = completeStoryChecklistItem({
-			storyMarkdown,
-			storyTaskId: "1",
-			storySubtaskId: "2",
-		})
-
-		expect(result).to.deep.equal({
-			updatedMarkdown: `# Story 1.0
-Status: ready-for-dev
-
-## Tasks / Subtasks
-- [x] Implement prompt injection
-  - [x] Parse the story file
-  - [x] Preserve runtime-only ids
-`,
-			manualPatch: `- [x] Implement prompt injection
-  - [x] Preserve runtime-only ids`,
-		})
-	})
-
-	it("rejects direct parent completion while subtasks remain unchecked", () => {
-		const storyMarkdown = `# Story 1.0
-Status: ready-for-dev
-
-## Tasks / Subtasks
-- [ ] Implement prompt injection
-  - [x] Parse the story file
-  - [ ] Preserve runtime-only ids
-`
-
-		const result = completeStoryChecklistItem({
-			storyMarkdown,
-			storyTaskId: "1",
-		})
-
-		expect(result).to.deep.equal({
-			error: "Cannot complete story task 1 directly while it still has incomplete subtasks. Complete each remaining subtask first.",
-		})
-	})
-
-	it("allows direct parent completion for a task with no subtasks", () => {
-		const storyMarkdown = `# Story 1.0
-Status: ready-for-dev
-
-## Tasks / Subtasks
-- [ ] Implement prompt injection
-`
-
-		const result = completeStoryChecklistItem({
-			storyMarkdown,
-			storyTaskId: "1",
-		})
-
-		expect(result).to.deep.equal({
-			updatedMarkdown: `# Story 1.0
-Status: ready-for-dev
-
-## Tasks / Subtasks
-- [x] Implement prompt injection
-`,
-			manualPatch: "- [x] Implement prompt injection",
-		})
-	})
-
-	it("appends entries to completion notes and file list sections without rewriting prior content", () => {
-		const storyMarkdown = `# Story 1.0
-Status: ready-for-dev
-
-## Completion Notes List
-- Existing note
-
-## File List
-- src/existing.ts
-`
-
-		const notesResult = appendStorySectionEntry({
-			storyMarkdown,
-			sectionHeading: "## Completion Notes List",
-			entry: "- Added note",
-		})
-		const filesResult = appendStorySectionEntry({
-			storyMarkdown,
-			sectionHeading: "## File List",
-			entry: "- src/new-file.ts",
-		})
-
-		expect(notesResult).to.deep.equal({
-			updatedMarkdown: `# Story 1.0
-Status: ready-for-dev
-
-## Completion Notes List
-- Existing note
-
-- Added note
-## File List
-- src/existing.ts
-`,
-			manualPatch: `## Completion Notes List
-- Added note`,
-		})
-		expect(filesResult).to.deep.equal({
-			updatedMarkdown: `# Story 1.0
-Status: ready-for-dev
-
-## Completion Notes List
-- Existing note
-
-## File List
-- src/existing.ts
-
-- src/new-file.ts`,
-			manualPatch: `## File List
-- src/new-file.ts`,
-		})
-	})
-
-	it("replaces the first status line with review", () => {
-		const storyMarkdown = `# Story 1.0
-Status: ready-for-dev
-
-## Tasks / Subtasks
-- [ ] Implement prompt injection
-`
-
-		expect(markStoryStatusReview(storyMarkdown)).to.deep.equal({
-			updatedMarkdown: `# Story 1.0
-Status: review
-
-## Tasks / Subtasks
-- [ ] Implement prompt injection
-`,
-			manualPatch: "Status: review",
-		})
-	})
-
-	it("returns a parse error for unsupported nested indentation deeper than one subtask level", () => {
-		const storyMarkdown = `# Story 1.0
-Status: ready-for-dev
-
-## Tasks / Subtasks
-- [ ] Implement prompt injection
-  - [ ] Parse the story file
-    - [ ] Unsupported nested checklist item
-`
-
+storySubtaskId: 2.2
+  - [x] Subtask 2.2. Preserve completed subtasks`)
 		expect(buildCurrentStoryTaskPrompt(storyMarkdown)).to.deep.equal({
-			error: "Unsupported nested story checklist indentation deeper than one subtask level.",
+			storyTaskId: "2",
+			storySubtaskIds: ["2.1", "2.2"],
+			promptKey: "2:2.1,2.2:- [ ] Task 2. Implement handlers",
+			promptText: formatStoryTaskDetail(detail),
+		})
+	})
+
+	it("returns task detail by task ID for complete and incomplete tasks", () => {
+		const parsed = parseDevStoryDocument(
+			buildStoryMarkdown(`## Tasks
+- [x] Task 1. Completed parser setup
+  - [x] Subtask 1.1. Already done
+- [ ] Task 2. Implement handlers
+  - [ ] Subtask 2.1. Use target_story
+`),
+		)
+
+		expect(parsed.ok).to.equal(true)
+		if (!parsed.ok) {
+			throw new Error(parsed.message)
+		}
+
+		expect(getStoryTaskDetailById(parsed.document, "1")).to.deep.include({
+			taskId: "1",
+			rawTaskLine: "- [x] Task 1. Completed parser setup",
+			completed: true,
+		})
+		expect(getStoryTaskDetailById(parsed.document, "2")).to.deep.include({
+			taskId: "2",
+			rawTaskLine: "- [ ] Task 2. Implement handlers",
+			completed: false,
+		})
+		expect(getStoryTaskDetailById(parsed.document, "3")).to.equal(undefined)
+	})
+
+	it("returns incomplete summaries, all-complete status, and allowed-file entries", () => {
+		const parsed = parseDevStoryDocument(
+			buildStoryMarkdown(`## Tasks
+- [x] Task 1. Completed parser setup
+  - [x] Subtask 1.1. Already done
+    Allowed files:
+    - \`src/completed.ts\`
+- [ ] Task 2. Implement handlers
+  - [x] Subtask 2.1. Use target_story
+  - [ ] Subtask 2.2. Return progress metadata
+    Allowed files:
+    - \`src/incomplete.ts\`
+- [ ] Task 3. Direct task
+  Allowed files:
+  - \`src/task-only.ts\`
+`),
+		)
+
+		expect(parsed.ok).to.equal(true)
+		if (!parsed.ok) {
+			throw new Error(parsed.message)
+		}
+
+		expect(getIncompleteStoryTaskSummaries(parsed.document)).to.deep.equal([
+			{ taskId: "2", incompleteSubtaskIds: ["2.2"] },
+			{ taskId: "3", incompleteSubtaskIds: [] },
+		])
+		expect(areAllStoryTasksComplete(parsed.document)).to.equal(false)
+		expect(getAllowedFileEntriesForCompletedStory(parsed.document).map((entry) => entry.path)).to.deep.equal([
+			"src/completed.ts",
+			"src/incomplete.ts",
+			"src/task-only.ts",
+		])
+	})
+
+	it("reports all-complete status and completion metadata after story item updates", () => {
+		const storyMarkdown = buildStoryMarkdown(`## Tasks
+- [ ] Task 1. Finish parser
+  - [x] Subtask 1.1. Existing work
+  - [ ] Subtask 1.2. Final work
+`)
+
+		const result = completeStoryChecklistItem({
+			storyMarkdown,
+			storyItemId: "1.2",
+		})
+
+		expect(result).to.deep.equal({
+			updatedMarkdown: buildStoryMarkdown(`## Tasks
+- [x] Task 1. Finish parser
+  - [x] Subtask 1.1. Existing work
+  - [x] Subtask 1.2. Final work
+`),
+			manualPatch: `- [x] Task 1. Finish parser
+  - [x] Subtask 1.2. Final work`,
+			progress: {
+				completedStoryItemId: "1.2",
+				completedItemKind: "subtask",
+				parentTaskId: "1",
+				parentTaskComplete: true,
+				allStoryTasksComplete: true,
+			},
 		})
 	})
 })

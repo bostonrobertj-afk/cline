@@ -30,9 +30,11 @@ import { PlanStoryArtifactsToolHandler } from "./handlers/PlanStoryArtifactsTool
 import { ReadFileRangeToolHandler } from "./handlers/ReadFileRangeToolHandler"
 import { ReadFileToolHandler } from "./handlers/ReadFileToolHandler"
 import { ReportBugHandler } from "./handlers/ReportBugHandler"
+import { RequestTaskDetailToolHandler } from "./handlers/RequestTaskDetailToolHandler"
 import { SearchFilesToolHandler } from "./handlers/SearchFilesToolHandler"
 import { SendUserMessageHandler } from "./handlers/SendUserMessageHandler"
 import { SetWorkflowValuesToolHandler } from "./handlers/SetWorkflowValuesToolHandler"
+import { ShowIncompleteTasksToolHandler } from "./handlers/ShowIncompleteTasksToolHandler"
 import { StoryNotesUpdateToolHandler } from "./handlers/StoryNotesUpdateToolHandler"
 import { StoryTaskCompleteToolHandler } from "./handlers/StoryTaskCompleteToolHandler"
 import { StoryTaskReminderToolHandler } from "./handlers/StoryTaskReminderToolHandler"
@@ -146,6 +148,8 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: (_v: ToolValidator) => new CodeReviewSpecUpdateToolHandler(),
 		[ClineDefaultTool.STORY_TASK_REMINDER]: (_v: ToolValidator) => new StoryTaskReminderToolHandler(),
 		[ClineDefaultTool.STORY_TASK_COMPLETE]: (_v: ToolValidator) => new StoryTaskCompleteToolHandler(),
+		[ClineDefaultTool.REQUEST_TASK_DETAIL]: (_v: ToolValidator) => new RequestTaskDetailToolHandler(),
+		[ClineDefaultTool.SHOW_INCOMPLETE_TASKS]: (_v: ToolValidator) => new ShowIncompleteTasksToolHandler(),
 		[ClineDefaultTool.STORY_NOTES_UPDATE]: (_v: ToolValidator) => new StoryNotesUpdateToolHandler(),
 		[ClineDefaultTool.STORY_TESTING_COMPLETE]: (_v: ToolValidator) => new StoryTestingCompleteToolHandler(),
 		[ClineDefaultTool.USE_SUBAGENTS]: (_v: ToolValidator) => new UseSubagentsToolHandler(),

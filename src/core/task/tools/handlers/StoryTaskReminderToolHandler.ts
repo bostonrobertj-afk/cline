@@ -1,13 +1,33 @@
 import type { ToolUse } from "@core/assistant-message"
 import { formatResponse } from "@core/prompts/responses"
 import fs from "fs/promises"
-import { buildCurrentStoryTaskPrompt } from "@/core/task/story-tools/storyTaskDocument"
+import {
+	buildCurrentStoryTaskPrompt,
+	DEV_STORY_WORKFLOW_NAME,
+	resolveActiveStoryPath,
+} from "@/core/task/story-tools/storyTaskDocument"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { ToolResponse } from "../../index"
 import type { IPartialBlockHandler, IToolHandler } from "../ToolExecutorCoordinator"
 import type { TaskConfig } from "../types/TaskConfig"
 import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
-import { resolveStoryPathFromTaskState } from "./StoryTaskCompleteToolHandler"
+
+function resolveDevStoryTargetStoryPath(config: TaskConfig): { storyPath: string } | { errorMessage: string } {
+	const session = config.taskState.activeWorkflowSession
+	if (config.taskState.activeWorkflowName !== DEV_STORY_WORKFLOW_NAME || session === undefined) {
+		return { errorMessage: "requires an active dev-story workflow session." }
+	}
+
+	const resolvedStoryPath = resolveActiveStoryPath({
+		cwd: config.cwd,
+		workflowValues: session.workflowValues,
+	})
+	if (!resolvedStoryPath.ok) {
+		return { errorMessage: resolvedStoryPath.message }
+	}
+
+	return { storyPath: resolvedStoryPath.storyPath }
+}
 
 export class StoryTaskReminderToolHandler implements IToolHandler, IPartialBlockHandler {
 	readonly name = ClineDefaultTool.STORY_TASK_REMINDER
@@ -21,21 +41,23 @@ export class StoryTaskReminderToolHandler implements IToolHandler, IPartialBlock
 	}
 
 	async execute(config: TaskConfig, _block: ToolUse): Promise<ToolResponse> {
-		const resolvedStoryPath = resolveStoryPathFromTaskState(config)
+		const resolvedStoryPath = resolveDevStoryTargetStoryPath(config)
 		if ("errorMessage" in resolvedStoryPath) {
-			return formatResponse.toolError(resolvedStoryPath.errorMessage)
+			return formatResponse.toolError(`story_task_reminder failed: ${resolvedStoryPath.errorMessage}`)
 		}
 
 		try {
 			const storyMarkdown = await fs.readFile(resolvedStoryPath.storyPath, "utf8")
 			const promptPayload = buildCurrentStoryTaskPrompt(storyMarkdown)
 			if ("error" in promptPayload) {
-				return formatResponse.toolError(promptPayload.error)
+				return formatResponse.toolError(`story_task_reminder failed: ${promptPayload.error}`)
 			}
 
 			return formatResponse.toolResult(promptPayload.promptText)
 		} catch (error) {
-			return formatResponse.toolError(error instanceof Error ? error.message : String(error))
+			return formatResponse.toolError(
+				`story_task_reminder failed: ${error instanceof Error ? error.message : String(error)}`,
+			)
 		}
 	}
 }

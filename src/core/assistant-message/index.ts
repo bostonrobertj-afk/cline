@@ -77,6 +77,8 @@ export const toolParamNames = [
 	"to_ref",
 	"skill_name",
 	"item_id",
+	"storyItemId",
+	"storyTaskId",
 	"prompt_1",
 	"prompt_2",
 	"prompt_3",

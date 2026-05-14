@@ -87,6 +87,8 @@ const RESPONSE_TOOL_METADATA: Record<ClineDefaultTool, ResponseToolMetadata | un
 	[ClineDefaultTool.USE_SKILL]: undefined,
 	[ClineDefaultTool.STORY_TASK_REMINDER]: undefined,
 	[ClineDefaultTool.STORY_TASK_COMPLETE]: undefined,
+	[ClineDefaultTool.REQUEST_TASK_DETAIL]: undefined,
+	[ClineDefaultTool.SHOW_INCOMPLETE_TASKS]: undefined,
 	[ClineDefaultTool.STORY_NOTES_UPDATE]: undefined,
 	[ClineDefaultTool.STORY_TESTING_COMPLETE]: undefined,
 	[ClineDefaultTool.SET_WORKFLOW_VALUES]: undefined,

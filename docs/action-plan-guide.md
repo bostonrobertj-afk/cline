@@ -62,6 +62,9 @@ Include this exact frontmatter at the top of every action plan document:
 - Subtasks must never prescribe more than ONE required revision
 - Each task & subtasks should have clearly defined allowed files for the prescribed edit.
 - You must not leave decision space to the agent who will implement the action plan. As the action plan author, it is your job to review runtime code, identify the complete and correct necessary revisions, and prescribe those revisions clearly within the action plan. This includes test fixtures associated with any runtime code that is being revised, removed, or added.
+- Every code/test subtask must be compile-path reviewed before it is written. The action-plan author must inspect the target runtime file, target test file, adjacent sibling patterns, and relevant shared types to identify TypeScript constraints the dev agent will encounter.
+- If a subtask touches parsed JSON, `unknown`, discriminated unions, optional properties, workflow values, tool params/results, schema objects, event objects, persisted metadata, stubs, mocks, fixtures, or helper return types, the subtask must prescribe the exact compile-safe type narrowing, object construction, or fixture shape required.
+- Do not leave TypeScript narrowing, union discrimination, fixture typing, or helper return typing for the dev agent to discover during validation.
 
 *** Before turning a necessary revision into a task or subtask, you MUST: ***
 1. Verify solution quality and standards
@@ -117,6 +120,10 @@ Include this exact frontmatter at the top of every action plan document:
     - compatibility remaps that preserve retired concepts by pointing them at surviving generic behavior unless the upstream requirements explicitly approve that remap
     - boolean aliases whose name does not exactly match the condition they represent; use the existing boolean directly or introduce a correctly named concept only if the architecture requires it
     - retaining obsolete gates/seams/flags after their original behavior is removed
+    - returning a value typed only as `object` from a helper declared to return `Record<string, unknown>`; build a new record from `Object.entries(...)` after validating the value is a non-null, non-array object
+    - reading variant-specific fields from a union before narrowing on the discriminant
+    - using test fixture objects that omit required fields from typed runtime events, sessions, route actions, tool requests, workflow values, or metadata contracts
+    - relying on TypeScript inference for complex test helpers when an explicit return type or typed intermediate object is required
 
 8. Do not introduce architecture in the action plan that is not prescribed in an upstream document.
     - If there is an architecture or requirements document, the action plan must not introduce additional architecture beyond the scope of what those documents prescribe. There is no such thing as inferred architecture. If something is not explicitly prescribed, it is not prescribed at all.
@@ -130,6 +137,11 @@ Include this exact frontmatter at the top of every action plan document:
 - If code cannot be cleanly introduced without being used until a later phase, move that code to the later phase or merge the phases so the pause point occurs after the code is used.
 - Phase boundaries must be implementation-cohesive, not merely topical. A phase should represent a valid, reviewable increment that can be committed without bypassing repo hooks.
 
+11. Every phase must be compile-ready by construction.
+- Before finalizing a phase, review every prescribed runtime helper, test helper, fixture, stub, mock, schema object, tool result, workflow value, and route/event object for likely `npm run check-types` failures.
+- If the final implementation will require a specific type guard, discriminant check, typed intermediate object, `satisfies` clause, or explicit return type, prescribe that exact pattern in the relevant subtask.
+- If the action-plan author cannot determine the compile-safe pattern from the existing codebase, stop and ask the user before marking the action plan ready.
+
 
 If at any point you cannot satisfy one or more of these rules (for example, due to missing context or constraints in the existing architecture), you MUST:
 - Explicitly state which rule(s) you cannot fully satisfy, and why.
@@ -140,6 +152,7 @@ If at any point you cannot satisfy one or more of these rules (for example, due 
 - Review the test expectations/ assertions and ensure that they will not be stale due to changes made during action plan implementation
 - Ensure that prescribed testing is supported by the repo
 - For phased plans, prescribe phase-level validation at every QA pause, including the repo’s formatting/lint/typecheck gates needed for a clean commit.
+- If `npm run check-types` fails in files modified by the current phase, treat it as an action-plan prescription gap unless investigation proves it is unrelated drift or environment failure.
 
 
 # Test Prescription Calibration
