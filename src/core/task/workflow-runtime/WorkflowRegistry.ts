@@ -3,6 +3,7 @@ import { brainstormingWorkflowDefinition } from "@/core/task/workflow-runtime/wo
 import { createArchitectureWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-architecture"
 import { createEpicsWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-epics"
 import { createStoryWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-story"
+import { devStoryWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/dev-story"
 import { piPlanningWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/pi-planning"
 
 const shippedWorkflowDefinitions: WorkflowDefinition[] = [
@@ -10,6 +11,7 @@ const shippedWorkflowDefinitions: WorkflowDefinition[] = [
 	createArchitectureWorkflowDefinition,
 	createEpicsWorkflowDefinition,
 	createStoryWorkflowDefinition,
+	devStoryWorkflowDefinition,
 	piPlanningWorkflowDefinition,
 ]
 

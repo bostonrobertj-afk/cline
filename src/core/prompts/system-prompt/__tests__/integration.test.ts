@@ -40,6 +40,12 @@ import {
 	buildCreateStoryStep3ToolSchemas,
 	buildCreateStoryStep4ToolSchemas,
 } from "@/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas"
+import { DevStoryWorkflowValueKey, devStoryWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/dev-story"
+import {
+	buildDevStoryStep2ToolSchemas,
+	buildDevStoryStep3ToolSchemas,
+	buildDevStoryStep4ToolSchemas,
+} from "@/core/task/workflow-runtime/workflow-modules/dev-story/devStoryToolSchemas"
 import { piPlanningWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/pi-planning"
 import type { McpHub } from "@/services/mcp/McpHub"
 import type { McpServer } from "@/shared/mcp"
@@ -705,6 +711,110 @@ const buildCreateStoryPromptContext = async (
 	}
 }
 
+type DevStoryPromptStepNumber = 2 | 3 | 4
+
+const DEV_STORY_TARGET_STORY = "/test/project/implementation/stories-backlog/Story-1-2.md"
+const DEV_STORY_TARGET_STORY_FILENAME = "Story-1-2.md"
+const DEV_STORY_STORIES_INDEX = "/test/project/implementation/epic-1-stories.index.json"
+const DEV_STORY_SELECTED_STORY_IDENTITY = "1.2"
+
+const getDevStoryEntryBranchId = (activeStepNumber: DevStoryPromptStepNumber): string => {
+	switch (activeStepNumber) {
+		case 2:
+			return devStoryWorkflowDefinition.steps["step-2"].decisionTree.entryBranchId
+		case 3:
+			return devStoryWorkflowDefinition.steps["step-3"].decisionTree.entryBranchId
+		case 4:
+			return devStoryWorkflowDefinition.steps["step-4"].decisionTree.entryBranchId
+	}
+
+	const unreachableActiveStepNumber: never = activeStepNumber
+	return unreachableActiveStepNumber
+}
+
+const createDevStoryWorkflowValues = (): WorkflowValues => ({
+	[DevStoryWorkflowValueKey.TargetStory]: DEV_STORY_TARGET_STORY,
+	[DevStoryWorkflowValueKey.TargetStoryFilename]: DEV_STORY_TARGET_STORY_FILENAME,
+	[DevStoryWorkflowValueKey.SelectedStoryIdentity]: DEV_STORY_SELECTED_STORY_IDENTITY,
+	[DevStoryWorkflowValueKey.EpicIdentity]: "1",
+	[DevStoryWorkflowValueKey.StoriesIndex]: DEV_STORY_STORIES_INDEX,
+	[DevStoryWorkflowValueKey.SelectedStoryType]: "primary",
+	[DevStoryWorkflowValueKey.StoryGeneralInstructions]: "General guidance",
+	[DevStoryWorkflowValueKey.StoryObjective]: "Objective detail",
+	[DevStoryWorkflowValueKey.StoryScope]: "Scope detail",
+	[DevStoryWorkflowValueKey.StoryScopeBoundary]: "Boundary detail",
+	[DevStoryWorkflowValueKey.StoryRequirements]: "Requirement detail",
+	[DevStoryWorkflowValueKey.StoryIssues]: "Issue detail",
+	[DevStoryWorkflowValueKey.StoryTaskInventory]: {
+		tasks: [
+			{
+				id: "1",
+				lineIndex: 10,
+				rawLine: "- [ ] Task 1: Implement the runtime change",
+				completed: false,
+				allowedFiles: [],
+				subtasks: [
+					{
+						id: "1.1",
+						lineIndex: 11,
+						rawLine: "  - [ ] Subtask 1.1: Add the implementation",
+						completed: false,
+						allowedFiles: [],
+					},
+				],
+			},
+		],
+	},
+	[DevStoryWorkflowValueKey.CurrentStoryTaskId]: "1",
+	[DevStoryWorkflowValueKey.UnpermittedFilePaths]: [],
+	[DevStoryWorkflowValueKey.SelectedUnpermittedFilePaths]: [],
+	[DevStoryWorkflowValueKey.CommitStagedFiles]: false,
+})
+
+const createDevStoryWorkflowSession = (activeStepNumber: DevStoryPromptStepNumber): ActiveWorkflowSession => ({
+	activeStepNumber,
+	workflowValues: createDevStoryWorkflowValues(),
+	projectSelection: {
+		projectMode: "new",
+		projectTitle: "Dev Story Session",
+		projectFolderName: "dev-story-session",
+	},
+	lifecycle: {
+		projectSelectionCompleted: true,
+	},
+	entryArtifactResolution: undefined,
+	ui: {
+		suppressedWorkflowFormIds: [],
+		suppressedWorkflowStepResolutionRoutes: [],
+	},
+	branchContext: {
+		activeBranchId: getDevStoryEntryBranchId(activeStepNumber),
+	},
+})
+
+const buildDevStoryPromptContext = async (
+	activeStepNumber: DevStoryPromptStepNumber,
+): Promise<SystemPromptContext & WorkflowPromptProjection> => {
+	const workspacePathPolicy: WorkflowWorkspacePathPolicy = {
+		validateAccess: () => true,
+	}
+	const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })
+	const taskState = new TaskState()
+	taskState.activeWorkflowName = "dev-story"
+	taskState.activeWorkflowSession = createDevStoryWorkflowSession(activeStepNumber)
+	taskState.apiRequestCount = 1
+	const workflowProjection = await runtime.buildTurnProjection({ taskState })
+
+	return {
+		...baseContext,
+		mcpHub: makeMcpHub([]),
+		providerInfo: makeProviderInfo("gpt-5-codex", "openai"),
+		enableNativeToolCalls: true,
+		useMinimalGptPrompt: true,
+		...workflowProjection,
+	}
+}
+
 type PiPlanningPromptStepNumber = 2 | 3 | 4 | 5 | 6
 
 const PI_PLANNING_ARCHITECTURE_DOCUMENT = "/test/project/planning/architecture.md"
@@ -838,6 +948,20 @@ async function expectCreateStoryProjectedToolSurface(
 ): Promise<void> {
 	const expectedToolNames = expectedToolSpecs.map((tool) => tool.name)
 	const context = await buildCreateStoryPromptContext(activeStepNumber)
+	expect(context.workflowToolSchemaOverride).to.deep.equal(expectedToolSpecs)
+
+	await runPromptTest(testCtx, context, "gpt-5-codex", async ({ tools }) => {
+		expect(getNativeToolNames(tools)).to.deep.equal(expectedToolNames)
+	})
+}
+
+async function expectDevStoryProjectedToolSurface(
+	testCtx: TestRunner,
+	activeStepNumber: DevStoryPromptStepNumber,
+	expectedToolSpecs: readonly ClineToolSpec[],
+): Promise<void> {
+	const expectedToolNames = expectedToolSpecs.map((tool) => tool.name)
+	const context = await buildDevStoryPromptContext(activeStepNumber)
 	expect(context.workflowToolSchemaOverride).to.deep.equal(expectedToolSpecs)
 
 	await runPromptTest(testCtx, context, "gpt-5-codex", async ({ tools }) => {
@@ -1575,6 +1699,49 @@ describe("Prompt System Integration Tests", () => {
 			}
 		})
 
+		it("projects active dev-story step tools from module-owned builders into native GPT-5 prompts", async function () {
+			const expectations: readonly {
+				activeStepNumber: DevStoryPromptStepNumber
+				expectedToolSpecs: readonly ClineToolSpec[]
+			}[] = [
+				{
+					activeStepNumber: 2,
+					expectedToolSpecs: buildDevStoryStep2ToolSchemas(),
+				},
+				{
+					activeStepNumber: 3,
+					expectedToolSpecs: buildDevStoryStep3ToolSchemas(),
+				},
+				{
+					activeStepNumber: 4,
+					expectedToolSpecs: buildDevStoryStep4ToolSchemas(),
+				},
+			]
+
+			for (const expectation of expectations) {
+				await expectDevStoryProjectedToolSurface(this, expectation.activeStepNumber, expectation.expectedToolSpecs)
+			}
+		})
+
+		it("projects dev-story Step 2 story tools only while Step 2 is active", async () => {
+			const step2Context = await buildDevStoryPromptContext(2)
+			const step2ToolNames = (step2Context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
+			expect(step2ToolNames).to.include("story_task_complete")
+			expect(step2ToolNames).to.include("request_task_detail")
+			expect(step2ToolNames).to.include("show_incomplete_tasks")
+			expect(step2ToolNames).to.include("execute_command")
+
+			const laterStepNumbers: readonly DevStoryPromptStepNumber[] = [3, 4]
+			for (const activeStepNumber of laterStepNumbers) {
+				const context = await buildDevStoryPromptContext(activeStepNumber)
+				const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
+				expect(projectedToolNames).to.not.include("story_task_complete")
+				expect(projectedToolNames).to.not.include("request_task_detail")
+				expect(projectedToolNames).to.not.include("show_incomplete_tasks")
+				expect(projectedToolNames).to.not.include("execute_command")
+			}
+		})
+
 		it("renders create-story response-tool guidance for progress steps and completion step only", async function () {
 			const workflowProgressStepNumbers: readonly CreateStoryPromptStepNumber[] = [2, 3]
 
@@ -1728,6 +1895,33 @@ describe("Prompt System Integration Tests", () => {
 			await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt }) => {
 				expect(systemPrompt).to.not.include("CURRENT STEP DETAILED INSTRUCTIONS")
 				expect(systemPrompt).to.not.include("Step 2: Review Context & Ensure Project Alignment")
+			})
+		})
+
+		it("projects dev-story current step details into the full-turn input payload only", async function () {
+			const context = await buildDevStoryPromptContext(2)
+			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+			expect(workflowInputPayloadBlock).to.not.equal(undefined)
+			if (workflowInputPayloadBlock === undefined) {
+				throw new Error("Expected dev-story workflow input payload.")
+			}
+
+			expect(workflowInputPayloadBlock).to.include("Workflow:\ndev-story")
+			expect(workflowInputPayloadBlock).to.include("Name: Amelia")
+			expect(workflowInputPayloadBlock).to.include("Role: Developer Agent")
+			expect(workflowInputPayloadBlock).to.include("1. Gather Inputs - Complete")
+			expect(workflowInputPayloadBlock).to.include("2. Execute Story Tasks - Active")
+			expect(workflowInputPayloadBlock).to.include("4. Update Project Records - Not Started")
+			expect(workflowInputPayloadBlock).to.include("CURRENT STEP DETAILED INSTRUCTIONS")
+			expect(workflowInputPayloadBlock).to.include("Step 2: Execute Story Tasks")
+			expect(workflowInputPayloadBlock).to.include("General guidance")
+			expect(workflowInputPayloadBlock).to.include("- [ ] Task 1: Implement the runtime change")
+			expect(workflowInputPayloadBlock).to.include("  - [ ] Subtask 1.1: Add the implementation")
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt }) => {
+				expect(systemPrompt).to.not.include("CURRENT STEP DETAILED INSTRUCTIONS")
+				expect(systemPrompt).to.not.include("Step 2: Execute Story Tasks")
+				expect(systemPrompt).to.not.include("- [ ] Task 1: Implement the runtime change")
 			})
 		})
 
