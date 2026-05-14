@@ -117,6 +117,20 @@ describe("storyTaskDocument", () => {
 		])
 	})
 
+	it("rejects stories that only provide the legacy ## Tasks / Subtasks heading", () => {
+		const result = parseDevStoryDocument(
+			buildStoryMarkdown(`## Tasks / Subtasks
+- [ ] Task 1. Legacy heading is not supported
+`),
+		)
+
+		expect(result.ok).to.equal(false)
+		if (result.ok) {
+			throw new Error("Expected parser failure.")
+		}
+		expect(result.reason).to.equal(DevStoryParseFailureReason.MissingTasksSection)
+	})
+
 	it("returns a typed parser failure with the invalid raw task line when an explicit task ID is missing", () => {
 		const result = parseDevStoryTasks(`## Tasks
 - [ ] Implement parser without an ID

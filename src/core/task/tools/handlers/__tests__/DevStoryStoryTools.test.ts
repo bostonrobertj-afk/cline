@@ -47,6 +47,8 @@ const queuedProjectPromptAction: WorkflowNextAction = {
 	},
 }
 
+const RETIRED_STORY_TOOL_NAMES: readonly string[] = ["story_notes_update", "story_testing_complete"]
+
 function createUnusedDependency<DependencyType extends object>(label: string): DependencyType {
 	const target: DependencyType = Object.create(null)
 	return new Proxy<DependencyType>(target, {
@@ -342,7 +344,7 @@ async function withStoryFile<T>(storyMarkdown: string, run: (storyPath: string) 
 }
 
 describe("Dev-story story task tool handlers", () => {
-	it("does not register retired story notes or testing-complete handlers", async () => {
+	it("does not register executable handlers for retired story notes or testing-complete tools", async () => {
 		await withStoryFile(
 			`# Story 1.2
 
@@ -368,12 +370,11 @@ describe("Dev-story story task tool handlers", () => {
 				expect(coordinator.has(ClineDefaultTool.STORY_TASK_COMPLETE)).to.equal(true)
 				expect(coordinator.has(ClineDefaultTool.REQUEST_TASK_DETAIL)).to.equal(true)
 				expect(coordinator.has(ClineDefaultTool.SHOW_INCOMPLETE_TASKS)).to.equal(true)
-				expect(Object.values(ClineDefaultTool)).not.to.include("story_notes_update")
-				expect(Object.values(ClineDefaultTool)).not.to.include("story_testing_complete")
-				expect(coordinator.has("story_notes_update")).to.equal(false)
-				expect(coordinator.has("story_testing_complete")).to.equal(false)
-				expect(coordinator.getHandler("story_notes_update")).to.equal(undefined)
-				expect(coordinator.getHandler("story_testing_complete")).to.equal(undefined)
+				for (const retiredStoryToolName of RETIRED_STORY_TOOL_NAMES) {
+					expect(Object.values(ClineDefaultTool)).not.to.include(retiredStoryToolName)
+					expect(coordinator.has(retiredStoryToolName)).to.equal(false)
+					expect(coordinator.getHandler(retiredStoryToolName)).to.equal(undefined)
+				}
 			},
 		)
 	})
