@@ -1350,6 +1350,238 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
 
+### Phase 11 - Use Same-Session Form Continuation For Step 2 Random Confirmation
+
+Pause for QA review after completing Phase 11.
+
+### Phase 11 Scope
+
+Update brainstorming Step 2 so runtime-owned random technique selection continues the existing `step-2-approach-form` session instead of re-rendering the form as a new form frame. This phase applies the Phase 68 workflow-form continuation model to the existing brainstorming Step 2 random path.
+
+### Phase 11 Scope Boundary
+
+- Do not change Step 1, Step 3, or Step 4 behavior.
+- Do not change brainstorming prompt text.
+- Do not change brainstorming model-facing tool schemas.
+- Do not change the brainstorming technique registry or random-selection algorithm.
+- Do not change shared workflow-form or workflow-runtime behavior.
+- Do not modify create-story, pi-planning, dev-story, or any other workflow module.
+
+### Phase 11 Known Issues / Risks / Technical Debt
+
+Completed historical phases in this action plan assert the older Step 2 workaround where random confirmation is reached by rendering the same workflow form again at `step-2-random-confirmation-panel`. Phase 11 supersedes that live behavior with `runtime_routed` panel submission and `continue_workflow_form`.
+
+[ ] Task 31. Align brainstorming requirements with same-session Step 2 continuation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+
+[ ] Subtask 31.1. In `brainstorming-requirements.md`, revise the paragraph beginning `If selected_approach is I want a random technique` so it states that the Step 2 approach panel submission must be `runtime_routed`, and the Step 2 decision tree must run deterministic random selection after that panel submission.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+
+[ ] Subtask 31.2. In `brainstorming-requirements.md`, revise the paragraph beginning `After a random candidate exists` so it states that Step 2 must use `continue_workflow_form` to continue the active `step-2-approach-form` session to `step-2-random-confirmation-panel`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+
+[ ] Subtask 31.3. In `brainstorming-requirements.md`, revise the paragraph beginning `If the user requests another random technique` so it states that retry submission from the random confirmation panel must be `runtime_routed`, must re-run deterministic random selection, and must continue the same active `step-2-approach-form` session back to `step-2-random-confirmation-panel`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+
+[ ] Task 32. Add Step 2 runtime-routed form helper support.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 32.1. In `brainstormingWorkflow.ts`, add `WorkflowFormPanelAction` to the existing type import from `@shared/ExtensionMessage`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 32.2. In `brainstormingWorkflow.ts`, add `WorkflowFormContinuationReplacementBuilder` to the existing type import from `../../types`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 32.3. In `brainstormingWorkflow.ts`, add a helper named `workflowFormPanelSubmitted(panelId: string, action: WorkflowFormPanelAction): WorkflowDecisionBranchTrigger` that matches `triggerEvent.kind === "workflow_form_panel_submitted"`, `triggerEvent.workflowFormId === STEP_2_APPROACH_FORM_ID`, the supplied `panelId`, and the supplied `action`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 32.4. In `brainstormingWorkflow.ts`, add a helper named `workflowFormPanelSubmittedWithApproach(approach: BrainstormingSelectedApproach): WorkflowDecisionBranchTrigger` that matches submit events from `"step-2-approach-panel"` and requires `readSelectedApproach(workflowValues) === approach`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 32.5. In `brainstormingWorkflow.ts`, add a helper named `workflowFormPanelSubmittedWithRandomConfirmation(confirmation: BrainstormingRandomTechniqueConfirmation): WorkflowDecisionBranchTrigger` that matches submit events from `STEP_2_RANDOM_CONFIRMATION_PANEL_ID` and requires `readRandomTechniqueConfirmation(workflowValues) === confirmation`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 32.6. In `brainstormingWorkflow.ts`, add `buildStep2ContinuationReplacementBuilder(panelId: string): WorkflowFormContinuationReplacementBuilder` that reads the target panel from `buildStep2ApproachWorkflowForm().panels[panelId]`, throws if the panel is missing, and returns `{ panel, data: {} }`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 32.7. In `brainstormingWorkflow.ts`, delete the now-obsolete `workflowFormCompletedWithRandomConfirmation(...)` helper.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Task 33. Update the Step 2 workflow form definition for runtime-routed panels.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 33.1. In `buildStep2ApproachWorkflowForm()`, replace `"step-2-approach-panel"` transition with `{ type: "runtime_routed", staleValueKeysToClear: [BrainstormingWorkflowValueKey.ChosenTechniqueId, BrainstormingWorkflowValueKey.RandomTechniqueCandidate, BrainstormingWorkflowValueKey.RandomTechniqueRejectedIds, BrainstormingWorkflowValueKey.RandomTechniqueConfirmation] }`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 33.2. In `buildStep2ApproachWorkflowForm()`, add `backDestinationPanelId: "step-2-approach-panel"` to `"step-2-category-panel"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 33.3. In `buildStep2ApproachWorkflowForm()`, replace `STEP_2_RANDOM_CONFIRMATION_PANEL_ID` transition with `{ type: "runtime_routed" }`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Task 34. Update Step 2 decision-tree routing to continue the active form session.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 34.1. In branch `"step-2-after-approach-form"`, add route id `"step-2-continue-to-category-selection"` triggered by `workflowFormPanelSubmittedWithApproach(BrainstormingSelectedApproach.Choose)` with action kind `"continue_workflow_form"`, `workflowFormId: STEP_2_APPROACH_FORM_ID`, `panelId: "step-2-category-panel"`, `buildReplacement: buildStep2ContinuationReplacementBuilder("step-2-category-panel")`, and `followingBranchId: "step-2-after-approach-form"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 34.2. In branch `"step-2-after-approach-form"`, change route `"step-2-write-suggestion-placeholder"` to trigger on `workflowFormPanelSubmittedWithApproach(BrainstormingSelectedApproach.Suggest)` instead of `workflowFormCompletedWithApproach(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 34.3. In branch `"step-2-after-approach-form"`, change route `"step-2-select-random-technique"` to trigger on `workflowFormPanelSubmittedWithApproach(BrainstormingSelectedApproach.Random)` instead of `workflow_form_completed`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 34.4. In branch `"step-2-after-random-selection"`, replace route `"step-2-render-random-confirmation"` with route id `"step-2-continue-to-random-confirmation"` whose action kind is `"continue_workflow_form"`, `workflowFormId: STEP_2_APPROACH_FORM_ID`, `panelId: STEP_2_RANDOM_CONFIRMATION_PANEL_ID`, and `buildReplacement: buildStep2ContinuationReplacementBuilder(STEP_2_RANDOM_CONFIRMATION_PANEL_ID)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 34.5. In branch `"step-2-after-random-confirmation-form"`, change route `"step-2-persist-confirmed-random-technique"` to trigger on `workflowFormPanelSubmittedWithRandomConfirmation(BrainstormingRandomTechniqueConfirmation.Confirm)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Subtask 34.6. In branch `"step-2-after-random-confirmation-form"`, change route `"step-2-retry-random-technique"` to trigger on `workflowFormPanelSubmittedWithRandomConfirmation(BrainstormingRandomTechniqueConfirmation.Retry)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+
+[ ] Task 35. Update brainstorming workflow tests for same-session Step 2 continuation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 35.1. In `brainstormingWorkflow.test.ts`, add a helper that builds `workflow_form_panel_submitted` events for `step-2-approach-form`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 35.2. In `brainstormingWorkflow.test.ts`, update the Step 2 form-definition test so `"step-2-approach-panel"` is asserted to use transition type `"runtime_routed"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 35.3. In `brainstormingWorkflow.test.ts`, update the Step 2 form-definition test so `"step-2-approach-panel"` is asserted to clear `chosen_technique_id`, `random_technique_candidate`, `random_technique_rejected_ids`, and `random_technique_confirmation`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 35.4. In `brainstormingWorkflow.test.ts`, update the Step 2 form-definition test so `"step-2-category-panel"` is asserted to have `backDestinationPanelId: "step-2-approach-panel"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 35.5. In `brainstormingWorkflow.test.ts`, update the Step 2 form-definition test so `STEP_2_RANDOM_CONFIRMATION_PANEL_ID` is asserted to use transition type `"runtime_routed"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 35.6. In `brainstormingWorkflow.test.ts`, replace the test named `"keeps random confirmation inside the Step 2 approach form route"` with coverage proving route `"step-2-continue-to-random-confirmation"` uses action kind `"continue_workflow_form"` for `workflowFormId: "step-2-approach-form"` and `panelId: "step-2-random-confirmation-panel"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 35.7. In `brainstormingWorkflow.test.ts`, update the Step 2 route test so the choose path asserts route `"step-2-continue-to-category-selection"` is triggered by a `workflow_form_panel_submitted` event from `"step-2-approach-panel"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 35.8. In `brainstormingWorkflow.test.ts`, update the Step 2 route test so the suggest path asserts route `"step-2-write-suggestion-placeholder"` is triggered by a `workflow_form_panel_submitted` event from `"step-2-approach-panel"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 35.9. In `brainstormingWorkflow.test.ts`, update the Step 2 route test so the random path asserts route `"step-2-select-random-technique"` is triggered by a `workflow_form_panel_submitted` event from `"step-2-approach-panel"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 35.10. In `brainstormingWorkflow.test.ts`, update the Step 2 route test so random confirmation confirm asserts route `"step-2-persist-confirmed-random-technique"` is triggered by a `workflow_form_panel_submitted` event from `"step-2-random-confirmation-panel"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 35.11. In `brainstormingWorkflow.test.ts`, update the Step 2 route test so random confirmation retry asserts route `"step-2-retry-random-technique"` is triggered by a `workflow_form_panel_submitted` event from `"step-2-random-confirmation-panel"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 35.12. In `brainstormingWorkflow.test.ts`, add regression coverage proving no Step 2 decision-tree route action renders `STEP_2_APPROACH_FORM_ID` with `startPanelId: STEP_2_RANDOM_CONFIRMATION_PANEL_ID`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Task 36. Validate Phase 11.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/brainstorming/brainstorming-requirements.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 36.1. Run `rg -n "step-2-render-random-confirmation|startPanelId: STEP_2_RANDOM_CONFIRMATION_PANEL_ID|workflowFormCompletedWithRandomConfirmation" src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`; it must return no matches before Phase 11 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 36.2. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`; it must pass before Phase 11 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingToolSchemas.test.ts`
+
+[ ] Subtask 36.3. Run `npm run check-types`; it must pass before Phase 11 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
+[ ] Subtask 36.4. Run `npm run lint`; it must pass before Phase 11 is marked complete.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+
 ## Validation
 
 Run these commands after all tasks and subtasks are complete:
