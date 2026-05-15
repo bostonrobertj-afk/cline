@@ -1,5 +1,6 @@
 import type { WorkflowDefinition, WorkflowName } from "@/core/task/workflow-runtime/types"
 import { brainstormingWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/brainstorming"
+import { codeReviewWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/code-review"
 import { createArchitectureWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-architecture"
 import { createEpicsWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-epics"
 import { createStoryWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-story"
@@ -13,6 +14,7 @@ const shippedWorkflowDefinitions: WorkflowDefinition[] = [
 	createStoryWorkflowDefinition,
 	devStoryWorkflowDefinition,
 	piPlanningWorkflowDefinition,
+	codeReviewWorkflowDefinition,
 ]
 
 const shippedWorkflowDefinitionsByName = new Map<WorkflowName, WorkflowDefinition>(

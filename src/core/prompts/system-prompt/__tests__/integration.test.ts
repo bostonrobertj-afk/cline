@@ -29,6 +29,15 @@ import type {
 	WorkflowWorkspacePathPolicy,
 } from "@/core/task/workflow-runtime/types"
 import { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
+import {
+	CodeReviewWorkflowValueKey,
+	codeReviewWorkflowDefinition,
+} from "@/core/task/workflow-runtime/workflow-modules/code-review"
+import {
+	buildCodeReviewStep2ToolSchemas,
+	buildCodeReviewStep3ToolSchemas,
+	buildCodeReviewStep4ToolSchemas,
+} from "@/core/task/workflow-runtime/workflow-modules/code-review/codeReviewToolSchemas"
 import { createArchitectureWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-architecture"
 import { createEpicsWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-epics"
 import {
@@ -815,6 +824,130 @@ const buildDevStoryPromptContext = async (
 	}
 }
 
+type CodeReviewPromptStepNumber = 2 | 3 | 4
+
+const CODE_REVIEW_TARGET_STORY = "/test/project/implementation/stories-review/Story-1-1.md"
+const CODE_REVIEW_SELECTED_STORY_IDENTITY = "1.1"
+const CODE_REVIEW_SELECTED_STORY_FILENAME = "Story-1-1.md"
+const CODE_REVIEW_STORIES_INDEX = "/test/project/implementation/epic-1-stories.index.json"
+const CODE_REVIEW_REVIEW_FOLDER = "/test/project/review"
+const CODE_REVIEW_EPICS_DOCUMENT = "/test/project/planning/Epics.md"
+const CODE_REVIEW_ARCHITECTURE_DOCUMENT = "/test/project/planning/architecture.md"
+const CODE_REVIEW_CODE_REVIEW_OUTPUT = `${CODE_REVIEW_REVIEW_FOLDER}/code-review-1-1.md`
+const CODE_REVIEW_REVIEW_SCOPE_MANIFEST = `${CODE_REVIEW_REVIEW_FOLDER}/review-scope-1-1.md`
+const CODE_REVIEW_BLIND_REVIEW_OUTPUT = `${CODE_REVIEW_REVIEW_FOLDER}/blind-review-1-1.md`
+const CODE_REVIEW_EDGE_CASE_REVIEW_OUTPUT = `${CODE_REVIEW_REVIEW_FOLDER}/edge-case-hunter-1-1.md`
+const CODE_REVIEW_REVIEW_COMMIT_HASH = "abc1234"
+const CODE_REVIEW_REVIEW_COMMIT_PARENT = "def5678"
+const CODE_REVIEW_REMEDIATION_STORY = "/test/project/implementation/stories-draft/Remediation-story-1-1-1.md"
+
+function getCodeReviewEntryBranchId(activeStepNumber: CodeReviewPromptStepNumber): string {
+	switch (activeStepNumber) {
+		case 2:
+			return codeReviewWorkflowDefinition.steps["step-2"].decisionTree.entryBranchId
+		case 3:
+			return codeReviewWorkflowDefinition.steps["step-3"].decisionTree.entryBranchId
+		case 4:
+			return codeReviewWorkflowDefinition.steps["step-4"].decisionTree.entryBranchId
+	}
+
+	const unreachableActiveStepNumber: never = activeStepNumber
+	return unreachableActiveStepNumber
+}
+
+function createCodeReviewWorkflowValues(overrides: WorkflowValues = {}): WorkflowValues {
+	return {
+		[CodeReviewWorkflowValueKey.ProjectMode]: "existing",
+		[CodeReviewWorkflowValueKey.ProjectTitle]: "Code Review Session",
+		[CodeReviewWorkflowValueKey.ProjectFolderName]: "test-project",
+		[CodeReviewWorkflowValueKey.ReviewFolder]: CODE_REVIEW_REVIEW_FOLDER,
+		[CodeReviewWorkflowValueKey.TargetStory]: CODE_REVIEW_TARGET_STORY,
+		[CodeReviewWorkflowValueKey.SelectedStoryIdentity]: CODE_REVIEW_SELECTED_STORY_IDENTITY,
+		[CodeReviewWorkflowValueKey.SelectedStoryFilename]: CODE_REVIEW_SELECTED_STORY_FILENAME,
+		[CodeReviewWorkflowValueKey.EpicIdentity]: "1",
+		[CodeReviewWorkflowValueKey.StoriesIndex]: CODE_REVIEW_STORIES_INDEX,
+		[CodeReviewWorkflowValueKey.EpicsDocument]: CODE_REVIEW_EPICS_DOCUMENT,
+		[CodeReviewWorkflowValueKey.ArchitectureDocument]: CODE_REVIEW_ARCHITECTURE_DOCUMENT,
+		[CodeReviewWorkflowValueKey.CodeReviewOutput]: CODE_REVIEW_CODE_REVIEW_OUTPUT,
+		[CodeReviewWorkflowValueKey.CodeReviewOutputArtifactFamily]: "code_review_output",
+		[CodeReviewWorkflowValueKey.CodeReviewOutputArtifactIdentity]: "1-1",
+		[CodeReviewWorkflowValueKey.CodeReviewOutputArtifactFilename]: "code-review-1-1.md",
+		[CodeReviewWorkflowValueKey.CodeReviewOutputArtifactRelativePath]: "review/code-review-1-1.md",
+		[CodeReviewWorkflowValueKey.ReviewScopeManifest]: CODE_REVIEW_REVIEW_SCOPE_MANIFEST,
+		[CodeReviewWorkflowValueKey.ReviewScopeManifestArtifactFamily]: "review_scope_manifest",
+		[CodeReviewWorkflowValueKey.ReviewScopeManifestArtifactIdentity]: "1-1",
+		[CodeReviewWorkflowValueKey.ReviewScopeManifestArtifactFilename]: "review-scope-1-1.md",
+		[CodeReviewWorkflowValueKey.ReviewScopeManifestArtifactRelativePath]: "review/review-scope-1-1.md",
+		[CodeReviewWorkflowValueKey.BlindReviewOutput]: CODE_REVIEW_BLIND_REVIEW_OUTPUT,
+		[CodeReviewWorkflowValueKey.EdgeCaseReviewOutput]: CODE_REVIEW_EDGE_CASE_REVIEW_OUTPUT,
+		[CodeReviewWorkflowValueKey.MissingSubagentOutputFiles]: [],
+		[CodeReviewWorkflowValueKey.ReviewCommitHash]: CODE_REVIEW_REVIEW_COMMIT_HASH,
+		[CodeReviewWorkflowValueKey.ReviewCommitParent]: CODE_REVIEW_REVIEW_COMMIT_PARENT,
+		[CodeReviewWorkflowValueKey.RemediationStory]: CODE_REVIEW_REMEDIATION_STORY,
+		[CodeReviewWorkflowValueKey.RemediationStoryArtifactFamily]: "remediation_story",
+		[CodeReviewWorkflowValueKey.RemediationStoryArtifactIdentity]: "1-1-1",
+		[CodeReviewWorkflowValueKey.RemediationStoryArtifactFilename]: "Remediation-story-1-1-1.md",
+		[CodeReviewWorkflowValueKey.RemediationStoryArtifactRelativePath]:
+			"implementation/stories-draft/Remediation-story-1-1-1.md",
+		[CodeReviewWorkflowValueKey.RemediationStoryParentIdentity]: CODE_REVIEW_SELECTED_STORY_IDENTITY,
+		[CodeReviewWorkflowValueKey.ReviewFindingsPresent]: true,
+		[CodeReviewWorkflowValueKey.UpstreamFindingsPresent]: true,
+		...overrides,
+	}
+}
+
+function createCodeReviewWorkflowSession(
+	activeStepNumber: CodeReviewPromptStepNumber,
+	workflowValues: WorkflowValues = createCodeReviewWorkflowValues(),
+): ActiveWorkflowSession {
+	return {
+		activeStepNumber,
+		workflowValues,
+		projectSelection: {
+			projectMode: "existing",
+			projectTitle: "Code Review Session",
+			projectFolderName: "test-project",
+		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
+		entryArtifactResolution: undefined,
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: {
+			activeBranchId: getCodeReviewEntryBranchId(activeStepNumber),
+		},
+	}
+}
+
+async function buildCodeReviewPromptContext(
+	activeStepNumber: CodeReviewPromptStepNumber,
+	workflowValues: WorkflowValues = createCodeReviewWorkflowValues(),
+): Promise<SystemPromptContext & WorkflowPromptProjection> {
+	const workspacePathPolicy: WorkflowWorkspacePathPolicy = {
+		validateAccess: () => true,
+	}
+	const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })
+	const taskState = new TaskState()
+	taskState.activeWorkflowName = "code-review"
+	taskState.activeWorkflowSession = createCodeReviewWorkflowSession(activeStepNumber, workflowValues)
+	taskState.apiRequestCount = 1
+	const workflowProjection = await runtime.buildTurnProjection({ taskState })
+
+	return {
+		...baseContext,
+		mcpHub: makeMcpHub([]),
+		providerInfo: makeProviderInfo("gpt-5-codex", "openai"),
+		enableNativeToolCalls: true,
+		useMinimalGptPrompt: true,
+		...workflowProjection,
+	}
+}
+
 type PiPlanningPromptStepNumber = 2 | 3 | 4 | 5 | 6
 
 const PI_PLANNING_ARCHITECTURE_DOCUMENT = "/test/project/planning/architecture.md"
@@ -967,6 +1100,79 @@ async function expectDevStoryProjectedToolSurface(
 	await runPromptTest(testCtx, context, "gpt-5-codex", async ({ tools }) => {
 		expect(getNativeToolNames(tools)).to.deep.equal(expectedToolNames)
 	})
+}
+
+async function expectCodeReviewProjectedToolSurface(
+	testCtx: TestRunner,
+	activeStepNumber: CodeReviewPromptStepNumber,
+	expectedToolSpecs: readonly ClineToolSpec[],
+): Promise<void> {
+	const expectedToolNames = expectedToolSpecs.map((tool) => tool.name)
+	const context = await buildCodeReviewPromptContext(activeStepNumber)
+	expect(context.workflowToolSchemaOverride).to.deep.equal(expectedToolSpecs)
+
+	await runPromptTest(testCtx, context, "gpt-5-codex", async ({ tools }) => {
+		expect(getNativeToolNames(tools)).to.deep.equal(expectedToolNames)
+	})
+}
+
+interface CodeReviewStep4PayloadBlocks {
+	workflowInputPayloadBlock: string
+	continuationWorkflowInputPayloadBlock: string
+}
+
+async function expectCodeReviewStep4PromptProjection(
+	testCtx: TestRunner,
+	context: SystemPromptContext & WorkflowPromptProjection,
+): Promise<CodeReviewStep4PayloadBlocks> {
+	const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
+	expect(projectedToolNames).to.deep.equal([
+		"read_file",
+		"read_file_range",
+		"apply_patch",
+		"ask_followup_question",
+		"send_user_message",
+		"attempt_completion",
+	])
+
+	const forbiddenToolNames: readonly string[] = [
+		"record_findings",
+		"workflow_progress_request",
+		"create_workflow_artifact",
+		"build_workflow_document",
+		"plan_remediation_story_artifact",
+		"update_story_index_status",
+		"move_workflow_project_file",
+	]
+	for (const forbiddenToolName of forbiddenToolNames) {
+		expect(projectedToolNames).to.not.include(forbiddenToolName)
+	}
+
+	const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+	const continuationWorkflowInputPayloadBlock = context.continuationWorkflowInputPayloadBlock
+	if (workflowInputPayloadBlock === undefined || workflowInputPayloadBlock === "") {
+		throw new Error("Expected code-review Step 4 workflow input payload.")
+	}
+	if (continuationWorkflowInputPayloadBlock === undefined || continuationWorkflowInputPayloadBlock === "") {
+		throw new Error("Expected code-review Step 4 continuation workflow input payload.")
+	}
+
+	const payloadBlocks: readonly string[] = [workflowInputPayloadBlock, continuationWorkflowInputPayloadBlock]
+	for (const payloadBlock of payloadBlocks) {
+		expect(payloadBlock.trim()).to.not.equal("")
+	}
+
+	await runPromptTest(testCtx, context, "gpt-5-codex", async ({ tools }) => {
+		const nativeToolNames = getNativeToolNames(tools)
+		for (const forbiddenToolName of forbiddenToolNames) {
+			expect(nativeToolNames).to.not.include(forbiddenToolName)
+		}
+	})
+
+	return {
+		workflowInputPayloadBlock,
+		continuationWorkflowInputPayloadBlock,
+	}
 }
 
 // ============================================================================
@@ -1720,6 +1926,174 @@ describe("Prompt System Integration Tests", () => {
 
 			for (const expectation of expectations) {
 				await expectDevStoryProjectedToolSurface(this, expectation.activeStepNumber, expectation.expectedToolSpecs)
+			}
+		})
+
+		it("projects active code-review step tools from module-owned builders into native GPT-5 prompts", async function () {
+			const expectations: readonly {
+				activeStepNumber: CodeReviewPromptStepNumber
+				expectedToolSpecs: readonly ClineToolSpec[]
+			}[] = [
+				{
+					activeStepNumber: 2,
+					expectedToolSpecs: buildCodeReviewStep2ToolSchemas(),
+				},
+				{
+					activeStepNumber: 3,
+					expectedToolSpecs: buildCodeReviewStep3ToolSchemas(),
+				},
+				{
+					activeStepNumber: 4,
+					expectedToolSpecs: buildCodeReviewStep4ToolSchemas(),
+				},
+			]
+
+			for (const expectation of expectations) {
+				await expectCodeReviewProjectedToolSurface(this, expectation.activeStepNumber, expectation.expectedToolSpecs)
+			}
+		})
+
+		it("projects code-review Step 2 review-orchestration details into non-empty prompt payloads", async () => {
+			const context = await buildCodeReviewPromptContext(2)
+			const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
+			expect(projectedToolNames).to.deep.equal(["use_subagents", "send_user_message", "workflow_progress_request"])
+
+			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+			const continuationWorkflowInputPayloadBlock = context.continuationWorkflowInputPayloadBlock
+			if (workflowInputPayloadBlock === undefined || workflowInputPayloadBlock === "") {
+				throw new Error("Expected code-review workflow input payload.")
+			}
+			if (continuationWorkflowInputPayloadBlock === undefined || continuationWorkflowInputPayloadBlock === "") {
+				throw new Error("Expected code-review continuation workflow input payload.")
+			}
+
+			const payloadBlocks: readonly string[] = [workflowInputPayloadBlock, continuationWorkflowInputPayloadBlock]
+			for (const payloadBlock of payloadBlocks) {
+				expect(payloadBlock.trim()).to.not.equal("")
+			}
+		})
+
+		it("projects code-review Step 3 synthesis values and guards forbidden tools", async function () {
+			const context = await buildCodeReviewPromptContext(3)
+			const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
+			expect(projectedToolNames).to.deep.equal([
+				"read_file",
+				"read_file_range",
+				"record_findings",
+				"send_user_message",
+				"workflow_progress_request",
+			])
+
+			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+			const continuationWorkflowInputPayloadBlock = context.continuationWorkflowInputPayloadBlock
+			if (workflowInputPayloadBlock === undefined || workflowInputPayloadBlock === "") {
+				throw new Error("Expected code-review Step 3 workflow input payload.")
+			}
+			if (continuationWorkflowInputPayloadBlock === undefined || continuationWorkflowInputPayloadBlock === "") {
+				throw new Error("Expected code-review Step 3 continuation workflow input payload.")
+			}
+
+			const materializedWorkflowValues: readonly string[] = [
+				CODE_REVIEW_BLIND_REVIEW_OUTPUT,
+				CODE_REVIEW_EDGE_CASE_REVIEW_OUTPUT,
+				CODE_REVIEW_TARGET_STORY,
+				CODE_REVIEW_REVIEW_SCOPE_MANIFEST,
+				CODE_REVIEW_EPICS_DOCUMENT,
+				CODE_REVIEW_ARCHITECTURE_DOCUMENT,
+			]
+			const payloadBlocks: readonly string[] = [workflowInputPayloadBlock, continuationWorkflowInputPayloadBlock]
+			for (const payloadBlock of payloadBlocks) {
+				for (const materializedWorkflowValue of materializedWorkflowValues) {
+					expect(payloadBlock).to.include(materializedWorkflowValue)
+				}
+			}
+
+			const forbiddenToolNames: readonly string[] = [
+				"attempt_completion",
+				"create_workflow_artifact",
+				"build_workflow_document",
+				"plan_remediation_story_artifact",
+				"update_story_index_status",
+				"move_workflow_project_file",
+			]
+			for (const forbiddenToolName of forbiddenToolNames) {
+				expect(projectedToolNames).to.not.include(forbiddenToolName)
+			}
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ tools }) => {
+				const nativeToolNames = getNativeToolNames(tools)
+				for (const forbiddenToolName of forbiddenToolNames) {
+					expect(nativeToolNames).to.not.include(forbiddenToolName)
+				}
+			})
+		})
+
+		it("projects code-review Step 4 upstream-findings remediation payload", async function () {
+			const context = await buildCodeReviewPromptContext(
+				4,
+				createCodeReviewWorkflowValues({
+					[CodeReviewWorkflowValueKey.UpstreamFindingsPresent]: true,
+					[CodeReviewWorkflowValueKey.RemediationStory]: CODE_REVIEW_REMEDIATION_STORY,
+				}),
+			)
+			const payloadBlocks = await expectCodeReviewStep4PromptProjection(this, context)
+
+			const payloadBlockValues: readonly string[] = [
+				payloadBlocks.workflowInputPayloadBlock,
+				payloadBlocks.continuationWorkflowInputPayloadBlock,
+			]
+			for (const payloadBlock of payloadBlockValues) {
+				expect(payloadBlock).to.include(CODE_REVIEW_REMEDIATION_STORY)
+			}
+		})
+
+		it("projects code-review Step 4 upstream-absent payload differently from upstream-present", async function () {
+			const upstreamPresentContext = await buildCodeReviewPromptContext(
+				4,
+				createCodeReviewWorkflowValues({
+					[CodeReviewWorkflowValueKey.UpstreamFindingsPresent]: true,
+					[CodeReviewWorkflowValueKey.RemediationStory]: CODE_REVIEW_REMEDIATION_STORY,
+				}),
+			)
+			const upstreamAbsentContext = await buildCodeReviewPromptContext(
+				4,
+				createCodeReviewWorkflowValues({
+					[CodeReviewWorkflowValueKey.UpstreamFindingsPresent]: false,
+				}),
+			)
+			const upstreamPresentPayloadBlocks = await expectCodeReviewStep4PromptProjection(this, upstreamPresentContext)
+			const upstreamAbsentPayloadBlocks = await expectCodeReviewStep4PromptProjection(this, upstreamAbsentContext)
+			expect(upstreamPresentPayloadBlocks.workflowInputPayloadBlock).to.not.equal(
+				upstreamAbsentPayloadBlocks.workflowInputPayloadBlock,
+			)
+			expect(upstreamPresentPayloadBlocks.continuationWorkflowInputPayloadBlock).to.not.equal(
+				upstreamAbsentPayloadBlocks.continuationWorkflowInputPayloadBlock,
+			)
+
+			const upstreamAbsentPayloadBlockValues: readonly string[] = [
+				upstreamAbsentPayloadBlocks.workflowInputPayloadBlock,
+				upstreamAbsentPayloadBlocks.continuationWorkflowInputPayloadBlock,
+			]
+			for (const payloadBlock of upstreamAbsentPayloadBlockValues) {
+				expect(payloadBlock).to.include(CODE_REVIEW_REMEDIATION_STORY)
+			}
+		})
+
+		it("projects code-review Step 4 without remediation path when remediation story is empty", async function () {
+			const context = await buildCodeReviewPromptContext(
+				4,
+				createCodeReviewWorkflowValues({
+					[CodeReviewWorkflowValueKey.RemediationStory]: "",
+				}),
+			)
+			const payloadBlocks = await expectCodeReviewStep4PromptProjection(this, context)
+
+			const payloadBlockValues: readonly string[] = [
+				payloadBlocks.workflowInputPayloadBlock,
+				payloadBlocks.continuationWorkflowInputPayloadBlock,
+			]
+			for (const payloadBlock of payloadBlockValues) {
+				expect(payloadBlock).to.not.include(CODE_REVIEW_REMEDIATION_STORY)
 			}
 		})
 

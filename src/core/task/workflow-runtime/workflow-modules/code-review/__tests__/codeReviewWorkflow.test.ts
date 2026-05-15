@@ -9,6 +9,11 @@ import type {
 } from "@shared/ExtensionMessage"
 import { expect } from "chai"
 import { describe, it } from "mocha"
+import {
+	resolveWorkflowBySlashCommand,
+	resolveWorkflowByUseSkillName,
+	resolveWorkflowDefinition,
+} from "@/core/task/workflow-runtime/WorkflowRegistry"
 import { ClineDefaultTool } from "@/shared/tools"
 import { WorkflowArtifactFamily } from "../../../artifactFamilies"
 import type {
@@ -359,6 +364,15 @@ describe("codeReviewWorkflowDefinition", () => {
 		expect(codeReviewWorkflowDefinition.entryPanel.promptMarkdown).to.equal(CODE_REVIEW_WORKFLOW_DESCRIPTION)
 		expect(codeReviewWorkflowDefinition.workflowValueKeys).to.deep.equal(CODE_REVIEW_WORKFLOW_VALUE_KEYS)
 		expect(codeReviewWorkflowDefinition.entryProjectValueKeys).to.deep.equal(CODE_REVIEW_ENTRY_PROJECT_VALUE_KEYS)
+	})
+
+	it("resolves through registry names without preserving the legacy markdown alias", () => {
+		expect(resolveWorkflowDefinition("code-review")).to.equal(codeReviewWorkflowDefinition)
+		expect(resolveWorkflowBySlashCommand("code-review")).to.equal(codeReviewWorkflowDefinition)
+		expect(resolveWorkflowByUseSkillName("code-review")).to.equal(codeReviewWorkflowDefinition)
+		expect(resolveWorkflowDefinition("code-review.md")).to.equal(undefined)
+		expect(resolveWorkflowBySlashCommand("code-review.md")).to.equal(undefined)
+		expect(resolveWorkflowByUseSkillName("code-review.md")).to.equal(undefined)
 	})
 
 	it("declares the target-story prerequisite", () => {
