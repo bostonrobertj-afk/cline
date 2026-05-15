@@ -721,7 +721,7 @@ Allowed files:
 
 After completing this phase, pause for QA review before considering the module build complete.
 
-[ ] Task 13. Delete the legacy BMAD code-review workflow package.
+[x] Task 13. Delete the legacy BMAD code-review workflow package.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-code-review/SKILL.md`
@@ -732,77 +732,77 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-code-review/steps/step-03-triage.md`
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-code-review/steps/step-04-present.md`
 
-[ ] Subtask 13.1. Delete `.cline/skills/bmad-code-review/SKILL.md`.
+[x] Subtask 13.1. Delete `.cline/skills/bmad-code-review/SKILL.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-code-review/SKILL.md`
 
-[ ] Subtask 13.2. Delete `.cline/skills/bmad-code-review/bmad-skill-manifest.yaml`.
+[x] Subtask 13.2. Delete `.cline/skills/bmad-code-review/bmad-skill-manifest.yaml`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-code-review/bmad-skill-manifest.yaml`
 
-[ ] Subtask 13.3. Delete `.cline/skills/bmad-code-review/workflow.md`.
+[x] Subtask 13.3. Delete `.cline/skills/bmad-code-review/workflow.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-code-review/workflow.md`
 
-[ ] Subtask 13.4. Delete `.cline/skills/bmad-code-review/steps/step-01-gather-context.md`.
+[x] Subtask 13.4. Delete `.cline/skills/bmad-code-review/steps/step-01-gather-context.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-code-review/steps/step-01-gather-context.md`
 
-[ ] Subtask 13.5. Delete `.cline/skills/bmad-code-review/steps/step-02-review.md`.
+[x] Subtask 13.5. Delete `.cline/skills/bmad-code-review/steps/step-02-review.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-code-review/steps/step-02-review.md`
 
-[ ] Subtask 13.6. Delete `.cline/skills/bmad-code-review/steps/step-03-triage.md`.
+[x] Subtask 13.6. Delete `.cline/skills/bmad-code-review/steps/step-03-triage.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-code-review/steps/step-03-triage.md`
 
-[ ] Subtask 13.7. Delete `.cline/skills/bmad-code-review/steps/step-04-present.md`.
+[x] Subtask 13.7. Delete `.cline/skills/bmad-code-review/steps/step-04-present.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-code-review/steps/step-04-present.md`
 
-[ ] Task 14. Run final code-review module validation.
+[x] Task 14. Run final code-review module validation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-[ ] Subtask 14.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/reviewScopeManifest.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts src/core/task/tools/handlers/__tests__/RecordFindingsToolHandler.test.ts src/core/task/__tests__/ToolExecutor.nativeToolParity.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts`.
+[x] Subtask 14.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/reviewScopeManifest.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts src/core/task/tools/handlers/__tests__/RecordFindingsToolHandler.test.ts src/core/task/__tests__/ToolExecutor.nativeToolParity.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-[ ] Subtask 14.2. Run `npm run check-types`; if it fails during proto host probing, rerun with the approved elevated path and stop on the first non-environment TypeScript failure.
+[x] Subtask 14.2. Run `npm run check-types`; if it fails during proto host probing, rerun with the approved elevated path and stop on the first non-environment TypeScript failure.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-[ ] Subtask 14.3. Run `npm run lint`.
+[x] Subtask 14.3. Run `npm run lint`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-[ ] Subtask 14.4. Run `rg -n "ReviewBlindHunter|ReviewEdgeCaseHunter|AdversarialReview|ReviewInputMarkdown|ReviewInputDiff|Review-blind-hunter|Review-edge-case-hunter|Adversarial-review|Review-input|review_blind_hunter|review_edge_case_hunter|adversarial_review|review_input_markdown|review_input_diff" src/core/task/workflow-runtime/artifactFamilies.ts src/core/task/workflow-runtime/types.ts src/core/task/workflow-runtime/WorkflowRuntime.ts src/core/task/workflow-runtime/workflow-modules/code-review`; treat exit code 1 with no output as success, inspect any output in context, and stop if any hit is active runtime code instead of an explicit negative test assertion.
+[x] Subtask 14.4. Run `rg -n "ReviewBlindHunter|ReviewEdgeCaseHunter|AdversarialReview|ReviewInputMarkdown|ReviewInputDiff|Review-blind-hunter|Review-edge-case-hunter|Adversarial-review|Review-input|review_blind_hunter|review_edge_case_hunter|adversarial_review|review_input_markdown|review_input_diff" src/core/task/workflow-runtime/artifactFamilies.ts src/core/task/workflow-runtime/types.ts src/core/task/workflow-runtime/WorkflowRuntime.ts src/core/task/workflow-runtime/workflow-modules/code-review`; treat exit code 1 with no output as success, inspect any output in context, and stop if any hit is active runtime code instead of an explicit negative test assertion.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-[ ] Subtask 14.5. Run `rg -n "build_review_diff_output|BuildReviewInputToolHandler|BuildReviewDiffOutputToolHandler|code_review_spec_update|CODE_REVIEW_SPEC_UPDATE|CodeReviewSpecUpdateToolHandler|codeReviewSpecUpdateMerge" src/shared/tools.ts src/core/assistant-message/index.ts src/core/task/tools/backendWorkflowToolContracts.ts src/core/task/tools/response/ResponseToolRegistry.ts src/core/task/tools/ToolExecutorCoordinator.ts src/core/task/tools/handlers src/core/task/__tests__/ToolExecutor.nativeToolParity.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts src/core/task/workflow-runtime/workflow-modules/code-review`; treat exit code 1 with no output as success, inspect any output in context, and stop if any hit is active runtime code instead of an explicit negative test assertion.
+[x] Subtask 14.5. Run `rg -n "build_review_diff_output|BuildReviewInputToolHandler|BuildReviewDiffOutputToolHandler|code_review_spec_update|CODE_REVIEW_SPEC_UPDATE|CodeReviewSpecUpdateToolHandler|codeReviewSpecUpdateMerge" src/shared/tools.ts src/core/assistant-message/index.ts src/core/task/tools/backendWorkflowToolContracts.ts src/core/task/tools/response/ResponseToolRegistry.ts src/core/task/tools/ToolExecutorCoordinator.ts src/core/task/tools/handlers src/core/task/__tests__/ToolExecutor.nativeToolParity.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts src/core/task/workflow-runtime/workflow-modules/code-review`; treat exit code 1 with no output as success, inspect any output in context, and stop if any hit is active runtime code instead of an explicit negative test assertion.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-[ ] Subtask 14.6. Run `rg -n "code-review\\.md|bmad-code-review" src/core/task/workflow-runtime src/core/prompts .cline/skills`; treat exit code 1 with no output as success, inspect any output in context, and stop if any hit is active runtime code, prompt code, or surviving legacy skill-package content instead of an explicit negative test assertion.
+[x] Subtask 14.6. Run `rg -n "code-review\\.md|bmad-code-review" src/core/task/workflow-runtime src/core/prompts .cline/skills`; treat exit code 1 with no output as success, inspect any output in context, and stop if any hit is active runtime code, prompt code, or surviving legacy skill-package content instead of an explicit negative test assertion.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-[ ] Subtask 14.7. Run `git status --short` and inspect the persistent diff scope; stop and report if any changed, deleted, or untracked path is outside the files prescribed by completed code-review action-plan tasks plus this action-plan file's checkbox updates.
+[x] Subtask 14.7. Run `git status --short` and inspect the persistent diff scope; stop and report if any changed, deleted, or untracked path is outside the files prescribed by completed code-review action-plan tasks plus this action-plan file's checkbox updates.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
