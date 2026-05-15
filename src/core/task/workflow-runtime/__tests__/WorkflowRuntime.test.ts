@@ -9918,9 +9918,8 @@ describe("WorkflowRuntime", () => {
 		const remediationStoryKeys = createParentedArtifactOutputValueKeys("remediation_story")
 		const blindReviewKeys = createTargetedArtifactOutputValueKeys("blind_review")
 		const edgeCaseReviewKeys = createTargetedArtifactOutputValueKeys("edge_case_review")
-		const adversarialReviewKeys = createTargetedArtifactOutputValueKeys("adversarial_review")
-		const reviewInputMarkdownKeys = createTargetedArtifactOutputValueKeys("review_input_markdown")
-		const reviewInputDiffKeys = createTargetedArtifactOutputValueKeys("review_input_diff")
+		const codeReviewKeys = createTargetedArtifactOutputValueKeys("code_review")
+		const reviewScopeKeys = createTargetedArtifactOutputValueKeys("review_scope")
 		const workflow = createWorkflowDefinition({
 			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(
 				epicsKeys,
@@ -9930,9 +9929,8 @@ describe("WorkflowRuntime", () => {
 				remediationStoryKeys,
 				blindReviewKeys,
 				edgeCaseReviewKeys,
-				adversarialReviewKeys,
-				reviewInputMarkdownKeys,
-				reviewInputDiffKeys,
+				codeReviewKeys,
+				reviewScopeKeys,
 			),
 			artifacts: {
 				epics_doc: {
@@ -9983,7 +9981,7 @@ describe("WorkflowRuntime", () => {
 				},
 				blind_review_doc: {
 					id: "blind_review_doc",
-					family: WorkflowArtifactFamily.ReviewBlindHunter,
+					family: WorkflowArtifactFamily.BlindReviewOutput,
 					intentMode: "derived",
 					parentIdentitySource: undefined,
 					targetIdentitySource: {
@@ -9994,7 +9992,7 @@ describe("WorkflowRuntime", () => {
 				},
 				edge_case_review_doc: {
 					id: "edge_case_review_doc",
-					family: WorkflowArtifactFamily.ReviewEdgeCaseHunter,
+					family: WorkflowArtifactFamily.EdgeCaseReviewOutput,
 					intentMode: "derived",
 					parentIdentitySource: undefined,
 					targetIdentitySource: {
@@ -10003,38 +10001,27 @@ describe("WorkflowRuntime", () => {
 					},
 					outputValueKeys: edgeCaseReviewKeys,
 				},
-				adversarial_review_doc: {
-					id: "adversarial_review_doc",
-					family: WorkflowArtifactFamily.AdversarialReview,
+				code_review_doc: {
+					id: "code_review_doc",
+					family: WorkflowArtifactFamily.CodeReviewOutput,
 					intentMode: "derived",
 					parentIdentitySource: undefined,
 					targetIdentitySource: {
 						kind: "workflow_value",
 						key: remediationStoryKeys.artifactIdentity,
 					},
-					outputValueKeys: adversarialReviewKeys,
+					outputValueKeys: codeReviewKeys,
 				},
-				review_input_markdown_doc: {
-					id: "review_input_markdown_doc",
-					family: WorkflowArtifactFamily.ReviewInputMarkdown,
+				review_scope_doc: {
+					id: "review_scope_doc",
+					family: WorkflowArtifactFamily.ReviewScopeManifest,
 					intentMode: "derived",
 					parentIdentitySource: undefined,
 					targetIdentitySource: {
 						kind: "workflow_value",
 						key: remediationStoryKeys.artifactIdentity,
 					},
-					outputValueKeys: reviewInputMarkdownKeys,
-				},
-				review_input_diff_doc: {
-					id: "review_input_diff_doc",
-					family: WorkflowArtifactFamily.ReviewInputDiff,
-					intentMode: "derived",
-					parentIdentitySource: undefined,
-					targetIdentitySource: {
-						kind: "workflow_value",
-						key: remediationStoryKeys.artifactIdentity,
-					},
-					outputValueKeys: reviewInputDiffKeys,
+					outputValueKeys: reviewScopeKeys,
 				},
 			},
 		})
@@ -10086,19 +10073,14 @@ describe("WorkflowRuntime", () => {
 			artifactId: "edge_case_review_doc",
 			expectedArtifactAbsolutePath: undefined,
 		})
-		const adversarialReviewResult = await runtime.createWorkflowArtifact({
+		const codeReviewResult = await runtime.createWorkflowArtifact({
 			taskState,
-			artifactId: "adversarial_review_doc",
+			artifactId: "code_review_doc",
 			expectedArtifactAbsolutePath: undefined,
 		})
-		const reviewInputMarkdownResult = await runtime.createWorkflowArtifact({
+		const reviewScopeResult = await runtime.createWorkflowArtifact({
 			taskState,
-			artifactId: "review_input_markdown_doc",
-			expectedArtifactAbsolutePath: undefined,
-		})
-		const reviewInputDiffResult = await runtime.createWorkflowArtifact({
-			taskState,
-			artifactId: "review_input_diff_doc",
+			artifactId: "review_scope_doc",
 			expectedArtifactAbsolutePath: undefined,
 		})
 
@@ -10158,75 +10140,60 @@ describe("WorkflowRuntime", () => {
 		})
 		expect(reviewResult).to.deep.include({
 			artifactIdentity: "1.1.1",
-			artifactFilename: "Review-blind-hunter-1-1-1.md",
-			artifactRelativePath: join("planning", "Review-blind-hunter-1-1-1.md"),
+			artifactFilename: "blind-review-1-1-1.md",
+			artifactRelativePath: join("planning", "blind-review-1-1-1.md"),
 			artifactAbsolutePath: join(
 				cwd,
 				"docs",
 				"projects",
 				"artifact-allocation-project",
 				"planning",
-				"Review-blind-hunter-1-1-1.md",
+				"blind-review-1-1-1.md",
 			),
 			parentIdentity: undefined,
 			targetIdentity: "1.1.1",
 		})
 		expect(edgeCaseReviewResult).to.deep.include({
 			artifactIdentity: "1.1.1",
-			artifactFilename: "Review-edge-case-hunter-1-1-1.md",
-			artifactRelativePath: join("planning", "Review-edge-case-hunter-1-1-1.md"),
+			artifactFilename: "edge-case-hunter-1-1-1.md",
+			artifactRelativePath: join("planning", "edge-case-hunter-1-1-1.md"),
 			artifactAbsolutePath: join(
 				cwd,
 				"docs",
 				"projects",
 				"artifact-allocation-project",
 				"planning",
-				"Review-edge-case-hunter-1-1-1.md",
+				"edge-case-hunter-1-1-1.md",
 			),
 			parentIdentity: undefined,
 			targetIdentity: "1.1.1",
 		})
-		expect(adversarialReviewResult).to.deep.include({
+		expect(codeReviewResult).to.deep.include({
 			artifactIdentity: "1.1.1",
-			artifactFilename: "Adversarial-review-1-1-1.md",
-			artifactRelativePath: join("planning", "Adversarial-review-1-1-1.md"),
+			artifactFilename: "code-review-1-1-1.md",
+			artifactRelativePath: join("planning", "code-review-1-1-1.md"),
 			artifactAbsolutePath: join(
 				cwd,
 				"docs",
 				"projects",
 				"artifact-allocation-project",
 				"planning",
-				"Adversarial-review-1-1-1.md",
+				"code-review-1-1-1.md",
 			),
 			parentIdentity: undefined,
 			targetIdentity: "1.1.1",
 		})
-		expect(reviewInputMarkdownResult).to.deep.include({
+		expect(reviewScopeResult).to.deep.include({
 			artifactIdentity: "1.1.1",
-			artifactFilename: "Review-input-1-1-1.md",
-			artifactRelativePath: join("planning", "Review-input-1-1-1.md"),
+			artifactFilename: "review-scope-1-1-1.md",
+			artifactRelativePath: join("planning", "review-scope-1-1-1.md"),
 			artifactAbsolutePath: join(
 				cwd,
 				"docs",
 				"projects",
 				"artifact-allocation-project",
 				"planning",
-				"Review-input-1-1-1.md",
-			),
-			parentIdentity: undefined,
-			targetIdentity: "1.1.1",
-		})
-		expect(reviewInputDiffResult).to.deep.include({
-			artifactIdentity: "1.1.1",
-			artifactFilename: "Review-input-1-1-1.diff",
-			artifactRelativePath: join("planning", "Review-input-1-1-1.diff"),
-			artifactAbsolutePath: join(
-				cwd,
-				"docs",
-				"projects",
-				"artifact-allocation-project",
-				"planning",
-				"Review-input-1-1-1.diff",
+				"review-scope-1-1-1.md",
 			),
 			parentIdentity: undefined,
 			targetIdentity: "1.1.1",
@@ -10239,12 +10206,10 @@ describe("WorkflowRuntime", () => {
 		await access(remediationStoryResult.artifactAbsolutePath)
 		await access(reviewResult.artifactAbsolutePath)
 		await access(edgeCaseReviewResult.artifactAbsolutePath)
-		await access(adversarialReviewResult.artifactAbsolutePath)
-		await access(reviewInputMarkdownResult.artifactAbsolutePath)
-		await access(reviewInputDiffResult.artifactAbsolutePath)
+		await access(codeReviewResult.artifactAbsolutePath)
+		await access(reviewScopeResult.artifactAbsolutePath)
 		expect(await readFile(epicsResult.artifactAbsolutePath, "utf8")).to.equal("")
 		expect(await readFile(deliverySpecResult.artifactAbsolutePath, "utf8")).to.equal("")
-		expect(await readFile(reviewInputDiffResult.artifactAbsolutePath, "utf8")).to.equal("")
 
 		expect(getActiveWorkflowSession(taskState).workflowValues).to.deep.include({
 			[epicsKeys.projectTitle]: "Artifact Allocation Project",
@@ -10291,12 +10256,147 @@ describe("WorkflowRuntime", () => {
 			[remediationStoryKeys.parentIdentity]: "1.1",
 			[blindReviewKeys.artifactIdentity]: "1.1.1",
 			[blindReviewKeys.targetIdentity]: "1.1.1",
-			[blindReviewKeys.artifactFilename]: "Review-blind-hunter-1-1-1.md",
-			[edgeCaseReviewKeys.artifactFilename]: "Review-edge-case-hunter-1-1-1.md",
-			[adversarialReviewKeys.artifactFilename]: "Adversarial-review-1-1-1.md",
-			[reviewInputMarkdownKeys.artifactFilename]: "Review-input-1-1-1.md",
-			[reviewInputDiffKeys.artifactFilename]: "Review-input-1-1-1.diff",
+			[blindReviewKeys.artifactFilename]: "blind-review-1-1-1.md",
+			[edgeCaseReviewKeys.artifactFilename]: "edge-case-hunter-1-1-1.md",
+			[codeReviewKeys.artifactFilename]: "code-review-1-1-1.md",
+			[reviewScopeKeys.artifactFilename]: "review-scope-1-1-1.md",
 		})
+	})
+
+	it("rejects retired review artifact filename aliases for target-derived review artifacts", async () => {
+		discoverWorkflowCandidatesStub.restore()
+		const targetIdentityKey = "selected_review_target"
+		const codeReviewKeys = createTargetedArtifactOutputValueKeys("retired_review_alias")
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [targetIdentityKey, ...collectArtifactOutputWorkflowValueKeys(codeReviewKeys)],
+			artifacts: {
+				code_review_doc: {
+					id: "code_review_doc",
+					family: WorkflowArtifactFamily.CodeReviewOutput,
+					intentMode: "derived",
+					parentIdentitySource: undefined,
+					targetIdentitySource: {
+						kind: "workflow_value",
+						key: targetIdentityKey,
+					},
+					outputValueKeys: codeReviewKeys,
+				},
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Retired Review Alias Project")
+		const planningFolder = join(cwd, "docs", "projects", "retired-review-alias-project", "planning")
+		await writeFile(join(planningFolder, "Story-1-1.md"), "story", "utf8")
+
+		const retiredReviewArtifactAliases = [
+			"Review-input-1-1.md",
+			"Review-input-1-1.diff",
+			"Review-blind-hunter-1-1.md",
+			"Review-edge-case-hunter-1-1.md",
+			"Adversarial-review-1-1.md",
+		]
+
+		for (const retiredReviewArtifactAlias of retiredReviewArtifactAliases) {
+			getActiveWorkflowSession(taskState).workflowValues[targetIdentityKey] = retiredReviewArtifactAlias
+			let allocationError: unknown
+			try {
+				await runtime.prepareWorkflowArtifactCreation({
+					taskState,
+					artifactId: "code_review_doc",
+				})
+			} catch (error) {
+				allocationError = error
+			}
+
+			expect(allocationError, retiredReviewArtifactAlias).to.be.instanceOf(Error)
+			if (!(allocationError instanceof Error)) {
+				throw new Error(`Expected retired review alias ${retiredReviewArtifactAlias} to throw.`)
+			}
+			expect(allocationError.message, retiredReviewArtifactAlias).to.contain("must use dotted numeric form")
+		}
+	})
+
+	it("allocates code review output for targets discovered in implementation stories-review", async () => {
+		discoverWorkflowCandidatesStub.restore()
+		const targetIdentityKey = "selected_review_target"
+		const codeReviewKeys = createTargetedArtifactOutputValueKeys("stories_review_target")
+		const workflow = createWorkflowDefinition({
+			projectSubfolder: "review",
+			workflowValueKeys: [targetIdentityKey, ...collectArtifactOutputWorkflowValueKeys(codeReviewKeys)],
+			artifacts: {
+				code_review_doc: {
+					id: "code_review_doc",
+					family: WorkflowArtifactFamily.CodeReviewOutput,
+					intentMode: "derived",
+					parentIdentitySource: undefined,
+					targetIdentitySource: {
+						kind: "workflow_value",
+						key: targetIdentityKey,
+					},
+					outputValueKeys: codeReviewKeys,
+				},
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Stories Review Target Project")
+		const projectFolder = join(cwd, "docs", "projects", "stories-review-target-project")
+		const storiesReviewFolder = join(projectFolder, "implementation", "stories-review")
+		await mkdir(storiesReviewFolder, { recursive: true })
+		await writeFile(join(storiesReviewFolder, "Story-1-1.md"), "story", "utf8")
+		await writeFile(join(storiesReviewFolder, "Remediation-story-1-1-1.md"), "remediation story", "utf8")
+
+		getActiveWorkflowSession(taskState).workflowValues[targetIdentityKey] = "1.1"
+		const storyTargetResult = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "code_review_doc",
+			expectedArtifactAbsolutePath: undefined,
+		})
+
+		expect(storyTargetResult).to.deep.include({
+			artifactIdentity: "1.1",
+			artifactFilename: "code-review-1-1.md",
+			artifactRelativePath: join("review", "code-review-1-1.md"),
+			artifactAbsolutePath: join(projectFolder, "review", "code-review-1-1.md"),
+			targetIdentity: "1.1",
+		})
+
+		getActiveWorkflowSession(taskState).workflowValues[targetIdentityKey] = "1.1.1"
+		const remediationTargetResult = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "code_review_doc",
+			expectedArtifactAbsolutePath: undefined,
+		})
+
+		expect(remediationTargetResult).to.deep.include({
+			artifactIdentity: "1.1.1",
+			artifactFilename: "code-review-1-1-1.md",
+			artifactRelativePath: join("review", "code-review-1-1-1.md"),
+			artifactAbsolutePath: join(projectFolder, "review", "code-review-1-1-1.md"),
+			targetIdentity: "1.1.1",
+		})
+
+		getActiveWorkflowSession(taskState).workflowValues[targetIdentityKey] = "1.2"
+		let missingTargetError: unknown
+		try {
+			await runtime.prepareWorkflowArtifactCreation({
+				taskState,
+				artifactId: "code_review_doc",
+			})
+		} catch (error) {
+			missingTargetError = error
+		}
+
+		expect(missingTargetError).to.be.instanceOf(Error)
+		if (!(missingTargetError instanceof Error)) {
+			throw new Error("Expected missing target identity to throw.")
+		}
+		expect(missingTargetError.message).to.equal(
+			"Cannot allocate workflow artifact code_review_doc because required artifact identity 1.2 was not found in the selected project.",
+		)
 	})
 
 	it("allocates the brainstorming singleton artifact in discovery and maps its absolute path to output_file", async () => {
@@ -10517,6 +10617,94 @@ describe("WorkflowRuntime", () => {
 			artifactIdentity: "1.1",
 			artifactFilename: "Story-1-1.md",
 			parentIdentity: "1",
+		})
+	})
+
+	it("allocates story and remediation story identities after moved implementation story files", async () => {
+		discoverWorkflowCandidatesStub.restore()
+		const selectedEpicIdentityKey = "selected_epic_identity"
+		const selectedStoryIdentityKey = "selected_story_identity"
+		const storyKeys = createParentedArtifactOutputValueKeys("implementation_child_story")
+		const remediationStoryKeys = createParentedArtifactOutputValueKeys("implementation_child_remediation_story")
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [
+				selectedEpicIdentityKey,
+				selectedStoryIdentityKey,
+				...collectArtifactOutputWorkflowValueKeys(storyKeys, remediationStoryKeys),
+			],
+			artifacts: {
+				story_doc: {
+					id: "story_doc",
+					family: WorkflowArtifactFamily.Story,
+					intentMode: "new",
+					parentIdentitySource: {
+						kind: "workflow_value",
+						key: selectedEpicIdentityKey,
+					},
+					targetIdentitySource: undefined,
+					outputValueKeys: storyKeys,
+				},
+				remediation_story_doc: {
+					id: "remediation_story_doc",
+					family: WorkflowArtifactFamily.RemediationStory,
+					intentMode: "new",
+					parentIdentitySource: {
+						kind: "workflow_value",
+						key: selectedStoryIdentityKey,
+					},
+					targetIdentitySource: undefined,
+					outputValueKeys: remediationStoryKeys,
+				},
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Implementation Child Numbering Project")
+		const projectFolder = join(cwd, "docs", "projects", "implementation-child-numbering-project")
+		const planningFolder = join(projectFolder, "planning")
+		await writeFile(join(planningFolder, "Epic-2-delivery-spec.md"), "delivery spec", "utf8")
+		const implementationStoryChildFolders: readonly string[] = [
+			"drafts",
+			"stories-backlog",
+			"stories-review",
+			"stories-complete",
+		]
+		for (const [index, childFolder] of implementationStoryChildFolders.entries()) {
+			const storyNumber = index + 1
+			const implementationChildFolder = join(projectFolder, "implementation", childFolder)
+			await mkdir(implementationChildFolder, { recursive: true })
+			await writeFile(join(implementationChildFolder, `Story-2-${storyNumber}.md`), "story", "utf8")
+			await writeFile(
+				join(implementationChildFolder, `Remediation-story-3-1-${storyNumber}.md`),
+				"remediation story",
+				"utf8",
+			)
+		}
+		await writeFile(join(projectFolder, "implementation", "stories-review", "Story-3-1.md"), "parent story", "utf8")
+
+		getActiveWorkflowSession(taskState).workflowValues[selectedEpicIdentityKey] = "2"
+		const storyResult = await runtime.prepareWorkflowArtifactCreation({
+			taskState,
+			artifactId: "story_doc",
+		})
+
+		expect(storyResult).to.deep.include({
+			artifactIdentity: "2.5",
+			artifactFilename: "Story-2-5.md",
+			parentIdentity: "2",
+		})
+
+		getActiveWorkflowSession(taskState).workflowValues[selectedStoryIdentityKey] = "3.1"
+		const remediationStoryResult = await runtime.prepareWorkflowArtifactCreation({
+			taskState,
+			artifactId: "remediation_story_doc",
+		})
+
+		expect(remediationStoryResult).to.deep.include({
+			artifactIdentity: "3.1.5",
+			artifactFilename: "Remediation-story-3-1-5.md",
+			parentIdentity: "3.1",
 		})
 	})
 
@@ -10989,11 +11177,11 @@ describe("WorkflowRuntime", () => {
 			{
 				artifactId: "review_doc",
 				sourceKey: "selected_review_target",
-				sourceValue: "1.1",
+				sourceValue: "code-review-1-1.md",
 				outputKeys: createTargetedArtifactOutputValueKeys("review"),
 				artifactDefinition: {
 					id: "review_doc",
-					family: WorkflowArtifactFamily.AdversarialReview,
+					family: WorkflowArtifactFamily.CodeReviewOutput,
 					intentMode: "derived",
 					parentIdentitySource: undefined,
 					targetIdentitySource: {

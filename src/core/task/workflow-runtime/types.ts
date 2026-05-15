@@ -457,11 +457,10 @@ export type WorkflowArtifactDefinition =
 	| {
 			id: string
 			family:
-				| WorkflowArtifactFamily.ReviewBlindHunter
-				| WorkflowArtifactFamily.ReviewEdgeCaseHunter
-				| WorkflowArtifactFamily.AdversarialReview
-				| WorkflowArtifactFamily.ReviewInputMarkdown
-				| WorkflowArtifactFamily.ReviewInputDiff
+				| WorkflowArtifactFamily.BlindReviewOutput
+				| WorkflowArtifactFamily.EdgeCaseReviewOutput
+				| WorkflowArtifactFamily.CodeReviewOutput
+				| WorkflowArtifactFamily.ReviewScopeManifest
 			intentMode: "derived"
 			parentIdentitySource: undefined
 			targetIdentitySource: WorkflowArtifactIdentitySource

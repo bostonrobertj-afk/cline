@@ -6304,13 +6304,26 @@ export class WorkflowRuntime {
 			throw new Error("Cannot discover workflow artifacts without a selected project folder.")
 		}
 
-		const subfolders = args.searchProjectWide ? WORKFLOW_PROJECT_SUBFOLDERS : [args.workflow.projectSubfolder]
+		const projectSubfolderPathSegmentSets = (
+			args.searchProjectWide ? WORKFLOW_PROJECT_SUBFOLDERS : [args.workflow.projectSubfolder]
+		).map((subfolder): readonly string[] => [projectFolderName, subfolder])
+		const implementationStoryChildFolderPathSegmentSets =
+			args.searchProjectWide &&
+			(args.familyDefinition.family === WorkflowArtifactFamily.Story ||
+				args.familyDefinition.family === WorkflowArtifactFamily.RemediationStory)
+				? WORKFLOW_IMPLEMENTATION_STORY_CHILD_FOLDERS.map((childFolder): readonly string[] => [
+						projectFolderName,
+						"implementation",
+						childFolder,
+					])
+				: []
+		const targetPathSegmentSets = [...projectSubfolderPathSegmentSets, ...implementationStoryChildFolderPathSegmentSets]
 		const filenames: string[] = []
-		for (const subfolder of subfolders) {
+		for (const targetPathSegments of targetPathSegmentSets) {
 			const candidates = await discoverWorkflowCandidates({
 				rootDirectory: this.resolveWorkflowProjectOutputRoot(),
 				workspacePathPolicy: this.workspacePathPolicy,
-				targetPathSegments: [projectFolderName, subfolder],
+				targetPathSegments,
 				entryType: "file",
 				immediateChildrenOnly: true,
 				namingPattern: args.familyDefinition.discoveryPattern,
@@ -6415,11 +6428,10 @@ export class WorkflowRuntime {
 					targetIdentity: undefined,
 				}
 			}
-			case WorkflowArtifactFamily.ReviewBlindHunter:
-			case WorkflowArtifactFamily.ReviewEdgeCaseHunter:
-			case WorkflowArtifactFamily.AdversarialReview:
-			case WorkflowArtifactFamily.ReviewInputMarkdown:
-			case WorkflowArtifactFamily.ReviewInputDiff: {
+			case WorkflowArtifactFamily.BlindReviewOutput:
+			case WorkflowArtifactFamily.EdgeCaseReviewOutput:
+			case WorkflowArtifactFamily.CodeReviewOutput:
+			case WorkflowArtifactFamily.ReviewScopeManifest: {
 				const targetIdentity = this.normalizeWorkflowArtifactIdentityInput(
 					this.readWorkflowArtifactIdentitySource({
 						session: args.session,
@@ -6739,11 +6751,10 @@ export class WorkflowRuntime {
 				return this.parseDottedWorkflowArtifactIdentity(`${match[1]}.${match[2]}`)
 			case WorkflowArtifactFamily.RemediationStory:
 				return this.parseDottedWorkflowArtifactIdentity(`${match[1]}.${match[2]}.${match[3]}`)
-			case WorkflowArtifactFamily.ReviewBlindHunter:
-			case WorkflowArtifactFamily.ReviewEdgeCaseHunter:
-			case WorkflowArtifactFamily.AdversarialReview:
-			case WorkflowArtifactFamily.ReviewInputMarkdown:
-			case WorkflowArtifactFamily.ReviewInputDiff:
+			case WorkflowArtifactFamily.BlindReviewOutput:
+			case WorkflowArtifactFamily.EdgeCaseReviewOutput:
+			case WorkflowArtifactFamily.CodeReviewOutput:
+			case WorkflowArtifactFamily.ReviewScopeManifest:
 				return this.parseDottedWorkflowArtifactIdentity(match[1].replace(/-/g, "."))
 		}
 	}
@@ -6765,10 +6776,9 @@ export class WorkflowRuntime {
 			return `${remediationStoryMatch[1]}.${remediationStoryMatch[2]}.${remediationStoryMatch[3]}`
 		}
 
-		const reviewArtifactMatch =
-			/^(?:Review-blind-hunter|Review-edge-case-hunter|Adversarial-review|Review-input)-(\d+-\d+(?:-\d+)?)\.(?:md|diff)$/.exec(
-				trimmedIdentity,
-			)
+		const reviewArtifactMatch = /^(?:blind-review|edge-case-hunter|code-review|review-scope)-(\d+-\d+(?:-\d+)?)\.md$/.exec(
+			trimmedIdentity,
+		)
 		if (reviewArtifactMatch) {
 			return reviewArtifactMatch[1].replace(/-/g, ".")
 		}

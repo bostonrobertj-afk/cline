@@ -7,11 +7,10 @@ export enum WorkflowArtifactFamily {
 	EpicStoriesIndex = "epic_stories_index",
 	Story = "story",
 	RemediationStory = "remediation_story",
-	ReviewBlindHunter = "review_blind_hunter",
-	ReviewEdgeCaseHunter = "review_edge_case_hunter",
-	AdversarialReview = "adversarial_review",
-	ReviewInputMarkdown = "review_input_markdown",
-	ReviewInputDiff = "review_input_diff",
+	BlindReviewOutput = "blind_review_output",
+	EdgeCaseReviewOutput = "edge_case_review_output",
+	CodeReviewOutput = "code_review_output",
+	ReviewScopeManifest = "review_scope_manifest",
 }
 
 export type WorkflowArtifactAllocationMode =
@@ -31,8 +30,8 @@ export type WorkflowArtifactNumberingScope =
 	| "parent_epic"
 	| "parent_story"
 	| "target_identity"
-export type WorkflowArtifactFileExtension = ".md" | ".json" | ".diff"
-export type WorkflowArtifactContentKind = "markdown" | "structured_json_index" | "diff"
+export type WorkflowArtifactFileExtension = ".md" | ".json"
+export type WorkflowArtifactContentKind = "markdown" | "structured_json_index"
 
 interface WorkflowArtifactFamilyDefinitionBase {
 	family: WorkflowArtifactFamily
@@ -70,11 +69,10 @@ export interface WorkflowNewNumberedArtifactFamilyDefinition extends WorkflowArt
 
 export interface WorkflowTargetDerivedArtifactFamilyDefinition extends WorkflowArtifactFamilyDefinitionBase {
 	family:
-		| WorkflowArtifactFamily.ReviewBlindHunter
-		| WorkflowArtifactFamily.ReviewEdgeCaseHunter
-		| WorkflowArtifactFamily.AdversarialReview
-		| WorkflowArtifactFamily.ReviewInputMarkdown
-		| WorkflowArtifactFamily.ReviewInputDiff
+		| WorkflowArtifactFamily.BlindReviewOutput
+		| WorkflowArtifactFamily.EdgeCaseReviewOutput
+		| WorkflowArtifactFamily.CodeReviewOutput
+		| WorkflowArtifactFamily.ReviewScopeManifest
 	allocationMode: "derived_from_target"
 	identityRequirement: "target_story_or_remediation_story"
 	numberingScope: "target_identity"
@@ -171,54 +169,44 @@ export const WORKFLOW_ARTIFACT_FAMILY_REGISTRY: Readonly<Record<WorkflowArtifact
 		numberingScope: "parent_story",
 		discoveryPattern: /^Remediation-story-(\d+)-(\d+)-(\d+)\.md$/,
 	},
-	[WorkflowArtifactFamily.ReviewBlindHunter]: {
-		family: WorkflowArtifactFamily.ReviewBlindHunter,
+	[WorkflowArtifactFamily.BlindReviewOutput]: {
+		family: WorkflowArtifactFamily.BlindReviewOutput,
 		allocationMode: "derived_from_target",
 		identityRequirement: "target_story_or_remediation_story",
-		filenamePattern: "Review-blind-hunter-{target}.md",
+		filenamePattern: "blind-review-{target}.md",
 		fileExtension: ".md",
 		contentKind: "markdown",
 		numberingScope: "target_identity",
-		discoveryPattern: /^Review-blind-hunter-(\d+-\d+(?:-\d+)?)\.md$/,
+		discoveryPattern: /^blind-review-(\d+-\d+(?:-\d+)?)\.md$/,
 	},
-	[WorkflowArtifactFamily.ReviewEdgeCaseHunter]: {
-		family: WorkflowArtifactFamily.ReviewEdgeCaseHunter,
+	[WorkflowArtifactFamily.EdgeCaseReviewOutput]: {
+		family: WorkflowArtifactFamily.EdgeCaseReviewOutput,
 		allocationMode: "derived_from_target",
 		identityRequirement: "target_story_or_remediation_story",
-		filenamePattern: "Review-edge-case-hunter-{target}.md",
+		filenamePattern: "edge-case-hunter-{target}.md",
 		fileExtension: ".md",
 		contentKind: "markdown",
 		numberingScope: "target_identity",
-		discoveryPattern: /^Review-edge-case-hunter-(\d+-\d+(?:-\d+)?)\.md$/,
+		discoveryPattern: /^edge-case-hunter-(\d+-\d+(?:-\d+)?)\.md$/,
 	},
-	[WorkflowArtifactFamily.AdversarialReview]: {
-		family: WorkflowArtifactFamily.AdversarialReview,
+	[WorkflowArtifactFamily.CodeReviewOutput]: {
+		family: WorkflowArtifactFamily.CodeReviewOutput,
 		allocationMode: "derived_from_target",
 		identityRequirement: "target_story_or_remediation_story",
-		filenamePattern: "Adversarial-review-{target}.md",
+		filenamePattern: "code-review-{target}.md",
 		fileExtension: ".md",
 		contentKind: "markdown",
 		numberingScope: "target_identity",
-		discoveryPattern: /^Adversarial-review-(\d+-\d+(?:-\d+)?)\.md$/,
+		discoveryPattern: /^code-review-(\d+-\d+(?:-\d+)?)\.md$/,
 	},
-	[WorkflowArtifactFamily.ReviewInputMarkdown]: {
-		family: WorkflowArtifactFamily.ReviewInputMarkdown,
+	[WorkflowArtifactFamily.ReviewScopeManifest]: {
+		family: WorkflowArtifactFamily.ReviewScopeManifest,
 		allocationMode: "derived_from_target",
 		identityRequirement: "target_story_or_remediation_story",
-		filenamePattern: "Review-input-{target}.md",
+		filenamePattern: "review-scope-{target}.md",
 		fileExtension: ".md",
 		contentKind: "markdown",
 		numberingScope: "target_identity",
-		discoveryPattern: /^Review-input-(\d+-\d+(?:-\d+)?)\.md$/,
-	},
-	[WorkflowArtifactFamily.ReviewInputDiff]: {
-		family: WorkflowArtifactFamily.ReviewInputDiff,
-		allocationMode: "derived_from_target",
-		identityRequirement: "target_story_or_remediation_story",
-		filenamePattern: "Review-input-{target}.diff",
-		fileExtension: ".diff",
-		contentKind: "diff",
-		numberingScope: "target_identity",
-		discoveryPattern: /^Review-input-(\d+-\d+(?:-\d+)?)\.diff$/,
+		discoveryPattern: /^review-scope-(\d+-\d+(?:-\d+)?)\.md$/,
 	},
 }

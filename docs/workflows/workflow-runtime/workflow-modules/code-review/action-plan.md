@@ -76,7 +76,7 @@ Sibling-pattern audit summary:
 
 After completing this phase, pause for QA review before moving to Phase 2.
 
-[ ] Task 1. Replace legacy runtime review artifact families with the current review artifact families.
+[x] Task 1. Replace legacy runtime review artifact families with the current review artifact families.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`
@@ -84,97 +84,97 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 1.1. In `artifactFamilies.ts`, replace the enum members `ReviewBlindHunter`, `ReviewEdgeCaseHunter`, `AdversarialReview`, `ReviewInputMarkdown`, and `ReviewInputDiff` with exactly `BlindReviewOutput = "blind_review_output"`, `EdgeCaseReviewOutput = "edge_case_review_output"`, `CodeReviewOutput = "code_review_output"`, and `ReviewScopeManifest = "review_scope_manifest"`.
+[x] Subtask 1.1. In `artifactFamilies.ts`, replace the enum members `ReviewBlindHunter`, `ReviewEdgeCaseHunter`, `AdversarialReview`, `ReviewInputMarkdown`, and `ReviewInputDiff` with exactly `BlindReviewOutput = "blind_review_output"`, `EdgeCaseReviewOutput = "edge_case_review_output"`, `CodeReviewOutput = "code_review_output"`, and `ReviewScopeManifest = "review_scope_manifest"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`
 
-[ ] Subtask 1.2. In `artifactFamilies.ts`, update `WorkflowTargetDerivedArtifactFamilyDefinition.family` so the target-derived union contains only `BlindReviewOutput`, `EdgeCaseReviewOutput`, `CodeReviewOutput`, and `ReviewScopeManifest`.
+[x] Subtask 1.2. In `artifactFamilies.ts`, update `WorkflowTargetDerivedArtifactFamilyDefinition.family` so the target-derived union contains only `BlindReviewOutput`, `EdgeCaseReviewOutput`, `CodeReviewOutput`, and `ReviewScopeManifest`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`
 
-[ ] Subtask 1.3. In `artifactFamilies.ts`, replace the five legacy target-derived registry entries with four entries whose filename patterns and discovery patterns are exactly `blind-review-{target}.md` with `/^blind-review-(\d+-\d+(?:-\d+)?)\.md$/`, `edge-case-hunter-{target}.md` with `/^edge-case-hunter-(\d+-\d+(?:-\d+)?)\.md$/`, `code-review-{target}.md` with `/^code-review-(\d+-\d+(?:-\d+)?)\.md$/`, and `review-scope-{target}.md` with `/^review-scope-(\d+-\d+(?:-\d+)?)\.md$/`; each entry must keep `allocationMode: "derived_from_target"`, `identityRequirement: "target_story_or_remediation_story"`, `fileExtension: ".md"`, `contentKind: "markdown"`, and `numberingScope: "target_identity"`.
+[x] Subtask 1.3. In `artifactFamilies.ts`, replace the five legacy target-derived registry entries with four entries whose filename patterns and discovery patterns are exactly `blind-review-{target}.md` with `/^blind-review-(\d+-\d+(?:-\d+)?)\.md$/`, `edge-case-hunter-{target}.md` with `/^edge-case-hunter-(\d+-\d+(?:-\d+)?)\.md$/`, `code-review-{target}.md` with `/^code-review-(\d+-\d+(?:-\d+)?)\.md$/`, and `review-scope-{target}.md` with `/^review-scope-(\d+-\d+(?:-\d+)?)\.md$/`; each entry must keep `allocationMode: "derived_from_target"`, `identityRequirement: "target_story_or_remediation_story"`, `fileExtension: ".md"`, `contentKind: "markdown"`, and `numberingScope: "target_identity"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`
 
-[ ] Subtask 1.4. In `artifactFamilies.ts`, remove `.diff` from `WorkflowArtifactFileExtension` and remove `"diff"` from `WorkflowArtifactContentKind` after confirming no surviving runtime artifact family uses diff content.
+[x] Subtask 1.4. In `artifactFamilies.ts`, remove `.diff` from `WorkflowArtifactFileExtension` and remove `"diff"` from `WorkflowArtifactContentKind` after confirming no surviving runtime artifact family uses diff content.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`
 
-[ ] Subtask 1.5. In `types.ts`, update the `WorkflowArtifactDefinition` target-derived family union so it contains only `WorkflowArtifactFamily.BlindReviewOutput`, `WorkflowArtifactFamily.EdgeCaseReviewOutput`, `WorkflowArtifactFamily.CodeReviewOutput`, and `WorkflowArtifactFamily.ReviewScopeManifest`.
+[x] Subtask 1.5. In `types.ts`, update the `WorkflowArtifactDefinition` target-derived family union so it contains only `WorkflowArtifactFamily.BlindReviewOutput`, `WorkflowArtifactFamily.EdgeCaseReviewOutput`, `WorkflowArtifactFamily.CodeReviewOutput`, and `WorkflowArtifactFamily.ReviewScopeManifest`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 
-[ ] Subtask 1.6. In `WorkflowRuntime.ts`, update `resolveWorkflowArtifactIdentity(...)` target-derived cases so the branch handles only `BlindReviewOutput`, `EdgeCaseReviewOutput`, `CodeReviewOutput`, and `ReviewScopeManifest`.
+[x] Subtask 1.6. In `WorkflowRuntime.ts`, update `resolveWorkflowArtifactIdentity(...)` target-derived cases so the branch handles only `BlindReviewOutput`, `EdgeCaseReviewOutput`, `CodeReviewOutput`, and `ReviewScopeManifest`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 1.7. In `WorkflowRuntime.ts`, update `parseWorkflowArtifactFilenameIdentity(...)` target-derived cases so the branch handles only `BlindReviewOutput`, `EdgeCaseReviewOutput`, `CodeReviewOutput`, and `ReviewScopeManifest`.
+[x] Subtask 1.7. In `WorkflowRuntime.ts`, update `parseWorkflowArtifactFilenameIdentity(...)` target-derived cases so the branch handles only `BlindReviewOutput`, `EdgeCaseReviewOutput`, `CodeReviewOutput`, and `ReviewScopeManifest`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 1.8. In `WorkflowRuntime.ts`, replace the legacy review artifact alias regex in `normalizeWorkflowArtifactIdentityInput(...)` with `/^(?:blind-review|edge-case-hunter|code-review|review-scope)-(\d+-\d+(?:-\d+)?)\.md$/`.
+[x] Subtask 1.8. In `WorkflowRuntime.ts`, replace the legacy review artifact alias regex in `normalizeWorkflowArtifactIdentityInput(...)` with `/^(?:blind-review|edge-case-hunter|code-review|review-scope)-(\d+-\d+(?:-\d+)?)\.md$/`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 1.9. In `WorkflowRuntime.test.ts`, update target-derived artifact allocation tests to create and assert only `blind-review-1-1-1.md`, `edge-case-hunter-1-1-1.md`, `code-review-1-1-1.md`, and `review-scope-1-1-1.md`; remove the old `Review-blind-hunter`, `Review-edge-case-hunter`, `Adversarial-review`, `Review-input` markdown, and `Review-input` diff expectations from active runtime artifact tests.
+[x] Subtask 1.9. In `WorkflowRuntime.test.ts`, update target-derived artifact allocation tests to create and assert only `blind-review-1-1-1.md`, `edge-case-hunter-1-1-1.md`, `code-review-1-1-1.md`, and `review-scope-1-1-1.md`; remove the old `Review-blind-hunter`, `Review-edge-case-hunter`, `Adversarial-review`, `Review-input` markdown, and `Review-input` diff expectations from active runtime artifact tests.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 1.10. In `WorkflowRuntime.test.ts`, update invalid or missing target-derived artifact tests that reference `WorkflowArtifactFamily.AdversarialReview` or other retired review families to use `WorkflowArtifactFamily.CodeReviewOutput` and the current `code-review-{target}.md` naming pattern.
+[x] Subtask 1.10. In `WorkflowRuntime.test.ts`, update invalid or missing target-derived artifact tests that reference `WorkflowArtifactFamily.AdversarialReview` or other retired review families to use `WorkflowArtifactFamily.CodeReviewOutput` and the current `code-review-{target}.md` naming pattern.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 1.11. In `WorkflowRuntime.test.ts`, add negative assertions proving `Review-input-1-1.md`, `Review-input-1-1.diff`, `Review-blind-hunter-1-1.md`, `Review-edge-case-hunter-1-1.md`, and `Adversarial-review-1-1.md` no longer normalize as current target-derived review artifact filenames.
+[x] Subtask 1.11. In `WorkflowRuntime.test.ts`, add negative assertions proving `Review-input-1-1.md`, `Review-input-1-1.diff`, `Review-blind-hunter-1-1.md`, `Review-edge-case-hunter-1-1.md`, and `Adversarial-review-1-1.md` no longer normalize as current target-derived review artifact filenames.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 1.12. In `WorkflowRuntime.ts`, update project-wide artifact discovery so `WorkflowArtifactFamily.Story` and `WorkflowArtifactFamily.RemediationStory` discovery includes immediate files under `implementation/drafts`, `implementation/stories-backlog`, `implementation/stories-review`, and `implementation/stories-complete` in addition to the existing project subfolder scan; keep non-story artifact discovery unchanged.
+[x] Subtask 1.12. In `WorkflowRuntime.ts`, update project-wide artifact discovery so `WorkflowArtifactFamily.Story` and `WorkflowArtifactFamily.RemediationStory` discovery includes immediate files under `implementation/drafts`, `implementation/stories-backlog`, `implementation/stories-review`, and `implementation/stories-complete` in addition to the existing project subfolder scan; keep non-story artifact discovery unchanged.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 
-[ ] Subtask 1.13. In `WorkflowRuntime.test.ts`, add coverage proving target-derived `code_review_output` allocation accepts an existing target story file in `implementation/stories-review` and an existing remediation story file in `implementation/stories-review`, and still rejects a target identity when no matching story or remediation-story file exists in any implementation story child folder.
+[x] Subtask 1.13. In `WorkflowRuntime.test.ts`, add coverage proving target-derived `code_review_output` allocation accepts an existing target story file in `implementation/stories-review` and an existing remediation story file in `implementation/stories-review`, and still rejects a target identity when no matching story or remediation-story file exists in any implementation story child folder.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Subtask 1.14. In `WorkflowRuntime.test.ts`, add coverage proving new story and remediation-story artifact allocation considers existing `Story-{E}-{S}.md` and `Remediation-story-{E}-{S}-{R}.md` files in `implementation/drafts`, `implementation/stories-backlog`, `implementation/stories-review`, and `implementation/stories-complete` so moved story files cannot cause duplicate story or remediation-story identities.
+[x] Subtask 1.14. In `WorkflowRuntime.test.ts`, add coverage proving new story and remediation-story artifact allocation considers existing `Story-{E}-{S}.md` and `Remediation-story-{E}-{S}-{R}.md` files in `implementation/drafts`, `implementation/stories-backlog`, `implementation/stories-review`, and `implementation/stories-complete` so moved story files cannot cause duplicate story or remediation-story identities.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-[ ] Task 2. Validate Phase 1.
+[x] Task 2. Validate Phase 1.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-[ ] Subtask 2.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; if generated proto files are missing, run `npm run protos` and rerun the exact failed test command before reporting the result.
+[x] Subtask 2.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; if generated proto files are missing, run `npm run protos` and rerun the exact failed test command before reporting the result.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-[ ] Subtask 2.2. Run `npm run check-types`; if it fails during proto host probing, rerun with the approved elevated path and stop on the first non-environment TypeScript failure.
+[x] Subtask 2.2. Run `npm run check-types`; if it fails during proto host probing, rerun with the approved elevated path and stop on the first non-environment TypeScript failure.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-[ ] Subtask 2.3. Run `npm run lint`.
+[x] Subtask 2.3. Run `npm run lint`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-[ ] Subtask 2.4. Run `rg -n "ReviewBlindHunter|ReviewEdgeCaseHunter|AdversarialReview|ReviewInputMarkdown|ReviewInputDiff|Review-blind-hunter|Review-edge-case-hunter|Adversarial-review|Review-input|review_blind_hunter|review_edge_case_hunter|adversarial_review|review_input_markdown|review_input_diff" src/core/task/workflow-runtime`; inspect any hits in context and stop if any hit is active runtime code instead of an explicit negative test assertion.
+[x] Subtask 2.4. Run `rg -n "ReviewBlindHunter|ReviewEdgeCaseHunter|AdversarialReview|ReviewInputMarkdown|ReviewInputDiff|Review-blind-hunter|Review-edge-case-hunter|Adversarial-review|Review-input|review_blind_hunter|review_edge_case_hunter|adversarial_review|review_input_markdown|review_input_diff" src/core/task/workflow-runtime`; inspect any hits in context and stop if any hit is active runtime code instead of an explicit negative test assertion.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
