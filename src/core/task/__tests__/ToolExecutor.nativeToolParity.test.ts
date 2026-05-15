@@ -1,12 +1,44 @@
 import { strict as assert } from "node:assert"
 import { afterEach, describe, it } from "mocha"
 import sinon from "sinon"
+import type { ToolUse } from "@/core/assistant-message"
 import { ClineDefaultTool } from "@/shared/tools"
-import { formatResponse } from "../../prompts/responses"
 import { TaskState } from "../TaskState"
 import { ToolExecutor } from "../ToolExecutor"
+import { ToolExecutorCoordinator } from "../tools/ToolExecutorCoordinator"
 
-function createExecutor() {
+interface ToolExecutorNativeParityHarness {
+	executor: ToolExecutor
+	taskState: TaskState
+	coordinator: ToolExecutorCoordinator
+	executeStub: sinon.SinonStub
+}
+
+function createReadFileNativeBlock(callId: string): ToolUse {
+	return {
+		type: "tool_use",
+		name: ClineDefaultTool.FILE_READ,
+		params: {
+			path: "src/index.ts",
+		},
+		partial: false,
+		isNativeToolCall: true,
+		call_id: callId,
+	}
+}
+
+function createRecordFindingsBlock(): ToolUse {
+	return {
+		type: "tool_use",
+		name: ClineDefaultTool.RECORD_FINDINGS,
+		params: {
+			findings: "[]",
+		},
+		partial: false,
+	}
+}
+
+function createExecutor(): ToolExecutorNativeParityHarness {
 	const taskState = new TaskState()
 	const stateManager = {
 		getGlobalSettingsKey: (key: string) => {
@@ -73,17 +105,16 @@ function createExecutor() {
 		sinon.stub().resolves({}),
 	)
 
-	const coordinator = (executor as any).coordinator
-	sinon.stub(coordinator, "has").returns(true)
-	sinon.stub(coordinator, "getHandler").callsFake((...args: unknown[]) => ({
-		getDescription: () => `[${String(args[0])}]`,
-	}))
+	const coordinatorValue: unknown = Reflect.get(executor, "coordinator")
+	if (!(coordinatorValue instanceof ToolExecutorCoordinator)) {
+		throw new Error("Expected ToolExecutorCoordinator on ToolExecutor.")
+	}
 
 	return {
 		executor,
 		taskState,
-		coordinator,
-		executeStub: sinon.stub(coordinator, "execute"),
+		coordinator: coordinatorValue,
+		executeStub: sinon.stub(coordinatorValue, "execute"),
 	}
 }
 
@@ -96,16 +127,7 @@ describe("ToolExecutor native tool parity", () => {
 		const { executor, taskState, executeStub } = createExecutor()
 		taskState.didRejectTool = true
 
-		const outcome = await executor.executeTool({
-			type: "tool_use",
-			name: ClineDefaultTool.FILE_READ,
-			params: {
-				path: "src/index.ts",
-			},
-			partial: false,
-			isNativeToolCall: true,
-			call_id: "call_denied",
-		} as any)
+		const outcome = await executor.executeTool(createReadFileNativeBlock("call_denied"))
 
 		sinon.assert.notCalled(executeStub)
 		assert.deepEqual(outcome, {
@@ -121,16 +143,7 @@ describe("ToolExecutor native tool parity", () => {
 		const { executor, taskState, executeStub } = createExecutor()
 		executeStub.resolves("file contents")
 
-		const outcome = await executor.executeTool({
-			type: "tool_use",
-			name: ClineDefaultTool.FILE_READ,
-			params: {
-				path: "src/index.ts",
-			},
-			partial: false,
-			isNativeToolCall: true,
-			call_id: "call_read_file",
-		} as any)
+		const outcome = await executor.executeTool(createReadFileNativeBlock("call_read_file"))
 
 		assert.deepEqual(outcome, {
 			status: "executed",
@@ -143,38 +156,15 @@ describe("ToolExecutor native tool parity", () => {
 		assert.equal(taskState.nativeToolCallIdsBreakingPreviousResponseChain.has("call_read_file"), false)
 	})
 
-	it("returns true when executeInternalToolSilently receives a non-failure tool result", async () => {
-		const { executor, taskState, executeStub } = createExecutor()
-		executeStub.resolves("ok")
+	it("registers record_findings and leaves the retired code_review_spec_update handler absent", () => {
+		const { coordinator } = createExecutor()
+		const recordFindingsHandler = coordinator.getHandler(ClineDefaultTool.RECORD_FINDINGS)
 
-		const result = await executor.executeInternalToolSilently(ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE)
-
-		assert.equal(result, true)
-		assert.equal(executeStub.calledOnce, true)
-		assert.deepEqual(executeStub.firstCall.args[1], {
-			type: "tool_use",
-			name: ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE,
-			params: {},
-			partial: false,
-		})
-		assert.deepEqual(taskState.userMessageContent, [])
-	})
-
-	it("returns false when executeInternalToolSilently receives a formatted tool error result", async () => {
-		const { executor, executeStub } = createExecutor()
-		executeStub.resolves(formatResponse.toolError("boom"))
-
-		const result = await executor.executeInternalToolSilently(ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE)
-
-		assert.equal(result, false)
-	})
-
-	it("returns false when executeInternalToolSilently catches a coordinator throw", async () => {
-		const { executor, executeStub } = createExecutor()
-		executeStub.rejects(new Error("boom"))
-
-		const result = await executor.executeInternalToolSilently(ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE)
-
-		assert.equal(result, false)
+		assert.equal(coordinator.has(ClineDefaultTool.RECORD_FINDINGS), true)
+		assert.notEqual(recordFindingsHandler, undefined)
+		assert.equal(recordFindingsHandler?.name, ClineDefaultTool.RECORD_FINDINGS)
+		assert.equal(recordFindingsHandler?.getDescription(createRecordFindingsBlock()), "[record_findings]")
+		assert.equal(coordinator.has("code_review_spec_update"), false)
+		assert.equal(coordinator.getHandler("code_review_spec_update"), undefined)
 	})
 })

@@ -11,7 +11,6 @@ import { AskFollowupQuestionToolHandler } from "./handlers/AskFollowupQuestionTo
 import { AttemptCompletionHandler } from "./handlers/AttemptCompletionHandler"
 import { BrowserToolHandler } from "./handlers/BrowserToolHandler"
 import { BuildWorkflowDocumentToolHandler } from "./handlers/BuildWorkflowDocumentToolHandler"
-import { CodeReviewSpecUpdateToolHandler } from "./handlers/CodeReviewSpecUpdateToolHandler"
 import { CondenseHandler } from "./handlers/CondenseHandler"
 import { CreateWorkflowArtifactToolHandler } from "./handlers/CreateWorkflowArtifactToolHandler"
 import { DeleteWorkflowArtifactToolHandler } from "./handlers/DeleteWorkflowArtifactToolHandler"
@@ -30,6 +29,7 @@ import { PlanRemediationStoryArtifactToolHandler } from "./handlers/PlanRemediat
 import { PlanStoryArtifactsToolHandler } from "./handlers/PlanStoryArtifactsToolHandler"
 import { ReadFileRangeToolHandler } from "./handlers/ReadFileRangeToolHandler"
 import { ReadFileToolHandler } from "./handlers/ReadFileToolHandler"
+import { RecordFindingsToolHandler } from "./handlers/RecordFindingsToolHandler"
 import { ReportBugHandler } from "./handlers/ReportBugHandler"
 import { RequestTaskDetailToolHandler } from "./handlers/RequestTaskDetailToolHandler"
 import { SearchFilesToolHandler } from "./handlers/SearchFilesToolHandler"
@@ -145,7 +145,7 @@ export class ToolExecutorCoordinator {
 		[ClineDefaultTool.GENERATE_STORY_FILES]: (v: ToolValidator) => new GenerateStoryFilesToolHandler(v),
 		[ClineDefaultTool.UPDATE_STORY_INDEX_STATUS]: (v: ToolValidator) => new UpdateStoryIndexStatusToolHandler(v),
 		[ClineDefaultTool.DEV_STORY_GIT_FINALIZE]: (v: ToolValidator) => new DevStoryGitFinalizeToolHandler(v),
-		[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: (_v: ToolValidator) => new CodeReviewSpecUpdateToolHandler(),
+		[ClineDefaultTool.RECORD_FINDINGS]: (v: ToolValidator) => new RecordFindingsToolHandler(v),
 		[ClineDefaultTool.STORY_TASK_REMINDER]: (_v: ToolValidator) => new StoryTaskReminderToolHandler(),
 		[ClineDefaultTool.STORY_TASK_COMPLETE]: (_v: ToolValidator) => new StoryTaskCompleteToolHandler(),
 		[ClineDefaultTool.REQUEST_TASK_DETAIL]: (_v: ToolValidator) => new RequestTaskDetailToolHandler(),

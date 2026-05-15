@@ -82,6 +82,7 @@ describe("ResponseToolRuntime", () => {
 	it("keeps workflow-owned deterministic tools registered as non-response tools", () => {
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.SET_WORKFLOW_VALUES), undefined)
 		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT), undefined)
+		assert.equal(ResponseToolRegistry.get(ClineDefaultTool.RECORD_FINDINGS), undefined)
 	})
 
 	it("keeps workflow file-operation tools registered as non-response tools", () => {

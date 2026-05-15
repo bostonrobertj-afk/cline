@@ -68,6 +68,7 @@ export const toolParamNames = [
 	"description",
 	"id",
 	"category",
+	"findings",
 	"output_file",
 	"selected_approach",
 	"technique_name",

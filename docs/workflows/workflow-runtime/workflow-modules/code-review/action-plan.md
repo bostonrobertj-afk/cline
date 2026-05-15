@@ -183,7 +183,7 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 3.
 
-[ ] Task 3. Add the shared `record_findings` tool contract and remove the retired `code_review_spec_update` contract.
+[x] Task 3. Add the shared `record_findings` tool contract and remove the retired `code_review_spec_update` contract.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
@@ -193,93 +193,93 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 
-[ ] Subtask 3.1. In `tools.ts`, delete `ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE` and add `ClineDefaultTool.RECORD_FINDINGS = "record_findings"` in the workflow-tool group.
+[x] Subtask 3.1. In `tools.ts`, delete `ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE` and add `ClineDefaultTool.RECORD_FINDINGS = "record_findings"` in the workflow-tool group.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
 
-[ ] Subtask 3.2. In `tools.ts`, keep `record_findings` out of `READ_ONLY_TOOLS` because it mutates the findings document.
+[x] Subtask 3.2. In `tools.ts`, keep `record_findings` out of `READ_ONLY_TOOLS` because it mutates the findings document.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/tools.ts`
 
-[ ] Subtask 3.3. In `assistant-message/index.ts`, add `"findings"` to `toolParamNames`.
+[x] Subtask 3.3. In `assistant-message/index.ts`, add `"findings"` to `toolParamNames`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/assistant-message/index.ts`
 
-[ ] Subtask 3.4. In `backendWorkflowToolContracts.ts`, delete the `CODE_REVIEW_SPEC_UPDATE` contract entry and add a `RECORD_FINDINGS` contract entry named `record_findings` with one required `findings` array parameter whose items are objects with required `finding`, `categories`, and `description` fields; `finding` and `description` are strings, and `categories` is an array of strings.
+[x] Subtask 3.4. In `backendWorkflowToolContracts.ts`, delete the `CODE_REVIEW_SPEC_UPDATE` contract entry and add a `RECORD_FINDINGS` contract entry named `record_findings` with one required `findings` array parameter whose items are objects with required `finding`, `categories`, and `description` fields; `finding` and `description` are strings, and `categories` is an array of strings.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/backendWorkflowToolContracts.ts`
 
-[ ] Subtask 3.5. In `ResponseToolRegistry.ts`, delete the `CODE_REVIEW_SPEC_UPDATE` metadata entry and add `[ClineDefaultTool.RECORD_FINDINGS]: undefined`.
+[x] Subtask 3.5. In `ResponseToolRegistry.ts`, delete the `CODE_REVIEW_SPEC_UPDATE` metadata entry and add `[ClineDefaultTool.RECORD_FINDINGS]: undefined`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/ResponseToolRegistry.ts`
 
-[ ] Subtask 3.6. In `workflow-runtime-metadata.test.ts`, add assertions that `getBackendWorkflowToolContract(ClineDefaultTool.RECORD_FINDINGS)` returns the `record_findings` contract with a required `findings` parameter, and that `ResponseToolRegistry.get(ClineDefaultTool.RECORD_FINDINGS)` and `ResponseToolRegistry.isResponseTool(ClineDefaultTool.RECORD_FINDINGS)` identify it as a non-response tool.
+[x] Subtask 3.6. In `workflow-runtime-metadata.test.ts`, add assertions that `getBackendWorkflowToolContract(ClineDefaultTool.RECORD_FINDINGS)` returns the `record_findings` contract with a required `findings` parameter, and that `ResponseToolRegistry.get(ClineDefaultTool.RECORD_FINDINGS)` and `ResponseToolRegistry.isResponseTool(ClineDefaultTool.RECORD_FINDINGS)` identify it as a non-response tool.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/workflow-runtime-metadata.test.ts`
 
-[ ] Subtask 3.7. In `ResponseToolRuntime.test.ts`, add `ClineDefaultTool.RECORD_FINDINGS` to the non-response workflow tool assertions.
+[x] Subtask 3.7. In `ResponseToolRuntime.test.ts`, add `ClineDefaultTool.RECORD_FINDINGS` to the non-response workflow tool assertions.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts`
 
-[ ] Task 4. Implement `RecordFindingsToolHandler`.
+[x] Task 4. Implement `RecordFindingsToolHandler`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/RecordFindingsToolHandler.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/RecordFindingsToolHandler.test.ts`
 
-[ ] Subtask 4.1. Add `RecordFindingsToolHandler.ts` with `readonly name = ClineDefaultTool.RECORD_FINDINGS`, a constructor accepting `ToolValidator`, and `getDescription(...)` returning `[record_findings]`.
+[x] Subtask 4.1. Add `RecordFindingsToolHandler.ts` with `readonly name = ClineDefaultTool.RECORD_FINDINGS`, a constructor accepting `ToolValidator`, and `getDescription(...)` returning `[record_findings]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/RecordFindingsToolHandler.ts`
 
-[ ] Subtask 4.2. In `RecordFindingsToolHandler.ts`, add typed parser helpers that read only the `findings` param, accept either a JSON string or a materialized value, reject unsupported top-level params, and narrow to `readonly CodeReviewFindingRequest[]` without `any` or forced assertions.
+[x] Subtask 4.2. In `RecordFindingsToolHandler.ts`, add typed parser helpers that read only the `findings` param, accept either a JSON string or a materialized value, reject unsupported top-level params, and narrow to `readonly CodeReviewFindingRequest[]` without `any` or forced assertions.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/RecordFindingsToolHandler.ts`
 
-[ ] Subtask 4.3. In `RecordFindingsToolHandler.ts`, model categories with an enum or literal union containing exactly `task_failure`, `dev_agent_failure`, and `upstream_failure`, and map those values to exactly `## Task Failures`, `## Dev Agent Failures`, and `## Upstream Failures`.
+[x] Subtask 4.3. In `RecordFindingsToolHandler.ts`, model categories with an enum or literal union containing exactly `task_failure`, `dev_agent_failure`, and `upstream_failure`, and map those values to exactly `## Task Failures`, `## Dev Agent Failures`, and `## Upstream Failures`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/RecordFindingsToolHandler.ts`
 
-[ ] Subtask 4.4. In `RecordFindingsToolHandler.ts`, resolve the target file from `config.taskState.activeWorkflowSession.workflowValues.code_review_output`, require `activeWorkflowName === "code-review"`, require a non-empty string path, and reject calls that do not have an active code-review workflow session.
+[x] Subtask 4.4. In `RecordFindingsToolHandler.ts`, resolve the target file from `config.taskState.activeWorkflowSession.workflowValues.code_review_output`, require `activeWorkflowName === "code-review"`, require a non-empty string path, and reject calls that do not have an active code-review workflow session.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/RecordFindingsToolHandler.ts`
 
-[ ] Subtask 4.5. In `RecordFindingsToolHandler.ts`, validate the resolved `code_review_output` path with `ToolValidator.checkClineIgnorePath(...)`, read the existing document, require all three headings to exist, and fail without mutation when any path, read, or heading validation fails.
+[x] Subtask 4.5. In `RecordFindingsToolHandler.ts`, validate the resolved `code_review_output` path with `ToolValidator.checkClineIgnorePath(...)`, read the existing document, require all three headings to exist, and fail without mutation when any path, read, or heading validation fails.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/RecordFindingsToolHandler.ts`
 
-[ ] Subtask 4.6. In `RecordFindingsToolHandler.ts`, implement append-only markdown updates so each finding is appended below each selected category heading in exactly this shape: `### {finding}`, blank line, `{description}`; preserve heading order and existing content.
+[x] Subtask 4.6. In `RecordFindingsToolHandler.ts`, implement append-only markdown updates so each finding is appended below each selected category heading in exactly this shape: `### {finding}`, blank line, `{description}`; preserve heading order and existing content.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/RecordFindingsToolHandler.ts`
 
-[ ] Subtask 4.7. In `RecordFindingsToolHandler.ts`, return success without file write when `findings` is an empty array; the result JSON must report `recordedFindingCount: 0` and `updatedHeadings: []`.
+[x] Subtask 4.7. In `RecordFindingsToolHandler.ts`, return success without file write when `findings` is an empty array; the result JSON must report `recordedFindingCount: 0` and `updatedHeadings: []`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/RecordFindingsToolHandler.ts`
 
-[ ] Subtask 4.8. In `RecordFindingsToolHandler.ts`, for non-empty successful writes, use the existing approval/path policy pattern from `UpsertEpicToolHandler`, atomically replace the document, clear the file-read cache for the findings path, set `didEditFile`, reset `consecutiveMistakeCount`, and return JSON with exactly `recordedFindingCount` and `updatedHeadings`; do not return raw document content.
+[x] Subtask 4.8. In `RecordFindingsToolHandler.ts`, for non-empty successful writes, use the existing approval/path policy pattern from `UpsertEpicToolHandler`, atomically replace the document, clear the file-read cache for the findings path, set `didEditFile`, reset `consecutiveMistakeCount`, and return JSON with exactly `recordedFindingCount` and `updatedHeadings`; do not return raw document content.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/RecordFindingsToolHandler.ts`
 
-[ ] Subtask 4.9. Add `RecordFindingsToolHandler.test.ts` covering active workflow gating, missing `code_review_output`, blocked path, missing file, missing headings, unsupported category, malformed finding entries, empty-array no-op success, single-category append, multi-category duplication, append-only preservation, exact result keys, and absence of raw document content; build fixtures with explicit helper return types and use JSON-string params for `findings`.
+[x] Subtask 4.9. Add `RecordFindingsToolHandler.test.ts` covering active workflow gating, missing `code_review_output`, blocked path, missing file, missing headings, unsupported category, malformed finding entries, empty-array no-op success, single-category append, multi-category duplication, append-only preservation, exact result keys, and absence of raw document content; build fixtures with explicit helper return types and use JSON-string params for `findings`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/RecordFindingsToolHandler.test.ts`
 
-[ ] Task 5. Wire `record_findings` and delete retired `code_review_spec_update` runtime surfaces.
+[x] Task 5. Wire `record_findings` and delete retired `code_review_spec_update` runtime surfaces.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
@@ -288,52 +288,52 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/codeReviewSpecUpdateMerge.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.nativeToolParity.test.ts`
 
-[ ] Subtask 5.1. In `ToolExecutorCoordinator.ts`, delete the `CodeReviewSpecUpdateToolHandler` import and `CODE_REVIEW_SPEC_UPDATE` map entry, import `RecordFindingsToolHandler`, and register `[ClineDefaultTool.RECORD_FINDINGS]: (v: ToolValidator) => new RecordFindingsToolHandler(v)`.
+[x] Subtask 5.1. In `ToolExecutorCoordinator.ts`, delete the `CodeReviewSpecUpdateToolHandler` import and `CODE_REVIEW_SPEC_UPDATE` map entry, import `RecordFindingsToolHandler`, and register `[ClineDefaultTool.RECORD_FINDINGS]: (v: ToolValidator) => new RecordFindingsToolHandler(v)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/ToolExecutorCoordinator.ts`
 
-[ ] Subtask 5.2. Delete `CodeReviewSpecUpdateToolHandler.ts`.
+[x] Subtask 5.2. Delete `CodeReviewSpecUpdateToolHandler.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/CodeReviewSpecUpdateToolHandler.ts`
 
-[ ] Subtask 5.3. Delete `codeReviewSpecUpdateMerge.ts`.
+[x] Subtask 5.3. Delete `codeReviewSpecUpdateMerge.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/codeReviewSpecUpdateMerge.ts`
 
-[ ] Subtask 5.4. Delete `codeReviewSpecUpdateMerge.test.ts`.
+[x] Subtask 5.4. Delete `codeReviewSpecUpdateMerge.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/codeReviewSpecUpdateMerge.test.ts`
 
-[ ] Subtask 5.5. In `ToolExecutor.nativeToolParity.test.ts`, remove `CODE_REVIEW_SPEC_UPDATE` executions and replace the surviving parity assertions with `ClineDefaultTool.RECORD_FINDINGS` handler registration checks where a real execution would require an active workflow session; use raw string lookup APIs for deleted `code_review_spec_update` absence checks rather than constructing a `ToolUse` with a deleted enum member.
+[x] Subtask 5.5. In `ToolExecutor.nativeToolParity.test.ts`, remove `CODE_REVIEW_SPEC_UPDATE` executions and replace the surviving parity assertions with `ClineDefaultTool.RECORD_FINDINGS` handler registration checks where a real execution would require an active workflow session; use raw string lookup APIs for deleted `code_review_spec_update` absence checks rather than constructing a `ToolUse` with a deleted enum member.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.nativeToolParity.test.ts`
 
-[ ] Task 6. Validate Phase 2.
+[x] Task 6. Validate Phase 2.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-[ ] Subtask 6.1. Run `npm run test:unit -- src/core/task/tools/handlers/__tests__/RecordFindingsToolHandler.test.ts src/core/task/__tests__/ToolExecutor.nativeToolParity.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts`.
+[x] Subtask 6.1. Run `npm run test:unit -- src/core/task/tools/handlers/__tests__/RecordFindingsToolHandler.test.ts src/core/task/__tests__/ToolExecutor.nativeToolParity.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-[ ] Subtask 6.2. Run `npm run check-types`; if it fails during proto host probing, rerun with the approved elevated path and stop on the first non-environment TypeScript failure.
+[x] Subtask 6.2. Run `npm run check-types`; if it fails during proto host probing, rerun with the approved elevated path and stop on the first non-environment TypeScript failure.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-[ ] Subtask 6.3. Run `npm run lint`.
+[x] Subtask 6.3. Run `npm run lint`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-[ ] Subtask 6.4. Run `rg -n "code_review_spec_update|CODE_REVIEW_SPEC_UPDATE|CodeReviewSpecUpdateToolHandler|codeReviewSpecUpdateMerge" src/core src/shared`; inspect any hits in context and stop if any hit is active runtime code instead of an explicit negative test assertion.
+[x] Subtask 6.4. Run `rg -n "code_review_spec_update|CODE_REVIEW_SPEC_UPDATE|CodeReviewSpecUpdateToolHandler|codeReviewSpecUpdateMerge" src/core src/shared`; inspect any hits in context and stop if any hit is active runtime code instead of an explicit negative test assertion.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`

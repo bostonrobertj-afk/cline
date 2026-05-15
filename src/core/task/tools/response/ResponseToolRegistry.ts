@@ -103,7 +103,7 @@ const RESPONSE_TOOL_METADATA: Record<ClineDefaultTool, ResponseToolMetadata | un
 	[ClineDefaultTool.GENERATE_STORY_FILES]: undefined,
 	[ClineDefaultTool.UPDATE_STORY_INDEX_STATUS]: undefined,
 	[ClineDefaultTool.DEV_STORY_GIT_FINALIZE]: undefined,
-	[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: undefined,
+	[ClineDefaultTool.RECORD_FINDINGS]: undefined,
 	[ClineDefaultTool.USE_SUBAGENTS]: undefined,
 }
 

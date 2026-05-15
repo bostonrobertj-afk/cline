@@ -916,6 +916,41 @@ describe("workflow runtime metadata persistence", () => {
 		expect(ResponseToolRegistry.isResponseTool(ClineDefaultTool.UPDATE_STORY_INDEX_STATUS)).to.equal(false)
 	})
 
+	it("declares record_findings as a backend non-response workflow tool", () => {
+		const contract = getBackendWorkflowToolContract(ClineDefaultTool.RECORD_FINDINGS)
+
+		if (contract === undefined) {
+			throw new Error("Expected record_findings backend workflow tool contract")
+		}
+
+		expect(contract).to.deep.include({
+			id: ClineDefaultTool.RECORD_FINDINGS,
+			name: "record_findings",
+		})
+		expect(contract.parameters).to.deep.equal([
+			{
+				name: "findings",
+				required: true,
+				type: "array",
+				description: "Code-review findings to append to the governed findings document.",
+				items: {
+					type: "object",
+					properties: {
+						finding: { type: "string" },
+						categories: {
+							type: "array",
+							items: { type: "string" },
+						},
+						description: { type: "string" },
+					},
+					requiredProperties: ["finding", "categories", "description"],
+				},
+			},
+		])
+		expect(ResponseToolRegistry.get(ClineDefaultTool.RECORD_FINDINGS)).to.equal(undefined)
+		expect(ResponseToolRegistry.isResponseTool(ClineDefaultTool.RECORD_FINDINGS)).to.equal(false)
+	})
+
 	it("does not re-enter workflow runtime only because set_workflow_values executed", async () => {
 		const taskState = new TaskState()
 		taskState.assistantMessageContent = [

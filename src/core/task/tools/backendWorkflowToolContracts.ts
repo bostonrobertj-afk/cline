@@ -307,10 +307,29 @@ export const backendWorkflowToolContracts: Partial<Record<ClineDefaultTool, Back
 			},
 		],
 	},
-	[ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE]: {
-		id: ClineDefaultTool.CODE_REVIEW_SPEC_UPDATE,
-		name: "code_review_spec_update",
-		parameters: [],
+	[ClineDefaultTool.RECORD_FINDINGS]: {
+		id: ClineDefaultTool.RECORD_FINDINGS,
+		name: "record_findings",
+		parameters: [
+			{
+				name: "findings",
+				required: true,
+				type: "array",
+				description: "Code-review findings to append to the governed findings document.",
+				items: {
+					type: "object",
+					properties: {
+						finding: { type: "string" },
+						categories: {
+							type: "array",
+							items: { type: "string" },
+						},
+						description: { type: "string" },
+					},
+					requiredProperties: ["finding", "categories", "description"],
+				},
+			},
+		],
 	},
 }
 
