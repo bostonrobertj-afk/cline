@@ -2,29 +2,78 @@
 - Each action plan must be a standalone document and must be saved in the project folder if one exists
 - The action plan must directly support achievement/delivery of every project requirement
 - If you encounter a decision point which was not already explicitly discussed and decided/approved by the user, you must STOP and present the decision to them along with a recommendation, then gain their approval and/or alignment before continuing your work authoring the action plan. YOU DO NOT SOLVE FOR AMBIGUOUS REQUIREMENTS UNLESS YOU CLEARLY STATE TO THE USER THAT THE REQUIREMENTS ARE AMBIGUOUS OR LEAVE ROOM FOR INTERPRETATION AND YOU ARE PROPOSING A SPECIFIC APPROACH.
--When a plan references existing artifacts or placeholders, trace the exact runtime resolution path end to end:
-    config/source of truth
-    resolver/helper
-    handler/runtime consumer
-    tests/docs that assert the convention
-    For any plan that introduces a new artifact, tool, or schema entry, perform a sibling-pattern audit:
-    registration
-    executor wiring
-    prompt/tool exposure
-    approval/path policy
-    tests
-    snapshots/generated surfaces
-    docs/reference surfaces if treated as canonical in-repo
-- After writing an action plan, reach each line of the action plan and seek out any inconsistencies or conflicts. During this review, assess each task and subtask for internal dependencies, and ensure that no task or subtask is dependent upon a task or subtask which is sequenced after it in the action plan. Resolve them appropriately, asking the user for input if necessary, before indicating that the action plan is complete.
-- NEVER prescribe retyping, casting, renaming, or otherwise mutating existing capabilities/functionality within an action plan unless you have surfaced the proposed change as a single topic to the user and gained their approval. 
+- After writing an action plan, reach each line of the action plan and seek out any inconsistencies, conflicts, or tasks/subtasks which do not prescribe exact necessary revisions. During this review, assess each task and subtask for internal dependencies, and ensure that no task or subtask is dependent upon a task or subtask which is sequenced after it in the action plan. Resolve them appropriately, asking the user for input if necessary, before indicating that the action plan is complete.
+- NEVER prescribe retyping, casting, renaming, or otherwise mutating existing capabilities/functionality within an action plan unless you have surfaced the proposed change as a single topic to the user and gained their approval.
+- When authoring an action plan, you must fully follow every rule and guideline in this action plan guide exactly. Summarizing or loose interpretation of the guidelines in this document is prohibited.
 
-# Required Action Plan Sections:
+# Action Plan Guide Authoring Procedure
+
+## Required Action Plan Sections:
 - FrontMatter
 - Scope
 - Scope Boundary (what is out of scope)
 - Known Issues/ Risks/ Technical Debt (may be omitted if there is nothing relevant to include for the action plan)
 - Tasks / Subtasks
 - Validation
+
+## Authoring the Guide:
+### FrontMatter
+Start with the exact required frontmatter from the guide. This is the execution contract for dev agents.
+
+### Scope
+After parsing requirements, summarize only the approved obligations the action plan will deliver: runtime behavior, tools, forms, artifacts, prompt projection, cleanup, and tests.
+
+### Scope Boundary
+List what the requirements do not authorize. This prevents accidental inferred work, such as implementing child workflows, changing shared runtime architecture, or preserving legacy aliases.
+
+### Known Issues / Risks / Technical Debt
+Add only real risks discovered during code inspection: dirty worktree constraints, legacy code being deleted, known environment validation behavior, or dependencies on existing shared runtime seams. Do not use this section for unresolved decisions; unresolved decisions must stop authoring.
+
+### Tasks / Subtasks
+
+#### Prohibited Behavior
+This action plan guide is intended to PREVENT & PROHIBIT this behavior:
+- Agent read the requirements and converted them into broad implementation objectives.
+- Agent did not fully trace every target test/runtime file to the actual TypeScript contracts before writing each subtask.
+- Agent wrote milestone-style subtasks where the guide requires exact revisions.
+- Agent relied on validation to expose details that the action plan author is supposed to catch up front.
+
+#### Required Behavior
+
+1. Treat the action-plan guide as the acceptance contract. Read it first and use it as the checklist for whether the plan is valid.
+
+2. Read the requirements and parse them into observable obligations:
+   runtime behavior, persisted values, artifacts, form UI, tool exposure, prompt projection, routing, validation, cleanup, and tests.
+
+3. Map each obligation to the owning layer:
+   workflow definition, shared runtime, tool handler, schema builder, artifact registry, prompt integration, runtime tests, handler tests, cleanup, or validation.
+
+4. For each owning layer, inspect the actual target files before drafting:
+   current code, sibling module patterns, imports, exports, shared types, route/action contracts, workflow value contracts, tool schemas, fixture helpers, and existing test style.
+
+5. Derive the exact delta from code, not from requirement prose:
+   add, update, delete, export, register, test, or validate. No “support X” or “cover Y” summaries.
+
+6. Check compile contracts before writing the subtask:
+   required imports, discriminated unions, required fields, typed return values, event/session/action shape, workflow values, mocks, stubs, fixtures, and no forced casts.
+
+7. Write tasks & subtasks following the Task/ Subtask Authoring Rules:
+   Each subtask covers one target area, one prescribed change. If a subtask contains multiple independent decisions, split it. Indicate target file for each subtask.
+
+8. For tests, prescribe setup and assertions explicitly:
+   imports, helper shapes, fixture values, event/action/session objects, stable behavioral assertions, and forbidden prompt-prose or legacy assertions.
+
+9. Re-read the drafted phase line by line:
+   if a dev agent would need to choose architecture, infer a type shape, discover an import path, design a fixture, or decide what proves correctness, rewrite the subtask.
+
+10. When revising checked work, reopen every materially changed task/subtask.
+
+11. When a blocker exposes a class of issue, audit the rest of the phase for that same issue before returning work to the dev agent.
+
+### Validation
+Author the validation section following the Validation Section Rules.
+Derive validation from the touched layers:
+focused unit tests, integration tests, check-types, lint, negative guards for retired runtime concepts, and scope-diff checks. Validation commands must be exact and supported by the repo.
 
 # Required Frontmatter:
 Include this exact frontmatter at the top of every action plan document:
@@ -58,7 +107,7 @@ Include this exact frontmatter at the top of every action plan document:
 *** Task / Subtask Section Structure: ***
 - If the action plan is not a simple patch with few steps, it must be broken into distinct phases with instructions to pause for QA review before moving on to the next section.
 - Tasks & Subtasks must be on their own lines starting with "[ ]" so that dev agents can mark completion as they progress through the action plan.
-- Subtasks must prescribe exact line-level revisions with target file indicated.
+- Subtasks must prescribe exact line-level revisions with target file indicated- summaries or descriptions of changes are not sufficient.
 - Subtasks must never prescribe more than ONE required revision
 - Each task & subtasks should have clearly defined allowed files for the prescribed edit.
 - You must not leave decision space to the agent who will implement the action plan. As the action plan author, it is your job to review runtime code, identify the complete and correct necessary revisions, and prescribe those revisions clearly within the action plan. This includes test fixtures associated with any runtime code that is being revised, removed, or added.
@@ -96,7 +145,6 @@ Include this exact frontmatter at the top of every action plan document:
    - Consider related/downstream modules that may now contain redundant or inconsistent code as a result of your change.
    - De-crufting should be treated as part of the fix: either perform it in your changes, or clearly specify what should be removed/refactored and where.
 - When deleting or retiring a domain concept, delete its named gates, helper methods, variables, and tests rather than repointing them at another surviving concept.
-
 
 7. Practice Good Code Hygiene by avoiding common bad habits:
     - "any" typing
@@ -142,6 +190,23 @@ Include this exact frontmatter at the top of every action plan document:
 - If the final implementation will require a specific type guard, discriminant check, typed intermediate object, `satisfies` clause, or explicit return type, prescribe that exact pattern in the relevant subtask.
 - If the action-plan author cannot determine the compile-safe pattern from the existing codebase, stop and ask the user before marking the action plan ready.
 
+12. When a plan references existing artifacts or placeholders, trace the exact runtime resolution path end to end:
+    config/source of truth
+    resolver/helper
+    handler/runtime consumer
+    tests/docs that assert the convention
+    
+13. For any plan that introduces a new artifact, tool, or schema entry, perform a sibling-pattern audit:
+    registration
+    executor wiring
+    prompt/tool exposure
+    approval/path policy
+    tests
+    snapshots/generated surfaces
+    docs/reference surfaces if treated as canonical in-repo
+
+14. Do not compress tasks/ subtasks into milestone-style implementation summaries. They must prescribe exact revisions as outlined in this action plan guide.
+
 
 If at any point you cannot satisfy one or more of these rules (for example, due to missing context or constraints in the existing architecture), you MUST:
 - Explicitly state which rule(s) you cannot fully satisfy, and why.
@@ -154,8 +219,7 @@ If at any point you cannot satisfy one or more of these rules (for example, due 
 - For phased plans, prescribe phase-level validation at every QA pause, including the repo’s formatting/lint/typecheck gates needed for a clean commit.
 - If `npm run check-types` fails in files modified by the current phase, treat it as an action-plan prescription gap unless investigation proves it is unrelated drift or environment failure.
 
-
-# Test Prescription Calibration
+## Test Prescription Calibration
 - Prescribe tests only for behavior, contracts, regressions, and material risks required by the requirements, architecture, or approved action plan scope.
 - Tests related to prompting should look for non-empty prompt strings; they should never prescribe or assert specific prompt verbiage. 
 - Each prescribed test must have a clear purpose: success path, required failure path, boundary/security behavior, persistence contract, schema/tool exposure contract, or integration wiring.
@@ -165,3 +229,4 @@ If at any point you cannot satisfy one or more of these rules (for example, due 
 - Avoid duplicative coverage across layers. Prefer unit tests for pure builders and handlers, integration tests for runtime projection/wiring, and E2E tests only when user-visible extension behavior cannot be adequately verified below that layer.
 - Do not add static guards unless they protect an approved boundary, forbidden legacy dependency, forbidden model-facing tool, or known regression risk.
 - Before prescribing validation, review the assertions that will be introduced or updated and ensure they will not fail only because approved editable wording changed.
+- For tests focused on prompt behavior, ensure that coverage exists ensuring that required prompts are non-empty, conditional prompting is included when required, and that each placeholder is materialized in the prompt rather than the prompt including the raw placeholder text.

@@ -342,196 +342,301 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 4.
 
-[ ] Task 7. Add module-owned tool schemas.
+[x] Task 7. Add module-owned tool schemas.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewToolSchemas.test.ts`
 
-[ ] Subtask 7.1. Create `codeReviewToolSchemas.ts` with named exported builders `buildCodeReviewStep1ToolSchemas`, `buildCodeReviewStep2ToolSchemas`, `buildCodeReviewStep3ToolSchemas`, and `buildCodeReviewStep4ToolSchemas`; Step 1 must return `[]`.
+[x] Subtask 7.1. Create `codeReviewToolSchemas.ts` with named exported builders `buildCodeReviewStep1ToolSchemas`, `buildCodeReviewStep2ToolSchemas`, `buildCodeReviewStep3ToolSchemas`, and `buildCodeReviewStep4ToolSchemas`; Step 1 must return `[]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewToolSchemas.ts`
 
-[ ] Subtask 7.2. In `codeReviewToolSchemas.ts`, implement Step 2 schemas with exactly `use_subagents`, `send_user_message`, and `workflow_progress_request`, using `ModelFamily.NATIVE_GPT_5` and module-local schema builders.
+[x] Subtask 7.2. In `codeReviewToolSchemas.ts`, implement Step 2 schemas with exactly `use_subagents`, `send_user_message`, and `workflow_progress_request`, using `ModelFamily.NATIVE_GPT_5` and module-local schema builders.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewToolSchemas.ts`
 
-[ ] Subtask 7.3. In `codeReviewToolSchemas.ts`, implement Step 3 schemas with exactly `read_file`, `read_file_range`, `record_findings`, `send_user_message`, and `workflow_progress_request`, using the `record_findings` schema shape from the requirements.
+[x] Subtask 7.3. In `codeReviewToolSchemas.ts`, implement Step 3 schemas with exactly `read_file`, `read_file_range`, `record_findings`, `send_user_message`, and `workflow_progress_request`, using the `record_findings` schema shape from the requirements.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewToolSchemas.ts`
 
-[ ] Subtask 7.4. In `codeReviewToolSchemas.ts`, implement Step 4 schemas with exactly `read_file`, `read_file_range`, `apply_patch`, `ask_followup_question`, `send_user_message`, and `attempt_completion`.
+[x] Subtask 7.4. In `codeReviewToolSchemas.ts`, implement Step 4 schemas with exactly `read_file`, `read_file_range`, `apply_patch`, `ask_followup_question`, `send_user_message`, and `attempt_completion`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewToolSchemas.ts`
 
-[ ] Subtask 7.5. Add `codeReviewToolSchemas.test.ts` asserting exact tool names for each step, `record_findings` only in Step 3, `attempt_completion` only in Step 4, and absence of `set_workflow_values`, `build_workflow_document`, `create_workflow_artifact`, `plan_remediation_story_artifact`, `update_story_index_status`, `move_workflow_project_file`, and retired code-review tools from all step schemas.
+[x] Subtask 7.5. Add `codeReviewToolSchemas.test.ts` asserting exact tool names for each step, `record_findings` only in Step 3, `attempt_completion` only in Step 4, and absence of `set_workflow_values`, `build_workflow_document`, `create_workflow_artifact`, `plan_remediation_story_artifact`, `update_story_index_status`, `move_workflow_project_file`, and retired code-review tools from all step schemas.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewToolSchemas.test.ts`
 
-[ ] Task 8. Add review-scope manifest helper logic.
+[x] Task 8. Add review-scope manifest helper logic.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/reviewScopeManifest.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/reviewScopeManifest.test.ts`
 
-[ ] Subtask 8.1. Create `reviewScopeManifest.ts` with explicit exported types for changed file status, additions, deletions, allowed-file comparison, story task summary, and the final manifest content; do not use `any`, forced assertions, or untyped object helpers.
+[x] Subtask 8.1. In `reviewScopeManifest.ts`, define the exported review-scope types in this exact compile-safe shape: keep `ReviewScopeChangedFileStatus` as an enum with `Added = "added"`, `Modified = "modified"`, `Deleted = "deleted"`, `Renamed = "renamed"`, and `Copied = "copied"`; keep `ReviewScopeLineCount = number | "binary"`; define `ReviewScopeChangedFile` as a discriminated union with one branch whose `status` is `ReviewScopeChangedFileStatus.Added | ReviewScopeChangedFileStatus.Modified | ReviewScopeChangedFileStatus.Deleted`, `path: string`, `previousPath: undefined`, `additions: ReviewScopeLineCount`, `deletions: ReviewScopeLineCount`, and `allowedFileComparison: ReviewScopeAllowedFileComparisonKind`, and one branch whose `status` is `ReviewScopeChangedFileStatus.Renamed | ReviewScopeChangedFileStatus.Copied`, `path: string`, `previousPath: string`, `additions: ReviewScopeLineCount`, `deletions: ReviewScopeLineCount`, and `allowedFileComparison: ReviewScopeAllowedFileComparisonKind`; define `ReviewScopeNameStatusRecord` as the same path/previousPath union without line counts or allowed-file comparison; define `ReviewScopeNumstatRecord` separately as an interface with only `path: string`, `previousPath: string | undefined`, `additions: ReviewScopeLineCount`, and `deletions: ReviewScopeLineCount`; place the renamed/copied `ReviewScopeChangedFile` branch inside the `ReviewScopeChangedFile` union before `ReviewScopeNameStatusRecord`, not after `ReviewScopeNumstatRecord`; do not use `any`, forced assertions, or untyped object helpers.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/reviewScopeManifest.ts`
 
-[ ] Subtask 8.2. In `reviewScopeManifest.ts`, add parser helpers for `git show --name-status <hash>` and `git show --numstat <hash>` output that support added, modified, deleted, renamed, and copied path records and return typed failures for malformed rows.
+[x] Subtask 8.2. In `reviewScopeManifest.ts`, add parser helpers for `git show --name-status <hash>` and `git show --numstat <hash>` output that support added, modified, deleted, renamed, and copied path records and return typed failures for malformed rows.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/reviewScopeManifest.ts`
 
-[ ] Subtask 8.3. In `reviewScopeManifest.ts`, add a builder that reads parsed story task/subtask and allowed-file data from the shared `storyTaskDocument` parser, compares committed paths against allowed files, and returns a typed manifest model without treating story tasks as proof of implementation.
+[x] Subtask 8.3. In `reviewScopeManifest.ts`, add a builder that reads parsed story task/subtask and allowed-file data from the shared `storyTaskDocument` parser, compares committed paths against allowed files, and returns a typed manifest model without treating story tasks as proof of implementation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/reviewScopeManifest.ts`
 
-[ ] Subtask 8.4. In `reviewScopeManifest.ts`, add `buildReviewScopeManifestMarkdown(...)` that emits the exact required headings, source metadata lines, summary counts, changed-file table, review target commands, and approved suggested review strategy from the requirements.
+[x] Subtask 8.4. In `reviewScopeManifest.ts`, add `buildReviewScopeManifestMarkdown(...)` that emits the exact required headings, source metadata lines, summary counts, changed-file table, review target commands, and approved suggested review strategy from the requirements.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/reviewScopeManifest.ts`
 
-[ ] Subtask 8.5. Add `reviewScopeManifest.test.ts` covering name-status parsing, numstat parsing, deleted files, renamed files, allowed-vs-touched comparison, required heading order, changed-file table shape, source metadata lines, per-file `git show <hash> -- <path>` commands, and no whole-commit diff embedding.
+[x] Subtask 8.5. Add `reviewScopeManifest.test.ts` covering name-status parsing, numstat parsing, deleted files, renamed files, allowed-vs-touched comparison, required heading order, changed-file table shape, source metadata lines, per-file `git show <hash> -- <path>` commands, and no whole-commit diff embedding.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/reviewScopeManifest.test.ts`
 
-[ ] Task 9. Add the code-review workflow definition.
+[x] Task 9. Add the code-review workflow definition.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/index.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
 
-[ ] Subtask 9.1. Create `codeReviewWorkflow.ts` with exported identity constants exactly matching the requirements: name, slash command, use skill name, display name, description, project subfolder, and structured Fred quality-control persona.
+[x] Subtask 9.1. Create `codeReviewWorkflow.ts` with exported identity constants exactly matching the requirements: name, slash command, use skill name, display name, description, project subfolder, and structured Fred quality-control persona.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-[ ] Subtask 9.2. In `codeReviewWorkflow.ts`, add `CodeReviewWorkflowValueKey` enum and `CODE_REVIEW_WORKFLOW_VALUE_KEYS` containing every requirements value key, including the approved dedicated artifact metadata keys and `remediation_story_parent_identity`.
+[x] Subtask 9.2. In `codeReviewWorkflow.ts`, add `CodeReviewWorkflowValueKey` enum and `CODE_REVIEW_WORKFLOW_VALUE_KEYS` containing every requirements value key, including the approved dedicated artifact metadata keys and `remediation_story_parent_identity`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-[ ] Subtask 9.3. In `codeReviewWorkflow.ts`, add `CODE_REVIEW_ENTRY_PROJECT_VALUE_KEYS` mapping exactly `projectMode`, `projectTitle`, and `projectFolderName`.
+[x] Subtask 9.3. In `codeReviewWorkflow.ts`, add `CODE_REVIEW_ENTRY_PROJECT_VALUE_KEYS` mapping exactly `projectMode`, `projectTitle`, and `projectFolderName`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-[ ] Subtask 9.4. In `codeReviewWorkflow.ts`, add the required `target_story` prerequisite with `producingWorkflowName: "dev-story"`, `projectSubfolderSegments: ["implementation", "stories-review"]`, naming pattern `/^(Story-\d+-\d+|Remediation-story-\d+-\d+-\d+)\.md$/`, workflow value key `target_story`, and `outputDocumentReference: "none"`.
+[x] Subtask 9.4. In `codeReviewWorkflow.ts`, add the required `target_story` prerequisite with `producingWorkflowName: "dev-story"`, `projectSubfolderSegments: ["implementation", "stories-review"]`, naming pattern `/^(Story-\d+-\d+|Remediation-story-\d+-\d+-\d+)\.md$/`, workflow value key `target_story`, and `outputDocumentReference: "none"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-[ ] Subtask 9.5. In `codeReviewWorkflow.ts`, add artifact definitions for `code_review_output` and `review_scope_manifest` using `WorkflowArtifactFamily.CodeReviewOutput` and `WorkflowArtifactFamily.ReviewScopeManifest`, `intentMode: "derived"`, `targetIdentitySource` from `selected_story_identity`, and the dedicated output value keys prescribed in the requirements.
+[x] Subtask 9.5. In `codeReviewWorkflow.ts`, add artifact definitions for `code_review_output` and `review_scope_manifest` using `WorkflowArtifactFamily.CodeReviewOutput` and `WorkflowArtifactFamily.ReviewScopeManifest`, `intentMode: "derived"`, `targetIdentitySource` from `selected_story_identity`, and the dedicated output value keys prescribed in the requirements.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-[ ] Subtask 9.6. In `codeReviewWorkflow.ts`, add the `remediation_story` artifact definition using `WorkflowArtifactFamily.RemediationStory`, `intentMode: "new"`, `parentIdentitySource` from `remediation_story_parent_identity`, and the dedicated remediation output value keys prescribed in the requirements.
+[x] Subtask 9.6. In `codeReviewWorkflow.ts`, add the `remediation_story` artifact definition using `WorkflowArtifactFamily.RemediationStory`, `intentMode: "new"`, `parentIdentitySource` from `remediation_story_parent_identity`, and the dedicated remediation output value keys prescribed in the requirements.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-[ ] Subtask 9.7. In `codeReviewWorkflow.ts`, add the Step 1 workflow form with Panel A and Panel B exactly as prescribed, including Panel B same-session back navigation to Panel A. Panel A submit must be `runtime_routed`, and the commit hash field must not declare `workflowValueKey`; the validation route must read the field's form-session value and persist `review_commit_hash` only after Git validation succeeds.
+[x] Subtask 9.7. In `codeReviewWorkflow.ts`, add the Step 1 workflow form with Panel A and Panel B exactly as prescribed, including Panel B same-session back navigation to Panel A. Panel A submit must be `runtime_routed`, and the commit hash field must not declare `workflowValueKey`; the validation route must read the field's form-session value and persist `review_commit_hash` only after Git validation succeeds.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-[ ] Subtask 9.8. In `codeReviewWorkflow.ts`, add deterministic helpers that derive and validate `selected_story_filename`, `selected_story_identity`, `epic_identity`, `stories_index`, `review_folder`, `epics_document`, and `architecture_document` from the selected `target_story` and selected project root; failures must return typed deterministic failures with concrete messages.
+[x] Subtask 9.8. In `codeReviewWorkflow.ts`, add deterministic helpers that derive and validate `selected_story_filename`, `selected_story_identity`, `epic_identity`, `stories_index`, `review_folder`, `epics_document`, and `architecture_document` from the selected `target_story` and selected project root; failures must return typed deterministic failures with concrete messages.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-[ ] Subtask 9.9. In `codeReviewWorkflow.ts`, add a read-only Git command runner helper for Step 1 using `execa("git", args, { cwd: selectedProjectRoot, shell: false, reject: false })`; commit validation must persist `review_commit_hash` and `review_commit_parent`, and review-scope document building must later collect name-status and numstat output using those persisted values.
+[x] Subtask 9.9. In `codeReviewWorkflow.ts`, add a read-only Git command runner helper for Step 1 using `execa("git", args, { cwd: selectedProjectRoot, shell: false, reject: false })`; commit validation must persist `review_commit_hash` and `review_commit_parent`, and review-scope document building must later collect name-status and numstat output using those persisted values. `runCodeReviewGitCommand(...)` must normalize Execa's optional `result.exitCode` into a concrete number before returning `CodeReviewGitCommandResult`; use `const exitCode = typeof result.exitCode === "number" ? result.exitCode : 1` and return that `exitCode` value.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-[ ] Subtask 9.10. In `codeReviewWorkflow.ts`, add Step 1 decision routes in this order: resolve `target_story`; derive target/story/project values; allocate `code_review_output`; build the initial code-review output headings document; render Panel A; on Panel A submit validate the commit hash and persist `review_commit_hash` plus `review_commit_parent`; on invalid commit continue the same form session to Panel B; on valid commit allocate `review_scope_manifest`; build the review-scope document by collecting Git changed-file data and story context through the review-scope helper; transition to Step 2.
+[x] Subtask 9.10. In `codeReviewWorkflow.ts`, add Step 1 decision routes in this order: resolve `target_story`; derive target/story/project values; allocate `code_review_output`; build the initial code-review output headings document; render Panel A; on Panel A submit validate the commit hash and persist `review_commit_hash` plus `review_commit_parent`; on invalid commit continue the same form session to Panel B; on valid commit allocate `review_scope_manifest`; build the review-scope document by collecting Git changed-file data and story context through the review-scope helper; transition to Step 2.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-[ ] Subtask 9.11. In `codeReviewWorkflow.ts`, add Step 2 prompt building so it returns the initial Step 2 prompt when `missing_subagent_output_files` is empty or absent, and returns the exact missing-output prompt with the persisted filename list when `missing_subagent_output_files` contains values.
+[x] Subtask 9.11. In `codeReviewWorkflow.ts`, add Step 2 prompt building so it returns the initial Step 2 prompt when `missing_subagent_output_files` is empty or absent, and returns the exact missing-output prompt with the persisted filename list when `missing_subagent_output_files` contains values.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-[ ] Subtask 9.12. In `codeReviewWorkflow.ts`, add Step 2 decision routes so the entry route projects the prompt, `workflow_progress_request_confirmed` triggers child-output discovery, missing or empty child outputs persist `missing_subagent_output_files` and re-project Step 2, and both non-empty child outputs persist `blind_review_output` and `edge_case_review_output`, clear `missing_subagent_output_files`, and transition to Step 3.
+[x] Subtask 9.12. In `codeReviewWorkflow.ts`, add Step 2 decision routes so the entry route projects the prompt, `workflow_progress_request_confirmed` triggers child-output discovery, missing or empty child outputs persist `missing_subagent_output_files` and re-project Step 2, and both non-empty child outputs persist `blind_review_output` and `edge_case_review_output`, clear `missing_subagent_output_files`, and transition to Step 3.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-[ ] Subtask 9.13. In `codeReviewWorkflow.ts`, add Step 3 prompt building and decision routes so the entry route projects the Step 3 prompt, and `workflow_progress_request_confirmed` transitions to Step 4.
+[x] Subtask 9.13. In `codeReviewWorkflow.ts`, add Step 3 prompt building and decision routes so the entry route projects the Step 3 prompt, and `workflow_progress_request_confirmed` transitions to Step 4.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-[ ] Subtask 9.14. In `codeReviewWorkflow.ts`, add Step 4 findings evaluation helper that reads `code_review_output`, inspects only content under the three required headings, persists `review_findings_present` and `upstream_findings_present`, derives `remediation_story_parent_identity` as the first two identity segments for primary or remediation targets, and fails with a concrete terminal-error message if the findings document or selected identity is invalid.
+[x] Subtask 9.14. In `codeReviewWorkflow.ts`, add Step 4 findings evaluation helper that reads `code_review_output`, inspects only content under the three required headings, persists `review_findings_present` and `upstream_findings_present`, derives `remediation_story_parent_identity` as the first two identity segments for primary or remediation targets, and fails with a concrete terminal-error message if the findings document or selected identity is invalid.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-[ ] Subtask 9.15. In `codeReviewWorkflow.ts`, add Step 4 decision routes so no findings routes through backend-only `update_story_index_status` for the selected target story with `storyIndexWorkflowValueKey: CodeReviewWorkflowValueKey.StoriesIndex`, `storyIdentityWorkflowValueKey: CodeReviewWorkflowValueKey.SelectedStoryIdentity`, `status: "complete"`, and `expectedCurrentStatus: "review"`, then through `move_project_file` from `["implementation", "stories-review"]` to `["implementation", "stories-complete"]` using `filenameWorkflowValueKey: CodeReviewWorkflowValueKey.SelectedStoryFilename`, then to `complete_workflow`.
+[x] Subtask 9.15. In `codeReviewWorkflow.ts`, add Step 4 decision routes so no findings routes through backend-only `update_story_index_status` for the selected target story with `storyIndexWorkflowValueKey: CodeReviewWorkflowValueKey.StoriesIndex`, `storyIdentityWorkflowValueKey: CodeReviewWorkflowValueKey.SelectedStoryIdentity`, `status: "complete"`, and `expectedCurrentStatus: "review"`, then through `move_project_file` from `["implementation", "stories-review"]` to `["implementation", "stories-complete"]` using `filenameWorkflowValueKey: CodeReviewWorkflowValueKey.SelectedStoryFilename`, then to `complete_workflow`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-[ ] Subtask 9.16. In `codeReviewWorkflow.ts`, for every Step 4 tool-backed failure route, route through a `run_deterministic_procedure` terminal-failure helper that reads `session.branchContext.failureState?.terminalErrorMessage` and returns `{ kind: "failed", errorMessage }`; do not use static `terminal_error` strings that drop the backend failure reason.
+[x] Subtask 9.16. In `codeReviewWorkflow.ts`, for every Step 4 tool-backed failure route, route through a `run_deterministic_procedure` terminal-failure helper that reads `session.branchContext.failureState?.terminalErrorMessage` and returns `{ kind: "failed", errorMessage }`; do not use static `terminal_error` strings that drop the backend failure reason.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-[ ] Subtask 9.17. In `codeReviewWorkflow.ts`, add the Step 4 findings route through backend-only `plan_remediation_story_artifact` using `remediation_story_parent_identity`, `allocate_artifact` for `remediation_story`, `build_workflow_document` with the exact remediation shell headings, and then `project_prompt`; remediation story planning remains the only Step 4 story-index mutation before the model prompt because it appends the draft remediation story entry to the story index.
+[x] Subtask 9.17. In `codeReviewWorkflow.ts`, add the Step 4 findings route through backend-only `plan_remediation_story_artifact` using `remediation_story_parent_identity`, `allocate_artifact` for `remediation_story`, `build_workflow_document` with the exact remediation shell headings, and then `project_prompt`; remediation story planning remains the only Step 4 story-index mutation before the model prompt because it appends the draft remediation story entry to the story index.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-[ ] Subtask 9.18. In `codeReviewWorkflow.ts`, add Step 4 prompt construction so it always includes `Review the findings in code_review_output.`, includes the upstream-failure conditional block only when `upstream_findings_present === true`, includes the remediation-story conditional block only when `remediation_story` is a non-empty string, and routes `attempt_completion_succeeded` through the same selected-target-story completion sequence as the no-findings route: backend-only `update_story_index_status` to `complete` with `expectedCurrentStatus: "review"`, `move_project_file` from `implementation/stories-review` to `implementation/stories-complete`, then `complete_workflow`.
+[x] Subtask 9.18. In `codeReviewWorkflow.ts`, add Step 4 prompt construction so it always includes `Review the findings in code_review_output.`, includes the upstream-failure conditional block only when `upstream_findings_present === true`, includes the remediation-story conditional block only when `remediation_story` is a non-empty string, joins the selected Step 4 prompt sections into one string, and returns `currentStepInstructions: renderCodeReviewPromptTemplate(input, joinedPrompt)` so `code_review_output`, `architecture_document`, `epics_document`, `target_story`, and `remediation_story` placeholders are materialized before projection. `renderCodeReviewPromptTemplate(...)` must include `.replaceAll("code_review_output", renderWorkflowValueByKey(input, CodeReviewWorkflowValueKey.CodeReviewOutput))`. Route `attempt_completion_succeeded` through the same selected-target-story completion sequence as the no-findings route: backend-only `update_story_index_status` to `complete` with `expectedCurrentStatus: "review"`, `move_project_file` from `implementation/stories-review` to `implementation/stories-complete`, then `complete_workflow`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-[ ] Subtask 9.19. In `codeReviewWorkflow.ts`, export `codeReviewWorkflowDefinition` with entry panel prompt equal to the module description, declared value keys, entry project keys, prerequisite files, artifacts, workflow form, and exactly four steps with the checklist labels from the requirements.
+[x] Subtask 9.19. In `codeReviewWorkflow.ts`, export `codeReviewWorkflowDefinition` with entry panel prompt equal to the module description, declared value keys, entry project keys, prerequisite files, artifacts, workflow form, and exactly four steps with the checklist labels from the requirements.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-[ ] Subtask 9.20. Create `index.ts` exporting `codeReviewWorkflowDefinition`, value-key constants, artifact ids, form ids, panel ids, and tool-schema builders needed by tests and prompt integration.
+[x] Subtask 9.20. Create `index.ts` exporting `codeReviewWorkflowDefinition`, value-key constants, artifact ids, form ids, panel ids, and tool-schema builders needed by tests and prompt integration.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/index.ts`
 
-[ ] Subtask 9.21. Add `codeReviewWorkflow.test.ts` covering workflow identity, persona, entry panel, value keys, entry project keys, prerequisite declaration, artifact declarations and output keys, form panel shapes, Step 1 target derivation, invalid commit same-session Panel B route, valid commit review-scope route, Step 2 child output discovery and missing-output re-prompt, Step 3 route to Step 4, Step 4 no-findings route through selected-target-story status update, selected-target-story file move, and completion, Step 4 findings remediation route sequence, Step 4 upstream conditional prompt inclusion, Step 4 backend failure reason propagation, and Step 4 `attempt_completion_succeeded` route through selected-target-story status update, selected-target-story file move, and completion.
+[x] Subtask 9.21. In `codeReviewWorkflow.test.ts`, revise the import block so `WorkflowArtifactFamily` imports from `../../../artifactFamilies`, workflow runtime types import from `../../../types`, `ClineDefaultTool` imports from `@/shared/tools`, shared workflow form types import from `@shared/ExtensionMessage`, and all code-review module exports used by the tests import from `..`; remove any `../../artifactFamilies` import.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
 
-[ ] Task 10. Validate Phase 3.
+[x] Subtask 9.22. In `codeReviewWorkflow.test.ts`, add or revise the shared constant fixture block so it declares `PROJECT_ROOT`, `TARGET_STORY_PATH`, `STORIES_INDEX_PATH`, `REVIEW_FOLDER_PATH`, and `SAMPLE_WORKFLOW_VALUES: WorkflowValues`; `SAMPLE_WORKFLOW_VALUES` must include `target_story`, `selected_story_filename`, `selected_story_identity`, `epic_identity`, `stories_index`, `review_folder`, `epics_document`, `architecture_document`, `code_review_output`, `review_scope_manifest`, `review_commit_hash`, `review_commit_parent`, `blind_review_output`, `edge_case_review_output`, `remediation_story_parent_identity`, and `remediation_story` using `CodeReviewWorkflowValueKey`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Subtask 9.23. In `codeReviewWorkflow.test.ts`, add or revise `createSession(workflowValues: WorkflowValues, projectRoot = PROJECT_ROOT, branchContext: ActiveWorkflowSession["branchContext"] = { activeBranchId: "step-1-resolve-target-story" }): ActiveWorkflowSession` so the returned object includes `activeStepNumber: 1`, the provided `workflowValues`, complete `projectSelection`, `lifecycle.projectSelectionCompleted: true`, `entryArtifactResolution: undefined`, complete `ui` with `formSession`, `stepResolutionSession`, `suppressedWorkflowFormIds`, and `suppressedWorkflowStepResolutionRoutes`, and the provided `branchContext`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Subtask 9.24. In `codeReviewWorkflow.test.ts`, add or revise the workflow-definition lookup helpers with explicit return types: `getStep(stepId: WorkflowStepDefinition["id"]): WorkflowStepDefinition`, `findRoute(stepId: WorkflowStepDefinition["id"], branchId: string, routeId: string): WorkflowDecisionBranchRoute`, `getWorkflowForm(workflowFormId: string): WorkflowFormDefinitionPayload`, `getPanel(form: WorkflowFormDefinitionPayload, panelId: string): WorkflowFormPanelDefinition`, and `getSingleField(panel: WorkflowFormPanelDefinition): WorkflowFormFieldDefinition`; each helper must throw a descriptive `Error` when the requested object is missing instead of returning `undefined`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Subtask 9.25. In `codeReviewWorkflow.test.ts`, add or revise prompt and tool helper functions with explicit return types: `renderWorkflowValue(value: WorkflowValue): string`, `createPromptInput(stepId: WorkflowStepDefinition["id"], workflowValues: WorkflowValues): WorkflowPromptBuilderInput`, `buildPrompt(stepId: WorkflowStepDefinition["id"], workflowValues: WorkflowValues): string`, and `getToolNamesForStep(stepId: WorkflowStepDefinition["id"]): readonly string[]`; `buildPrompt` must throw when `currentStepInstructions` is `undefined` and prompt tests in this file must assert non-empty prompt output instead of exact editable prompt prose.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Subtask 9.26. In `codeReviewWorkflow.test.ts`, add or revise branch-event and action helper functions with exact typed shapes: `buildWorkflowFormPanelSubmittedEvent(...)` must return a `workflow_form_panel_submitted` event containing `workflowFormId`, `panelId`, `action`, `submittedValueKeys: []`, and `clearedValueKeys: []`; `buildToolBackedOperationSucceededEvent(...)` must return a `tool_backed_operation_succeeded` event with `sourceRoute`; `buildToolBackedOperationFailedEvent(...)` must return a `tool_backed_operation_failed` event with `sourceRoute` and `errorMessage`; `buildAttemptCompletionSucceededEvent()` must return `{ kind: "attempt_completion_succeeded" }`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Subtask 9.27. In `codeReviewWorkflow.test.ts`, add or revise assertion helpers with explicit return types: `expectActionKind<TKind extends WorkflowDecisionAction["kind"]>(...)` must narrow and return `Extract<WorkflowDecisionAction, { kind: TKind }>` after checking `action.kind`; `expectTransitionStepAction(...)`, `expectOnEventTrigger(...)`, `expectEventPredicateMatches(...)`, `expectSessionPredicateMatches(...)`, and `expectSucceeded(...)` must construct complete typed context objects and must not use `any`, `as any`, or incomplete route/event/session fixtures.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Subtask 9.28. In `codeReviewWorkflow.test.ts`, add or revise `createTargetStoryProject(): Promise<{ root: string; targetStory: string; storiesIndex: string; reviewFolder: string }>` so it creates a temporary selected project with `planning/Epics.md`, `planning/architecture.md`, `implementation/stories-review/Story-1-1.md`, `implementation/epic-1-stories.index.json` containing a matching `review` story entry, and a `review` folder; tests using this helper must remove the temp root in `finally`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Subtask 9.29. In `codeReviewWorkflow.test.ts`, add or revise the identity test so it asserts `codeReviewWorkflowDefinition` name, display name, description, slash command, use-skill name, project subfolder, persona, entry panel prompt, `workflowValueKeys`, and `entryProjectValueKeys` against the exported code-review constants.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Subtask 9.30. In `codeReviewWorkflow.test.ts`, add or revise the prerequisite and artifact declaration tests so the prerequisite equals `CODE_REVIEW_PREREQUISITE_FILES[CODE_REVIEW_TARGET_STORY_PREREQUISITE_ID]`, accepts `Story-1-1.md` and `Remediation-story-1-1-1.md`, and the artifact assertions verify the three artifact ids, each artifact family, intent mode, identity source, and output value keys using `WorkflowArtifactFamily` and `CodeReviewWorkflowValueKey`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Subtask 9.31. In `codeReviewWorkflow.test.ts`, add or revise the Step 1 workflow-form test so it asserts the form equals `buildCodeReviewStep1WorkflowForm()`, Panel A has the required title, prompt, submit action, `runtime_routed` transition, and `small_text` commit-hash field without `workflowValueKey`, and Panel B has the required invalid-commit title, prompt, no fields, back action label, and `backDestinationPanelId` pointing to Panel A.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Subtask 9.32. In `codeReviewWorkflow.test.ts`, add or revise the step label and tool-surface test so it asserts exact checklist labels for Steps 1-4, exact model-facing tool names for each step, and absence of `set_workflow_values`, `build_workflow_document`, `create_workflow_artifact`, `plan_remediation_story_artifact`, `update_story_index_status`, and `move_workflow_project_file` from all step tool schemas.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Subtask 9.33. In `codeReviewWorkflow.test.ts`, add or revise the Step 1 route-chain test so it asserts the exact route sequence from `resolve_prerequisite_files` through target derivation, code-review output allocation, initial output build, Panel A render, Panel A submit commit validation, invalid-commit `continue_workflow_form` to Panel B, valid-commit review-scope allocation, review-scope manifest build through `buildAndPersistReviewScopeManifest`, and transition to Step 2. Before asserting `renderFormAction.startPanelId`, narrow the `render_workflow_form` action variant with `"startPanelId" in renderFormAction`; throw a descriptive `Error` if the property is absent, then assert the narrowed `startPanelId` equals `CODE_REVIEW_STEP_1_PANEL_A_COMMIT_HASH_ID`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Subtask 9.34. In `codeReviewWorkflow.test.ts`, add or revise the Step 1 target-derivation helper test so it uses `createTargetStoryProject()`, runs `deriveCodeReviewTargetStoryValues(...)`, and asserts exact workflow value writes for `selected_story_filename`, `selected_story_identity`, `epic_identity`, `stories_index`, `review_folder`, `epics_document`, and `architecture_document`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Subtask 9.35. In `codeReviewWorkflow.test.ts`, add or revise Step 2 tests so child-output discovery first writes `missing_subagent_output_files` for missing outputs, then writes `blind_review_output`, `edge_case_review_output`, and clears `missing_subagent_output_files` after both files are non-empty; route tests must assert `workflow_progress_request_confirmed` triggers `discoverChildReviewOutputs`, ready state transitions to Step 3, missing state projects a prompt and returns to the progress-request branch, and prompt assertions must be limited to non-empty output plus materialized missing filenames rather than exact editable prompt prose.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Subtask 9.36. In `codeReviewWorkflow.test.ts`, add or revise Step 3 tests so the prompt builder returns a non-empty string with materialized `blind_review_output` and `edge_case_review_output` paths, and the route test asserts `workflow_progress_request_confirmed` transitions from Step 3 to Step 4.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Subtask 9.37. In `codeReviewWorkflow.test.ts`, add or revise the Step 4 findings-evaluation test so it writes a no-findings code-review output document and a findings document under the temp review folder, runs `evaluateCodeReviewFindings(...)` for each, and asserts exact workflow value writes for `review_findings_present`, `upstream_findings_present`, and `remediation_story_parent_identity`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Subtask 9.38. In `codeReviewWorkflow.test.ts`, add or revise the Step 4 no-findings route test so it asserts the findings-evaluation action, the no-findings `update_story_index_status` action with `stories_index`, `selected_story_identity`, `status: "complete"`, and `expectedCurrentStatus: "review"`, the selected-story `move_project_file` action from `implementation/stories-review` to `implementation/stories-complete`, and the final `complete_workflow` action.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Subtask 9.39. In `codeReviewWorkflow.test.ts`, add or revise the Step 4 findings route test so it asserts the findings route plans a remediation story through `PLAN_REMEDIATION_STORY_ARTIFACT`, allocates `CODE_REVIEW_REMEDIATION_STORY_ARTIFACT_ID`, builds `CODE_REVIEW_REMEDIATION_STORY_SHELL`, projects the Step 4 prompt, and waits for `attempt_completion_succeeded`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Subtask 9.40. In `codeReviewWorkflow.test.ts`, add or revise the Step 4 prompt test so it verifies the Step 4 prompt builder returns a non-empty string for no-upstream/no-remediation values, upstream-present values, and remediation-story values; verifies each Step 4 prompt includes the materialized `code_review_output` path and does not include the literal `code_review_output` placeholder; verifies materialized `remediation_story` appears only when the workflow value is non-empty; and does not assert exact editable Step 4 prompt prose.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Subtask 9.41. In `codeReviewWorkflow.test.ts`, add or revise the Step 4 backend-failure test so it creates a session with `branchContext.failureState.terminalErrorMessage`, asserts `failWithToolBackedOperationReason(...)` returns that concrete error message, and asserts every Step 4 tool-backed failure route uses `run_deterministic_procedure` with `failWithToolBackedOperationReason`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Subtask 9.42. In `codeReviewWorkflow.test.ts`, add or revise the Step 4 `attempt_completion_succeeded` route test so it asserts attempt completion triggers selected-story `update_story_index_status`, then selected-story `move_project_file`, then `complete_workflow`, using complete typed trigger events for each route.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+
+[x] Task 10. Validate Phase 3.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-[ ] Subtask 10.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/reviewScopeManifest.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`.
+[x] Subtask 10.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/reviewScopeManifest.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-[ ] Subtask 10.2. Run `npm run check-types`; if it fails during proto host probing, rerun with the approved elevated path and stop on the first non-environment TypeScript failure.
+[x] Subtask 10.2. Run `npm run check-types`; if it fails during proto host probing, rerun with the approved elevated path and stop on the first non-environment TypeScript failure.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-[ ] Subtask 10.3. Run `npm run lint`.
+[x] Subtask 10.3. Run `npm run lint`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
@@ -547,27 +652,47 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 11.1. In `WorkflowRegistry.ts`, import `codeReviewWorkflowDefinition` from the code-review module and add it to `shippedWorkflowDefinitions` without changing the existing workflow order except appending code-review after the currently shipped modules.
+[ ] Subtask 11.1. In `WorkflowRegistry.ts`, add `import { codeReviewWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/code-review"` with the other shipped workflow imports, then append `codeReviewWorkflowDefinition` as the final entry in `shippedWorkflowDefinitions` after `piPlanningWorkflowDefinition`; do not reorder or rename any existing shipped workflow entry.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 
-[ ] Subtask 11.2. In `codeReviewWorkflow.test.ts`, add registry assertions proving `resolveWorkflowDefinition("code-review")`, `resolveWorkflowBySlashCommand("code-review")`, and `resolveWorkflowByUseSkillName("code-review")` return `codeReviewWorkflowDefinition`, and proving `code-review.md` resolves through none of those registry paths.
+[ ] Subtask 11.2. In `codeReviewWorkflow.test.ts`, import `resolveWorkflowDefinition`, `resolveWorkflowBySlashCommand`, and `resolveWorkflowByUseSkillName` from `@/core/task/workflow-runtime/WorkflowRegistry`, then add one registry test that asserts `resolveWorkflowDefinition("code-review")`, `resolveWorkflowBySlashCommand("code-review")`, and `resolveWorkflowByUseSkillName("code-review")` each return `codeReviewWorkflowDefinition`, and asserts `resolveWorkflowDefinition("code-review.md")`, `resolveWorkflowBySlashCommand("code-review.md")`, and `resolveWorkflowByUseSkillName("code-review.md")` each return `undefined`; do not construct malformed workflow names through casts because `WorkflowName` is currently `string`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
 
-[ ] Subtask 11.3. In `integration.test.ts`, import `codeReviewWorkflowDefinition` and code-review tool-schema builders, then add prompt-projection tests proving active Step 2 projects required subagent assignment markers and only Step 2 tools without asserting the full Step 2 prompt prose.
+[ ] Subtask 11.3. In `integration.test.ts`, add code-review prompt-projection imports: import `CodeReviewWorkflowValueKey` and `codeReviewWorkflowDefinition` from `@/core/task/workflow-runtime/workflow-modules/code-review`, and import `buildCodeReviewStep2ToolSchemas`, `buildCodeReviewStep3ToolSchemas`, and `buildCodeReviewStep4ToolSchemas` from `@/core/task/workflow-runtime/workflow-modules/code-review/codeReviewToolSchemas`; keep these imports near the existing workflow-module imports.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 11.4. In `integration.test.ts`, add prompt-projection tests proving active Step 3 projects non-empty current step instructions, renders non-empty document path placeholders, includes `record_findings` in the workflow tool schema override, and excludes backend-only and retired code-review tools.
+[ ] Subtask 11.4. In `integration.test.ts`, add code-review prompt fixture constants and helper functions near the existing dev-story and pi-planning prompt fixtures: define `type CodeReviewPromptStepNumber = 2 | 3 | 4`; define constants for `target_story`, `selected_story_identity`, `selected_story_filename`, `stories_index`, `review_folder`, `epics_document`, `architecture_document`, `code_review_output`, `review_scope_manifest`, `blind_review_output`, `edge_case_review_output`, `review_commit_hash`, `review_commit_parent`, and `remediation_story`; define `getCodeReviewEntryBranchId(activeStepNumber: CodeReviewPromptStepNumber): string` with explicit switch cases `2`, `3`, and `4` returning `codeReviewWorkflowDefinition.steps["step-2"].decisionTree.entryBranchId`, `codeReviewWorkflowDefinition.steps["step-3"].decisionTree.entryBranchId`, and `codeReviewWorkflowDefinition.steps["step-4"].decisionTree.entryBranchId`, followed by a `const unreachableActiveStepNumber: never = activeStepNumber` exhaustiveness assignment; define `createCodeReviewWorkflowValues(overrides: WorkflowValues = {}): WorkflowValues` returning a full baseline `WorkflowValues` object keyed by `CodeReviewWorkflowValueKey` plus `...overrides`; define `createCodeReviewWorkflowSession(activeStepNumber: CodeReviewPromptStepNumber, workflowValues: WorkflowValues = createCodeReviewWorkflowValues()): ActiveWorkflowSession` with complete `projectSelection`, `lifecycle`, `entryArtifactResolution`, `ui.suppressedWorkflowFormIds`, `ui.suppressedWorkflowStepResolutionRoutes`, and `branchContext.activeBranchId`; define `buildCodeReviewPromptContext(activeStepNumber: CodeReviewPromptStepNumber, workflowValues: WorkflowValues = createCodeReviewWorkflowValues()): Promise<SystemPromptContext & WorkflowPromptProjection>` using a `WorkflowRuntime`, `TaskState.activeWorkflowName = "code-review"`, `TaskState.activeWorkflowSession`, and `apiRequestCount = 1`; do not use `as never`, `as any`, incomplete `WorkflowPromptProjection` objects, or helper return types inferred from complex object literals.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 11.5. In `integration.test.ts`, add prompt-projection tests proving active Step 4 projects `attempt_completion`, excludes `record_findings`, excludes backend-only and retired code-review tools, includes the upstream conditional block only when `upstream_findings_present === true`, and includes remediation-story instructions only when `remediation_story` is a non-empty string.
+[ ] Subtask 11.5. In `integration.test.ts`, add `expectCodeReviewProjectedToolSurface(testCtx: TestRunner, activeStepNumber: CodeReviewPromptStepNumber, expectedToolSpecs: readonly ClineToolSpec[]): Promise<void>` mirroring `expectDevStoryProjectedToolSurface`: compute expected names from `expectedToolSpecs`, call `buildCodeReviewPromptContext(activeStepNumber)`, assert `context.workflowToolSchemaOverride` deep-equals `expectedToolSpecs`, then call `runPromptTest(...)` and assert `getNativeToolNames(tools)` deep-equals the expected names.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[ ] Subtask 11.6. In `integration.test.ts`, add a test named `projects active code-review step tools from module-owned builders into native GPT-5 prompts` that iterates exactly three expectations: Step 2 with `buildCodeReviewStep2ToolSchemas()`, Step 3 with `buildCodeReviewStep3ToolSchemas()`, and Step 4 with `buildCodeReviewStep4ToolSchemas()`, and passes each expectation to `expectCodeReviewProjectedToolSurface(...)`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[ ] Subtask 11.7. In `integration.test.ts`, add a Step 2 code-review prompt-projection test that builds `const context = await buildCodeReviewPromptContext(2)`, asserts projected tool names are exactly `["use_subagents", "send_user_message", "workflow_progress_request"]`, assigns `workflowInputPayloadBlock` and `continuationWorkflowInputPayloadBlock` from the context, explicitly throws if either value is `undefined` or `""`, iterates the narrowed payload strings, and asserts each payload is non-empty after trimming; do not assert exact Step 2 prompt prose or exact subagent prompt-marker text.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[ ] Subtask 11.8. In `integration.test.ts`, add a Step 3 code-review prompt-projection test that builds `const context = await buildCodeReviewPromptContext(3)`, asserts projected tool names are exactly `["read_file", "read_file_range", "record_findings", "send_user_message", "workflow_progress_request"]`, assigns `workflowInputPayloadBlock` and `continuationWorkflowInputPayloadBlock` from the context, explicitly throws if either value is `undefined` or `""`, iterates the narrowed payload strings, asserts each payload contains the materialized baseline values for `blind_review_output`, `edge_case_review_output`, `target_story`, `review_scope_manifest`, `epics_document`, and `architecture_document`, and asserts the projected/native tool names exclude `attempt_completion`, `create_workflow_artifact`, `build_workflow_document`, `plan_remediation_story_artifact`, `update_story_index_status`, and `move_workflow_project_file`; do not assert the complete Step 3 prompt prose.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[ ] Subtask 11.9. In `integration.test.ts`, add Step 4 code-review prompt-projection tests that build contexts with `upstream_findings_present: true` and `remediation_story` set to the baseline remediation path, with `upstream_findings_present: false`, and with `remediation_story` overwritten to an empty string. Each test must assert projected tool names are exactly `["read_file", "read_file_range", "apply_patch", "ask_followup_question", "send_user_message", "attempt_completion"]`, assert `record_findings`, `workflow_progress_request`, `create_workflow_artifact`, `build_workflow_document`, `plan_remediation_story_artifact`, `update_story_index_status`, and `move_workflow_project_file` are absent from projected/native tools, assign `workflowInputPayloadBlock` and `continuationWorkflowInputPayloadBlock` from the context, explicitly throw if either value is `undefined` or `""`, iterate the narrowed payload strings, assert each payload is non-empty after trimming, assert the upstream-present payload differs from the upstream-absent payload without asserting the upstream prose, and assert the baseline remediation story path appears only when `remediation_story` is a non-empty string; do not assert exact Step 4 prompt prose.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
@@ -662,12 +787,22 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-[ ] Subtask 14.4. Run `rg -n "ReviewBlindHunter|ReviewEdgeCaseHunter|AdversarialReview|ReviewInputMarkdown|ReviewInputDiff|Review-blind-hunter|Review-edge-case-hunter|Adversarial-review|Review-input|review_blind_hunter|review_edge_case_hunter|adversarial_review|review_input_markdown|review_input_diff|build_review_diff_output|BuildReviewInputToolHandler|BuildReviewDiffOutputToolHandler|code_review_spec_update|CodeReviewSpecUpdateToolHandler|codeReviewSpecUpdateMerge" src/core/task src/core/prompts src/shared docs/workflows/workflow-runtime/workflow-modules/code-review`; inspect hits in context and stop if any hit is active runtime code instead of historical docs or explicit negative test assertions.
+[ ] Subtask 14.4. Run `rg -n "ReviewBlindHunter|ReviewEdgeCaseHunter|AdversarialReview|ReviewInputMarkdown|ReviewInputDiff|Review-blind-hunter|Review-edge-case-hunter|Adversarial-review|Review-input|review_blind_hunter|review_edge_case_hunter|adversarial_review|review_input_markdown|review_input_diff" src/core/task/workflow-runtime/artifactFamilies.ts src/core/task/workflow-runtime/types.ts src/core/task/workflow-runtime/WorkflowRuntime.ts src/core/task/workflow-runtime/workflow-modules/code-review`; treat exit code 1 with no output as success, inspect any output in context, and stop if any hit is active runtime code instead of an explicit negative test assertion.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-[ ] Subtask 14.5. Run `rg -n "code-review\\.md|bmad-code-review" src/core/task/workflow-runtime src/core/prompts docs/workflows/workflow-runtime/workflow-modules/code-review`; inspect hits in context and stop if any hit is active runtime code instead of explicit negative test assertions.
+[ ] Subtask 14.5. Run `rg -n "build_review_diff_output|BuildReviewInputToolHandler|BuildReviewDiffOutputToolHandler|code_review_spec_update|CODE_REVIEW_SPEC_UPDATE|CodeReviewSpecUpdateToolHandler|codeReviewSpecUpdateMerge" src/shared/tools.ts src/core/assistant-message/index.ts src/core/task/tools/backendWorkflowToolContracts.ts src/core/task/tools/response/ResponseToolRegistry.ts src/core/task/tools/ToolExecutorCoordinator.ts src/core/task/tools/handlers src/core/task/__tests__/ToolExecutor.nativeToolParity.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/response/__tests__/ResponseToolRuntime.test.ts src/core/task/workflow-runtime/workflow-modules/code-review`; treat exit code 1 with no output as success, inspect any output in context, and stop if any hit is active runtime code instead of an explicit negative test assertion.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
+
+[ ] Subtask 14.6. Run `rg -n "code-review\\.md|bmad-code-review" src/core/task/workflow-runtime src/core/prompts .cline/skills`; treat exit code 1 with no output as success, inspect any output in context, and stop if any hit is active runtime code, prompt code, or surviving legacy skill-package content instead of an explicit negative test assertion.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
+
+[ ] Subtask 14.7. Run `git status --short` and inspect the persistent diff scope; stop and report if any changed, deleted, or untracked path is outside the files prescribed by completed code-review action-plan tasks plus this action-plan file's checkbox updates.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
