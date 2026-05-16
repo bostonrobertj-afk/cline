@@ -6,6 +6,7 @@ import { createArchitectureWorkflowDefinition } from "@/core/task/workflow-runti
 import { createEpicsWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-epics"
 import { createStoryWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-story"
 import { devStoryWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/dev-story"
+import { edgeCaseHunterReviewWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review"
 import { piPlanningWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/pi-planning"
 
 const shippedWorkflowDefinitions: WorkflowDefinition[] = [
@@ -17,6 +18,7 @@ const shippedWorkflowDefinitions: WorkflowDefinition[] = [
 	piPlanningWorkflowDefinition,
 	codeReviewWorkflowDefinition,
 	blindReviewWorkflowDefinition,
+	edgeCaseHunterReviewWorkflowDefinition,
 ]
 
 const shippedWorkflowDefinitionsByName = new Map<WorkflowName, WorkflowDefinition>(

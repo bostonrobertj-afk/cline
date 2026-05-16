@@ -154,7 +154,7 @@ Launch two subagents and assign their specialized code review workflows:
     - You MUST assign the appropriate workflow to this subagent by including this exact phrase, with identical formatting and punctuation in your prompt: Skill: use_skill('blind-review')
     - The blind-review workflow will then activate and provide the subagent with detailed instructions.
 - Edge Case Hunter:
-     - You MUST assign the appropriate workflow to this subagent by including this exact phrase, with identical formatting and punctuation in your prompt: Skill: use_skill('review-edge-case-hunter')
+     - You MUST assign the appropriate workflow to this subagent by including this exact phrase, with identical formatting and punctuation in your prompt: Skill: use_skill('edge-case-hunter-review')
      - The edge-case-hunter workflow will then activate and provide the subagent with detailed instructions.
 - Track any review layer that fails, times out, or returns no useful output. Once the subagents complete their work, shut them down.
 

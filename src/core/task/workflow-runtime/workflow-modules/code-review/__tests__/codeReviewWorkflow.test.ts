@@ -745,6 +745,9 @@ describe("codeReviewWorkflowDefinition", () => {
 	it("builds non-empty Step 2 and Step 3 prompts with materialized review output paths", () => {
 		const step2Prompt = buildPrompt("step-2", {})
 		expect(step2Prompt.trim().length).to.be.greaterThan(0)
+		expect(step2Prompt).to.include("Skill: use_skill('blind-review')")
+		expect(step2Prompt).to.include("Skill: use_skill('edge-case-hunter-review')")
+		expect(step2Prompt).not.to.include("Skill: use_skill('review-edge-case-hunter')")
 
 		const step3Prompt = buildPrompt("step-3", SAMPLE_WORKFLOW_VALUES)
 		expect(step3Prompt).to.include(SAMPLE_WORKFLOW_VALUES[CodeReviewWorkflowValueKey.BlindReviewOutput])

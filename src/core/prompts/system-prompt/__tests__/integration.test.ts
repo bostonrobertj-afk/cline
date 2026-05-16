@@ -60,6 +60,11 @@ import {
 	buildDevStoryStep3ToolSchemas,
 	buildDevStoryStep4ToolSchemas,
 } from "@/core/task/workflow-runtime/workflow-modules/dev-story/devStoryToolSchemas"
+import {
+	buildEdgeCaseHunterReviewStep2ToolSchemas,
+	EdgeCaseHunterReviewWorkflowValueKey,
+	edgeCaseHunterReviewWorkflowDefinition,
+} from "@/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review"
 import { piPlanningWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/pi-planning"
 import type { McpHub } from "@/services/mcp/McpHub"
 import type { McpServer } from "@/shared/mcp"
@@ -862,6 +867,44 @@ const BLIND_REVIEW_FORBIDDEN_PROMPT_TOOL_NAMES: readonly string[] = [
 	"record_findings",
 ]
 
+const EDGE_CASE_HUNTER_REVIEW_TARGET_STORY = "/test/project/implementation/stories-review/Story-1-1.md"
+const EDGE_CASE_HUNTER_REVIEW_SELECTED_STORY_IDENTITY = "1.1"
+const EDGE_CASE_HUNTER_REVIEW_REVIEW_COMMIT_HASH = "abc1234"
+const EDGE_CASE_HUNTER_REVIEW_REVIEW_COMMIT_PARENT = "def5678"
+const EDGE_CASE_HUNTER_REVIEW_REVIEW_FOLDER = "/test/project/review"
+const EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST = `${EDGE_CASE_HUNTER_REVIEW_REVIEW_FOLDER}/review-scope-1-1.md`
+const EDGE_CASE_HUNTER_REVIEW_OUTPUT = `${EDGE_CASE_HUNTER_REVIEW_REVIEW_FOLDER}/edge-case-hunter-1-1.md`
+const EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST_ARTIFACT_FAMILY = "review_scope_manifest"
+const EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST_ARTIFACT_IDENTITY = "1.1"
+const EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST_ARTIFACT_FILENAME = "review-scope-1-1.md"
+const EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST_ARTIFACT_RELATIVE_PATH = "review/review-scope-1-1.md"
+const EDGE_CASE_HUNTER_REVIEW_OUTPUT_ARTIFACT_FAMILY = "edge_case_review_output"
+const EDGE_CASE_HUNTER_REVIEW_OUTPUT_ARTIFACT_IDENTITY = "1.1"
+const EDGE_CASE_HUNTER_REVIEW_OUTPUT_ARTIFACT_FILENAME = "edge-case-hunter-1-1.md"
+const EDGE_CASE_HUNTER_REVIEW_OUTPUT_ARTIFACT_RELATIVE_PATH = "review/edge-case-hunter-1-1.md"
+const EDGE_CASE_HUNTER_REVIEW_FORBIDDEN_PROMPT_TOOL_NAMES: readonly string[] = [
+	"web_search",
+	"web_fetch",
+	"browser_action",
+	"ask_followup_question",
+	"use_subagents",
+	"use_skill",
+	"set_workflow_values",
+	"build_workflow_document",
+	"create_workflow_artifact",
+	"archive_workflow_artifact",
+	"delete_workflow_artifact",
+	"move_workflow_project_file",
+	"workflow_progress_request",
+	"use_mcp_tool",
+	"access_mcp_resource",
+	"load_mcp_documentation",
+	"build_review_input",
+	"build_review_diff_output",
+	"code_review_spec_update",
+	"record_findings",
+]
+
 type BlindReviewPromptStepNumber = 2
 
 function getBlindReviewEntryBranchId(activeStepNumber: BlindReviewPromptStepNumber): string {
@@ -931,6 +974,100 @@ async function buildBlindReviewPromptContext(
 	const taskState = new TaskState()
 	taskState.activeWorkflowName = "blind-review"
 	taskState.activeWorkflowSession = createBlindReviewWorkflowSession(activeStepNumber, workflowValues)
+	taskState.apiRequestCount = 1
+	const workflowProjection = await runtime.buildTurnProjection({ taskState })
+
+	return {
+		...baseContext,
+		mcpHub: makeMcpHub([]),
+		providerInfo: makeProviderInfo("gpt-5-codex", "openai"),
+		enableNativeToolCalls: true,
+		useMinimalGptPrompt: true,
+		...workflowProjection,
+	}
+}
+
+type EdgeCaseHunterReviewPromptStepNumber = 2
+
+function getEdgeCaseHunterReviewEntryBranchId(activeStepNumber: EdgeCaseHunterReviewPromptStepNumber): string {
+	switch (activeStepNumber) {
+		case 2:
+			return edgeCaseHunterReviewWorkflowDefinition.steps["step-2"].decisionTree.entryBranchId
+	}
+
+	const unreachableActiveStepNumber: never = activeStepNumber
+	return unreachableActiveStepNumber
+}
+
+function createEdgeCaseHunterReviewWorkflowValues(overrides: WorkflowValues = {}): WorkflowValues {
+	return {
+		[EdgeCaseHunterReviewWorkflowValueKey.ProjectMode]: "existing",
+		[EdgeCaseHunterReviewWorkflowValueKey.ProjectTitle]: "Edge Case Hunter Review Session",
+		[EdgeCaseHunterReviewWorkflowValueKey.ProjectFolderName]: "test-project",
+		[EdgeCaseHunterReviewWorkflowValueKey.TargetStory]: EDGE_CASE_HUNTER_REVIEW_TARGET_STORY,
+		[EdgeCaseHunterReviewWorkflowValueKey.SelectedStoryIdentity]: EDGE_CASE_HUNTER_REVIEW_SELECTED_STORY_IDENTITY,
+		[EdgeCaseHunterReviewWorkflowValueKey.ReviewCommitHash]: EDGE_CASE_HUNTER_REVIEW_REVIEW_COMMIT_HASH,
+		[EdgeCaseHunterReviewWorkflowValueKey.ReviewCommitParent]: EDGE_CASE_HUNTER_REVIEW_REVIEW_COMMIT_PARENT,
+		[EdgeCaseHunterReviewWorkflowValueKey.ReviewScopeManifest]: EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST,
+		[EdgeCaseHunterReviewWorkflowValueKey.ReviewScopeManifestArtifactFamily]:
+			EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST_ARTIFACT_FAMILY,
+		[EdgeCaseHunterReviewWorkflowValueKey.ReviewScopeManifestArtifactIdentity]:
+			EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST_ARTIFACT_IDENTITY,
+		[EdgeCaseHunterReviewWorkflowValueKey.ReviewScopeManifestArtifactFilename]:
+			EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST_ARTIFACT_FILENAME,
+		[EdgeCaseHunterReviewWorkflowValueKey.ReviewScopeManifestArtifactRelativePath]:
+			EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST_ARTIFACT_RELATIVE_PATH,
+		[EdgeCaseHunterReviewWorkflowValueKey.EdgeCaseReviewOutput]: EDGE_CASE_HUNTER_REVIEW_OUTPUT,
+		[EdgeCaseHunterReviewWorkflowValueKey.EdgeCaseReviewOutputArtifactFamily]: EDGE_CASE_HUNTER_REVIEW_OUTPUT_ARTIFACT_FAMILY,
+		[EdgeCaseHunterReviewWorkflowValueKey.EdgeCaseReviewOutputArtifactIdentity]:
+			EDGE_CASE_HUNTER_REVIEW_OUTPUT_ARTIFACT_IDENTITY,
+		[EdgeCaseHunterReviewWorkflowValueKey.EdgeCaseReviewOutputArtifactFilename]:
+			EDGE_CASE_HUNTER_REVIEW_OUTPUT_ARTIFACT_FILENAME,
+		[EdgeCaseHunterReviewWorkflowValueKey.EdgeCaseReviewOutputArtifactRelativePath]:
+			EDGE_CASE_HUNTER_REVIEW_OUTPUT_ARTIFACT_RELATIVE_PATH,
+		...overrides,
+	}
+}
+
+function createEdgeCaseHunterReviewWorkflowSession(
+	activeStepNumber: EdgeCaseHunterReviewPromptStepNumber,
+	workflowValues: WorkflowValues = createEdgeCaseHunterReviewWorkflowValues(),
+): ActiveWorkflowSession {
+	return {
+		activeStepNumber,
+		workflowValues,
+		projectSelection: {
+			projectMode: "existing",
+			projectTitle: "Edge Case Hunter Review Session",
+			projectFolderName: "test-project",
+		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
+		entryArtifactResolution: undefined,
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: {
+			activeBranchId: getEdgeCaseHunterReviewEntryBranchId(activeStepNumber),
+		},
+	}
+}
+
+async function buildEdgeCaseHunterReviewPromptContext(
+	activeStepNumber: EdgeCaseHunterReviewPromptStepNumber = 2,
+	workflowValues: WorkflowValues = createEdgeCaseHunterReviewWorkflowValues(),
+): Promise<SystemPromptContext & WorkflowPromptProjection> {
+	const workspacePathPolicy: WorkflowWorkspacePathPolicy = {
+		validateAccess: () => true,
+	}
+	const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })
+	const taskState = new TaskState()
+	taskState.activeWorkflowName = "edge-case-hunter-review"
+	taskState.activeWorkflowSession = createEdgeCaseHunterReviewWorkflowSession(activeStepNumber, workflowValues)
 	taskState.apiRequestCount = 1
 	const workflowProjection = await runtime.buildTurnProjection({ taskState })
 
@@ -1228,6 +1365,19 @@ async function expectBlindReviewProjectedToolSurface(
 ): Promise<void> {
 	const expectedToolNames = expectedToolSpecs.map((tool) => tool.name)
 	const context = await buildBlindReviewPromptContext(2)
+	expect(context.workflowToolSchemaOverride).to.deep.equal(expectedToolSpecs)
+
+	await runPromptTest(testCtx, context, "gpt-5-codex", async ({ tools }) => {
+		expect(getNativeToolNames(tools)).to.deep.equal(expectedToolNames)
+	})
+}
+
+async function expectEdgeCaseHunterReviewProjectedToolSurface(
+	testCtx: TestRunner,
+	expectedToolSpecs: readonly ClineToolSpec[],
+): Promise<void> {
+	const expectedToolNames = expectedToolSpecs.map((tool) => tool.name)
+	const context = await buildEdgeCaseHunterReviewPromptContext(2)
 	expect(context.workflowToolSchemaOverride).to.deep.equal(expectedToolSpecs)
 
 	await runPromptTest(testCtx, context, "gpt-5-codex", async ({ tools }) => {
@@ -2119,6 +2269,76 @@ describe("Prompt System Integration Tests", () => {
 					expect(systemPrompt).to.include(approvedToolName)
 				}
 				for (const forbiddenToolName of BLIND_REVIEW_FORBIDDEN_PROMPT_TOOL_NAMES) {
+					expect(systemPrompt).to.not.include(forbiddenToolName)
+				}
+			})
+		})
+
+		it("projects active edge-case-hunter-review Step 2 tools from module-owned builders into native GPT-5 prompts", async function () {
+			await expectEdgeCaseHunterReviewProjectedToolSurface(this, buildEdgeCaseHunterReviewStep2ToolSchemas())
+		})
+
+		it("projects edge-case-hunter-review Step 2 materialized values into full-turn and continuation payloads", async () => {
+			const context = await buildEdgeCaseHunterReviewPromptContext(2)
+			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+			const continuationWorkflowInputPayloadBlock = context.continuationWorkflowInputPayloadBlock
+			if (workflowInputPayloadBlock === undefined || workflowInputPayloadBlock === "") {
+				throw new Error("Expected edge-case-hunter-review Step 2 workflow input payload.")
+			}
+			if (continuationWorkflowInputPayloadBlock === undefined || continuationWorkflowInputPayloadBlock === "") {
+				throw new Error("Expected edge-case-hunter-review Step 2 continuation workflow input payload.")
+			}
+
+			const payloadBlocks: readonly string[] = [workflowInputPayloadBlock, continuationWorkflowInputPayloadBlock]
+			for (const payloadBlock of payloadBlocks) {
+				expect(payloadBlock.trim()).to.not.equal("")
+				expect(payloadBlock).to.include(EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST)
+				expect(payloadBlock).to.include(EDGE_CASE_HUNTER_REVIEW_TARGET_STORY)
+				expect(payloadBlock).to.include(EDGE_CASE_HUNTER_REVIEW_REVIEW_COMMIT_HASH)
+				expect(payloadBlock).to.include(EDGE_CASE_HUNTER_REVIEW_REVIEW_COMMIT_PARENT)
+				expect(payloadBlock).to.include(EDGE_CASE_HUNTER_REVIEW_OUTPUT)
+				expect(payloadBlock).to.not.include("review_scope_manifest")
+				expect(payloadBlock).to.not.include("target_story")
+				expect(payloadBlock).to.not.include("review_commit_hash")
+				expect(payloadBlock).to.not.include("review_commit_parent")
+				expect(payloadBlock).to.not.include("edge_case_review_output")
+			}
+		})
+
+		it("does not expose forbidden tools in edge-case-hunter-review Step 2 prompt projection", async () => {
+			const context = await buildEdgeCaseHunterReviewPromptContext(2)
+			const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
+			for (const forbiddenToolName of EDGE_CASE_HUNTER_REVIEW_FORBIDDEN_PROMPT_TOOL_NAMES) {
+				expect(projectedToolNames).to.not.include(forbiddenToolName)
+			}
+		})
+
+		it("does not expose forbidden native tools in edge-case-hunter-review Step 2 prompts", async function () {
+			const context = await buildEdgeCaseHunterReviewPromptContext(2)
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ tools }) => {
+				const nativeToolNames = getNativeToolNames(tools)
+				for (const forbiddenToolName of EDGE_CASE_HUNTER_REVIEW_FORBIDDEN_PROMPT_TOOL_NAMES) {
+					expect(nativeToolNames).to.not.include(forbiddenToolName)
+				}
+			})
+		})
+
+		it("renders edge-case-hunter-review Step 2 tools through non-native prompt text without forbidden tools", async function () {
+			const nativeContext = await buildEdgeCaseHunterReviewPromptContext(2)
+			const context: SystemPromptContext = {
+				...nativeContext,
+				providerInfo: makeProviderInfo("gpt-3", "openai"),
+				enableNativeToolCalls: false,
+			}
+			const approvedToolNames = buildEdgeCaseHunterReviewStep2ToolSchemas().map((tool) => tool.name)
+
+			await runPromptTest(this, context, "gpt-3", async ({ systemPrompt, tools }) => {
+				expect(tools).to.equal(undefined)
+				for (const approvedToolName of approvedToolNames) {
+					expect(systemPrompt).to.include(approvedToolName)
+				}
+				for (const forbiddenToolName of EDGE_CASE_HUNTER_REVIEW_FORBIDDEN_PROMPT_TOOL_NAMES) {
 					expect(systemPrompt).to.not.include(forbiddenToolName)
 				}
 			})

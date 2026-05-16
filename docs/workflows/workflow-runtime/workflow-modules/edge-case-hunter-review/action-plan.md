@@ -723,206 +723,206 @@ Allowed files:
 
 After completing this phase, pause for QA review before moving to Phase 4.
 
-[ ] Task 10. Register edge-case-hunter-review in the workflow registry.
+[x] Task 10. Register edge-case-hunter-review in the workflow registry.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts`
 
-[ ] Subtask 10.1. In `WorkflowRegistry.ts`, import `edgeCaseHunterReviewWorkflowDefinition` from `@/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review` and add it to `shippedWorkflowDefinitions` after `blindReviewWorkflowDefinition`.
+[x] Subtask 10.1. In `WorkflowRegistry.ts`, import `edgeCaseHunterReviewWorkflowDefinition` from `@/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review` and add it to `shippedWorkflowDefinitions` after `blindReviewWorkflowDefinition`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 
-[ ] Subtask 10.2. In `edgeCaseHunterReviewWorkflow.test.ts`, add imports for `resolveWorkflowDefinition`, `resolveWorkflowBySlashCommand`, and `resolveWorkflowByUseSkillName` from `../../../WorkflowRegistry`.
+[x] Subtask 10.2. In `edgeCaseHunterReviewWorkflow.test.ts`, add imports for `resolveWorkflowDefinition`, `resolveWorkflowBySlashCommand`, and `resolveWorkflowByUseSkillName` from `../../../WorkflowRegistry`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts`
 
-[ ] Subtask 10.3. In `edgeCaseHunterReviewWorkflow.test.ts`, add test `resolves edge-case-hunter-review through every registry lookup`; assert `resolveWorkflowDefinition("edge-case-hunter-review")`, `resolveWorkflowBySlashCommand("edge-case-hunter-review")`, and `resolveWorkflowByUseSkillName("edge-case-hunter-review")` each return `edgeCaseHunterReviewWorkflowDefinition`.
+[x] Subtask 10.3. In `edgeCaseHunterReviewWorkflow.test.ts`, add test `resolves edge-case-hunter-review through every registry lookup`; assert `resolveWorkflowDefinition("edge-case-hunter-review")`, `resolveWorkflowBySlashCommand("edge-case-hunter-review")`, and `resolveWorkflowByUseSkillName("edge-case-hunter-review")` each return `edgeCaseHunterReviewWorkflowDefinition`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts`
 
-[ ] Subtask 10.4. In `edgeCaseHunterReviewWorkflow.test.ts`, add test `does not preserve retired edge-case-hunter workflow aliases`; for each name `review-edge-case-hunter`, `review-edge-case-hunter.md`, and `edge-case-hunter-review.md`, assert `resolveWorkflowDefinition(name)`, `resolveWorkflowBySlashCommand(name)`, and `resolveWorkflowByUseSkillName(name)` each return `undefined`.
+[x] Subtask 10.4. In `edgeCaseHunterReviewWorkflow.test.ts`, add test `does not preserve retired edge-case-hunter workflow aliases`; for each name `review-edge-case-hunter`, `review-edge-case-hunter.md`, and `edge-case-hunter-review.md`, assert `resolveWorkflowDefinition(name)`, `resolveWorkflowBySlashCommand(name)`, and `resolveWorkflowByUseSkillName(name)` each return `undefined`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts`
 
-[ ] Subtask 10.5. In `edgeCaseHunterReviewWorkflow.test.ts`, add imports for `TaskState` from `@/core/task/TaskState`, `ClineDefaultTool` from `@/shared/tools`, `WorkflowRuntime` from `../../../WorkflowRuntime`, and type import `WorkflowWorkspacePathPolicy` from `../../../types`.
+[x] Subtask 10.5. In `edgeCaseHunterReviewWorkflow.test.ts`, add imports for `TaskState` from `@/core/task/TaskState`, `ClineDefaultTool` from `@/shared/tools`, `WorkflowRuntime` from `../../../WorkflowRuntime`, and type import `WorkflowWorkspacePathPolicy` from `../../../types`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts`
 
-[ ] Subtask 10.6. In `edgeCaseHunterReviewWorkflow.test.ts`, add test `activates from a parent session through the registered workflow name`; define `const workspacePathPolicy: WorkflowWorkspacePathPolicy = { validateAccess: () => true }`, construct `const runtime = new WorkflowRuntime({ cwd: PROJECT_ROOT, workspacePathPolicy })`, construct `const taskState = new TaskState()`, construct `const parentSession = createSession(SAMPLE_WORKFLOW_VALUES)`, call `runtime.activateWorkflow({ taskState, workflowName: "edge-case-hunter-review", parentSession })`, assert `result.kind === "execute_tool_backed_operation"`, then after that discriminant check assert `result.toolRequest.toolName === ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT`, `result.toolRequest.toolParams.artifact_id === EDGE_CASE_HUNTER_REVIEW_OUTPUT_ARTIFACT_ID`, `taskState.activeWorkflowName === "edge-case-hunter-review"`, `taskState.activeWorkflowSession` is not `undefined`, child `projectSelection` deep-equals but is not the same reference as `parentSession.projectSelection`, and child workflow values include the same `target_story`, `review_commit_hash`, `review_commit_parent`, and `review_scope_manifest` string values as `parentSession.workflowValues`.
+[x] Subtask 10.6. In `edgeCaseHunterReviewWorkflow.test.ts`, add test `activates from a parent session through the registered workflow name`; define `const workspacePathPolicy: WorkflowWorkspacePathPolicy = { validateAccess: () => true }`, construct `const runtime = new WorkflowRuntime({ cwd: PROJECT_ROOT, workspacePathPolicy })`, construct `const taskState = new TaskState()`, construct `const parentSession = createSession(SAMPLE_WORKFLOW_VALUES)`, call `runtime.activateWorkflow({ taskState, workflowName: "edge-case-hunter-review", parentSession })`, assert `result.kind === "execute_tool_backed_operation"`, then after that discriminant check assert `result.toolRequest.toolName === ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT`, `result.toolRequest.toolParams.artifact_id === EDGE_CASE_HUNTER_REVIEW_OUTPUT_ARTIFACT_ID`, `taskState.activeWorkflowName === "edge-case-hunter-review"`, `taskState.activeWorkflowSession` is not `undefined`, child `projectSelection` deep-equals but is not the same reference as `parentSession.projectSelection`, and child workflow values include the same `target_story`, `review_commit_hash`, `review_commit_parent`, and `review_scope_manifest` string values as `parentSession.workflowValues`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts`
 
-[ ] Task 11. Update code-review Step 2 to invoke the canonical edge-case-hunter-review child workflow name.
+[x] Task 11. Update code-review Step 2 to invoke the canonical edge-case-hunter-review child workflow name.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
 
-[ ] Subtask 11.1. In `codeReviewWorkflow.ts`, replace the Step 2 subagent assignment phrase `Skill: use_skill('review-edge-case-hunter')` with exactly `Skill: use_skill('edge-case-hunter-review')`; do not change any other Step 2 prompt wording.
+[x] Subtask 11.1. In `codeReviewWorkflow.ts`, replace the Step 2 subagent assignment phrase `Skill: use_skill('review-edge-case-hunter')` with exactly `Skill: use_skill('edge-case-hunter-review')`; do not change any other Step 2 prompt wording.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-[ ] Subtask 11.2. In `codeReviewWorkflow.test.ts`, update the Step 2 prompt test so it asserts the non-empty Step 2 prompt includes `Skill: use_skill('blind-review')` and `Skill: use_skill('edge-case-hunter-review')`, and asserts it does not include `Skill: use_skill('review-edge-case-hunter')`; keep the assertion limited to these stable workflow activation phrases and non-empty prompt shape.
+[x] Subtask 11.2. In `codeReviewWorkflow.test.ts`, update the Step 2 prompt test so it asserts the non-empty Step 2 prompt includes `Skill: use_skill('blind-review')` and `Skill: use_skill('edge-case-hunter-review')`, and asserts it does not include `Skill: use_skill('review-edge-case-hunter')`; keep the assertion limited to these stable workflow activation phrases and non-empty prompt shape.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
 
-[ ] Task 12. Add edge-case-hunter-review prompt integration coverage.
+[x] Task 12. Add edge-case-hunter-review prompt integration coverage.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.1. In `integration.test.ts`, add imports for `EdgeCaseHunterReviewWorkflowValueKey`, `edgeCaseHunterReviewWorkflowDefinition`, and `buildEdgeCaseHunterReviewStep2ToolSchemas` from `@/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review`.
+[x] Subtask 12.1. In `integration.test.ts`, add imports for `EdgeCaseHunterReviewWorkflowValueKey`, `edgeCaseHunterReviewWorkflowDefinition`, and `buildEdgeCaseHunterReviewStep2ToolSchemas` from `@/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.2. In `integration.test.ts`, add fixture constants near the blind-review prompt fixtures exactly: `EDGE_CASE_HUNTER_REVIEW_TARGET_STORY = "/test/project/implementation/stories-review/Story-1-1.md"`, `EDGE_CASE_HUNTER_REVIEW_SELECTED_STORY_IDENTITY = "1.1"`, `EDGE_CASE_HUNTER_REVIEW_REVIEW_COMMIT_HASH = "abc1234"`, `EDGE_CASE_HUNTER_REVIEW_REVIEW_COMMIT_PARENT = "def5678"`, `EDGE_CASE_HUNTER_REVIEW_REVIEW_FOLDER = "/test/project/review"`, `EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST = `${EDGE_CASE_HUNTER_REVIEW_REVIEW_FOLDER}/review-scope-1-1.md``, and `EDGE_CASE_HUNTER_REVIEW_OUTPUT = `${EDGE_CASE_HUNTER_REVIEW_REVIEW_FOLDER}/edge-case-hunter-1-1.md``.
+[x] Subtask 12.2. In `integration.test.ts`, add fixture constants near the blind-review prompt fixtures exactly: `EDGE_CASE_HUNTER_REVIEW_TARGET_STORY = "/test/project/implementation/stories-review/Story-1-1.md"`, `EDGE_CASE_HUNTER_REVIEW_SELECTED_STORY_IDENTITY = "1.1"`, `EDGE_CASE_HUNTER_REVIEW_REVIEW_COMMIT_HASH = "abc1234"`, `EDGE_CASE_HUNTER_REVIEW_REVIEW_COMMIT_PARENT = "def5678"`, `EDGE_CASE_HUNTER_REVIEW_REVIEW_FOLDER = "/test/project/review"`, `EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST = `${EDGE_CASE_HUNTER_REVIEW_REVIEW_FOLDER}/review-scope-1-1.md``, and `EDGE_CASE_HUNTER_REVIEW_OUTPUT = `${EDGE_CASE_HUNTER_REVIEW_REVIEW_FOLDER}/edge-case-hunter-1-1.md``.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.3. In `integration.test.ts`, add review-scope artifact metadata constants exactly: `EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST_ARTIFACT_FAMILY = "review_scope_manifest"`, `EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST_ARTIFACT_IDENTITY = "1.1"`, `EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST_ARTIFACT_FILENAME = "review-scope-1-1.md"`, and `EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST_ARTIFACT_RELATIVE_PATH = "review/review-scope-1-1.md"`.
+[x] Subtask 12.3. In `integration.test.ts`, add review-scope artifact metadata constants exactly: `EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST_ARTIFACT_FAMILY = "review_scope_manifest"`, `EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST_ARTIFACT_IDENTITY = "1.1"`, `EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST_ARTIFACT_FILENAME = "review-scope-1-1.md"`, and `EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST_ARTIFACT_RELATIVE_PATH = "review/review-scope-1-1.md"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.4. In `integration.test.ts`, add edge-case output artifact metadata constants exactly: `EDGE_CASE_HUNTER_REVIEW_OUTPUT_ARTIFACT_FAMILY = "edge_case_review_output"`, `EDGE_CASE_HUNTER_REVIEW_OUTPUT_ARTIFACT_IDENTITY = "1.1"`, `EDGE_CASE_HUNTER_REVIEW_OUTPUT_ARTIFACT_FILENAME = "edge-case-hunter-1-1.md"`, and `EDGE_CASE_HUNTER_REVIEW_OUTPUT_ARTIFACT_RELATIVE_PATH = "review/edge-case-hunter-1-1.md"`.
+[x] Subtask 12.4. In `integration.test.ts`, add edge-case output artifact metadata constants exactly: `EDGE_CASE_HUNTER_REVIEW_OUTPUT_ARTIFACT_FAMILY = "edge_case_review_output"`, `EDGE_CASE_HUNTER_REVIEW_OUTPUT_ARTIFACT_IDENTITY = "1.1"`, `EDGE_CASE_HUNTER_REVIEW_OUTPUT_ARTIFACT_FILENAME = "edge-case-hunter-1-1.md"`, and `EDGE_CASE_HUNTER_REVIEW_OUTPUT_ARTIFACT_RELATIVE_PATH = "review/edge-case-hunter-1-1.md"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.5. In `integration.test.ts`, add `EDGE_CASE_HUNTER_REVIEW_FORBIDDEN_PROMPT_TOOL_NAMES: readonly string[]` with exactly the same forbidden tool names as `FORBIDDEN_MODEL_FACING_TOOL_NAMES` in Subtask 8.4.
+[x] Subtask 12.5. In `integration.test.ts`, add `EDGE_CASE_HUNTER_REVIEW_FORBIDDEN_PROMPT_TOOL_NAMES: readonly string[]` with exactly the same forbidden tool names as `FORBIDDEN_MODEL_FACING_TOOL_NAMES` in Subtask 8.4.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.6. In `integration.test.ts`, add `type EdgeCaseHunterReviewPromptStepNumber = 2`.
+[x] Subtask 12.6. In `integration.test.ts`, add `type EdgeCaseHunterReviewPromptStepNumber = 2`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.7. In `integration.test.ts`, add `getEdgeCaseHunterReviewEntryBranchId(activeStepNumber: EdgeCaseHunterReviewPromptStepNumber): string`; implement a `switch` with case `2` returning `edgeCaseHunterReviewWorkflowDefinition.steps["step-2"].decisionTree.entryBranchId`, then assign `const unreachableActiveStepNumber: never = activeStepNumber` after the switch and return it.
+[x] Subtask 12.7. In `integration.test.ts`, add `getEdgeCaseHunterReviewEntryBranchId(activeStepNumber: EdgeCaseHunterReviewPromptStepNumber): string`; implement a `switch` with case `2` returning `edgeCaseHunterReviewWorkflowDefinition.steps["step-2"].decisionTree.entryBranchId`, then assign `const unreachableActiveStepNumber: never = activeStepNumber` after the switch and return it.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.8. In `integration.test.ts`, add `createEdgeCaseHunterReviewWorkflowValues(overrides: WorkflowValues = {}): WorkflowValues`; return a workflow-values object containing project mode/title/folder, target story, selected story identity, review commit hash, review commit parent, review scope manifest path, all four review-scope artifact metadata values, edge-case output path, all four edge-case output artifact metadata values, and spread `overrides` last.
+[x] Subtask 12.8. In `integration.test.ts`, add `createEdgeCaseHunterReviewWorkflowValues(overrides: WorkflowValues = {}): WorkflowValues`; return a workflow-values object containing project mode/title/folder, target story, selected story identity, review commit hash, review commit parent, review scope manifest path, all four review-scope artifact metadata values, edge-case output path, all four edge-case output artifact metadata values, and spread `overrides` last.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.9. In `integration.test.ts`, add `createEdgeCaseHunterReviewWorkflowSession(activeStepNumber: EdgeCaseHunterReviewPromptStepNumber, workflowValues: WorkflowValues = createEdgeCaseHunterReviewWorkflowValues()): ActiveWorkflowSession`; return a complete session with `activeStepNumber`, supplied `workflowValues`, `projectSelection` `{ projectMode: "existing", projectTitle: "Edge Case Hunter Review Session", projectFolderName: "test-project" }`, `lifecycle.projectSelectionCompleted: true`, `entryArtifactResolution: undefined`, `ui: { formSession: undefined, stepResolutionSession: undefined, suppressedWorkflowFormIds: [], suppressedWorkflowStepResolutionRoutes: [] }`, and `branchContext.activeBranchId` from `getEdgeCaseHunterReviewEntryBranchId(activeStepNumber)`.
+[x] Subtask 12.9. In `integration.test.ts`, add `createEdgeCaseHunterReviewWorkflowSession(activeStepNumber: EdgeCaseHunterReviewPromptStepNumber, workflowValues: WorkflowValues = createEdgeCaseHunterReviewWorkflowValues()): ActiveWorkflowSession`; return a complete session with `activeStepNumber`, supplied `workflowValues`, `projectSelection` `{ projectMode: "existing", projectTitle: "Edge Case Hunter Review Session", projectFolderName: "test-project" }`, `lifecycle.projectSelectionCompleted: true`, `entryArtifactResolution: undefined`, `ui: { formSession: undefined, stepResolutionSession: undefined, suppressedWorkflowFormIds: [], suppressedWorkflowStepResolutionRoutes: [] }`, and `branchContext.activeBranchId` from `getEdgeCaseHunterReviewEntryBranchId(activeStepNumber)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.10. In `integration.test.ts`, add `buildEdgeCaseHunterReviewPromptContext(activeStepNumber: EdgeCaseHunterReviewPromptStepNumber = 2, workflowValues: WorkflowValues = createEdgeCaseHunterReviewWorkflowValues()): Promise<SystemPromptContext & WorkflowPromptProjection>`; instantiate `WorkflowRuntime` with cwd `/test/project` and `workspacePathPolicy.validateAccess: () => true`, instantiate `TaskState`, set `activeWorkflowName = "edge-case-hunter-review"`, set `activeWorkflowSession = createEdgeCaseHunterReviewWorkflowSession(activeStepNumber, workflowValues)`, set `apiRequestCount = 1`, await `runtime.buildTurnProjection({ taskState })`, and return `{ ...baseContext, mcpHub: makeMcpHub([]), providerInfo: makeProviderInfo("gpt-5-codex", "openai"), enableNativeToolCalls: true, useMinimalGptPrompt: true, ...workflowProjection }`.
+[x] Subtask 12.10. In `integration.test.ts`, add `buildEdgeCaseHunterReviewPromptContext(activeStepNumber: EdgeCaseHunterReviewPromptStepNumber = 2, workflowValues: WorkflowValues = createEdgeCaseHunterReviewWorkflowValues()): Promise<SystemPromptContext & WorkflowPromptProjection>`; instantiate `WorkflowRuntime` with cwd `/test/project` and `workspacePathPolicy.validateAccess: () => true`, instantiate `TaskState`, set `activeWorkflowName = "edge-case-hunter-review"`, set `activeWorkflowSession = createEdgeCaseHunterReviewWorkflowSession(activeStepNumber, workflowValues)`, set `apiRequestCount = 1`, await `runtime.buildTurnProjection({ taskState })`, and return `{ ...baseContext, mcpHub: makeMcpHub([]), providerInfo: makeProviderInfo("gpt-5-codex", "openai"), enableNativeToolCalls: true, useMinimalGptPrompt: true, ...workflowProjection }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.11. In `integration.test.ts`, add `expectEdgeCaseHunterReviewProjectedToolSurface(testCtx: TestRunner, expectedToolSpecs: readonly ClineToolSpec[]): Promise<void>`; compute `expectedToolNames = expectedToolSpecs.map((tool) => tool.name)`, build context with `buildEdgeCaseHunterReviewPromptContext(2)`, assert `context.workflowToolSchemaOverride` deep-equals `expectedToolSpecs`, and call `runPromptTest(testCtx, context, "gpt-5-codex", async ({ tools }) => { expect(getNativeToolNames(tools)).to.deep.equal(expectedToolNames) })`.
+[x] Subtask 12.11. In `integration.test.ts`, add `expectEdgeCaseHunterReviewProjectedToolSurface(testCtx: TestRunner, expectedToolSpecs: readonly ClineToolSpec[]): Promise<void>`; compute `expectedToolNames = expectedToolSpecs.map((tool) => tool.name)`, build context with `buildEdgeCaseHunterReviewPromptContext(2)`, assert `context.workflowToolSchemaOverride` deep-equals `expectedToolSpecs`, and call `runPromptTest(testCtx, context, "gpt-5-codex", async ({ tools }) => { expect(getNativeToolNames(tools)).to.deep.equal(expectedToolNames) })`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.12. In `integration.test.ts`, add test `projects active edge-case-hunter-review Step 2 tools from module-owned builders into native GPT-5 prompts`; call `await expectEdgeCaseHunterReviewProjectedToolSurface(this, buildEdgeCaseHunterReviewStep2ToolSchemas())`.
+[x] Subtask 12.12. In `integration.test.ts`, add test `projects active edge-case-hunter-review Step 2 tools from module-owned builders into native GPT-5 prompts`; call `await expectEdgeCaseHunterReviewProjectedToolSurface(this, buildEdgeCaseHunterReviewStep2ToolSchemas())`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.13. In `integration.test.ts`, add test `projects edge-case-hunter-review Step 2 materialized values into full-turn and continuation payloads`; build context with `buildEdgeCaseHunterReviewPromptContext(2)`, require non-empty `workflowInputPayloadBlock` and non-empty `continuationWorkflowInputPayloadBlock`, iterate both payload blocks, and assert each includes `EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST`, `EDGE_CASE_HUNTER_REVIEW_TARGET_STORY`, `EDGE_CASE_HUNTER_REVIEW_REVIEW_COMMIT_HASH`, `EDGE_CASE_HUNTER_REVIEW_REVIEW_COMMIT_PARENT`, and `EDGE_CASE_HUNTER_REVIEW_OUTPUT`; assert neither block includes raw placeholders `review_scope_manifest`, `target_story`, `review_commit_hash`, `review_commit_parent`, or `edge_case_review_output`.
+[x] Subtask 12.13. In `integration.test.ts`, add test `projects edge-case-hunter-review Step 2 materialized values into full-turn and continuation payloads`; build context with `buildEdgeCaseHunterReviewPromptContext(2)`, require non-empty `workflowInputPayloadBlock` and non-empty `continuationWorkflowInputPayloadBlock`, iterate both payload blocks, and assert each includes `EDGE_CASE_HUNTER_REVIEW_REVIEW_SCOPE_MANIFEST`, `EDGE_CASE_HUNTER_REVIEW_TARGET_STORY`, `EDGE_CASE_HUNTER_REVIEW_REVIEW_COMMIT_HASH`, `EDGE_CASE_HUNTER_REVIEW_REVIEW_COMMIT_PARENT`, and `EDGE_CASE_HUNTER_REVIEW_OUTPUT`; assert neither block includes raw placeholders `review_scope_manifest`, `target_story`, `review_commit_hash`, `review_commit_parent`, or `edge_case_review_output`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.14. In `integration.test.ts`, add test `does not expose forbidden tools in edge-case-hunter-review Step 2 prompt projection`; build context with `buildEdgeCaseHunterReviewPromptContext(2)`, map `context.workflowToolSchemaOverride ?? []` to tool names, and assert every name in `EDGE_CASE_HUNTER_REVIEW_FORBIDDEN_PROMPT_TOOL_NAMES` is absent.
+[x] Subtask 12.14. In `integration.test.ts`, add test `does not expose forbidden tools in edge-case-hunter-review Step 2 prompt projection`; build context with `buildEdgeCaseHunterReviewPromptContext(2)`, map `context.workflowToolSchemaOverride ?? []` to tool names, and assert every name in `EDGE_CASE_HUNTER_REVIEW_FORBIDDEN_PROMPT_TOOL_NAMES` is absent.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.15. In `integration.test.ts`, add test `does not expose forbidden native tools in edge-case-hunter-review Step 2 prompts`; build context with `buildEdgeCaseHunterReviewPromptContext(2)`, call `runPromptTest(this, context, "gpt-5-codex", async ({ tools }) => { const nativeToolNames = getNativeToolNames(tools); for each forbidden name assert `nativeToolNames` does not include it })`.
+[x] Subtask 12.15. In `integration.test.ts`, add test `does not expose forbidden native tools in edge-case-hunter-review Step 2 prompts`; build context with `buildEdgeCaseHunterReviewPromptContext(2)`, call `runPromptTest(this, context, "gpt-5-codex", async ({ tools }) => { const nativeToolNames = getNativeToolNames(tools); for each forbidden name assert `nativeToolNames` does not include it })`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 12.16. In `integration.test.ts`, add test `renders edge-case-hunter-review Step 2 tools through non-native prompt text without forbidden tools`; build `nativeContext` with `buildEdgeCaseHunterReviewPromptContext(2)`, define `context: SystemPromptContext = { ...nativeContext, providerInfo: makeProviderInfo("gpt-3", "openai"), enableNativeToolCalls: false }`, compute approved tool names from `buildEdgeCaseHunterReviewStep2ToolSchemas().map((tool) => tool.name)`, call `runPromptTest(this, context, "gpt-3", async ({ systemPrompt, tools }) => { expect(tools).to.equal(undefined); assert every approved tool name appears in `systemPrompt`; assert every forbidden tool name is absent from `systemPrompt` })`.
+[x] Subtask 12.16. In `integration.test.ts`, add test `renders edge-case-hunter-review Step 2 tools through non-native prompt text without forbidden tools`; build `nativeContext` with `buildEdgeCaseHunterReviewPromptContext(2)`, define `context: SystemPromptContext = { ...nativeContext, providerInfo: makeProviderInfo("gpt-3", "openai"), enableNativeToolCalls: false }`, compute approved tool names from `buildEdgeCaseHunterReviewStep2ToolSchemas().map((tool) => tool.name)`, call `runPromptTest(this, context, "gpt-3", async ({ systemPrompt, tools }) => { expect(tools).to.equal(undefined); assert every approved tool name appears in `systemPrompt`; assert every forbidden tool name is absent from `systemPrompt` })`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Task 13. Delete the legacy edge-case-hunter workflow package.
+[x] Task 13. Delete the legacy edge-case-hunter workflow package.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-review-edge-case-hunter/SKILL.md`
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-review-edge-case-hunter/bmad-skill-manifest.yaml`
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-review-edge-case-hunter/workflow.md`
 
-[ ] Subtask 13.1. Delete `.cline/skills/bmad-review-edge-case-hunter/SKILL.md`; do not migrate text or behavior from this file into the runtime module.
+[x] Subtask 13.1. Delete `.cline/skills/bmad-review-edge-case-hunter/SKILL.md`; do not migrate text or behavior from this file into the runtime module.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-review-edge-case-hunter/SKILL.md`
 
-[ ] Subtask 13.2. Delete `.cline/skills/bmad-review-edge-case-hunter/bmad-skill-manifest.yaml`; do not migrate text or behavior from this file into the runtime module.
+[x] Subtask 13.2. Delete `.cline/skills/bmad-review-edge-case-hunter/bmad-skill-manifest.yaml`; do not migrate text or behavior from this file into the runtime module.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-review-edge-case-hunter/bmad-skill-manifest.yaml`
 
-[ ] Subtask 13.3. Delete `.cline/skills/bmad-review-edge-case-hunter/workflow.md`; do not migrate text or behavior from this file into the runtime module.
+[x] Subtask 13.3. Delete `.cline/skills/bmad-review-edge-case-hunter/workflow.md`; do not migrate text or behavior from this file into the runtime module.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/.cline/skills/bmad-review-edge-case-hunter/workflow.md`
 
-[ ] Task 14. Run Phase 3 validation.
+[x] Task 14. Run Phase 3 validation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`
 
-[ ] Subtask 14.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`.
+[x] Subtask 14.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`
 
-[ ] Subtask 14.2. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts`.
+[x] Subtask 14.2. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`
 
-[ ] Subtask 14.3. Run `test ! -f .cline/skills/bmad-review-edge-case-hunter/SKILL.md`.
+[x] Subtask 14.3. Run `test ! -f .cline/skills/bmad-review-edge-case-hunter/SKILL.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`
 
-[ ] Subtask 14.4. Run `test ! -f .cline/skills/bmad-review-edge-case-hunter/bmad-skill-manifest.yaml`.
+[x] Subtask 14.4. Run `test ! -f .cline/skills/bmad-review-edge-case-hunter/bmad-skill-manifest.yaml`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`
 
-[ ] Subtask 14.5. Run `test ! -f .cline/skills/bmad-review-edge-case-hunter/workflow.md`.
+[x] Subtask 14.5. Run `test ! -f .cline/skills/bmad-review-edge-case-hunter/workflow.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`
 
-[ ] Subtask 14.6. Run `rg -n "review-edge-case-hunter|review-edge-case-hunter\\.md|Review-edge-case-hunter|review_edge_case_hunter|ReviewEdgeCaseHunter" src/core/task/workflow-runtime src/core/prompts/system-prompt/__tests__/integration.test.ts`; treat exit code 1 with no output as success, inspect any output in context, and stop if any hit is active runtime code instead of an explicit negative test assertion.
+[x] Subtask 14.6. Run `rg -n "review-edge-case-hunter|review-edge-case-hunter\\.md|Review-edge-case-hunter|review_edge_case_hunter|ReviewEdgeCaseHunter" src/core/task/workflow-runtime src/core/prompts/system-prompt/__tests__/integration.test.ts`; treat exit code 1 with no output as success, inspect any output in context, and stop if any hit is active runtime code instead of an explicit negative test assertion.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`
 
-[ ] Subtask 14.7. Run `npm run check-types`; if it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos` and rerun `npm run check-types`.
+[x] Subtask 14.7. Run `npm run check-types`; if it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos` and rerun `npm run check-types`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`
 
-[ ] Subtask 14.8. Run `npm run lint`.
+[x] Subtask 14.8. Run `npm run lint`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`

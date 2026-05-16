@@ -9,7 +9,9 @@ import type {
 } from "@shared/ExtensionMessage"
 import { expect } from "chai"
 import { describe, it } from "mocha"
+import { TaskState } from "@/core/task/TaskState"
 import type { WorkflowFormSessionState } from "@/core/task/workflow-form/types"
+import { ClineDefaultTool } from "@/shared/tools"
 import { WorkflowArtifactFamily } from "../../../artifactFamilies"
 import type {
 	ActiveWorkflowSession,
@@ -21,7 +23,14 @@ import type {
 	WorkflowStepDefinition,
 	WorkflowValue,
 	WorkflowValues,
+	WorkflowWorkspacePathPolicy,
 } from "../../../types"
+import {
+	resolveWorkflowBySlashCommand,
+	resolveWorkflowByUseSkillName,
+	resolveWorkflowDefinition,
+} from "../../../WorkflowRegistry"
+import { WorkflowRuntime } from "../../../WorkflowRuntime"
 import {
 	buildAndPersistEdgeCaseHunterReviewScopeManifest,
 	buildEdgeCaseHunterReviewStep1WorkflowForm,
@@ -433,6 +442,65 @@ describe("edgeCaseHunterReviewWorkflowDefinition", () => {
 				childKey: "review_scope_manifest",
 			},
 		])
+	})
+
+	it("resolves edge-case-hunter-review through every registry lookup", () => {
+		expect(resolveWorkflowDefinition("edge-case-hunter-review")).to.equal(edgeCaseHunterReviewWorkflowDefinition)
+		expect(resolveWorkflowBySlashCommand("edge-case-hunter-review")).to.equal(edgeCaseHunterReviewWorkflowDefinition)
+		expect(resolveWorkflowByUseSkillName("edge-case-hunter-review")).to.equal(edgeCaseHunterReviewWorkflowDefinition)
+	})
+
+	it("does not preserve retired edge-case-hunter workflow aliases", () => {
+		const retiredNames: readonly string[] = [
+			"review-edge-case-hunter",
+			"review-edge-case-hunter.md",
+			"edge-case-hunter-review.md",
+		]
+
+		for (const name of retiredNames) {
+			expect(resolveWorkflowDefinition(name)).to.equal(undefined)
+			expect(resolveWorkflowBySlashCommand(name)).to.equal(undefined)
+			expect(resolveWorkflowByUseSkillName(name)).to.equal(undefined)
+		}
+	})
+
+	it("activates from a parent session through the registered workflow name", async () => {
+		const workspacePathPolicy: WorkflowWorkspacePathPolicy = { validateAccess: () => true }
+		const runtime = new WorkflowRuntime({ cwd: PROJECT_ROOT, workspacePathPolicy })
+		const taskState = new TaskState()
+		const parentSession = createSession(SAMPLE_WORKFLOW_VALUES)
+
+		const result = await runtime.activateWorkflow({
+			taskState,
+			workflowName: "edge-case-hunter-review",
+			parentSession,
+		})
+
+		expect(result.kind).to.equal("execute_tool_backed_operation")
+		if (result.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${result.kind}.`)
+		}
+		expect(result.toolRequest.toolName).to.equal(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
+		expect(result.toolRequest.toolParams.artifact_id).to.equal(EDGE_CASE_HUNTER_REVIEW_OUTPUT_ARTIFACT_ID)
+		expect(taskState.activeWorkflowName).to.equal("edge-case-hunter-review")
+
+		const childSession = taskState.activeWorkflowSession
+		expect(childSession).not.to.equal(undefined)
+		if (childSession === undefined) {
+			throw new Error("Expected active edge-case-hunter-review child workflow session.")
+		}
+		expect(childSession.projectSelection).to.deep.equal(parentSession.projectSelection)
+		expect(childSession.projectSelection).not.to.equal(parentSession.projectSelection)
+		expect(childSession.workflowValues).to.deep.include({
+			[EdgeCaseHunterReviewWorkflowValueKey.TargetStory]:
+				parentSession.workflowValues[EdgeCaseHunterReviewWorkflowValueKey.TargetStory],
+			[EdgeCaseHunterReviewWorkflowValueKey.ReviewCommitHash]:
+				parentSession.workflowValues[EdgeCaseHunterReviewWorkflowValueKey.ReviewCommitHash],
+			[EdgeCaseHunterReviewWorkflowValueKey.ReviewCommitParent]:
+				parentSession.workflowValues[EdgeCaseHunterReviewWorkflowValueKey.ReviewCommitParent],
+			[EdgeCaseHunterReviewWorkflowValueKey.ReviewScopeManifest]:
+				parentSession.workflowValues[EdgeCaseHunterReviewWorkflowValueKey.ReviewScopeManifest],
+		})
 	})
 
 	it("declares the target story prerequisite", () => {
