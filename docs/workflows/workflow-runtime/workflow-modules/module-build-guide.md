@@ -50,35 +50,17 @@ Define:
 - `projectSubfolder`
 - persona fields
 
-Use the canonical workflow-to-persona-to-project-subfolder mapping in `docs/workflows/workflow-runtime/requirements.md` to select the workflow persona and project subfolder. That mapping is the authority for which persona a workflow uses.
+The user-provided workflow instructions file contains the persona designation and supporting information, which must be exactly translated into requirements, then prescribed for implementation in the action plan, including:
+- name
+- role
+- identity
+- capabilities
+- communicationStyle
+- principles
 
-Use `_bmad/bmm/agents/` only as migration source material while building the module. Derive the structured `WorkflowPersonaDefinition` fields from the mapped persona source file, then copy the resulting data into module-owned constants. The runtime workflow module must not read BMAD files at activation time, prompt-projection time, or step execution time.
 
-For the current in-scope mappings, the BMAD migration source files are:
 
-| Requirements persona | BMAD source file |
-| --- | --- |
-| `analyst` | `_bmad/bmm/agents/analyst.md` |
-| `architect` | `_bmad/bmm/agents/architect.md` |
-| `developer` | `_bmad/bmm/agents/dev.md` |
-| `product-manager` | `_bmad/bmm/agents/pm.md` |
-| `quality-control` | `_bmad/bmm/agents/quality-control.md` |
-| `scrum-master` | `_bmad/bmm/agents/sm.md` |
-
-Map BMAD source content into `WorkflowPersonaDefinition` as follows:
-
-| WorkflowPersonaDefinition field | Source |
-| --- | --- |
-| `name` | BMAD agent `name` attribute when present; otherwise the persona display name prescribed by requirements |
-| `role` | BMAD `<role>` text |
-| `identity` | BMAD `<identity>` text |
-| `capabilities` | BMAD agent `capabilities` attribute split into trimmed entries |
-| `communicationStyle` | BMAD `<communication_style>` text |
-| `principles` | BMAD `<principles>` content split into explicit principle strings |
-
-If the requirements mapping, BMAD source file, or derived persona fields conflict or are incomplete, stop and tighten the requirements or migration source before implementing the workflow module. Do not invent persona data ad hoc inside the action plan or implementation.
-
-In the brainstorming module, `displayName`, `description`, and `persona` live as constants in `brainstormingWorkflow.ts`, and the entry panel reuses `brainstormingWorkflowDefinition.description`.
+If the module requirements and workflow instructions file do not contain the above persona details, stop and ask the user to ensure that the necessary information is present in the instructions file, then update the requirements document to mirror what is prescribed by the user. Do not invent persona data ad hoc inside the action plan or implementation.
 
 ### Runtime-Owned Values
 
@@ -100,7 +82,7 @@ When AI writes workflow values, the active step tool schema must explicitly expo
 
 Decide whether the workflow needs a runtime-owned artifact.
 
-If it needs a new artifact family, that is foundational/runtime work, not module-local code. For brainstorming, the singleton `brainstorming.md` artifact required `WorkflowArtifactFamily.BrainstormingSession` and runtime family support before the module could reference it.
+If it needs a new artifact family, the requirements must clearly indicate as much, and the action plan must prescribe the exact steps necesesary to register the artifact.
 
 Module artifact definitions should reference runtime-owned artifact families and map `outputValueKeys` into module workflow values. The module should not invent filename rules, numbering rules, path construction, or discovery rules that belong to the runtime artifact-family registry.
 
@@ -125,8 +107,6 @@ For model-facing artifact edits, expose governed file tools such as:
 
 - `read_file`
 - `apply_patch`
-
-The brainstorming module uses `build_workflow_document` for deterministic Step 1 and Step 2 document population, then uses `read_file` and `apply_patch` for Step 3 and Step 4 interactive document work.
 
 ### Steps And Progression
 
@@ -272,35 +252,34 @@ Each `WorkflowStepDefinition.buildToolSchema(...)` must delegate directly to a n
 
 The returned `readonly ClineToolSpec[]` is the complete model-visible workflow tool surface for that turn. It is not additive with default workflow tools, and the legacy contextual tool matrix must not participate.
 
-The deleted `contextualToolMatrix.ts` is reference material only. Use `docs/workflows/workflow-runtime/workflow-modules/legacy-tool-matrix.md` as a loose migration reference for historical tool-category intent, not as an implementation source and not as a 1:1 step mapping.
-
 Do not include `archive_workflow_artifact`, `delete_workflow_artifact`, or `move_workflow_project_file` in module tool schemas. Those are backend-only runtime-owned tools. `move_workflow_project_file` must not be model-facing unless a future requirement explicitly approves projection.
 
 Use this translation process for each model-driven step:
 
 1. Read the current workflow source prompt for the step.
-2. Compare it to the legacy matrix entry for the old markdown workflow step, if one exists.
-3. Identify the actual actions the AI must perform in the runtime workflow step.
-4. Translate those actions into exact `ClineDefaultTool` schema builders in `{workflowId}ToolSchemas.ts`.
+2. Identify the actual actions the AI must perform in the runtime workflow step.
+3. Translate those actions into exact `ClineDefaultTool` schema builders in `{workflowId}ToolSchemas.ts`. Select tools to surface for that turn using the following guidelines:
+    - write/ update files: apply_patch, write_to_file, read_file, read_file_range (the AI agent needs to be able to read files before/after writing to ensure their write action is executed correctly)
+    - read existing files: list_files, search_files, list_code_definition_names, read_file, read_file_range
+    - activate subagents: use_subagents
+    - search the web: web_search, web_fetch
+    - persist values for workflow session keys: set_workflow_values
+    - run local CLI commands: execute_command
+    - use connected MCP capabilities: use_mcp_tool (for calling tools provided by a connected MCP server), access_mcp_resource (when the step requires reading mcp-hosted resources), load_mcp_documentation (when the step requires mcp documentation discovery)
+    - provide an array of options to the user to select from: ask_followup_question
+    - send a final workflow recap/message to the user: attempt_completion
+    - progress the workflow step (only when prescribed): workflow_progress_request
+    - send a general message to the user: send_user_message
 5. Add workflow-specific backend tools only when normal shared tools cannot safely express the action.
-6. Add user-facing response or delivery tools required by the step.
+6. Add user-facing response or delivery tools appropriate for the step. send_user_message must be included in every model-facing step.
 7. Exclude placeholder-era tools and runtime-owned deterministic tools that are not model-facing.
 8. Add tests that assert the exact tool names returned for the step.
 
-Do not copy legacy bundle names literally. For example, old `DOC_WRITE` intent should become the exact governed file-edit tools needed by the runtime prompt, such as `apply_patch`, not `build_workflow_document`. Old placeholder-write intent should not become `set_workflow_values` unless the step requirements explicitly make workflow values AI-writable for that turn.
-
-If the prompt, legacy matrix, and available tool set do not clearly imply the exact schema, stop and tighten the module requirements before writing code.
+If the prompt and available tool set do not clearly imply the exact schema, stop and ask the user for input.
 
 ### Response Tools
 
 Include response or delivery tools deliberately.
-
-Examples:
-
-- Use `send_user_message` for ordinary user-visible messages.
-- Use `ask_followup_question` when the next thing needed is user input.
-- Use `workflow_progress_request` when the workflow step needs explicit confirmation to advance.
-- Use `attempt_completion` only for final delivery or completion-like turns.
 
 Do not expose only internal/backend tools in a model-facing step. A model-driven step needs at least one governed way to talk to the user or complete the turn.
 
