@@ -511,88 +511,88 @@ Allowed files:
 
 After completing this phase, pause for QA review before final validation.
 
-[ ] Task 10. Register blind-review as a shipped workflow.
+[x] Task 10. Register blind-review as a shipped workflow.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts`
 
-[ ] Subtask 10.1. In `WorkflowRegistry.ts`, import `blindReviewWorkflowDefinition` from `@/core/task/workflow-runtime/workflow-modules/blind-review` and add it to `shippedWorkflowDefinitions` after `codeReviewWorkflowDefinition`.
+[x] Subtask 10.1. In `WorkflowRegistry.ts`, import `blindReviewWorkflowDefinition` from `@/core/task/workflow-runtime/workflow-modules/blind-review` and add it to `shippedWorkflowDefinitions` after `codeReviewWorkflowDefinition`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 
-[ ] Subtask 10.2. In `blindReviewWorkflow.test.ts`, add a registry test asserting `resolveWorkflowDefinition("blind-review")`, `resolveWorkflowBySlashCommand("blind-review")`, and `resolveWorkflowByUseSkillName("blind-review")` all return `blindReviewWorkflowDefinition`, and asserting `blind-review.md` returns `undefined` through all three resolver APIs.
+[x] Subtask 10.2. In `blindReviewWorkflow.test.ts`, add a registry test asserting `resolveWorkflowDefinition("blind-review")`, `resolveWorkflowBySlashCommand("blind-review")`, and `resolveWorkflowByUseSkillName("blind-review")` all return `blindReviewWorkflowDefinition`, and asserting `blind-review.md` returns `undefined` through all three resolver APIs.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts`
 
-[ ] Subtask 10.3. In `blindReviewWorkflow.test.ts`, add a child-style activation test importing `TaskState`, `WorkflowRuntime`, and type `WorkflowWorkspacePathPolicy`; construct `const workspacePathPolicy: WorkflowWorkspacePathPolicy = { validateAccess: () => true }`, `const runtime = new WorkflowRuntime({ cwd: PROJECT_ROOT, workspacePathPolicy })`, `const taskState = new TaskState()`, and a parent `ActiveWorkflowSession` from `createSession(SAMPLE_WORKFLOW_VALUES)`; call `runtime.activateWorkflow({ taskState, workflowName: "blind-review", parentSession })`; assert the first returned action kind is not `render_workflow_form`, `taskState.activeWorkflowSession?.workflowValues` contains inherited `target_story`, `review_commit_hash`, and `review_commit_parent`, `taskState.activeWorkflowSession?.projectSelection` deeply equals the parent project selection, and the child project-selection object is not the same object reference as `parentSession.projectSelection`.
+[x] Subtask 10.3. In `blindReviewWorkflow.test.ts`, add a child-style activation test importing `TaskState`, `WorkflowRuntime`, and type `WorkflowWorkspacePathPolicy`; construct `const workspacePathPolicy: WorkflowWorkspacePathPolicy = { validateAccess: () => true }`, `const runtime = new WorkflowRuntime({ cwd: PROJECT_ROOT, workspacePathPolicy })`, `const taskState = new TaskState()`, and a parent `ActiveWorkflowSession` from `createSession(SAMPLE_WORKFLOW_VALUES)`; call `runtime.activateWorkflow({ taskState, workflowName: "blind-review", parentSession })`; assert the first returned action kind is not `render_workflow_form`, `taskState.activeWorkflowSession?.workflowValues` contains inherited `target_story`, `review_commit_hash`, and `review_commit_parent`, `taskState.activeWorkflowSession?.projectSelection` deeply equals the parent project selection, and the child project-selection object is not the same object reference as `parentSession.projectSelection`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts`
 
-[ ] Subtask 10.4. In `blindReviewWorkflow.test.ts`, add an artifact allocation failure test using the `TaskState`, `WorkflowRuntime`, and `WorkflowWorkspacePathPolicy` imports from Subtask 10.3; construct a `WorkflowRuntime` with `cwd: PROJECT_ROOT` and `validateAccess: () => true`, set `taskState.activeWorkflowName = "blind-review"`, set `taskState.activeWorkflowSession = createSession(SAMPLE_WORKFLOW_VALUES, PROJECT_ROOT, { activeBranchId: "step-1-await-blind-review-output-allocation", lastTriggerEvent: buildToolBackedOperationFailedEvent("step-1-allocate-blind-review-output", "step-1-allocate-blind-review-output"), failureState: { retryAttemptCount: 1, terminalErrorMessage: "backend failure" } })`, call `runtime.resolveNextAction({ taskState })`, and assert the returned action is `{ kind: "terminal_error", errorMessage: \`Blind Review output artifact creation failed for target_story ${TARGET_STORY_PATH}: backend failure\` }`.
+[x] Subtask 10.4. In `blindReviewWorkflow.test.ts`, add an artifact allocation failure test using the `TaskState`, `WorkflowRuntime`, and `WorkflowWorkspacePathPolicy` imports from Subtask 10.3; construct a `WorkflowRuntime` with `cwd: PROJECT_ROOT` and `validateAccess: () => true`, set `taskState.activeWorkflowName = "blind-review"`, set `taskState.activeWorkflowSession = createSession(SAMPLE_WORKFLOW_VALUES, PROJECT_ROOT, { activeBranchId: "step-1-await-blind-review-output-allocation", lastTriggerEvent: buildToolBackedOperationFailedEvent("step-1-allocate-blind-review-output", "step-1-allocate-blind-review-output"), failureState: { retryAttemptCount: 1, terminalErrorMessage: "backend failure" } })`, call `runtime.resolveNextAction({ taskState })`, and assert the returned action is `{ kind: "terminal_error", errorMessage: \`Blind Review output artifact creation failed for target_story ${TARGET_STORY_PATH}: backend failure\` }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts`
 
-[ ] Task 11. Add blind-review prompt integration coverage.
+[x] Task 11. Add blind-review prompt integration coverage.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 11.1. In `integration.test.ts`, import `blindReviewWorkflowDefinition`, `BlindReviewWorkflowValueKey`, and `buildBlindReviewStep2ToolSchemas` from the blind-review module.
+[x] Subtask 11.1. In `integration.test.ts`, import `blindReviewWorkflowDefinition`, `BlindReviewWorkflowValueKey`, and `buildBlindReviewStep2ToolSchemas` from the blind-review module.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 11.2. In `integration.test.ts`, add blind-review prompt fixture constants for target story, selected story identity, review commit hash, review commit parent, review folder, blind review output path, artifact family, artifact identity, artifact filename, and artifact relative path.
+[x] Subtask 11.2. In `integration.test.ts`, add blind-review prompt fixture constants for target story, selected story identity, review commit hash, review commit parent, review folder, blind review output path, artifact family, artifact identity, artifact filename, and artifact relative path.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 11.3. In `integration.test.ts`, add `type BlindReviewPromptStepNumber = 2`, `getBlindReviewEntryBranchId(activeStepNumber: BlindReviewPromptStepNumber): string`, `createBlindReviewWorkflowValues(overrides: WorkflowValues = {}): WorkflowValues`, `createBlindReviewWorkflowSession(activeStepNumber: BlindReviewPromptStepNumber, workflowValues: WorkflowValues = createBlindReviewWorkflowValues()): ActiveWorkflowSession`, and `buildBlindReviewPromptContext(...)`; the session object must include all required `ActiveWorkflowSession` fields and the helper return types must be explicit.
+[x] Subtask 11.3. In `integration.test.ts`, add `type BlindReviewPromptStepNumber = 2`, `getBlindReviewEntryBranchId(activeStepNumber: BlindReviewPromptStepNumber): string`, `createBlindReviewWorkflowValues(overrides: WorkflowValues = {}): WorkflowValues`, `createBlindReviewWorkflowSession(activeStepNumber: BlindReviewPromptStepNumber, workflowValues: WorkflowValues = createBlindReviewWorkflowValues()): ActiveWorkflowSession`, and `buildBlindReviewPromptContext(...)`; the session object must include all required `ActiveWorkflowSession` fields and the helper return types must be explicit.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 11.4. In `integration.test.ts`, add a native GPT-5 prompt-projection test that calls the existing projected-tool helper style for active blind-review Step 2 and asserts the projected tools match `buildBlindReviewStep2ToolSchemas()`.
+[x] Subtask 11.4. In `integration.test.ts`, add a native GPT-5 prompt-projection test that calls the existing projected-tool helper style for active blind-review Step 2 and asserts the projected tools match `buildBlindReviewStep2ToolSchemas()`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 11.5. In `integration.test.ts`, add a blind-review Step 2 prompt payload test asserting full-turn and continuation payload blocks are non-empty, include materialized commit hash, parent hash, and blind review output path, and do not include raw `review_commit_hash`, `review_commit_parent`, or `blind_review_output` placeholders.
+[x] Subtask 11.5. In `integration.test.ts`, add a blind-review Step 2 prompt payload test asserting full-turn and continuation payload blocks are non-empty, include materialized commit hash, parent hash, and blind review output path, and do not include raw `review_commit_hash`, `review_commit_parent`, or `blind_review_output` placeholders.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 11.6. In `integration.test.ts`, add a blind-review forbidden-tool prompt-projection test asserting `workflowToolSchemaOverride` and native GPT-5 tools do not include `web_search`, `web_fetch`, `browser_action`, `ask_followup_question`, `use_subagents`, `use_skill`, `set_workflow_values`, `build_workflow_document`, `create_workflow_artifact`, `archive_workflow_artifact`, `delete_workflow_artifact`, `move_workflow_project_file`, `workflow_progress_request`, `use_mcp_tool`, `access_mcp_resource`, `load_mcp_documentation`, `build_review_input`, `build_review_diff_output`, `code_review_spec_update`, or `record_findings`.
+[x] Subtask 11.6. In `integration.test.ts`, add a blind-review forbidden-tool prompt-projection test asserting `workflowToolSchemaOverride` and native GPT-5 tools do not include `web_search`, `web_fetch`, `browser_action`, `ask_followup_question`, `use_subagents`, `use_skill`, `set_workflow_values`, `build_workflow_document`, `create_workflow_artifact`, `archive_workflow_artifact`, `delete_workflow_artifact`, `move_workflow_project_file`, `workflow_progress_request`, `use_mcp_tool`, `access_mcp_resource`, `load_mcp_documentation`, `build_review_input`, `build_review_diff_output`, `code_review_spec_update`, or `record_findings`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Subtask 11.7. In `integration.test.ts`, add a non-native prompt-projection test using the active blind-review Step 2 context with `providerInfo: makeProviderInfo("gpt-3", "openai")` and `enableNativeToolCalls: false`; assert `tools` is `undefined`, `systemPrompt` includes every approved Step 2 tool name, and `systemPrompt` does not include any forbidden tool name listed in Subtask 11.6.
+[x] Subtask 11.7. In `integration.test.ts`, add a non-native prompt-projection test using the active blind-review Step 2 context with `providerInfo: makeProviderInfo("gpt-3", "openai")` and `enableNativeToolCalls: false`; assert `tools` is `undefined`, `systemPrompt` includes every approved Step 2 tool name, and `systemPrompt` does not include any forbidden tool name listed in Subtask 11.6.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-[ ] Task 12. Run Phase 3 validation.
+[x] Task 12. Run Phase 3 validation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/blind-review/action-plan.md`
 
-[ ] Subtask 12.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts`.
+[x] Subtask 12.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/blind-review/action-plan.md`
 
-[ ] Subtask 12.2. Run `npm run check-types`; if it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos` and rerun `npm run check-types`.
+[x] Subtask 12.2. Run `npm run check-types`; if it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos` and rerun `npm run check-types`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/blind-review/action-plan.md`
 
-[ ] Subtask 12.3. Run `npm run lint`.
+[x] Subtask 12.3. Run `npm run lint`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/blind-review/action-plan.md`

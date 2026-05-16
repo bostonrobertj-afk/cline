@@ -30,6 +30,11 @@ import type {
 } from "@/core/task/workflow-runtime/types"
 import { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
 import {
+	BlindReviewWorkflowValueKey,
+	blindReviewWorkflowDefinition,
+	buildBlindReviewStep2ToolSchemas,
+} from "@/core/task/workflow-runtime/workflow-modules/blind-review"
+import {
 	CodeReviewWorkflowValueKey,
 	codeReviewWorkflowDefinition,
 } from "@/core/task/workflow-runtime/workflow-modules/code-review"
@@ -824,6 +829,121 @@ const buildDevStoryPromptContext = async (
 	}
 }
 
+const BLIND_REVIEW_TARGET_STORY = "/test/project/implementation/stories-review/Story-1-1.md"
+const BLIND_REVIEW_SELECTED_STORY_IDENTITY = "1.1"
+const BLIND_REVIEW_REVIEW_COMMIT_HASH = "abc1234"
+const BLIND_REVIEW_REVIEW_COMMIT_PARENT = "def5678"
+const BLIND_REVIEW_REVIEW_FOLDER = "/test/project/review"
+const BLIND_REVIEW_OUTPUT = `${BLIND_REVIEW_REVIEW_FOLDER}/blind-review-1-1.md`
+const BLIND_REVIEW_OUTPUT_ARTIFACT_FAMILY = "blind_review_output"
+const BLIND_REVIEW_OUTPUT_ARTIFACT_IDENTITY = "1.1"
+const BLIND_REVIEW_OUTPUT_ARTIFACT_FILENAME = "blind-review-1-1.md"
+const BLIND_REVIEW_OUTPUT_ARTIFACT_RELATIVE_PATH = "review/blind-review-1-1.md"
+const BLIND_REVIEW_FORBIDDEN_PROMPT_TOOL_NAMES: readonly string[] = [
+	"web_search",
+	"web_fetch",
+	"browser_action",
+	"ask_followup_question",
+	"use_subagents",
+	"use_skill",
+	"set_workflow_values",
+	"build_workflow_document",
+	"create_workflow_artifact",
+	"archive_workflow_artifact",
+	"delete_workflow_artifact",
+	"move_workflow_project_file",
+	"workflow_progress_request",
+	"use_mcp_tool",
+	"access_mcp_resource",
+	"load_mcp_documentation",
+	"build_review_input",
+	"build_review_diff_output",
+	"code_review_spec_update",
+	"record_findings",
+]
+
+type BlindReviewPromptStepNumber = 2
+
+function getBlindReviewEntryBranchId(activeStepNumber: BlindReviewPromptStepNumber): string {
+	switch (activeStepNumber) {
+		case 2:
+			return blindReviewWorkflowDefinition.steps["step-2"].decisionTree.entryBranchId
+	}
+
+	const unreachableActiveStepNumber: never = activeStepNumber
+	return unreachableActiveStepNumber
+}
+
+function createBlindReviewWorkflowValues(overrides: WorkflowValues = {}): WorkflowValues {
+	return {
+		[BlindReviewWorkflowValueKey.ProjectMode]: "existing",
+		[BlindReviewWorkflowValueKey.ProjectTitle]: "Blind Review Session",
+		[BlindReviewWorkflowValueKey.ProjectFolderName]: "test-project",
+		[BlindReviewWorkflowValueKey.TargetStory]: BLIND_REVIEW_TARGET_STORY,
+		[BlindReviewWorkflowValueKey.SelectedStoryIdentity]: BLIND_REVIEW_SELECTED_STORY_IDENTITY,
+		[BlindReviewWorkflowValueKey.ReviewCommitHash]: BLIND_REVIEW_REVIEW_COMMIT_HASH,
+		[BlindReviewWorkflowValueKey.ReviewCommitParent]: BLIND_REVIEW_REVIEW_COMMIT_PARENT,
+		[BlindReviewWorkflowValueKey.BlindReviewOutput]: BLIND_REVIEW_OUTPUT,
+		[BlindReviewWorkflowValueKey.BlindReviewOutputArtifactFamily]: BLIND_REVIEW_OUTPUT_ARTIFACT_FAMILY,
+		[BlindReviewWorkflowValueKey.BlindReviewOutputArtifactIdentity]: BLIND_REVIEW_OUTPUT_ARTIFACT_IDENTITY,
+		[BlindReviewWorkflowValueKey.BlindReviewOutputArtifactFilename]: BLIND_REVIEW_OUTPUT_ARTIFACT_FILENAME,
+		[BlindReviewWorkflowValueKey.BlindReviewOutputArtifactRelativePath]: BLIND_REVIEW_OUTPUT_ARTIFACT_RELATIVE_PATH,
+		...overrides,
+	}
+}
+
+function createBlindReviewWorkflowSession(
+	activeStepNumber: BlindReviewPromptStepNumber,
+	workflowValues: WorkflowValues = createBlindReviewWorkflowValues(),
+): ActiveWorkflowSession {
+	return {
+		activeStepNumber,
+		workflowValues,
+		projectSelection: {
+			projectMode: "existing",
+			projectTitle: "Blind Review Session",
+			projectFolderName: "test-project",
+		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
+		entryArtifactResolution: undefined,
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: {
+			activeBranchId: getBlindReviewEntryBranchId(activeStepNumber),
+		},
+	}
+}
+
+async function buildBlindReviewPromptContext(
+	activeStepNumber: BlindReviewPromptStepNumber = 2,
+	workflowValues: WorkflowValues = createBlindReviewWorkflowValues(),
+): Promise<SystemPromptContext & WorkflowPromptProjection> {
+	const workspacePathPolicy: WorkflowWorkspacePathPolicy = {
+		validateAccess: () => true,
+	}
+	const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })
+	const taskState = new TaskState()
+	taskState.activeWorkflowName = "blind-review"
+	taskState.activeWorkflowSession = createBlindReviewWorkflowSession(activeStepNumber, workflowValues)
+	taskState.apiRequestCount = 1
+	const workflowProjection = await runtime.buildTurnProjection({ taskState })
+
+	return {
+		...baseContext,
+		mcpHub: makeMcpHub([]),
+		providerInfo: makeProviderInfo("gpt-5-codex", "openai"),
+		enableNativeToolCalls: true,
+		useMinimalGptPrompt: true,
+		...workflowProjection,
+	}
+}
+
 type CodeReviewPromptStepNumber = 2 | 3 | 4
 
 const CODE_REVIEW_TARGET_STORY = "/test/project/implementation/stories-review/Story-1-1.md"
@@ -1095,6 +1215,19 @@ async function expectDevStoryProjectedToolSurface(
 ): Promise<void> {
 	const expectedToolNames = expectedToolSpecs.map((tool) => tool.name)
 	const context = await buildDevStoryPromptContext(activeStepNumber)
+	expect(context.workflowToolSchemaOverride).to.deep.equal(expectedToolSpecs)
+
+	await runPromptTest(testCtx, context, "gpt-5-codex", async ({ tools }) => {
+		expect(getNativeToolNames(tools)).to.deep.equal(expectedToolNames)
+	})
+}
+
+async function expectBlindReviewProjectedToolSurface(
+	testCtx: TestRunner,
+	expectedToolSpecs: readonly ClineToolSpec[],
+): Promise<void> {
+	const expectedToolNames = expectedToolSpecs.map((tool) => tool.name)
+	const context = await buildBlindReviewPromptContext(2)
 	expect(context.workflowToolSchemaOverride).to.deep.equal(expectedToolSpecs)
 
 	await runPromptTest(testCtx, context, "gpt-5-codex", async ({ tools }) => {
@@ -1927,6 +2060,68 @@ describe("Prompt System Integration Tests", () => {
 			for (const expectation of expectations) {
 				await expectDevStoryProjectedToolSurface(this, expectation.activeStepNumber, expectation.expectedToolSpecs)
 			}
+		})
+
+		it("projects active blind-review Step 2 tools from module-owned builders into native GPT-5 prompts", async function () {
+			await expectBlindReviewProjectedToolSurface(this, buildBlindReviewStep2ToolSchemas())
+		})
+
+		it("projects blind-review Step 2 materialized values into full-turn and continuation payloads", async () => {
+			const context = await buildBlindReviewPromptContext(2)
+			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+			const continuationWorkflowInputPayloadBlock = context.continuationWorkflowInputPayloadBlock
+			if (workflowInputPayloadBlock === undefined || workflowInputPayloadBlock === "") {
+				throw new Error("Expected blind-review Step 2 workflow input payload.")
+			}
+			if (continuationWorkflowInputPayloadBlock === undefined || continuationWorkflowInputPayloadBlock === "") {
+				throw new Error("Expected blind-review Step 2 continuation workflow input payload.")
+			}
+
+			const payloadBlocks: readonly string[] = [workflowInputPayloadBlock, continuationWorkflowInputPayloadBlock]
+			for (const payloadBlock of payloadBlocks) {
+				expect(payloadBlock.trim()).to.not.equal("")
+				expect(payloadBlock).to.include(BLIND_REVIEW_REVIEW_COMMIT_HASH)
+				expect(payloadBlock).to.include(BLIND_REVIEW_REVIEW_COMMIT_PARENT)
+				expect(payloadBlock).to.include(BLIND_REVIEW_OUTPUT)
+				expect(payloadBlock).to.not.include("review_commit_hash")
+				expect(payloadBlock).to.not.include("review_commit_parent")
+				expect(payloadBlock).to.not.include("blind_review_output")
+			}
+		})
+
+		it("does not expose forbidden tools in blind-review Step 2 prompt projection", async function () {
+			const context = await buildBlindReviewPromptContext(2)
+			const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
+			for (const forbiddenToolName of BLIND_REVIEW_FORBIDDEN_PROMPT_TOOL_NAMES) {
+				expect(projectedToolNames).to.not.include(forbiddenToolName)
+			}
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ tools }) => {
+				const nativeToolNames = getNativeToolNames(tools)
+				for (const forbiddenToolName of BLIND_REVIEW_FORBIDDEN_PROMPT_TOOL_NAMES) {
+					expect(nativeToolNames).to.not.include(forbiddenToolName)
+				}
+			})
+		})
+
+		it("renders blind-review Step 2 tools through non-native prompt text without forbidden tools", async function () {
+			const nativeContext = await buildBlindReviewPromptContext(2)
+			const context: SystemPromptContext = {
+				...nativeContext,
+				providerInfo: makeProviderInfo("gpt-3", "openai"),
+				enableNativeToolCalls: false,
+			}
+			const approvedToolNames = buildBlindReviewStep2ToolSchemas().map((tool) => tool.name)
+
+			await runPromptTest(this, context, "gpt-3", async ({ systemPrompt, tools }) => {
+				expect(tools).to.equal(undefined)
+				for (const approvedToolName of approvedToolNames) {
+					expect(systemPrompt).to.include(approvedToolName)
+				}
+				for (const forbiddenToolName of BLIND_REVIEW_FORBIDDEN_PROMPT_TOOL_NAMES) {
+					expect(systemPrompt).to.not.include(forbiddenToolName)
+				}
+			})
 		})
 
 		it("projects active code-review step tools from module-owned builders into native GPT-5 prompts", async function () {

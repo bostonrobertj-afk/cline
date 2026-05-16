@@ -9,6 +9,7 @@ import type {
 } from "@shared/ExtensionMessage"
 import { expect } from "chai"
 import { describe, it } from "mocha"
+import { TaskState } from "@/core/task/TaskState"
 import type { WorkflowFormSessionState } from "@/core/task/workflow-form/types"
 import { WorkflowArtifactFamily } from "../../../artifactFamilies"
 import type {
@@ -21,7 +22,14 @@ import type {
 	WorkflowStepDefinition,
 	WorkflowValue,
 	WorkflowValues,
+	WorkflowWorkspacePathPolicy,
 } from "../../../types"
+import {
+	resolveWorkflowBySlashCommand,
+	resolveWorkflowByUseSkillName,
+	resolveWorkflowDefinition,
+} from "../../../WorkflowRegistry"
+import { WorkflowRuntime } from "../../../WorkflowRuntime"
 import {
 	BLIND_REVIEW_ARTIFACTS,
 	BLIND_REVIEW_COMMIT_HASH_FIELD_KEY,
@@ -416,6 +424,59 @@ describe("blindReviewWorkflowDefinition", () => {
 				childKey: "target_story",
 			},
 		])
+	})
+
+	it("resolves through registry names without preserving the legacy markdown alias", () => {
+		expect(resolveWorkflowDefinition("blind-review")).to.equal(blindReviewWorkflowDefinition)
+		expect(resolveWorkflowBySlashCommand("blind-review")).to.equal(blindReviewWorkflowDefinition)
+		expect(resolveWorkflowByUseSkillName("blind-review")).to.equal(blindReviewWorkflowDefinition)
+		expect(resolveWorkflowDefinition("blind-review.md")).to.equal(undefined)
+		expect(resolveWorkflowBySlashCommand("blind-review.md")).to.equal(undefined)
+		expect(resolveWorkflowByUseSkillName("blind-review.md")).to.equal(undefined)
+	})
+
+	it("activates from a parent session without rendering the commit form", async () => {
+		const workspacePathPolicy: WorkflowWorkspacePathPolicy = { validateAccess: () => true }
+		const runtime = new WorkflowRuntime({ cwd: PROJECT_ROOT, workspacePathPolicy })
+		const taskState = new TaskState()
+		const parentSession: ActiveWorkflowSession = createSession(SAMPLE_WORKFLOW_VALUES)
+
+		const result = await runtime.activateWorkflow({ taskState, workflowName: "blind-review", parentSession })
+
+		expect(result.kind).not.to.equal("render_workflow_form")
+		const activeSession = taskState.activeWorkflowSession
+		if (activeSession === undefined) {
+			throw new Error("Expected active blind-review child workflow session.")
+		}
+		expect(activeSession.workflowValues).to.deep.include({
+			[BlindReviewWorkflowValueKey.TargetStory]: TARGET_STORY_PATH,
+			[BlindReviewWorkflowValueKey.ReviewCommitHash]: "abc123",
+			[BlindReviewWorkflowValueKey.ReviewCommitParent]: "def456",
+		})
+		expect(activeSession.projectSelection).to.deep.equal(parentSession.projectSelection)
+		expect(activeSession.projectSelection).not.to.equal(parentSession.projectSelection)
+	})
+
+	it("returns the concrete terminal error when blind-review output allocation fails", async () => {
+		const workspacePathPolicy: WorkflowWorkspacePathPolicy = { validateAccess: () => true }
+		const runtime = new WorkflowRuntime({ cwd: PROJECT_ROOT, workspacePathPolicy })
+		const taskState = new TaskState()
+		taskState.activeWorkflowName = "blind-review"
+		taskState.activeWorkflowSession = createSession(SAMPLE_WORKFLOW_VALUES, PROJECT_ROOT, {
+			activeBranchId: "step-1-await-blind-review-output-allocation",
+			lastTriggerEvent: buildToolBackedOperationFailedEvent(
+				"step-1-allocate-blind-review-output",
+				"step-1-allocate-blind-review-output",
+			),
+			failureState: { retryAttemptCount: 1, terminalErrorMessage: "backend failure" },
+		})
+
+		const result = await runtime.resolveNextAction({ taskState })
+
+		expect(result).to.deep.equal({
+			kind: "terminal_error",
+			errorMessage: `Blind Review output artifact creation failed for target_story ${TARGET_STORY_PATH}: backend failure`,
+		})
 	})
 
 	it("declares the target-story prerequisite", () => {
