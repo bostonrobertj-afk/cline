@@ -599,27 +599,27 @@ Allowed files:
 
 ### Phase 4 - Final Validation
 
-[ ] Task 13. Run final validation for the blind-review workflow module.
+[x] Task 13. Run final validation for the blind-review workflow module.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/blind-review/action-plan.md`
 
-[ ] Subtask 13.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts`.
+[x] Subtask 13.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/blind-review/action-plan.md`
 
-[ ] Subtask 13.2. Run `npm run check-types`; if it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos` and rerun `npm run check-types`.
+[x] Subtask 13.2. Run `npm run check-types`; if it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos` and rerun `npm run check-types`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/blind-review/action-plan.md`
 
-[ ] Subtask 13.3. Run `npm run lint`.
+[x] Subtask 13.3. Run `npm run lint`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/blind-review/action-plan.md`
 
-[ ] Subtask 13.4. Run `git diff --name-only` and verify the persistent diff is limited to files allowed by this action plan plus checkbox updates in this file.
+[x] Subtask 13.4. Run `git diff --name-only` and verify the persistent diff is limited to files allowed by this action plan plus checkbox updates in this file.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/blind-review/action-plan.md`

@@ -22,6 +22,7 @@ Step 2: Agent needs to:
     - send user general message
     - use attempt_completion
     - use local CLI commands
+
 # Workflow Steps
 
 ## Focus Chain Steps
@@ -124,3 +125,28 @@ Story identity 1.1 → acceptance-audit-1-1.md
 Remediation story identity 1.1.1 → acceptance-audit-1-1-1.md
 
 the full file path for the generated document must be set as the workflow's acceptance_audit_review_output session key.
+
+## Step 2: Conduct Acceptance Audit
+
+### Prompt:
+
+You have been tasked with conducting an acceptance audit of preproduction code against backing project documentation. 
+
+Before starting your audit, read the following:
+- target story: target_story
+- epics document: epics_document
+- architecture document: architecture_document
+- review scope manifest: review_scope_manifest
+
+If needed, you may use the following commit hashes to identify specific code revisions for detailed analysis:
+- Commit from the implementation cycle: review_commit_hash
+- Latest commit immediately before the implementation cycle: review_commit_parent
+
+Your goal is to ensure that the work done during implementation satisfies the following:
+- includes all of the exact changes prescribed by the provided story document, and no other revisions
+- does not invent solutions and/or architecture not clearly authorized by the provided project documentation
+- fully satisfies the story's requirements and objective
+
+After conducting your audit, document your findings in this document: acceptance_audit_review_output
+
+You are an Acceptance Auditor. Review this diff against the spec and context docs. Check for: violations of acceptance criteria, deviations from spec intent, missing implementation of specified behavior, contradictions between spec constraints and actual code. Output findings as a Markdown list. Each finding: one-line title, which AC/constraint it violates, and evidence from the diff.
