@@ -1,14 +1,27 @@
 # Authoring Non-Negotiables:
-- Each action plan must be a standalone document and must be saved in the project folder if one exists
-- The action plan must directly support achievement/delivery of every project requirement
-- If you encounter a decision point which was not already explicitly discussed and decided/approved by the user, you must STOP and present the decision to them along with a recommendation, then gain their approval and/or alignment before continuing your work authoring the action plan. YOU DO NOT SOLVE FOR AMBIGUOUS REQUIREMENTS UNLESS YOU CLEARLY STATE TO THE USER THAT THE REQUIREMENTS ARE AMBIGUOUS OR LEAVE ROOM FOR INTERPRETATION AND YOU ARE PROPOSING A SPECIFIC APPROACH.
-- After writing an action plan, reach each line of the action plan and seek out any inconsistencies, conflicts, or tasks/subtasks which do not prescribe exact necessary revisions. During this review, assess each task and subtask for internal dependencies, and ensure that no task or subtask is dependent upon a task or subtask which is sequenced after it in the action plan. Resolve them appropriately, asking the user for input if necessary, before indicating that the action plan is complete.
-- NEVER prescribe retyping, casting, renaming, or otherwise mutating existing capabilities/functionality within an action plan unless you have surfaced the proposed change as a single topic to the user and gained their approval.
-- When authoring an action plan, you must fully follow every rule and guideline in this action plan guide exactly. Summarizing or loose interpretation of the guidelines in this document is prohibited.
+- This action plan guide is not to be treated as a checklist for the document's broad structure. While the guide does provide the document structure, it also serves as a hard constraint and acceptability standard for every task and subtask written into any action plan and must be treated as such.
+- An action plan must be a standalone document, and must be saved in the project folder in which the action plan's backing requirements documentation is saved.
+- An action plan must not introduce architecture or functionality which is not clearly prescribed in the provided requirements. While requirements do not provide exact code shape and file coverage, they should be clear enough that a single implementation solution is clear and easy to derive and build into the action plan. In these situations, you must stop, inform the user that the requirements need additional detail before the action plan can be authored in a compliant manner, and await their direction:
+    - The requirements may be implemented via more than one compliant method and do not clearly define the user-approved method.
+    - The necessary code revisions (adds/deletes/updates) uncover additional necessary revisions for which the user-approved approach is unclear or unaddressed in the requirements.
+    - The necessary code revisions conflict with the repo's established functionality, architecture, or coding conventions, and the requirements do not clearly acknowledge and resolve the conflict.
+- An action plan must never prescribe retyping, casting, renaming, or otherwise mutating existing capabilities/functionality unless the requirements clearly state that user approval was gained in advance.
+
+# Prohibited Behavior
+This action plan guide is intended to PREVENT & PROHIBIT this behavior:
+- Agent read the requirements and converted them into broad implementation objectives.
+- Agent did not fully trace every target test/runtime file to the actual TypeScript contracts before writing each subtask.
+- Agent treated this guide as a checklist for broad document structure, not a hard constraint for individual subtasks
+- Agent used sibling architecture similarity as a shortcut, including verbiage like "equivalent to" in subtasks rather than prescricing exact code shape.
+- Agent failed to scope each subtask to a single prescribed change by including subtask language like "add registry tests..." and "add prompt tests asserting..."
+- Agent wrote milestone-style subtasks where the guide requires exact revisions.
+- Agent relied on validation to expose details that the action plan author is supposed to catch up front.
+- Agent failed to trace implementation thoroughly, causing the action plan to sequence dependencies in reverse order
+- Agent performed a cursory audit only before signalling completion, treating subtasks that did not exhibit obvious violations like "if needed" as compliant rather than ensuring that each subtask fully complied with this guide.
 
 # Action Plan Guide Authoring Procedure
 
-## Required Action Plan Sections:
+## Step 1: Build the initial action plan structure with the following required headings:
 - FrontMatter
 - Scope
 - Scope Boundary (what is out of scope)
@@ -16,9 +29,10 @@
 - Tasks / Subtasks
 - Validation
 
-## Authoring the Guide:
+## Step 2: Populate frontmatter, scope, scope boundary, and known issues/ risks/ technical debt sections:
+
 ### FrontMatter
-Start with the exact required frontmatter from the guide. This is the execution contract for dev agents.
+Start with the exact required frontmatter from this guide. This is the execution contract for dev agents.
 
 ### Scope
 After parsing requirements, summarize only the approved obligations the action plan will deliver: runtime behavior, tools, forms, artifacts, prompt projection, cleanup, and tests.
@@ -27,20 +41,11 @@ After parsing requirements, summarize only the approved obligations the action p
 List what the requirements do not authorize. This prevents accidental inferred work, such as implementing child workflows, changing shared runtime architecture, or preserving legacy aliases.
 
 ### Known Issues / Risks / Technical Debt
-Add only real risks discovered during code inspection: dirty worktree constraints, legacy code being deleted, known environment validation behavior, or dependencies on existing shared runtime seams. Do not use this section for unresolved decisions; unresolved decisions must stop authoring.
+Add only real risks discovered during code inspection: dirty worktree constraints, legacy code being deleted, known environment validation behavior, or dependencies on existing shared runtime seams. Do not use this section for unresolved decisions; unresolved decisions must stop authoring. You may add to this section in step 3 while authoring tasks and subtasks if additional issues/ risks/ technical debt are discovered.
 
-### Tasks / Subtasks
+## Step 3: Identify and document the action plan's tasks and subtasks:
 
-#### Prohibited Behavior
-This action plan guide is intended to PREVENT & PROHIBIT this behavior:
-- Agent read the requirements and converted them into broad implementation objectives.
-- Agent did not fully trace every target test/runtime file to the actual TypeScript contracts before writing each subtask.
-- Agent wrote milestone-style subtasks where the guide requires exact revisions.
-- Agent relied on validation to expose details that the action plan author is supposed to catch up front.
-
-#### Required Behavior
-
-1. Treat the action-plan guide as the acceptance contract. Read it first and use it as the checklist for whether the plan is valid.
+1. Treat this action-plan guide as the acceptance contract. Read it first and use it as the checklist for whether the plan is valid. Every line of the action plan, every task and subtask, must be written in compliance with this guide and validated before completion to ensure compliance with this guide. 
 
 2. Read the requirements and parse them into observable obligations:
    runtime behavior, persisted values, artifacts, form UI, tool exposure, prompt projection, routing, validation, cleanup, and tests.
@@ -58,7 +63,22 @@ This action plan guide is intended to PREVENT & PROHIBIT this behavior:
    required imports, discriminated unions, required fields, typed return values, event/session/action shape, workflow values, mocks, stubs, fixtures, and no forced casts.
 
 7. Write tasks & subtasks following the Task/ Subtask Authoring Rules:
-   Each subtask covers one target area, one prescribed change. If a subtask contains multiple independent decisions, split it. Indicate target file for each subtask.
+   - Each subtask covers one target file with one prescribed change. If a subtask contains multiple independent decisions, split it. Indicate target file for each subtask.
+   - Each subtask prescribes a single target file to which the prescribed code is contained.
+   - Example of a subtask written in a non-compliant manner due to failure to prescribe the exact helper names or their parameter lists, return types, object shapes, or narrowing patterns:
+        [ ] Subtask 8.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts`, add typed helpers equivalent to the blind-review test helpers for creating sessions, commit form sessions, finding routes, reading panels/fields, rendering workflow values, building prompt input, building prompt strings, listing tool names, constructing `workflow_form_panel_submitted`, `tool_backed_operation_succeeded`, `tool_backed_operation_failed`, and `attempt_completion_succeeded` events; every event object must include all required fields such as `submittedValueKeys` and `clearedValueKeys`.
+   - Example of a subtask that is not compliant because it is milestone-based/descriptive, lumps several revisions together into a single subtask, and fails to prescribe exact required revisions:
+        [ ] Subtask 8.3. In `edgeCaseHunterReviewWorkflow.test.ts`, add tests asserting workflow identity, persona, description-backed entry panel, workflow value inventory, entry project keys, and child inheritance exactly include `review_commit_hash`, `review_commit_parent`, `target_story`, and `review_scope_manifest`; do not include registry assertions in this phase.
+    - Example of the same subtask, still written in non-compliant fashion due to failure to prescribe the exact parameter list, return type, object shape, and narrowing pattern for the prescribed helpers. It also fails to provide the full path for the target file:
+        [ ] Subtask 8.3. In `edgeCaseHunterReviewWorkflow.test.ts`, add these exact typed helpers with explicit return types and edge-case-hunter-review constants: `createSession`, `buildCommitFormSession`, `getStep`, `findRoute`, `getWorkflowForm`, `getPanel`, `getSingleField`, `renderWorkflowValue`, `createPromptInput`, `buildPrompt`, `getToolNamesForStep`, `buildWorkflowFormPanelSubmittedEvent`, `buildToolBackedOperationSucceededEvent`, `buildToolBackedOperationFailedEvent`, `buildAttemptCompletionSucceededEvent`, `isActionKind`, `expectActionKind`, `expectTransitionStepAction`, `expectEventPredicateMatches`, `expectSessionPredicateMatches`, `expectSucceeded`, `runRequiredGitCommand`, `createTemporaryGitProject`, and `expectSucceededWithoutCommitWrites`; every event object must include all required fields such as `submittedValueKeys` and `clearedValueKeys`, and no helper may use `any`, `as any`, `as never`, or incomplete runtime event/session/action shapes.
+    - Example of a subtask generated after breaking the example above apart into revision-scoped subtasks, is still not compliant because it does not provide the allowed file for the subtask:
+        [ ] Subtask 8.2. Add fixture constants exactly: `PROJECT_ROOT = "/tmp/edge-case-hunter-review-project"`, `TARGET_STORY_PATH = `${PROJECT_ROOT}/implementation/stories-review/Story-1-1.md``, `REVIEW_FOLDER_PATH = `${PROJECT_ROOT}/review``, `REVIEW_SCOPE_MANIFEST_PATH = `${REVIEW_FOLDER_PATH}/review-scope-1-1.md``, `EDGE_CASE_REVIEW_OUTPUT_PATH = `${REVIEW_FOLDER_PATH}/edge-case-hunter-1-1.md``, and `SAMPLE_WORKFLOW_VALUES: WorkflowValues` with exact entries for `TargetStory`, `SelectedStoryIdentity: "1.1"`, `ReviewCommitHash: "abc123"`, `ReviewCommitParent: "def456"`, `ReviewScopeManifest`, all four review-scope artifact metadata keys, `EdgeCaseReviewOutput`, and all four edge-case output artifact metadata keys.
+    - Example of a subtask that is still not compliant because it leaves object shapes partially complicit. For createSession, “complete ui state” is vague. It should spell out ui: { formSession, stepResolutionSession: undefined, suppressedWorkflowFormIds: [], suppressedWorkflowStepResolutionRoutes: [] }. The subtask also fails to indicate the target file.
+        [ ] Subtask 8.2. Add `createSession(workflowValues: WorkflowValues, projectRoot = PROJECT_ROOT, branchContext: ActiveWorkflowSession["branchContext"] = { activeBranchId: "step-1-route-by-existing-values" }, formSession: WorkflowFormSessionState | undefined = undefined): ActiveWorkflowSession`; it must return a complete active Step 1 session with `projectSelection.projectMode: "existing"`, project title/folder from `basename(projectRoot)`, `lifecycle.projectSelectionCompleted: true`, `entryArtifactResolution: undefined`, complete `ui` state, and the supplied `branchContext`.
+     - Example of a subtask that is not compliant because it prescribes a generic narrowing helper that still needs a type assertion to return Extract<...>. This guide forbids forcing assertions unless the exact safe narrowing pattern is prescribed. The subtask says “without forced casts” but fails to prescribe the exact TypeScript-safe implementation. The dev agent would still have to figure out whether the generic predicate narrows enough for the return type, and what to do if TypeScript does not accept it. The subtask also fails to indicate the target file. 
+        [ ] Subtask 8.18. Add `expectActionKind<Kind extends WorkflowDecisionAction["kind"]>(action: WorkflowDecisionAction, kind: Kind): Extract<WorkflowDecisionAction, { kind: Kind }>`; it must assert `action.kind`, call `isActionKind`, throw on mismatch, and return the narrowed action without `as any` or forced casts.
+    - Example of a subtask that is not compliant because createTemporaryGitProject is not exact enough. It does not prescribe temp folder prefix, file paths, commit file contents, git add/commit order, or cleanup expectations. The subtask also fails to indicate the target file.
+        [ ] Subtask 8.24. Add `createTemporaryGitProject(): Promise<{ root: string; targetStory: string; firstCommitHash: string; secondCommitHash: string }>`; it must create a temp Git project, configure user email/name, create `implementation/stories-review/Story-1-1.md`, create two commits, and return root/story/commit hashes.
 
 8. For tests, prescribe setup and assertions explicitly:
    imports, helper shapes, fixture values, event/action/session objects, stable behavioral assertions, and forbidden prompt-prose or legacy assertions.
@@ -70,7 +90,8 @@ This action plan guide is intended to PREVENT & PROHIBIT this behavior:
 
 11. When a blocker exposes a class of issue, audit the rest of the phase for that same issue before returning work to the dev agent.
 
-### Validation
+## Step 4: Author the validation section of the action plan:
+
 Author the validation section following the Validation Section Rules.
 Derive validation from the touched layers:
 focused unit tests, integration tests, check-types, lint, negative guards for retired runtime concepts, and scope-diff checks. Validation commands must be exact and supported by the repo.
@@ -78,9 +99,10 @@ focused unit tests, integration tests, check-types, lint, negative guards for re
 # Required Frontmatter:
 Include this exact frontmatter at the top of every action plan document:
   - Read this plan from top to bottom before making any changes.
-  - Read each step in full immediately before executing it.
+  - Read each task and subtask in full immediately before executing it.
   - Execute only one task or subtask at a time- return to this file and read the next task or subtask before executing. Do not rely on your internal memory when switching to a new task or subtask.
-  - After completing a task or subtask, update that step's checkbox from "[ ]" to "[x]".
+    - Exception: You may execute multiple sequential subtasks with one patch only if they are scoped to the same file, but must review each subtask vs the landed code after the patch to ensure that every subtask was implemented exactly as prescribed before marking the subtask as complete.
+    - After completing a task or subtask, update that step's checkbox from "[ ]" to "[x]".
   - Checkbox updates to this plan file are allowed in every step in addition to the listed allowed-files set.
   - Do not edit any file not listed in the current step's allowed-files list.
   - If any ambiguity is discovered, or if any change is needed outside the allowed-files list for the current step, stop and ask the user before proceeding.
@@ -106,10 +128,20 @@ Include this exact frontmatter at the top of every action plan document:
 # Task / Subtask Authoring Rules:
 *** Task / Subtask Section Structure: ***
 - If the action plan is not a simple patch with few steps, it must be broken into distinct phases with instructions to pause for QA review before moving on to the next section.
+- Tasks may be scoped in one of the following ways. Both methods may be used within the same action plan:
+    Method 1: Target File Scoped- this method is appropriate when there are many necessary revisions in a single file. Common when building a new file.
+    Method 2: Function-Scoped: this method groups subtasks for a single function or capability across many files. Common when renaming an existing function or introducing a new capability which requires integration across many files. 
+- A task must only encompasss more than one single prescribed revision when those revisions are prescribed through subordinate subtasks. A task with no subordinate subtasks must ony prescribe a single exact revision in a single target file. 
+- A task without subordinate subtasks must include the full full file path for the target file.
+- If a task is suppported by subordinate subtasks, the task itself may be a simple summarization of the prescribed changes, with the subtasks indicating the exact required revisions in compliance with this guide.
+    example:
+        [ ] Task 8: Add focused edge-case-hunter-review workflow tests
 - Tasks & Subtasks must be on their own lines starting with "[ ]" so that dev agents can mark completion as they progress through the action plan.
-- Subtasks must prescribe exact line-level revisions with target file indicated- summaries or descriptions of changes are not sufficient.
-- Subtasks must never prescribe more than ONE required revision
-- Each task & subtasks should have clearly defined allowed files for the prescribed edit.
+    - subtasks must be nested with appropriate indentation for readability.
+- Each subtask must prescribe exactly one line-level revision with target file indicated- summaries or descriptions of changes are not permitted.
+    Example task & subtask structure: (note that this subtask does prescribe the allowed file)
+        [ ] Subtask 8.3: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts`, add `STEP_2_TOOL_NAMES: readonly string[]` with exactly `["execute_command", "list_files", "search_files", "list_code_definition_names", "read_file", "read_file_range", "apply_patch", "write_to_file", "send_user_message", "attempt_completion"]`.
+- A task without subordinate subtasks and all subtasks must include clear indication of the target file for the prescribed revision.
 - You must not leave decision space to the agent who will implement the action plan. As the action plan author, it is your job to review runtime code, identify the complete and correct necessary revisions, and prescribe those revisions clearly within the action plan. This includes test fixtures associated with any runtime code that is being revised, removed, or added.
 - Every code/test subtask must be compile-path reviewed before it is written. The action-plan author must inspect the target runtime file, target test file, adjacent sibling patterns, and relevant shared types to identify TypeScript constraints the dev agent will encounter.
 - If a subtask touches parsed JSON, `unknown`, discriminated unions, optional properties, workflow values, tool params/results, schema objects, event objects, persisted metadata, stubs, mocks, fixtures, or helper return types, the subtask must prescribe the exact compile-safe type narrowing, object construction, or fixture shape required.
@@ -122,11 +154,11 @@ Include this exact frontmatter at the top of every action plan document:
 
 2. Prescribe deep, architectural fixes over surface workarounds
    - Check whether the issue can and should be solved at a deeper architectural layer (design, data flow, responsibilities) rather than with a shallow or hacky workaround.
-   - If you choose a workaround for pragmatic reasons, explicitly label it as such and describe the deeper architectural fix that would be ideal.
+    - A pragmatic workaround must not be prescribed unless it is clearly authorized in the separate requirements document and approved by the user. In these cases, the deeper architectural solution must be clearly documented in the separate requirements document. If it is not, then the pragmatic solution should be considered underspecified and unauthorized until the user authorizes an update to the requirements document.
 
 3. Look for underlying design-pattern flaws
-   - Examine whether the issue reveals deeper design or pattern problems (e.g., responsibilities mixed, poor separation of concerns, leaky abstractions).
-   - If such problems exist, call them out explicitly and propose how they could be addressed, even if the full fix is out of scope for the immediate change.
+   - Examine whether the necessary revision reveals deeper design or pattern problems (e.g., responsibilities mixed, poor separation of concerns, leaky abstractions).
+   - If such problems exist, you must stop and inform the user of them. When you do, provide detailed information and propose how they could be addressed, even if the full fix is out of scope based on the provided requirements.
 
 4. Consider downstream and peripheral impact
    - Evaluate how the change may affect other modules, call sites, and features, including edge cases and lifecycle interactions. Search the codbase and read peripheral files if uncertain.
@@ -205,10 +237,10 @@ Include this exact frontmatter at the top of every action plan document:
     snapshots/generated surfaces
     docs/reference surfaces if treated as canonical in-repo
 
-14. Do not compress tasks/ subtasks into milestone-style implementation summaries. They must prescribe exact revisions as outlined in this action plan guide.
+14. Do not compress tasks/ subtasks into milestone-style implementation summaries. Each subtask must prescribe a single, exact, unambiguous code revision, removal, or addition with exact required code shape. 
 
 
-If at any point you cannot satisfy one or more of these rules (for example, due to missing context or constraints in the existing architecture), you MUST:
+If at any point you cannot satisfy one or more of these rules (for example, due to missing context or constraints in the existing architecture), you MUST notify the user:
 - Explicitly state which rule(s) you cannot fully satisfy, and why.
 - Propose the best available compromise, and outline what a more ideal long-term fix would look like.
 
