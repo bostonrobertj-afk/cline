@@ -104,6 +104,48 @@ review_commit_parent: parentHash
 
 If any of those Git commands fail or return empty output, the function returns success without writing those values, which causes the workflow to treat the commit as invalid and continue to the invalid-commit panel path by showing panel B.
 
+Once panel A is submitted with a valid commit hash, runtime must use the existing workflow tools to generate the review scope manifest document, then populate the generated document. The file should be persisted in the project's review folder. The artifact conventions and registration were already used during the code review module build, so this workflow should mirror that configuration.
+
+Expected review scope manifest formatting:
+*** begin example ***
+ # Review Scope Manifest
+
+## Source
+- Commit: <hash>
+- Parent: <parent hash>
+- Story: <target_story path>
+- Generated from: git show --name-status --numstat <hash>
+
+## Summary
+- Files changed: 8
+- Added: 2
+- Modified: 5
+- Deleted: 1
+- Total additions/deletions: +214 / -37
+
+## Changed Files
+| Status | Path | Additions | Deletions |
+| M | src/foo.ts | 42 | 8 |
+| A | src/bar.ts | 90 | 0 |
+| D | src/old.ts | 0 | 20 |
+
+## Review Targets
+- src/foo.ts
+  - Status: modified
+  - Reason to inspect: implementation file changed by story commit
+  - Diff command: git show <hash> -- src/foo.ts
+
+- src/bar.ts
+  - Status: added
+  - Reason to inspect: new implementation file
+  - Diff command: git show <hash> -- src/bar.ts
+
+## Suggested Review Strategy
+- Start with modified/added implementation files.
+- Inspect deleted files only for unintended removal.
+- Use targeted git show commands per file rather than loading the whole commit diff.
+*** end example ***
+
 Panel B: shown only if the commit hash is invalid for any reason
 title: Invalid Commit Hash
 promptMarkdown: The provided commit hash is invalid. Please go back and provide a valid commit hash.
@@ -132,21 +174,35 @@ the full file path for the generated document must be set as the workflow's acce
 
 You have been tasked with conducting an acceptance audit of preproduction code against backing project documentation. 
 
-Before starting your audit, read the following:
-- target story: target_story
-- epics document: epics_document
-- architecture document: architecture_document
-- review scope manifest: review_scope_manifest
+1: Before starting your audit, read the following:
+    - target story: target_story
+    - epics document: epics_document
+    - architecture document: architecture_document
+    - review scope manifest: review_scope_manifest
 
-If needed, you may use the following commit hashes to identify specific code revisions for detailed analysis:
-- Commit from the implementation cycle: review_commit_hash
-- Latest commit immediately before the implementation cycle: review_commit_parent
+    If needed, you may use the following commit hashes to identify specific code revisions for detailed analysis:
+    - Commit from the implementation cycle: review_commit_hash
+    - Latest commit immediately before the implementation cycle: review_commit_parent
 
-Your goal is to ensure that the work done during implementation satisfies the following:
-- includes all of the exact changes prescribed by the provided story document, and no other revisions
-- does not invent solutions and/or architecture not clearly authorized by the provided project documentation
-- fully satisfies the story's requirements and objective
+2: Audit all code revisions (adds/edits/deletes). Your goal is to ensure that the work done during implementation satisfies the following:
+    - includes all of the exact changes prescribed by the provided story document, and no other revisions
+    - does not invent solutions and/or architecture not clearly authorized by the provided project documentation
+    - fully satisfies the story's requirements and objective
 
-After conducting your audit, document your findings in this document: acceptance_audit_review_output
+3: After conducting your audit, document your findings in this document: acceptance_audit_review_output. 
+    - For each finding, you must include:
+        - finding: a short title for the finding
+        - description: a detailed explanation of the finding, including:
+        - an explanation of the identified issue
+        - the trigger condition for the finding
+        - the potential consequence if the finding is not addressed
+        - exact supporting code location with file path, start line, and end line for the smallest line range that supports the finding. If a finding depends on more than one non-contiguous location, include each one in the finding description.
+        - an explanation of what in the cited code locations supports the finding
+    - If no findings were identified, add a note to acceptance_audit_review_output indicating that no findings were found after thorough review.
 
-You are an Acceptance Auditor. Review this diff against the spec and context docs. Check for: violations of acceptance criteria, deviations from spec intent, missing implementation of specified behavior, contradictions between spec constraints and actual code. Output findings as a Markdown list. Each finding: one-line title, which AC/constraint it violates, and evidence from the diff.
+4: Use attempt_completion to provide a final report to the user including:
+    - number of findings, or clear statement that no findings were identified
+    - The full file path for your recorded findings: acceptance_audit_review_output
+    - an overview of the findings you documented, if any.
+
+### Progression Rule: successful use of attempt_completion by the agent- workflow must end afterward.

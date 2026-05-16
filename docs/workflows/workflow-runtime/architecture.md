@@ -80,7 +80,7 @@ This architecture covers:
   - `dev-story`
   - `code-review`
   - `review-adversarial-general`
-  - `review-edge-case-hunter`
+  - `edge-case-hunter-review`
   - `blind-review`
   - `problem-solving`
   - `create-product-brief`
@@ -684,7 +684,7 @@ The canonical in-scope workflow mapping for this architecture is:
 | `problem-solving` | `analyst` | `discovery` |
 | `quick-spec` | `quick-flow-solo-dev` | `planning` |
 | `review-adversarial-general` | `quality-control` | `review` |
-| `review-edge-case-hunter` | `quality-control` | `review` |
+| `edge-case-hunter-review` | `quality-control` | `review` |
 | `write-remediation-story` | `developer` | `planning` |
 
 `problem-solving` is the target migrated workflow name for this initiative and replaces the legacy `cis-problem-solving` naming in the in-scope runtime design.

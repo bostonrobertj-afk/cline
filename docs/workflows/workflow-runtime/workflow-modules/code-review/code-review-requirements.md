@@ -8,7 +8,7 @@ Use `docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md` as 
 
 The code-review workflow performs a structured review of a completed story after the `dev-story` workflow has implemented the story and committed the implementation changes. It resolves the target story, collects a commit hash, prepares review artifacts and review-scope guidance, dispatches specialist subagent review workflows, consolidates findings, and creates a remediation story when findings require follow-up work.
 
-The code-review workflow must not implement the child `blind-review` or `review-edge-case-hunter` workflows. It may assign those child workflows to subagents and locate their output artifacts after the child workflows complete.
+The code-review workflow must not implement the child `blind-review` or `edge-case-hunter-review` workflows. It may assign those child workflows to subagents and locate their output artifacts after the child workflows complete.
 
 Do not rely on the source markdown workflow file, legacy BMAD workflow package files, placeholder workflow state, managed-workflow state, `.cline/workflow-config.yaml`, or other legacy workflow assets at runtime. Source files are migration references only.
 
@@ -81,7 +81,7 @@ The module must include workflow-value keys for:
 - `review_scope_manifest_artifact_filename`, the internal artifact-filename output key written when `review_scope_manifest` is allocated
 - `review_scope_manifest_artifact_relative_path`, the internal artifact-relative-path output key written when `review_scope_manifest` is allocated
 - `blind_review_output`, the absolute path to `blind-review-{target}.md` after the child `blind-review` workflow produces it
-- `edge_case_review_output`, the absolute path to `edge-case-hunter-{target}.md` after the child `review-edge-case-hunter` workflow produces it
+- `edge_case_review_output`, the absolute path to `edge-case-hunter-{target}.md` after the child `edge-case-hunter-review` workflow produces it
 - `missing_subagent_output_files`, a string array containing expected child output filenames that are missing or empty when Step 2 progression is requested
 - `review_commit_hash`, the normalized reviewed commit hash submitted by the user
 - `review_commit_parent`, the reviewed commit's parent hash
@@ -113,7 +113,7 @@ The workflow runtime artifact-family registry must support these target-derived 
 | Artifact family | Allocation mode | Identity requirement | Filename pattern | Project folder | Workflow owner |
 | --- | --- | --- | --- | --- | --- |
 | `blind_review_output` | `derived_from_target` | `target_story_or_remediation_story` | `blind-review-{target}.md` | `review` | `blind-review` |
-| `edge_case_review_output` | `derived_from_target` | `target_story_or_remediation_story` | `edge-case-hunter-{target}.md` | `review` | `review-edge-case-hunter` |
+| `edge_case_review_output` | `derived_from_target` | `target_story_or_remediation_story` | `edge-case-hunter-{target}.md` | `review` | `edge-case-hunter-review` |
 | `code_review_output` | `derived_from_target` | `target_story_or_remediation_story` | `code-review-{target}.md` | `review` | `code-review` |
 | `review_scope_manifest` | `derived_from_target` | `target_story_or_remediation_story` | `review-scope-{target}.md` | `review` | `code-review` |
 
@@ -349,7 +349,7 @@ Launch two subagents and assign their specialized code review workflows:
     - You MUST assign the appropriate workflow to this subagent by including this exact phrase, with identical formatting and punctuation in your prompt: Skill: use_skill('blind-review')
     - The blind-review workflow will then activate and provide the subagent with detailed instructions.
 - Edge Case Hunter:
-     - You MUST assign the appropriate workflow to this subagent by including this exact phrase, with identical formatting and punctuation in your prompt: Skill: use_skill('review-edge-case-hunter')
+     - You MUST assign the appropriate workflow to this subagent by including this exact phrase, with identical formatting and punctuation in your prompt: Skill: use_skill('edge-case-hunter-review')
      - The edge-case-hunter workflow will then activate and provide the subagent with detailed instructions.
 - Track any review layer that fails, times out, or returns no useful output. Once the subagents complete their work, shut them down.
 

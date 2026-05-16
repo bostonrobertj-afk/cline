@@ -185,7 +185,7 @@ The canonical in-scope workflow mapping for this requirements set is:
 | `problem-solving` | `analyst` | `discovery` |
 | `quick-spec` | `quick-flow-solo-dev` | `planning` |
 | `review-adversarial-general` | `quality-control` | `review` |
-| `review-edge-case-hunter` | `quality-control` | `review` |
+| `edge-case-hunter-review` | `quality-control` | `review` |
 | `write-remediation-story` | `developer` | `planning` |
 
 `problem-solving` is the target migrated workflow name for this initiative and replaces the legacy `cis-problem-solving.md` naming in the in-scope runtime contract.
@@ -323,7 +323,7 @@ The functional requirements below are grouped by the primary implementation phas
 - `FR-20b5`: Runtime must allocate remediation-story numbers within the selected parent story.
 - `FR-20b6`: QA/review artifacts must inherit the selected target story or remediation-story identity exactly, must use that inherited identity in the canonical filename, and must not allocate or increment any review-specific number.
 - `FR-20b6a`: Review artifact creation must fail through the runtime tool-backed operation result path when no convention-matching `Story-{E}-{S}.md` or `Remediation-story-{E}-{S}-{R}.md` target artifact is selected.
-- `FR-20b6b`: Review-layer workflows must produce target-derived review artifacts under the selected project's `review` folder. The `blind-review` workflow produces `blind-review-{target}.md`. The `review-edge-case-hunter` workflow produces `edge-case-hunter-{target}.md`. The `code-review` workflow produces `code-review-{target}.md` and `review-scope-{target}.md`. In all cases, `{target}` is the hyphenated identity of the selected story or remediation-story target, and review artifacts inherit the selected target identity rather than allocating a review-specific sequence.
+- `FR-20b6b`: Review-layer workflows must produce target-derived review artifacts under the selected project's `review` folder. The `blind-review` workflow produces `blind-review-{target}.md`. The `edge-case-hunter-review` workflow produces `edge-case-hunter-{target}.md`. The `code-review` workflow produces `code-review-{target}.md` and `review-scope-{target}.md`. In all cases, `{target}` is the hyphenated identity of the selected story or remediation-story target, and review artifacts inherit the selected target identity rather than allocating a review-specific sequence.
 - `FR-20b7`: Workflow modules may declare artifact family, parent/target requirements, and artifact type, but must not compute, increment, parse, or format canonical artifact numbers themselves.
 - `FR-20b8`: Runtime numbering must be based on convention-driven filesystem discovery, not a hidden artifact registry.
 - `FR-20b9`: Runtime artifact creation must not use collision suffixing as canonical artifact numbering. Runtime must use convention-driven filesystem discovery before write to avoid known canonical filename collisions, and must create new artifacts with exclusive-write semantics so existing files are never overwritten.
