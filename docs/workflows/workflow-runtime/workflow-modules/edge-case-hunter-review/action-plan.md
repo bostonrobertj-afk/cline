@@ -79,72 +79,72 @@ Sibling-pattern audit summary:
 
 After completing this phase, pause for QA review before moving to Phase 2.
 
-[ ] Task 1. Add the module-owned edge-case-hunter-review tool-schema builders.
+[x] Task 1. Add the module-owned edge-case-hunter-review tool-schema builders.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/edgeCaseHunterReviewToolSchemas.ts`
 
-[ ] Subtask 1.1. Add `edgeCaseHunterReviewToolSchemas.ts` with imports for `ClineToolSpec`, `AGENT_FEEDBACK_PARAMETER`, `ModelFamily`, and `ClineDefaultTool`; define `const EDGE_CASE_HUNTER_REVIEW_TOOL_SCHEMA_VARIANT = ModelFamily.NATIVE_GPT_5`; export `buildEdgeCaseHunterReviewStep1ToolSchemas(): readonly ClineToolSpec[]` returning `[]`.
+[x] Subtask 1.1. Add `edgeCaseHunterReviewToolSchemas.ts` with imports for `ClineToolSpec`, `AGENT_FEEDBACK_PARAMETER`, `ModelFamily`, and `ClineDefaultTool`; define `const EDGE_CASE_HUNTER_REVIEW_TOOL_SCHEMA_VARIANT = ModelFamily.NATIVE_GPT_5`; export `buildEdgeCaseHunterReviewStep1ToolSchemas(): readonly ClineToolSpec[]` returning `[]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/edgeCaseHunterReviewToolSchemas.ts`
 
-[ ] Subtask 1.2. In `edgeCaseHunterReviewToolSchemas.ts`, add exported source-inspection tool builders with these exact schema identities and parameter shapes: `buildEdgeCaseHunterReviewExecuteCommandToolSchema()` returns name `execute_command`, id `ClineDefaultTool.BASH`, required string parameter `command`, and required boolean parameter `requires_approval`; `buildEdgeCaseHunterReviewListFilesToolSchema()` returns name `list_files`, id `ClineDefaultTool.LIST_FILES`, required string parameter `path`, and optional boolean parameter `recursive`; `buildEdgeCaseHunterReviewSearchFilesToolSchema()` returns name `search_files`, id `ClineDefaultTool.SEARCH`, required string parameters `path` and `regex`, and optional string parameter `file_pattern`; `buildEdgeCaseHunterReviewListCodeDefinitionNamesToolSchema()` returns name `list_code_definition_names`, id `ClineDefaultTool.LIST_CODE_DEF`, and required string parameter `path`; `buildEdgeCaseHunterReviewReadFileToolSchema()` returns name `read_file`, id `ClineDefaultTool.FILE_READ`, and required string parameter `path`; `buildEdgeCaseHunterReviewReadFileRangeToolSchema()` returns name `read_file_range`, id `ClineDefaultTool.FILE_READ_RANGE`, required string parameter `path`, required integer parameter `start_line`, and required integer parameter `end_line`; every schema must include `variant: EDGE_CASE_HUNTER_REVIEW_TOOL_SCHEMA_VARIANT`, and every parameter object must include non-empty `instruction` and `description` strings.
+[x] Subtask 1.2. In `edgeCaseHunterReviewToolSchemas.ts`, add exported source-inspection tool builders with these exact schema identities and parameter shapes: `buildEdgeCaseHunterReviewExecuteCommandToolSchema()` returns name `execute_command`, id `ClineDefaultTool.BASH`, required string parameter `command`, and required boolean parameter `requires_approval`; `buildEdgeCaseHunterReviewListFilesToolSchema()` returns name `list_files`, id `ClineDefaultTool.LIST_FILES`, required string parameter `path`, and optional boolean parameter `recursive`; `buildEdgeCaseHunterReviewSearchFilesToolSchema()` returns name `search_files`, id `ClineDefaultTool.SEARCH`, required string parameters `path` and `regex`, and optional string parameter `file_pattern`; `buildEdgeCaseHunterReviewListCodeDefinitionNamesToolSchema()` returns name `list_code_definition_names`, id `ClineDefaultTool.LIST_CODE_DEF`, and required string parameter `path`; `buildEdgeCaseHunterReviewReadFileToolSchema()` returns name `read_file`, id `ClineDefaultTool.FILE_READ`, and required string parameter `path`; `buildEdgeCaseHunterReviewReadFileRangeToolSchema()` returns name `read_file_range`, id `ClineDefaultTool.FILE_READ_RANGE`, required string parameter `path`, required integer parameter `start_line`, and required integer parameter `end_line`; every schema must include `variant: EDGE_CASE_HUNTER_REVIEW_TOOL_SCHEMA_VARIANT`, and every parameter object must include non-empty `instruction` and `description` strings.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/edgeCaseHunterReviewToolSchemas.ts`
 
-[ ] Subtask 1.3. In `edgeCaseHunterReviewToolSchemas.ts`, add exported edit and response tool builders with these exact schema identities and parameter shapes: `buildEdgeCaseHunterReviewApplyPatchToolSchema()` returns name `apply_patch`, id `ClineDefaultTool.APPLY_PATCH`, and required string parameter `input`; `buildEdgeCaseHunterReviewWriteToFileToolSchema()` returns name `write_to_file`, id `ClineDefaultTool.FILE_NEW`, and required string parameters `absolutePath` and `content`; `buildEdgeCaseHunterReviewSendUserMessageToolSchema()` returns name `send_user_message`, id `ClineDefaultTool.SEND_USER_MESSAGE`, required string parameter `message`, and `AGENT_FEEDBACK_PARAMETER`; `buildEdgeCaseHunterReviewAttemptCompletionToolSchema()` returns name `attempt_completion`, id `ClineDefaultTool.ATTEMPT`, and required string parameter `result`; every schema must include `variant: EDGE_CASE_HUNTER_REVIEW_TOOL_SCHEMA_VARIANT`, and every non-shared parameter object must include non-empty `instruction` and `description` strings.
+[x] Subtask 1.3. In `edgeCaseHunterReviewToolSchemas.ts`, add exported edit and response tool builders with these exact schema identities and parameter shapes: `buildEdgeCaseHunterReviewApplyPatchToolSchema()` returns name `apply_patch`, id `ClineDefaultTool.APPLY_PATCH`, and required string parameter `input`; `buildEdgeCaseHunterReviewWriteToFileToolSchema()` returns name `write_to_file`, id `ClineDefaultTool.FILE_NEW`, and required string parameters `absolutePath` and `content`; `buildEdgeCaseHunterReviewSendUserMessageToolSchema()` returns name `send_user_message`, id `ClineDefaultTool.SEND_USER_MESSAGE`, required string parameter `message`, and `AGENT_FEEDBACK_PARAMETER`; `buildEdgeCaseHunterReviewAttemptCompletionToolSchema()` returns name `attempt_completion`, id `ClineDefaultTool.ATTEMPT`, and required string parameter `result`; every schema must include `variant: EDGE_CASE_HUNTER_REVIEW_TOOL_SCHEMA_VARIANT`, and every non-shared parameter object must include non-empty `instruction` and `description` strings.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/edgeCaseHunterReviewToolSchemas.ts`
 
-[ ] Subtask 1.4. In `edgeCaseHunterReviewToolSchemas.ts`, export `buildEdgeCaseHunterReviewStep2ToolSchemas(): readonly ClineToolSpec[]` returning these builders in this exact order: `execute_command`, `list_files`, `search_files`, `list_code_definition_names`, `read_file`, `read_file_range`, `apply_patch`, `write_to_file`, `send_user_message`, `attempt_completion`.
+[x] Subtask 1.4. In `edgeCaseHunterReviewToolSchemas.ts`, export `buildEdgeCaseHunterReviewStep2ToolSchemas(): readonly ClineToolSpec[]` returning these builders in this exact order: `execute_command`, `list_files`, `search_files`, `list_code_definition_names`, `read_file`, `read_file_range`, `apply_patch`, `write_to_file`, `send_user_message`, `attempt_completion`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/edgeCaseHunterReviewToolSchemas.ts`
 
-[ ] Task 2. Add focused edge-case-hunter-review tool-schema tests.
+[x] Task 2. Add focused edge-case-hunter-review tool-schema tests.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewToolSchemas.test.ts`
 
-[ ] Subtask 2.1. Add `edgeCaseHunterReviewToolSchemas.test.ts` importing `expect`, `describe`, `it`, `ModelFamily`, `ClineToolSpec`, and `buildEdgeCaseHunterReviewStep1ToolSchemas`/`buildEdgeCaseHunterReviewStep2ToolSchemas`; define typed helpers `schemaNames(schemas: readonly ClineToolSpec[]): readonly string[]` and `findSchemaByName(schemas: readonly ClineToolSpec[], name: string): ClineToolSpec` without casts.
+[x] Subtask 2.1. Add `edgeCaseHunterReviewToolSchemas.test.ts` importing `expect`, `describe`, `it`, `ModelFamily`, `ClineToolSpec`, and `buildEdgeCaseHunterReviewStep1ToolSchemas`/`buildEdgeCaseHunterReviewStep2ToolSchemas`; define typed helpers `schemaNames(schemas: readonly ClineToolSpec[]): readonly string[]` and `findSchemaByName(schemas: readonly ClineToolSpec[], name: string): ClineToolSpec` without casts.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewToolSchemas.test.ts`
 
-[ ] Subtask 2.2. In `edgeCaseHunterReviewToolSchemas.test.ts`, add a test asserting Step 1 returns `[]` and Step 2 returns exactly `["execute_command", "list_files", "search_files", "list_code_definition_names", "read_file", "read_file_range", "apply_patch", "write_to_file", "send_user_message", "attempt_completion"]`.
+[x] Subtask 2.2. In `edgeCaseHunterReviewToolSchemas.test.ts`, add a test asserting Step 1 returns `[]` and Step 2 returns exactly `["execute_command", "list_files", "search_files", "list_code_definition_names", "read_file", "read_file_range", "apply_patch", "write_to_file", "send_user_message", "attempt_completion"]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewToolSchemas.test.ts`
 
-[ ] Subtask 2.3. In `edgeCaseHunterReviewToolSchemas.test.ts`, add a test asserting every Step 2 schema has `variant === ModelFamily.NATIVE_GPT_5` and that each schema's parameter names, `required` flags, and `type` values exactly match Subtasks 1.2 and 1.3.
+[x] Subtask 2.3. In `edgeCaseHunterReviewToolSchemas.test.ts`, add a test asserting every Step 2 schema has `variant === ModelFamily.NATIVE_GPT_5` and that each schema's parameter names, `required` flags, and `type` values exactly match Subtasks 1.2 and 1.3.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewToolSchemas.test.ts`
 
-[ ] Subtask 2.4. In `edgeCaseHunterReviewToolSchemas.test.ts`, add a forbidden-tool test asserting Step 1 and Step 2 do not include `web_search`, `web_fetch`, `browser_action`, `ask_followup_question`, `use_subagents`, `use_skill`, `set_workflow_values`, `build_workflow_document`, `create_workflow_artifact`, `archive_workflow_artifact`, `delete_workflow_artifact`, `move_workflow_project_file`, `workflow_progress_request`, `use_mcp_tool`, `access_mcp_resource`, `load_mcp_documentation`, `build_review_input`, `build_review_diff_output`, `code_review_spec_update`, or `record_findings`.
+[x] Subtask 2.4. In `edgeCaseHunterReviewToolSchemas.test.ts`, add a forbidden-tool test asserting Step 1 and Step 2 do not include `web_search`, `web_fetch`, `browser_action`, `ask_followup_question`, `use_subagents`, `use_skill`, `set_workflow_values`, `build_workflow_document`, `create_workflow_artifact`, `archive_workflow_artifact`, `delete_workflow_artifact`, `move_workflow_project_file`, `workflow_progress_request`, `use_mcp_tool`, `access_mcp_resource`, `load_mcp_documentation`, `build_review_input`, `build_review_diff_output`, `code_review_spec_update`, or `record_findings`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewToolSchemas.test.ts`
 
-[ ] Task 3. Run Phase 1 validation.
+[x] Task 3. Run Phase 1 validation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`
 
-[ ] Subtask 3.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewToolSchemas.test.ts`.
+[x] Subtask 3.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewToolSchemas.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`
 
-[ ] Subtask 3.2. Run `npm run check-types`; if it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos` and rerun `npm run check-types`.
+[x] Subtask 3.2. Run `npm run check-types`; if it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos` and rerun `npm run check-types`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`
 
-[ ] Subtask 3.3. Run `npm run lint`.
+[x] Subtask 3.3. Run `npm run lint`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`
