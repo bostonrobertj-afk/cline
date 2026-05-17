@@ -4,6 +4,12 @@ slashcommandname: acceptance-audit-review
 useskillname: acceptance-audit-review
 description: In this workflow, the agent reviews shipped code vs project specs to ensure that implementation fully aligns with the project's intent, designed functionality, and prescribed code configuration.
 
+# Artifact Registration
+This workflow produces an artifact which is numbered by inheriting a target story's identifier. The artifact must be registered appropriately in a manner consistent with artifact registration for the artifacts produced by the blind review and edge case hunter review workflows.
+The artifact's file name must be:
+acceptance-audit-<target>.md
+
+Where <target> is the story identity for target_story with dots replaced by hyphens.
 
 # Persona
 Persona: (use exactly this)
@@ -157,7 +163,7 @@ this procedure must be run every time the workflow runs, whether it is activated
 
 Once the prerequisite files are confirmed and the commit hash and parent commit hash have been identified and persisted as workflow session keys, runtime must generate the following artifact in the selected project's review folder:
 
-acceptance-audit--<target>.md
+acceptance-audit-<target>.md
 
 Where <target> is the story identity for target_story with dots replaced by hyphens.
 
@@ -193,6 +199,7 @@ You have been tasked with conducting an acceptance audit of preproduction code a
     - For each finding, you must include:
         - finding: a short title for the finding
         - description: a detailed explanation of the finding, including:
+        - the task(s)/ subtask(s) from the target story which are associated with the finding
         - an explanation of the identified issue
         - the trigger condition for the finding
         - the potential consequence if the finding is not addressed

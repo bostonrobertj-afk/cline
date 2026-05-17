@@ -929,47 +929,47 @@ Allowed files:
 
 ### Phase 4 - Final Validation
 
-[ ] Task 15. Run final validation for the completed edge-case-hunter-review module build.
+[x] Task 15. Run final validation for the completed edge-case-hunter-review module build.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`
 
-[ ] Subtask 15.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts`.
+[x] Subtask 15.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`
 
-[ ] Subtask 15.2. Run `test ! -f .cline/skills/bmad-review-edge-case-hunter/SKILL.md`.
+[x] Subtask 15.2. Run `test ! -f .cline/skills/bmad-review-edge-case-hunter/SKILL.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`
 
-[ ] Subtask 15.3. Run `test ! -f .cline/skills/bmad-review-edge-case-hunter/bmad-skill-manifest.yaml`.
+[x] Subtask 15.3. Run `test ! -f .cline/skills/bmad-review-edge-case-hunter/bmad-skill-manifest.yaml`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`
 
-[ ] Subtask 15.4. Run `test ! -f .cline/skills/bmad-review-edge-case-hunter/workflow.md`.
+[x] Subtask 15.4. Run `test ! -f .cline/skills/bmad-review-edge-case-hunter/workflow.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`
 
-[ ] Subtask 15.5. Run `rg -n "review-edge-case-hunter|review-edge-case-hunter\\.md|Review-edge-case-hunter|review_edge_case_hunter|ReviewEdgeCaseHunter" src/core/task/workflow-runtime src/core/prompts/system-prompt/__tests__/integration.test.ts`; treat exit code 1 with no output as success, inspect any output in context, and stop if any hit is active runtime code instead of an explicit negative test assertion.
+[x] Subtask 15.5. Run `rg -n "review-edge-case-hunter|review-edge-case-hunter\\.md|Review-edge-case-hunter|review_edge_case_hunter|ReviewEdgeCaseHunter" src/core/task/workflow-runtime src/core/prompts/system-prompt/__tests__/integration.test.ts`; treat exit code 1 with no output as success, inspect any output in context, and stop if any hit is active runtime code instead of an explicit negative test assertion.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`
 
-[ ] Subtask 15.6. Run `npm run check-types`; if it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos` and rerun `npm run check-types`.
+[x] Subtask 15.6. Run `npm run check-types`; if it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos` and rerun `npm run check-types`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`
 
-[ ] Subtask 15.7. Run `npm run lint`.
+[x] Subtask 15.7. Run `npm run lint`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`
 
-[ ] Subtask 15.8. Run `git diff --name-only` and confirm the persistent diff is limited to files authorized by this action plan plus this action plan's checkbox updates, after accounting for the pre-existing dirty documentation files listed under Known Issues / Risks / Technical Debt; stop and report any other unrelated file as scope drift.
+[x] Subtask 15.8. Run `git diff --name-only` and confirm the persistent diff is limited to files authorized by this action plan plus this action plan's checkbox updates, after accounting for the pre-existing dirty documentation files listed under Known Issues / Risks / Technical Debt; stop and report any other unrelated file as scope drift.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/edge-case-hunter-review/action-plan.md`

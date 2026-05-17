@@ -8,7 +8,7 @@ Use `docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md` as 
 
 The code-review workflow performs a structured review of a completed story after the `dev-story` workflow has implemented the story and committed the implementation changes. It resolves the target story, collects a commit hash, prepares review artifacts and review-scope guidance, dispatches specialist subagent review workflows, consolidates findings, and creates a remediation story when findings require follow-up work.
 
-The code-review workflow must not implement the child `blind-review` or `edge-case-hunter-review` workflows. It may assign those child workflows to subagents and locate their output artifacts after the child workflows complete.
+The code-review workflow must not implement the child `blind-review`, `edge-case-hunter-review`, or `acceptance-audit-review` workflows. It may assign those child workflows to subagents and locate their output artifacts after the child workflows complete.
 
 Do not rely on the source markdown workflow file, legacy BMAD workflow package files, placeholder workflow state, managed-workflow state, `.cline/workflow-config.yaml`, or other legacy workflow assets at runtime. Source files are migration references only.
 
@@ -81,6 +81,7 @@ The module must include workflow-value keys for:
 - `review_scope_manifest_artifact_filename`, the internal artifact-filename output key written when `review_scope_manifest` is allocated
 - `review_scope_manifest_artifact_relative_path`, the internal artifact-relative-path output key written when `review_scope_manifest` is allocated
 - `blind_review_output`, the absolute path to `blind-review-{target}.md` after the child `blind-review` workflow produces it
+- `acceptance_audit_output`, the absolute path to `acceptance-audit-{target}.md` after the child `acceptance-audit-review` workflow produces it
 - `edge_case_review_output`, the absolute path to `edge-case-hunter-{target}.md` after the child `edge-case-hunter-review` workflow produces it
 - `missing_subagent_output_files`, a string array containing expected child output filenames that are missing or empty when Step 2 progression is requested
 - `review_commit_hash`, the normalized reviewed commit hash submitted by the user
@@ -113,6 +114,7 @@ The workflow runtime artifact-family registry must support these target-derived 
 | Artifact family | Allocation mode | Identity requirement | Filename pattern | Project folder | Workflow owner |
 | --- | --- | --- | --- | --- | --- |
 | `blind_review_output` | `derived_from_target` | `target_story_or_remediation_story` | `blind-review-{target}.md` | `review` | `blind-review` |
+| `acceptance_audit_output` | `derived_from_target` | `target_story_or_remediation_story` | `acceptance-audit-{target}.md` | `review` | `acceptance-audit-review` |
 | `edge_case_review_output` | `derived_from_target` | `target_story_or_remediation_story` | `edge-case-hunter-{target}.md` | `review` | `edge-case-hunter-review` |
 | `code_review_output` | `derived_from_target` | `target_story_or_remediation_story` | `code-review-{target}.md` | `review` | `code-review` |
 | `review_scope_manifest` | `derived_from_target` | `target_story_or_remediation_story` | `review-scope-{target}.md` | `review` | `code-review` |
@@ -121,7 +123,7 @@ The workflow runtime artifact-family registry must support these target-derived 
 
 The `code-review` workflow owns creation and document-building for `code_review_output` and `review_scope_manifest`.
 
-The `code-review` workflow does not own creation of `blind_review_output` or `edge_case_review_output`; it locates those files after the assigned child workflows complete.
+The `code-review` workflow does not own creation of `blind_review_output`, `acceptance_audit_output`, or `edge_case_review_output`; it locates those files after the assigned child workflows complete.
 
 The runtime must not preserve the retired `Review-input-{target}.md`, `Review-input-{target}.diff`, `Review-blind-hunter-{target}.md`, `Review-edge-case-hunter-{target}.md`, or `Adversarial-review-{target}.md` artifact families as canonical code-review module outputs.
 
@@ -196,7 +198,7 @@ The module must define these four steps, using these exact `checklistLabel` valu
 | Step id | Step number | `checklistLabel` | Required runtime shape |
 | --- | --- | --- | --- |
 | `step-1` | 1 | `Resolve Review Target` | Resolve the required target-story prerequisite, derive project/story metadata, create the code-review output artifact, render the commit-hash form, validate the commit hash, generate the review-scope manifest, and transition to Step 2 only after valid review evidence exists. |
-| `step-2` | 2 | `Dispatch Specialist Subagent Reviewers` | Model-driven subagent-dispatch step; progress only after user confirmation through `workflow_progress_request` and after both expected child output documents are present and non-empty. |
+| `step-2` | 2 | `Dispatch Specialist Subagent Reviewers` | Model-driven subagent-dispatch step; progress only after user confirmation through `workflow_progress_request` and after all three expected child output documents are present and non-empty. |
 | `step-3` | 3 | `Triage & Consolidate Findings` | Model-driven findings triage step; exposes `record_findings` and progresses after user confirmation through `workflow_progress_request`. |
 | `step-4` | 4 | `Process Findings & Complete Workflow` | Runtime-driven findings evaluation and remediation-story creation, followed by conditional model-driven remediation-story population when findings are present. |
 
@@ -344,16 +346,19 @@ Your first task is to dispatch subagents and task them with performing specializ
 
 *** Launch Subagents: ***
 It is critical that you use the exact "use_skill" subagent prompt verbiage provided below. This verbiage triggers a runtime-driven workflow for the subagent which provides them with the instructions needed for their specialized code review.
-Launch two subagents and assign their specialized code review workflows:
+Launch three subagents and assign their specialized code review workflows:
 - Blind Review:
     - You MUST assign the appropriate workflow to this subagent by including this exact phrase, with identical formatting and punctuation in your prompt: Skill: use_skill('blind-review')
     - The blind-review workflow will then activate and provide the subagent with detailed instructions.
 - Edge Case Hunter:
      - You MUST assign the appropriate workflow to this subagent by including this exact phrase, with identical formatting and punctuation in your prompt: Skill: use_skill('edge-case-hunter-review')
      - The edge-case-hunter workflow will then activate and provide the subagent with detailed instructions.
+- Acceptance Audit Review:
+    - You MUST assign the appropriate workflow to this subagent by including this exact phrase, with identical formatting and punctuation in your prompt: Skill: use_skill('acceptance-audit-review')
+    - The acceptance-audit-review workflow will then activate and provide the subagent with detailed instructions.
 - Track any review layer that fails, times out, or returns no useful output. Once the subagents complete their work, shut them down.
 
-Once both subagents are done and shut down, call workflow_progress_request to unlock the next workflow step's instructions.
+Once all three subagents are done and shut down, call workflow_progress_request to unlock the next workflow step's instructions.
 ```
 
 Step 2 must expose the tools needed to launch subagents, send user-visible messages, and call `workflow_progress_request`.
@@ -363,11 +368,12 @@ Step 2 must not expose `record_findings`, `attempt_completion`, `set_workflow_va
 When `workflow_progress_request` is confirmed, runtime/module logic must locate the child output documents matching the selected target story:
 
 - `blind-review-{target}.md`
+- `acceptance-audit-{target}.md`
 - `edge-case-hunter-{target}.md`
 
-Runtime/module logic must persist their full paths as `blind_review_output` and `edge_case_review_output` before prompting Step 3.
+Runtime/module logic must persist their full paths as `blind_review_output`, `acceptance_audit_output`, and `edge_case_review_output` before prompting Step 3.
 
-If either expected child output file is missing or empty, runtime/module logic must persist the missing or empty expected filenames as `missing_subagent_output_files`, remain in Step 2, and prompt the AI with exactly:
+If any expected child output file is missing or empty, runtime/module logic must persist the missing or empty expected filenames as `missing_subagent_output_files`, remain in Step 2, and prompt the AI with exactly:
 
 ```text
 These subagent output files were not found in the project's review folder:
@@ -380,11 +386,11 @@ Please launch a new subagent and assign them to the workflow associated with the
 Step 2 progression to Step 3 requires both:
 
 - user confirmation in response to `workflow_progress_request`
-- both child output files found and non-empty
+- all three child output files found and non-empty
 
 ## Step 3: Triage & Consolidate Findings
 
-Step 3 must enter model-driven work through a `project_prompt` decision action after `blind_review_output` and `edge_case_review_output` have been persisted.
+Step 3 must enter model-driven work through a `project_prompt` decision action after `blind_review_output`, `acceptance_audit_output`, and `edge_case_review_output` have been persisted.
 
 Step 3 `buildPromptSource` must construct the Step 3 prompt from module-owned code. The Step 3 prompt must preserve this exact source prompt text, with workflow values rendered by runtime prompt rendering:
 
@@ -392,8 +398,9 @@ Step 3 `buildPromptSource` must construct the Step 3 prompt from module-owned co
 Subagent findings are available:
 Blind Review: blind_review_output
 Edge Case Hunter: edge_case_review_output
+Acceptance Audit: acceptance_audit_output
 
-You must read both documents, assess them following the instructions below, then persist final findings using record_findings.
+You must read all three documents, assess them following the instructions below, then persist final findings using record_findings.
 
 You may leverage the following additional documents when validating the subagents' findings:
 - target_story
@@ -685,11 +692,11 @@ The code-review module build must add focused tests for:
 - Step 1 terminal error behavior for failed review-scope preparation
 - Step 2 exact tool schema names and forbidden tool absence
 - Step 2 prompt source shape, including non-empty required workflow-value rendering and required subagent assignment markers
-- Step 2 child output discovery for `blind-review-{target}.md` and `edge-case-hunter-{target}.md`
+- Step 2 child output discovery for `blind-review-{target}.md`, `acceptance-audit-{target}.md`, and `edge-case-hunter-{target}.md`
 - Step 2 missing/empty child output prompt behavior without transitioning to Step 3
-- Step 2 transition to Step 3 only after user confirmation and both child outputs are found and non-empty
+- Step 2 transition to Step 3 only after user confirmation and all three child outputs are found and non-empty
 - Step 3 exact tool schema names, including `record_findings`
-- Step 3 prompt source shape, including non-empty document path rendering
+- Step 3 prompt source shape, including non-empty document path rendering for `blind_review_output`, `acceptance_audit_output`, and `edge_case_review_output`
 - `record_findings` active workflow gating
 - `record_findings` payload validation
 - `record_findings` empty-array no-op success
