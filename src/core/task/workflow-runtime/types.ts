@@ -458,6 +458,7 @@ export type WorkflowArtifactDefinition =
 			id: string
 			family:
 				| WorkflowArtifactFamily.BlindReviewOutput
+				| WorkflowArtifactFamily.AcceptanceAuditOutput
 				| WorkflowArtifactFamily.EdgeCaseReviewOutput
 				| WorkflowArtifactFamily.CodeReviewOutput
 				| WorkflowArtifactFamily.ReviewScopeManifest

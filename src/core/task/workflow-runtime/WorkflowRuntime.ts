@@ -6429,6 +6429,7 @@ export class WorkflowRuntime {
 				}
 			}
 			case WorkflowArtifactFamily.BlindReviewOutput:
+			case WorkflowArtifactFamily.AcceptanceAuditOutput:
 			case WorkflowArtifactFamily.EdgeCaseReviewOutput:
 			case WorkflowArtifactFamily.CodeReviewOutput:
 			case WorkflowArtifactFamily.ReviewScopeManifest: {
@@ -6752,6 +6753,7 @@ export class WorkflowRuntime {
 			case WorkflowArtifactFamily.RemediationStory:
 				return this.parseDottedWorkflowArtifactIdentity(`${match[1]}.${match[2]}.${match[3]}`)
 			case WorkflowArtifactFamily.BlindReviewOutput:
+			case WorkflowArtifactFamily.AcceptanceAuditOutput:
 			case WorkflowArtifactFamily.EdgeCaseReviewOutput:
 			case WorkflowArtifactFamily.CodeReviewOutput:
 			case WorkflowArtifactFamily.ReviewScopeManifest:
@@ -6776,9 +6778,10 @@ export class WorkflowRuntime {
 			return `${remediationStoryMatch[1]}.${remediationStoryMatch[2]}.${remediationStoryMatch[3]}`
 		}
 
-		const reviewArtifactMatch = /^(?:blind-review|edge-case-hunter|code-review|review-scope)-(\d+-\d+(?:-\d+)?)\.md$/.exec(
-			trimmedIdentity,
-		)
+		const reviewArtifactMatch =
+			/^(?:blind-review|acceptance-audit|edge-case-hunter|code-review|review-scope)-(\d+-\d+(?:-\d+)?)\.md$/.exec(
+				trimmedIdentity,
+			)
 		if (reviewArtifactMatch) {
 			return reviewArtifactMatch[1].replace(/-/g, ".")
 		}

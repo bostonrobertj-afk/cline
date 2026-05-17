@@ -72,6 +72,7 @@ export enum CodeReviewWorkflowValueKey {
 	ReviewScopeManifestArtifactFilename = "review_scope_manifest_artifact_filename",
 	ReviewScopeManifestArtifactRelativePath = "review_scope_manifest_artifact_relative_path",
 	BlindReviewOutput = "blind_review_output",
+	AcceptanceAuditOutput = "acceptance_audit_output",
 	EdgeCaseReviewOutput = "edge_case_review_output",
 	MissingSubagentOutputFiles = "missing_subagent_output_files",
 	ReviewCommitHash = "review_commit_hash",
@@ -149,22 +150,26 @@ Your first task is to dispatch subagents and task them with performing specializ
 
 *** Launch Subagents: ***
 It is critical that you use the exact "use_skill" subagent prompt verbiage provided below. This verbiage triggers a runtime-driven workflow for the subagent which provides them with the instructions needed for their specialized code review.
-Launch two subagents and assign their specialized code review workflows:
+Launch three subagents and assign their specialized code review workflows:
 - Blind Review:
     - You MUST assign the appropriate workflow to this subagent by including this exact phrase, with identical formatting and punctuation in your prompt: Skill: use_skill('blind-review')
     - The blind-review workflow will then activate and provide the subagent with detailed instructions.
 - Edge Case Hunter:
      - You MUST assign the appropriate workflow to this subagent by including this exact phrase, with identical formatting and punctuation in your prompt: Skill: use_skill('edge-case-hunter-review')
      - The edge-case-hunter workflow will then activate and provide the subagent with detailed instructions.
+- Acceptance Audit Review:
+    - You MUST assign the appropriate workflow to this subagent by including this exact phrase, with identical formatting and punctuation in your prompt: Skill: use_skill('acceptance-audit-review')
+    - The acceptance-audit-review workflow will then activate and provide the subagent with detailed instructions.
 - Track any review layer that fails, times out, or returns no useful output. Once the subagents complete their work, shut them down.
 
-Once both subagents are done and shut down, call workflow_progress_request to unlock the next workflow step's instructions.`
+Once all three subagents are done and shut down, call workflow_progress_request to unlock the next workflow step's instructions.`
 
 const CODE_REVIEW_STEP_3_PROMPT = `Subagent findings are available:
 Blind Review: blind_review_output
 Edge Case Hunter: edge_case_review_output
+Acceptance Audit: acceptance_audit_output
 
-You must read both documents, assess them following the instructions below, then persist final findings using record_findings.
+You must read all three documents, assess them following the instructions below, then persist final findings using record_findings.
 
 You may leverage the following additional documents when validating the subagents' findings:
 - target_story
@@ -440,6 +445,7 @@ function renderWorkflowValueByKey(input: WorkflowPromptBuilderInput, key: CodeRe
 function renderCodeReviewPromptTemplate(input: WorkflowPromptBuilderInput, template: string): string {
 	return template
 		.replaceAll("blind_review_output", renderWorkflowValueByKey(input, CodeReviewWorkflowValueKey.BlindReviewOutput))
+		.replaceAll("acceptance_audit_output", renderWorkflowValueByKey(input, CodeReviewWorkflowValueKey.AcceptanceAuditOutput))
 		.replaceAll("edge_case_review_output", renderWorkflowValueByKey(input, CodeReviewWorkflowValueKey.EdgeCaseReviewOutput))
 		.replaceAll("code_review_output", renderWorkflowValueByKey(input, CodeReviewWorkflowValueKey.CodeReviewOutput))
 		.replaceAll("target_story", renderWorkflowValueByKey(input, CodeReviewWorkflowValueKey.TargetStory))
@@ -840,6 +846,7 @@ function childOutputsAreReady(): WorkflowDecisionBranchTrigger {
 		kind: "session_predicate",
 		matches: ({ workflowValues }) =>
 			readWorkflowStringValue(workflowValues, CodeReviewWorkflowValueKey.BlindReviewOutput) !== undefined &&
+			readWorkflowStringValue(workflowValues, CodeReviewWorkflowValueKey.AcceptanceAuditOutput) !== undefined &&
 			readWorkflowStringValue(workflowValues, CodeReviewWorkflowValueKey.EdgeCaseReviewOutput) !== undefined &&
 			readWorkflowStringArrayValue(workflowValues, CodeReviewWorkflowValueKey.MissingSubagentOutputFiles).length === 0,
 	}
@@ -1015,11 +1022,13 @@ export async function buildAndPersistReviewScopeManifest(
 
 function buildExpectedChildOutputFilenames(selectedStoryIdentity: string): {
 	blindReviewFilename: string
+	acceptanceAuditFilename: string
 	edgeCaseReviewFilename: string
 } {
 	const targetIdentity = selectedStoryIdentity.replace(/\./g, "-")
 	return {
 		blindReviewFilename: `blind-review-${targetIdentity}.md`,
+		acceptanceAuditFilename: `acceptance-audit-${targetIdentity}.md`,
 		edgeCaseReviewFilename: `edge-case-hunter-${targetIdentity}.md`,
 	}
 }
@@ -1059,6 +1068,10 @@ export async function discoverChildReviewOutputs(session: ActiveWorkflowSession)
 		{
 			filename: expectedFilenames.blindReviewFilename,
 			workflowValueKey: CodeReviewWorkflowValueKey.BlindReviewOutput,
+		},
+		{
+			filename: expectedFilenames.acceptanceAuditFilename,
+			workflowValueKey: CodeReviewWorkflowValueKey.AcceptanceAuditOutput,
 		},
 		{
 			filename: expectedFilenames.edgeCaseReviewFilename,

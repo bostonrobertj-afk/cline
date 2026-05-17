@@ -1093,6 +1093,7 @@ const CODE_REVIEW_ARCHITECTURE_DOCUMENT = "/test/project/planning/architecture.m
 const CODE_REVIEW_CODE_REVIEW_OUTPUT = `${CODE_REVIEW_REVIEW_FOLDER}/code-review-1-1.md`
 const CODE_REVIEW_REVIEW_SCOPE_MANIFEST = `${CODE_REVIEW_REVIEW_FOLDER}/review-scope-1-1.md`
 const CODE_REVIEW_BLIND_REVIEW_OUTPUT = `${CODE_REVIEW_REVIEW_FOLDER}/blind-review-1-1.md`
+const CODE_REVIEW_ACCEPTANCE_AUDIT_OUTPUT = `${CODE_REVIEW_REVIEW_FOLDER}/acceptance-audit-1-1.md`
 const CODE_REVIEW_EDGE_CASE_REVIEW_OUTPUT = `${CODE_REVIEW_REVIEW_FOLDER}/edge-case-hunter-1-1.md`
 const CODE_REVIEW_REVIEW_COMMIT_HASH = "abc1234"
 const CODE_REVIEW_REVIEW_COMMIT_PARENT = "def5678"
@@ -1136,6 +1137,7 @@ function createCodeReviewWorkflowValues(overrides: WorkflowValues = {}): Workflo
 		[CodeReviewWorkflowValueKey.ReviewScopeManifestArtifactFilename]: "review-scope-1-1.md",
 		[CodeReviewWorkflowValueKey.ReviewScopeManifestArtifactRelativePath]: "review/review-scope-1-1.md",
 		[CodeReviewWorkflowValueKey.BlindReviewOutput]: CODE_REVIEW_BLIND_REVIEW_OUTPUT,
+		[CodeReviewWorkflowValueKey.AcceptanceAuditOutput]: CODE_REVIEW_ACCEPTANCE_AUDIT_OUTPUT,
 		[CodeReviewWorkflowValueKey.EdgeCaseReviewOutput]: CODE_REVIEW_EDGE_CASE_REVIEW_OUTPUT,
 		[CodeReviewWorkflowValueKey.MissingSubagentOutputFiles]: [],
 		[CodeReviewWorkflowValueKey.ReviewCommitHash]: CODE_REVIEW_REVIEW_COMMIT_HASH,
@@ -2410,6 +2412,7 @@ describe("Prompt System Integration Tests", () => {
 
 			const materializedWorkflowValues: readonly string[] = [
 				CODE_REVIEW_BLIND_REVIEW_OUTPUT,
+				CODE_REVIEW_ACCEPTANCE_AUDIT_OUTPUT,
 				CODE_REVIEW_EDGE_CASE_REVIEW_OUTPUT,
 				CODE_REVIEW_TARGET_STORY,
 				CODE_REVIEW_REVIEW_SCOPE_MANIFEST,

@@ -78,6 +78,7 @@ const SAMPLE_WORKFLOW_VALUES: WorkflowValues = {
 	[CodeReviewWorkflowValueKey.ReviewCommitHash]: "abc123",
 	[CodeReviewWorkflowValueKey.ReviewCommitParent]: "def456",
 	[CodeReviewWorkflowValueKey.BlindReviewOutput]: `${REVIEW_FOLDER_PATH}/blind-review-1-1.md`,
+	[CodeReviewWorkflowValueKey.AcceptanceAuditOutput]: `${REVIEW_FOLDER_PATH}/acceptance-audit-1-1.md`,
 	[CodeReviewWorkflowValueKey.EdgeCaseReviewOutput]: `${REVIEW_FOLDER_PATH}/edge-case-hunter-1-1.md`,
 	[CodeReviewWorkflowValueKey.RemediationStoryParentIdentity]: "1.1",
 	[CodeReviewWorkflowValueKey.RemediationStory]: `${PROJECT_ROOT}/implementation/stories-draft/Remediation-story-1-1-1.md`,
@@ -675,10 +676,15 @@ describe("codeReviewWorkflowDefinition", () => {
 				),
 			)
 			expect(missingResult.workflowValueWrites).to.deep.equal({
-				[CodeReviewWorkflowValueKey.MissingSubagentOutputFiles]: ["blind-review-1-1.md", "edge-case-hunter-1-1.md"],
+				[CodeReviewWorkflowValueKey.MissingSubagentOutputFiles]: [
+					"blind-review-1-1.md",
+					"acceptance-audit-1-1.md",
+					"edge-case-hunter-1-1.md",
+				],
 			})
 
 			await writeFile(join(project.reviewFolder, "blind-review-1-1.md"), "blind review output\n", "utf8")
+			await writeFile(join(project.reviewFolder, "acceptance-audit-1-1.md"), "acceptance audit output\n", "utf8")
 			await writeFile(join(project.reviewFolder, "edge-case-hunter-1-1.md"), "edge case output\n", "utf8")
 
 			const readyResult = expectSucceeded(
@@ -694,6 +700,7 @@ describe("codeReviewWorkflowDefinition", () => {
 			)
 			expect(readyResult.workflowValueWrites).to.deep.equal({
 				[CodeReviewWorkflowValueKey.BlindReviewOutput]: join(project.reviewFolder, "blind-review-1-1.md"),
+				[CodeReviewWorkflowValueKey.AcceptanceAuditOutput]: join(project.reviewFolder, "acceptance-audit-1-1.md"),
 				[CodeReviewWorkflowValueKey.EdgeCaseReviewOutput]: join(project.reviewFolder, "edge-case-hunter-1-1.md"),
 				[CodeReviewWorkflowValueKey.MissingSubagentOutputFiles]: [],
 			})
@@ -714,6 +721,7 @@ describe("codeReviewWorkflowDefinition", () => {
 			route: readyRoute,
 			workflowValues: {
 				[CodeReviewWorkflowValueKey.BlindReviewOutput]: "/review/blind-review-1-1.md",
+				[CodeReviewWorkflowValueKey.AcceptanceAuditOutput]: "/review/acceptance-audit-1-1.md",
 				[CodeReviewWorkflowValueKey.EdgeCaseReviewOutput]: "/review/edge-case-hunter-1-1.md",
 				[CodeReviewWorkflowValueKey.MissingSubagentOutputFiles]: [],
 			},
@@ -747,10 +755,13 @@ describe("codeReviewWorkflowDefinition", () => {
 		expect(step2Prompt.trim().length).to.be.greaterThan(0)
 		expect(step2Prompt).to.include("Skill: use_skill('blind-review')")
 		expect(step2Prompt).to.include("Skill: use_skill('edge-case-hunter-review')")
+		expect(step2Prompt).to.include("Skill: use_skill('acceptance-audit-review')")
 		expect(step2Prompt).not.to.include("Skill: use_skill('review-edge-case-hunter')")
 
 		const step3Prompt = buildPrompt("step-3", SAMPLE_WORKFLOW_VALUES)
 		expect(step3Prompt).to.include(SAMPLE_WORKFLOW_VALUES[CodeReviewWorkflowValueKey.BlindReviewOutput])
+		expect(step3Prompt).to.include(SAMPLE_WORKFLOW_VALUES[CodeReviewWorkflowValueKey.AcceptanceAuditOutput])
+		expect(step3Prompt).not.to.include("acceptance_audit_output")
 		expect(step3Prompt).to.include(SAMPLE_WORKFLOW_VALUES[CodeReviewWorkflowValueKey.EdgeCaseReviewOutput])
 		expect(step3Prompt.trim().length).to.be.greaterThan(0)
 	})

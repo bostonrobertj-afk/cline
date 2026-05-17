@@ -811,7 +811,7 @@ Allowed files:
 
 After completing this phase, pause for QA review before considering the code-review module update complete.
 
-[ ] Task 15. Add acceptance-audit review artifact-family support.
+[x] Task 15. Add acceptance-audit review artifact-family support.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`
@@ -819,105 +819,105 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 
-  [ ] Subtask 15.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`, add `AcceptanceAuditOutput = "acceptance_audit_output"` to `WorkflowArtifactFamily` immediately after `BlindReviewOutput`.
+  [x] Subtask 15.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`, add `AcceptanceAuditOutput = "acceptance_audit_output"` to `WorkflowArtifactFamily` immediately after `BlindReviewOutput`.
 
-  [ ] Subtask 15.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`, add `WorkflowArtifactFamily.AcceptanceAuditOutput` to `WorkflowTargetDerivedArtifactFamilyDefinition.family` immediately after `WorkflowArtifactFamily.BlindReviewOutput`.
+  [x] Subtask 15.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`, add `WorkflowArtifactFamily.AcceptanceAuditOutput` to `WorkflowTargetDerivedArtifactFamilyDefinition.family` immediately after `WorkflowArtifactFamily.BlindReviewOutput`.
 
-  [ ] Subtask 15.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`, add `[WorkflowArtifactFamily.AcceptanceAuditOutput]` to `WORKFLOW_ARTIFACT_FAMILY_REGISTRY` immediately after the `BlindReviewOutput` entry with exactly `allocationMode: "derived_from_target"`, `identityRequirement: "target_story_or_remediation_story"`, `filenamePattern: "acceptance-audit-{target}.md"`, `fileExtension: ".md"`, `contentKind: "markdown"`, `numberingScope: "target_identity"`, and `discoveryPattern: /^acceptance-audit-(\d+-\d+(?:-\d+)?)\.md$/`.
+  [x] Subtask 15.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`, add `[WorkflowArtifactFamily.AcceptanceAuditOutput]` to `WORKFLOW_ARTIFACT_FAMILY_REGISTRY` immediately after the `BlindReviewOutput` entry with exactly `allocationMode: "derived_from_target"`, `identityRequirement: "target_story_or_remediation_story"`, `filenamePattern: "acceptance-audit-{target}.md"`, `fileExtension: ".md"`, `contentKind: "markdown"`, `numberingScope: "target_identity"`, and `discoveryPattern: /^acceptance-audit-(\d+-\d+(?:-\d+)?)\.md$/`.
 
-  [ ] Subtask 15.4. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`, add `WorkflowArtifactFamily.AcceptanceAuditOutput` to the derived `WorkflowArtifactDefinition.family` union immediately after `WorkflowArtifactFamily.BlindReviewOutput`.
+  [x] Subtask 15.4. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`, add `WorkflowArtifactFamily.AcceptanceAuditOutput` to the derived `WorkflowArtifactDefinition.family` union immediately after `WorkflowArtifactFamily.BlindReviewOutput`.
 
-  [ ] Subtask 15.5. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, add `case WorkflowArtifactFamily.AcceptanceAuditOutput:` to the target-derived branch in `resolveWorkflowArtifactIdentity(...)` immediately after `case WorkflowArtifactFamily.BlindReviewOutput:`.
+  [x] Subtask 15.5. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, add `case WorkflowArtifactFamily.AcceptanceAuditOutput:` to the target-derived branch in `resolveWorkflowArtifactIdentity(...)` immediately after `case WorkflowArtifactFamily.BlindReviewOutput:`.
 
-  [ ] Subtask 15.6. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, add `case WorkflowArtifactFamily.AcceptanceAuditOutput:` to the target-derived branch in `parseWorkflowArtifactFilenameIdentity(...)` immediately after `case WorkflowArtifactFamily.BlindReviewOutput:`.
+  [x] Subtask 15.6. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, add `case WorkflowArtifactFamily.AcceptanceAuditOutput:` to the target-derived branch in `parseWorkflowArtifactFilenameIdentity(...)` immediately after `case WorkflowArtifactFamily.BlindReviewOutput:`.
 
-  [ ] Subtask 15.7. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, update the `reviewArtifactMatch` regex in `normalizeWorkflowArtifactIdentityInput(...)` to exactly `/^(?:blind-review|acceptance-audit|edge-case-hunter|code-review|review-scope)-(\d+-\d+(?:-\d+)?)\.md$/`.
+  [x] Subtask 15.7. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, update the `reviewArtifactMatch` regex in `normalizeWorkflowArtifactIdentityInput(...)` to exactly `/^(?:blind-review|acceptance-audit|edge-case-hunter|code-review|review-scope)-(\d+-\d+(?:-\d+)?)\.md$/`.
 
-  [ ] Subtask 15.8. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, in `allocates and creates canonical workflow artifacts with persisted output values`, add `const acceptanceAuditKeys = createTargetedArtifactOutputValueKeys("acceptance_audit")` immediately after `blindReviewKeys`.
+  [x] Subtask 15.8. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, in `allocates and creates canonical workflow artifacts with persisted output values`, add `const acceptanceAuditKeys = createTargetedArtifactOutputValueKeys("acceptance_audit")` immediately after `blindReviewKeys`.
 
-  [ ] Subtask 15.9. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add `acceptanceAuditKeys` to the `collectArtifactOutputWorkflowValueKeys(...)` call immediately after `blindReviewKeys`.
+  [x] Subtask 15.9. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add `acceptanceAuditKeys` to the `collectArtifactOutputWorkflowValueKeys(...)` call immediately after `blindReviewKeys`.
 
-  [ ] Subtask 15.10. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add an `acceptance_audit_doc` artifact definition immediately after `blind_review_doc` with `family: WorkflowArtifactFamily.AcceptanceAuditOutput`, `intentMode: "derived"`, `parentIdentitySource: undefined`, `targetIdentitySource: { kind: "workflow_value", key: remediationStoryKeys.artifactIdentity }`, and `outputValueKeys: acceptanceAuditKeys`.
+  [x] Subtask 15.10. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add an `acceptance_audit_doc` artifact definition immediately after `blind_review_doc` with `family: WorkflowArtifactFamily.AcceptanceAuditOutput`, `intentMode: "derived"`, `parentIdentitySource: undefined`, `targetIdentitySource: { kind: "workflow_value", key: remediationStoryKeys.artifactIdentity }`, and `outputValueKeys: acceptanceAuditKeys`.
 
-  [ ] Subtask 15.11. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add `const acceptanceAuditResult = await runtime.createWorkflowArtifact({ taskState, artifactId: "acceptance_audit_doc", expectedArtifactAbsolutePath: undefined })` immediately after `reviewResult`.
+  [x] Subtask 15.11. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add `const acceptanceAuditResult = await runtime.createWorkflowArtifact({ taskState, artifactId: "acceptance_audit_doc", expectedArtifactAbsolutePath: undefined })` immediately after `reviewResult`.
 
-  [ ] Subtask 15.12. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add an `expect(acceptanceAuditResult).to.deep.include(...)` assertion immediately after the `reviewResult` assertion, expecting `artifactIdentity: "1.1.1"`, `artifactFilename: "acceptance-audit-1-1-1.md"`, `artifactRelativePath: join("planning", "acceptance-audit-1-1-1.md")`, `artifactAbsolutePath: join(cwd, "docs", "projects", "artifact-allocation-project", "planning", "acceptance-audit-1-1-1.md")`, `parentIdentity: undefined`, and `targetIdentity: "1.1.1"`.
+  [x] Subtask 15.12. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add an `expect(acceptanceAuditResult).to.deep.include(...)` assertion immediately after the `reviewResult` assertion, expecting `artifactIdentity: "1.1.1"`, `artifactFilename: "acceptance-audit-1-1-1.md"`, `artifactRelativePath: join("planning", "acceptance-audit-1-1-1.md")`, `artifactAbsolutePath: join(cwd, "docs", "projects", "artifact-allocation-project", "planning", "acceptance-audit-1-1-1.md")`, `parentIdentity: undefined`, and `targetIdentity: "1.1.1"`.
 
-  [ ] Subtask 15.13. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add `await access(acceptanceAuditResult.artifactAbsolutePath)` immediately after `await access(reviewResult.artifactAbsolutePath)`.
+  [x] Subtask 15.13. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add `await access(acceptanceAuditResult.artifactAbsolutePath)` immediately after `await access(reviewResult.artifactAbsolutePath)`.
 
-  [ ] Subtask 15.14. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add `[acceptanceAuditKeys.artifactFilename]: "acceptance-audit-1-1-1.md"` to the persisted workflow-values assertion immediately after `[blindReviewKeys.artifactFilename]: "blind-review-1-1-1.md"`.
+  [x] Subtask 15.14. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add `[acceptanceAuditKeys.artifactFilename]: "acceptance-audit-1-1-1.md"` to the persisted workflow-values assertion immediately after `[blindReviewKeys.artifactFilename]: "blind-review-1-1-1.md"`.
 
-[ ] Task 16. Update code-review runtime behavior for the third child output.
+[x] Task 16. Update code-review runtime behavior for the third child output.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`
 
-  [ ] Subtask 16.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, add `AcceptanceAuditOutput = "acceptance_audit_output"` to `CodeReviewWorkflowValueKey` immediately after `BlindReviewOutput`.
+  [x] Subtask 16.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, add `AcceptanceAuditOutput = "acceptance_audit_output"` to `CodeReviewWorkflowValueKey` immediately after `BlindReviewOutput`.
 
-  [ ] Subtask 16.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, replace `Launch two subagents and assign their specialized code review workflows:` in `CODE_REVIEW_STEP_2_INITIAL_PROMPT` with `Launch three subagents and assign their specialized code review workflows:`.
+  [x] Subtask 16.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, replace `Launch two subagents and assign their specialized code review workflows:` in `CODE_REVIEW_STEP_2_INITIAL_PROMPT` with `Launch three subagents and assign their specialized code review workflows:`.
 
-  [ ] Subtask 16.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, insert the Acceptance Audit Review prompt block from the requirements into `CODE_REVIEW_STEP_2_INITIAL_PROMPT` immediately after the Edge Case Hunter block.
+  [x] Subtask 16.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, insert the Acceptance Audit Review prompt block from the requirements into `CODE_REVIEW_STEP_2_INITIAL_PROMPT` immediately after the Edge Case Hunter block.
 
-  [ ] Subtask 16.4. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, replace `Once both subagents are done and shut down` with `Once all three subagents are done and shut down` in `CODE_REVIEW_STEP_2_INITIAL_PROMPT`.
+  [x] Subtask 16.4. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, replace `Once both subagents are done and shut down` with `Once all three subagents are done and shut down` in `CODE_REVIEW_STEP_2_INITIAL_PROMPT`.
 
-  [ ] Subtask 16.5. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, insert `Acceptance Audit: acceptance_audit_output` in `CODE_REVIEW_STEP_3_PROMPT` immediately after `Edge Case Hunter: edge_case_review_output`.
+  [x] Subtask 16.5. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, insert `Acceptance Audit: acceptance_audit_output` in `CODE_REVIEW_STEP_3_PROMPT` immediately after `Edge Case Hunter: edge_case_review_output`.
 
-  [ ] Subtask 16.6. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, replace `You must read both documents` with `You must read all three documents` in `CODE_REVIEW_STEP_3_PROMPT`.
+  [x] Subtask 16.6. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, replace `You must read both documents` with `You must read all three documents` in `CODE_REVIEW_STEP_3_PROMPT`.
 
-  [ ] Subtask 16.7. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, add `.replaceAll("acceptance_audit_output", renderWorkflowValueByKey(input, CodeReviewWorkflowValueKey.AcceptanceAuditOutput))` in `renderCodeReviewPromptTemplate(...)` immediately after the `blind_review_output` replacement.
+  [x] Subtask 16.7. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, add `.replaceAll("acceptance_audit_output", renderWorkflowValueByKey(input, CodeReviewWorkflowValueKey.AcceptanceAuditOutput))` in `renderCodeReviewPromptTemplate(...)` immediately after the `blind_review_output` replacement.
 
-  [ ] Subtask 16.8. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, update `childOutputsAreReady()` so its predicate also requires `readWorkflowStringValue(workflowValues, CodeReviewWorkflowValueKey.AcceptanceAuditOutput) !== undefined` between the blind-review and edge-case checks.
+  [x] Subtask 16.8. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, update `childOutputsAreReady()` so its predicate also requires `readWorkflowStringValue(workflowValues, CodeReviewWorkflowValueKey.AcceptanceAuditOutput) !== undefined` between the blind-review and edge-case checks.
 
-  [ ] Subtask 16.9. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, add `acceptanceAuditFilename: string` to the return type of `buildExpectedChildOutputFilenames(...)` immediately after `blindReviewFilename`.
+  [x] Subtask 16.9. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, add `acceptanceAuditFilename: string` to the return type of `buildExpectedChildOutputFilenames(...)` immediately after `blindReviewFilename`.
 
-  [ ] Subtask 16.10. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, add `acceptanceAuditFilename: \`acceptance-audit-${targetIdentity}.md\`` to the object returned by `buildExpectedChildOutputFilenames(...)` immediately after `blindReviewFilename`.
+  [x] Subtask 16.10. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, add `acceptanceAuditFilename: \`acceptance-audit-${targetIdentity}.md\`` to the object returned by `buildExpectedChildOutputFilenames(...)` immediately after `blindReviewFilename`.
 
-  [ ] Subtask 16.11. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, add an `expectedOutputPaths` entry immediately after the blind-review entry with `filename: expectedFilenames.acceptanceAuditFilename` and `workflowValueKey: CodeReviewWorkflowValueKey.AcceptanceAuditOutput`.
+  [x] Subtask 16.11. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts`, add an `expectedOutputPaths` entry immediately after the blind-review entry with `filename: expectedFilenames.acceptanceAuditFilename` and `workflowValueKey: CodeReviewWorkflowValueKey.AcceptanceAuditOutput`.
 
-[ ] Task 17. Update code-review workflow unit tests for acceptance-audit child output behavior.
+[x] Task 17. Update code-review workflow unit tests for acceptance-audit child output behavior.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
 
-  [ ] Subtask 17.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`, add `[CodeReviewWorkflowValueKey.AcceptanceAuditOutput]: `${REVIEW_FOLDER_PATH}/acceptance-audit-1-1.md`` to `SAMPLE_WORKFLOW_VALUES` immediately after `BlindReviewOutput`.
+  [x] Subtask 17.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`, add `[CodeReviewWorkflowValueKey.AcceptanceAuditOutput]: `${REVIEW_FOLDER_PATH}/acceptance-audit-1-1.md`` to `SAMPLE_WORKFLOW_VALUES` immediately after `BlindReviewOutput`.
 
-  [ ] Subtask 17.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`, update the missing-output expectation in `discovers Step 2 child outputs and re-prompts when outputs are missing or empty` so `MissingSubagentOutputFiles` is exactly `["blind-review-1-1.md", "acceptance-audit-1-1.md", "edge-case-hunter-1-1.md"]`.
+  [x] Subtask 17.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`, update the missing-output expectation in `discovers Step 2 child outputs and re-prompts when outputs are missing or empty` so `MissingSubagentOutputFiles` is exactly `["blind-review-1-1.md", "acceptance-audit-1-1.md", "edge-case-hunter-1-1.md"]`.
 
-  [ ] Subtask 17.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`, add `await writeFile(join(project.reviewFolder, "acceptance-audit-1-1.md"), "acceptance audit output\n", "utf8")` immediately after the blind-review output write.
+  [x] Subtask 17.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`, add `await writeFile(join(project.reviewFolder, "acceptance-audit-1-1.md"), "acceptance audit output\n", "utf8")` immediately after the blind-review output write.
 
-  [ ] Subtask 17.4. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`, add `[CodeReviewWorkflowValueKey.AcceptanceAuditOutput]: join(project.reviewFolder, "acceptance-audit-1-1.md")` to the ready-result workflow value assertion immediately after `BlindReviewOutput`.
+  [x] Subtask 17.4. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`, add `[CodeReviewWorkflowValueKey.AcceptanceAuditOutput]: join(project.reviewFolder, "acceptance-audit-1-1.md")` to the ready-result workflow value assertion immediately after `BlindReviewOutput`.
 
-  [ ] Subtask 17.5. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`, add `[CodeReviewWorkflowValueKey.AcceptanceAuditOutput]: "/review/acceptance-audit-1-1.md"` to the ready-route `workflowValues` fixture immediately after `BlindReviewOutput`.
+  [x] Subtask 17.5. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`, add `[CodeReviewWorkflowValueKey.AcceptanceAuditOutput]: "/review/acceptance-audit-1-1.md"` to the ready-route `workflowValues` fixture immediately after `BlindReviewOutput`.
 
-  [ ] Subtask 17.6. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`, add `expect(step2Prompt).to.include("Skill: use_skill('acceptance-audit-review')")` immediately after the edge-case-hunter skill-marker assertion.
+  [x] Subtask 17.6. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`, add `expect(step2Prompt).to.include("Skill: use_skill('acceptance-audit-review')")` immediately after the edge-case-hunter skill-marker assertion.
 
-  [ ] Subtask 17.7. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`, add `expect(step3Prompt).to.include(SAMPLE_WORKFLOW_VALUES[CodeReviewWorkflowValueKey.AcceptanceAuditOutput])` immediately after the blind-review Step 3 prompt assertion.
+  [x] Subtask 17.7. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`, add `expect(step3Prompt).to.include(SAMPLE_WORKFLOW_VALUES[CodeReviewWorkflowValueKey.AcceptanceAuditOutput])` immediately after the blind-review Step 3 prompt assertion.
 
-  [ ] Subtask 17.8. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`, add `expect(step3Prompt).not.to.include("acceptance_audit_output")` immediately after the acceptance-audit Step 3 prompt assertion.
+  [x] Subtask 17.8. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`, add `expect(step3Prompt).not.to.include("acceptance_audit_output")` immediately after the acceptance-audit Step 3 prompt assertion.
 
-[ ] Task 18. Update code-review prompt-projection integration coverage for acceptance-audit output.
+[x] Task 18. Update code-review prompt-projection integration coverage for acceptance-audit output.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-  [ ] Subtask 18.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`, add `const CODE_REVIEW_ACCEPTANCE_AUDIT_OUTPUT = `${CODE_REVIEW_REVIEW_FOLDER}/acceptance-audit-1-1.md`` immediately after `CODE_REVIEW_BLIND_REVIEW_OUTPUT`.
+  [x] Subtask 18.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`, add `const CODE_REVIEW_ACCEPTANCE_AUDIT_OUTPUT = `${CODE_REVIEW_REVIEW_FOLDER}/acceptance-audit-1-1.md`` immediately after `CODE_REVIEW_BLIND_REVIEW_OUTPUT`.
 
-  [ ] Subtask 18.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`, add `[CodeReviewWorkflowValueKey.AcceptanceAuditOutput]: CODE_REVIEW_ACCEPTANCE_AUDIT_OUTPUT` to `createCodeReviewWorkflowValues(...)` immediately after `BlindReviewOutput`.
+  [x] Subtask 18.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`, add `[CodeReviewWorkflowValueKey.AcceptanceAuditOutput]: CODE_REVIEW_ACCEPTANCE_AUDIT_OUTPUT` to `createCodeReviewWorkflowValues(...)` immediately after `BlindReviewOutput`.
 
-  [ ] Subtask 18.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`, add `CODE_REVIEW_ACCEPTANCE_AUDIT_OUTPUT` to the Step 3 `materializedWorkflowValues` array immediately after `CODE_REVIEW_BLIND_REVIEW_OUTPUT`.
+  [x] Subtask 18.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`, add `CODE_REVIEW_ACCEPTANCE_AUDIT_OUTPUT` to the Step 3 `materializedWorkflowValues` array immediately after `CODE_REVIEW_BLIND_REVIEW_OUTPUT`.
 
-[ ] Task 19. Validate Phase 6.
+[x] Task 19. Validate Phase 6.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/code-review/action-plan.md`
 
-  [ ] Subtask 19.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts`.
+  [x] Subtask 19.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts`.
 
-  [ ] Subtask 19.2. Run `npm run check-types`; if it fails during proto host probing, rerun with the approved elevated path and stop on the first non-environment TypeScript failure.
+  [x] Subtask 19.2. Run `npm run check-types`; if it fails during proto host probing, rerun with the approved elevated path and stop on the first non-environment TypeScript failure.
 
-  [ ] Subtask 19.3. Run `npm run lint`.
+  [x] Subtask 19.3. Run `npm run lint`.
 
-  [ ] Subtask 19.4. Run `rg -n "Launch two subagents|Once both subagents|both child output files|read both documents|either expected child output file" docs/workflows/workflow-runtime/workflow-modules/code-review/code-review-requirements.md src/core/task/workflow-runtime/workflow-modules/code-review src/core/prompts/system-prompt/__tests__/integration.test.ts`; treat exit code 1 with no output as success, inspect any output in context, and stop if any hit is active requirements, runtime, or test code instead of unrelated historical text.
+  [x] Subtask 19.4. Run `rg -n "Launch two subagents|Once both subagents|both child output files|read both documents|either expected child output file" docs/workflows/workflow-runtime/workflow-modules/code-review/code-review-requirements.md src/core/task/workflow-runtime/workflow-modules/code-review src/core/prompts/system-prompt/__tests__/integration.test.ts`; treat exit code 1 with no output as success, inspect any output in context, and stop if any hit is active requirements, runtime, or test code instead of unrelated historical text.
 
 ## Validation
 

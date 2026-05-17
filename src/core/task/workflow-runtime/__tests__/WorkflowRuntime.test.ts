@@ -9917,6 +9917,7 @@ describe("WorkflowRuntime", () => {
 		const storyKeys = createParentedArtifactOutputValueKeys("story")
 		const remediationStoryKeys = createParentedArtifactOutputValueKeys("remediation_story")
 		const blindReviewKeys = createTargetedArtifactOutputValueKeys("blind_review")
+		const acceptanceAuditKeys = createTargetedArtifactOutputValueKeys("acceptance_audit")
 		const edgeCaseReviewKeys = createTargetedArtifactOutputValueKeys("edge_case_review")
 		const codeReviewKeys = createTargetedArtifactOutputValueKeys("code_review")
 		const reviewScopeKeys = createTargetedArtifactOutputValueKeys("review_scope")
@@ -9928,6 +9929,7 @@ describe("WorkflowRuntime", () => {
 				storyKeys,
 				remediationStoryKeys,
 				blindReviewKeys,
+				acceptanceAuditKeys,
 				edgeCaseReviewKeys,
 				codeReviewKeys,
 				reviewScopeKeys,
@@ -9989,6 +9991,17 @@ describe("WorkflowRuntime", () => {
 						key: remediationStoryKeys.artifactIdentity,
 					},
 					outputValueKeys: blindReviewKeys,
+				},
+				acceptance_audit_doc: {
+					id: "acceptance_audit_doc",
+					family: WorkflowArtifactFamily.AcceptanceAuditOutput,
+					intentMode: "derived",
+					parentIdentitySource: undefined,
+					targetIdentitySource: {
+						kind: "workflow_value",
+						key: remediationStoryKeys.artifactIdentity,
+					},
+					outputValueKeys: acceptanceAuditKeys,
 				},
 				edge_case_review_doc: {
 					id: "edge_case_review_doc",
@@ -10066,6 +10079,11 @@ describe("WorkflowRuntime", () => {
 		const reviewResult = await runtime.createWorkflowArtifact({
 			taskState,
 			artifactId: "blind_review_doc",
+			expectedArtifactAbsolutePath: undefined,
+		})
+		const acceptanceAuditResult = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "acceptance_audit_doc",
 			expectedArtifactAbsolutePath: undefined,
 		})
 		const edgeCaseReviewResult = await runtime.createWorkflowArtifact({
@@ -10153,6 +10171,21 @@ describe("WorkflowRuntime", () => {
 			parentIdentity: undefined,
 			targetIdentity: "1.1.1",
 		})
+		expect(acceptanceAuditResult).to.deep.include({
+			artifactIdentity: "1.1.1",
+			artifactFilename: "acceptance-audit-1-1-1.md",
+			artifactRelativePath: join("planning", "acceptance-audit-1-1-1.md"),
+			artifactAbsolutePath: join(
+				cwd,
+				"docs",
+				"projects",
+				"artifact-allocation-project",
+				"planning",
+				"acceptance-audit-1-1-1.md",
+			),
+			parentIdentity: undefined,
+			targetIdentity: "1.1.1",
+		})
 		expect(edgeCaseReviewResult).to.deep.include({
 			artifactIdentity: "1.1.1",
 			artifactFilename: "edge-case-hunter-1-1-1.md",
@@ -10205,6 +10238,7 @@ describe("WorkflowRuntime", () => {
 		await access(storyResult.artifactAbsolutePath)
 		await access(remediationStoryResult.artifactAbsolutePath)
 		await access(reviewResult.artifactAbsolutePath)
+		await access(acceptanceAuditResult.artifactAbsolutePath)
 		await access(edgeCaseReviewResult.artifactAbsolutePath)
 		await access(codeReviewResult.artifactAbsolutePath)
 		await access(reviewScopeResult.artifactAbsolutePath)
@@ -10257,6 +10291,7 @@ describe("WorkflowRuntime", () => {
 			[blindReviewKeys.artifactIdentity]: "1.1.1",
 			[blindReviewKeys.targetIdentity]: "1.1.1",
 			[blindReviewKeys.artifactFilename]: "blind-review-1-1-1.md",
+			[acceptanceAuditKeys.artifactFilename]: "acceptance-audit-1-1-1.md",
 			[edgeCaseReviewKeys.artifactFilename]: "edge-case-hunter-1-1-1.md",
 			[codeReviewKeys.artifactFilename]: "code-review-1-1-1.md",
 			[reviewScopeKeys.artifactFilename]: "review-scope-1-1-1.md",

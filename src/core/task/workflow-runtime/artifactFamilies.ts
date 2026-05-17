@@ -8,6 +8,7 @@ export enum WorkflowArtifactFamily {
 	Story = "story",
 	RemediationStory = "remediation_story",
 	BlindReviewOutput = "blind_review_output",
+	AcceptanceAuditOutput = "acceptance_audit_output",
 	EdgeCaseReviewOutput = "edge_case_review_output",
 	CodeReviewOutput = "code_review_output",
 	ReviewScopeManifest = "review_scope_manifest",
@@ -70,6 +71,7 @@ export interface WorkflowNewNumberedArtifactFamilyDefinition extends WorkflowArt
 export interface WorkflowTargetDerivedArtifactFamilyDefinition extends WorkflowArtifactFamilyDefinitionBase {
 	family:
 		| WorkflowArtifactFamily.BlindReviewOutput
+		| WorkflowArtifactFamily.AcceptanceAuditOutput
 		| WorkflowArtifactFamily.EdgeCaseReviewOutput
 		| WorkflowArtifactFamily.CodeReviewOutput
 		| WorkflowArtifactFamily.ReviewScopeManifest
@@ -178,6 +180,16 @@ export const WORKFLOW_ARTIFACT_FAMILY_REGISTRY: Readonly<Record<WorkflowArtifact
 		contentKind: "markdown",
 		numberingScope: "target_identity",
 		discoveryPattern: /^blind-review-(\d+-\d+(?:-\d+)?)\.md$/,
+	},
+	[WorkflowArtifactFamily.AcceptanceAuditOutput]: {
+		family: WorkflowArtifactFamily.AcceptanceAuditOutput,
+		allocationMode: "derived_from_target",
+		identityRequirement: "target_story_or_remediation_story",
+		filenamePattern: "acceptance-audit-{target}.md",
+		fileExtension: ".md",
+		contentKind: "markdown",
+		numberingScope: "target_identity",
+		discoveryPattern: /^acceptance-audit-(\d+-\d+(?:-\d+)?)\.md$/,
 	},
 	[WorkflowArtifactFamily.EdgeCaseReviewOutput]: {
 		family: WorkflowArtifactFamily.EdgeCaseReviewOutput,
