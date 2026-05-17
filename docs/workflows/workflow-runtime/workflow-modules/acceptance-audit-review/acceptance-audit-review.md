@@ -161,7 +161,8 @@ allowedActions/ Labels:
 ### Step 1 Output File Generation:
 this procedure must be run every time the workflow runs, whether it is activated for a subagent or main agent.
 
-Once the prerequisite files are confirmed and the commit hash and parent commit hash have been identified and persisted as workflow session keys, runtime must generate the following artifact in the selected project's review folder:
+Once target_story, review_commit_hash, review_commit_parent, and review_scope_manifest are present through either child workflow inheritance or standard workflow resolution, runtime must generate the following artifact in the selected project's review folder:
+
 
 acceptance-audit-<target>.md
 
@@ -172,7 +173,7 @@ Examples:
 Story identity 1.1 → acceptance-audit-1-1.md
 Remediation story identity 1.1.1 → acceptance-audit-1-1-1.md
 
-the full file path for the generated document must be set as the workflow's acceptance_audit_review_output session key.
+the full file path for the generated document must be set as the workflow's acceptance_audit_output session key.
 
 ## Step 2: Conduct Acceptance Audit
 
@@ -195,7 +196,7 @@ You have been tasked with conducting an acceptance audit of preproduction code a
     - does not invent solutions and/or architecture not clearly authorized by the provided project documentation
     - fully satisfies the story's requirements and objective
 
-3: After conducting your audit, document your findings in this document: acceptance_audit_review_output. 
+3: After conducting your audit, document your findings in this document: acceptance_audit_output. 
     - For each finding, you must include:
         - finding: a short title for the finding
         - description: a detailed explanation of the finding, including:
@@ -205,11 +206,11 @@ You have been tasked with conducting an acceptance audit of preproduction code a
         - the potential consequence if the finding is not addressed
         - exact supporting code location with file path, start line, and end line for the smallest line range that supports the finding. If a finding depends on more than one non-contiguous location, include each one in the finding description.
         - an explanation of what in the cited code locations supports the finding
-    - If no findings were identified, add a note to acceptance_audit_review_output indicating that no findings were found after thorough review.
+    - If no findings were identified, add a note to acceptance_audit_output indicating that no findings were found after thorough review.
 
 4: Use attempt_completion to provide a final report to the user including:
     - number of findings, or clear statement that no findings were identified
-    - The full file path for your recorded findings: acceptance_audit_review_output
+    - The full file path for your recorded findings: acceptance_audit_output
     - an overview of the findings you documented, if any.
 
 ### Progression Rule: successful use of attempt_completion by the agent- workflow must end afterward.
