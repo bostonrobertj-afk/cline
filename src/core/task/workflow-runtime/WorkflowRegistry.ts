@@ -1,4 +1,5 @@
 import type { WorkflowDefinition, WorkflowName } from "@/core/task/workflow-runtime/types"
+import { acceptanceAuditReviewWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/acceptance-audit-review"
 import { blindReviewWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/blind-review"
 import { brainstormingWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/brainstorming"
 import { codeReviewWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/code-review"
@@ -18,6 +19,7 @@ const shippedWorkflowDefinitions: WorkflowDefinition[] = [
 	piPlanningWorkflowDefinition,
 	codeReviewWorkflowDefinition,
 	blindReviewWorkflowDefinition,
+	acceptanceAuditReviewWorkflowDefinition,
 	edgeCaseHunterReviewWorkflowDefinition,
 ]
 

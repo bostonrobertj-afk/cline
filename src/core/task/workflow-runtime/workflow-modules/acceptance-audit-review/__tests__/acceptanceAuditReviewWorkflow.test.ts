@@ -23,6 +23,11 @@ import type {
 	WorkflowValues,
 } from "../../../types"
 import {
+	resolveWorkflowBySlashCommand,
+	resolveWorkflowByUseSkillName,
+	resolveWorkflowDefinition,
+} from "../../../WorkflowRegistry"
+import {
 	ACCEPTANCE_AUDIT_REVIEW_ARTIFACTS,
 	ACCEPTANCE_AUDIT_REVIEW_COMMIT_HASH_FIELD_KEY,
 	ACCEPTANCE_AUDIT_REVIEW_ENTRY_PROJECT_VALUE_KEYS,
@@ -456,6 +461,18 @@ async function createTemporaryGitProject(): Promise<{
 }
 
 describe("acceptanceAuditReviewWorkflowDefinition", () => {
+	it("resolves through canonical workflow activation names", () => {
+		expect(resolveWorkflowDefinition("acceptance-audit-review")).to.equal(acceptanceAuditReviewWorkflowDefinition)
+		expect(resolveWorkflowBySlashCommand("acceptance-audit-review")).to.equal(acceptanceAuditReviewWorkflowDefinition)
+		expect(resolveWorkflowByUseSkillName("acceptance-audit-review")).to.equal(acceptanceAuditReviewWorkflowDefinition)
+	})
+
+	it("does not resolve the retired markdown workflow alias", () => {
+		expect(resolveWorkflowDefinition("acceptance-audit-review.md")).to.equal(undefined)
+		expect(resolveWorkflowBySlashCommand("acceptance-audit-review.md")).to.equal(undefined)
+		expect(resolveWorkflowByUseSkillName("acceptance-audit-review.md")).to.equal(undefined)
+	})
+
 	it("declares workflow identity", () => {
 		expect(acceptanceAuditReviewWorkflowDefinition.name).to.equal(ACCEPTANCE_AUDIT_REVIEW_WORKFLOW_NAME)
 		expect(acceptanceAuditReviewWorkflowDefinition.displayName).to.equal(ACCEPTANCE_AUDIT_REVIEW_WORKFLOW_DISPLAY_NAME)
