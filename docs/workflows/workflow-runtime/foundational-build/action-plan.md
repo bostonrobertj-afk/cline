@@ -11227,3 +11227,299 @@ Allowed files:
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+## Phase 69 - Runtime-Owned Existing Artifact Resolution And Story Index Entry Validation
+
+Pause for QA review after completing Phase 69.
+
+### Phase 69 Scope
+
+This phase implements runtime-owned `resolve_existing_project_artifact` and `validate_story_index_entry` workflow decision actions. Runtime will resolve existing selected-project artifact paths through artifact-family metadata, validate existing story index entries through the canonical parser, enforce workspace path-policy checks before disk access, persist only the approved workflow values, and re-enter decision-tree evaluation. This phase also documents how workflow modules should use these actions instead of module-owned filesystem reads or custom artifact path construction.
+
+Relevant requirements: `FR-16k`, `FR-20j9`, `FR-20j10`, `FR-20j10a`, `FR-20j10b`, `FR-20j10c`, `FR-20u`, `FR-20v`, `FR-20v1`, `FR-20v2`, `FR-20v3`, `FR-20v4`.
+
+### Phase 69 Scope Boundary
+
+- Do not implement or revise `write-remediation-story`, `create-story`, `pi-planning`, `dev-story`, or any other workflow module in this phase.
+- Do not add model-facing tool schemas, response-tool schemas, prompt-projected backend tools, or `ClineDefaultTool` enum entries for `resolve_existing_project_artifact` or `validate_story_index_entry`.
+- Do not add backend tool handlers or `ToolExecutorCoordinator` registrations for these actions.
+- Do not change artifact-family filename patterns, artifact-family discovery patterns, story-index file format, story-index parser semantics, or story artifact builders.
+- Do not replace `resolve_prerequisite_files`, `selectorDiscovery`, `jsonOptionsSource`, `plan_story_artifacts`, `plan_remediation_story_artifact`, `generate_story_files`, `update_story_index_status`, or `move_project_file`.
+
+### Phase 69 Known Issues / Risks / Technical Debt
+
+- `validate_story_index_entry` must use the canonical story-index parser. Malformed JSON or parser rejection is a missing-or-malformed-index failure, while a parsed entry that exists but does not match the required story type, story filename workflow value, or required status is an invalid-entry failure.
+- This phase is appended after Phase 68 while Phase 68 final validation remains partially unchecked. Do not mark Phase 68 validation subtasks complete while implementing Phase 69.
+- At the time this phase was authored, these non-Phase-69 files were already dirty: `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/requirements.md`, `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md`, and `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/acceptance-audit-review/action-plan.md`. Phase 69 implementation and QA must not treat those pre-existing diffs as Phase 69 scope unless Phase 69 changes them.
+
+[x] Task 241. Update module-build guidance for runtime-owned existing artifact resolution and story-index validation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
+
+[x] Subtask 241.1. In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`, after the paragraph ending `Modules may route to it through runtime-owned decision actions, but it must not be included in model-facing tool schemas.`, add exactly these five paragraphs: `Use runtime-owned resolve_existing_project_artifact when a workflow already has a canonical artifact identity in workflow values and needs runtime to resolve an existing selected-project artifact path. This action is for existing files only: runtime normalizes the identity through artifact-family rules, derives the canonical filename from WORKFLOW_ARTIFACT_FAMILY_REGISTRY, resolves the declared selected-project-relative folder, enforces workspace path-policy checks, requires the file to exist, persists the resolved absolute path, and re-enters decision-tree evaluation. Modules must not use direct fs reads, stat, access, custom filename builders, or custom selected-project path construction for this case.`; `resolve_existing_project_artifact routes must declare the artifact family, the workflow value key containing the artifact identity, the selected-project-relative projectSubfolderSegments, the output workflow value key that receives the absolute path, and the exact terminal error message to show when resolution fails. If a user choice can refer to either a primary story or a remediation story, the module must route through separate decision-tree branches so each branch declares the exact WorkflowArtifactFamily.Story or WorkflowArtifactFamily.RemediationStory contract.`; `Use runtime-owned validate_story_index_entry when a workflow must verify an existing selected story or remediation story entry in implementation/epic-{E}-stories.index.json before model-driven work, deterministic lifecycle actions, or project file moves. Runtime resolves the canonical story index path from the selected project and story identity, requires the persisted index path to match, enforces workspace path-policy checks before reading, parses through the canonical story-index parser, verifies the selected entry exists, and validates the entry's story_type, story_file_name, and status.`; `validate_story_index_entry routes must declare workflow value keys for the story index path, story identity, and story filename; the required story type; the required status; and exact terminal error messages for missing or malformed index, missing entry, and invalid entry. This action does not mutate the story index; status changes still use backend-only update_story_index_status.`; `resolve_existing_project_artifact and validate_story_index_entry are runtime-only decision actions. They must never be projected in model-facing tool schemas, response-tool schemas, or prompt-visible backend tool dictionaries. They do not replace prerequisite file selection, selectorDiscovery, JSON-backed form options, plan_story_artifacts, plan_remediation_story_artifact, generate_story_files, update_story_index_status, or move_project_file.`
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
+
+[ ] Task 242. Add workflow decision action type contracts and exported story-index guards.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/storyArtifacts.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/storyArtifacts.test.ts`
+
+[ ] Subtask 242.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`, replace `import type { WorkflowStoryStatus } from "./storyArtifacts"` with `import type { WorkflowStoryStatus, WorkflowStoryType } from "./storyArtifacts"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[ ] Subtask 242.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`, add this `WorkflowDecisionAction` union variant immediately after the existing `update_story_index_status` variant: `{ kind: "resolve_existing_project_artifact"; artifactFamily: WorkflowArtifactFamily; artifactIdentityWorkflowValueKey: string; projectSubfolderSegments: readonly string[]; outputWorkflowValueKey: string; missingArtifactErrorMessage: string }`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[ ] Subtask 242.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`, add this `WorkflowDecisionAction` union variant immediately after the new `resolve_existing_project_artifact` variant: `{ kind: "validate_story_index_entry"; storyIndexWorkflowValueKey: string; storyIdentityWorkflowValueKey: string; storyFilenameWorkflowValueKey: string; requiredStoryType: WorkflowStoryType; requiredStatus: WorkflowStoryStatus; missingOrMalformedIndexErrorMessage: string; missingEntryErrorMessage: string; invalidEntryErrorMessage: string }`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+
+[ ] Subtask 242.4. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/storyArtifacts.ts`, change `function isWorkflowStoryType(value: unknown): value is WorkflowStoryType` to `export function isWorkflowStoryType(value: unknown): value is WorkflowStoryType` without changing its implementation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/storyArtifacts.ts`
+
+[ ] Subtask 242.5. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/storyArtifacts.ts`, change `function isWorkflowStoryStatus(value: unknown): value is WorkflowStoryStatus` to `export function isWorkflowStoryStatus(value: unknown): value is WorkflowStoryStatus` without changing its implementation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/storyArtifacts.ts`
+
+[ ] Subtask 242.6. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/storyArtifacts.test.ts`, update the existing `../storyArtifacts` import to include `isWorkflowStoryStatus` and `isWorkflowStoryType`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/storyArtifacts.test.ts`
+
+[ ] Subtask 242.7. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/storyArtifacts.test.ts`, add a test named `exports story type and status guards` that asserts `isWorkflowStoryType("primary") === true`, `isWorkflowStoryType("remediation") === true`, `isWorkflowStoryType("feature") === false`, `isWorkflowStoryStatus("draft") === true`, `isWorkflowStoryStatus("backlog") === true`, `isWorkflowStoryStatus("review") === true`, `isWorkflowStoryStatus("complete") === true`, and `isWorkflowStoryStatus("ready") === false`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/storyArtifacts.test.ts`
+
+[ ] Task 243. Implement runtime action handling and definition validation for `resolve_existing_project_artifact` and `validate_story_index_entry`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 243.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, update the `@/core/task/workflow-runtime/storyArtifacts` import to include runtime imports `isWorkflowStoryStatus` and `isWorkflowStoryType`, and type imports `WorkflowStoryType` and `WorkflowStoryStatus`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 243.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, add `type ResolveExistingProjectArtifactAction = Extract<WorkflowDecisionAction, { kind: "resolve_existing_project_artifact" }>` and `type ValidateStoryIndexEntryAction = Extract<WorkflowDecisionAction, { kind: "validate_story_index_entry" }>` immediately after the `WorkflowUpdateStoryIndexStatusResult` interface.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 243.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, add a `case "resolve_existing_project_artifact"` branch in `buildNextActionFromDecisionTreeAction(...)` immediately after `case "update_story_index_status"`; it must call `return this.resolveExistingProjectArtifactNextAction({ taskState, action, sourceRoute })`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 243.4. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, add a `case "validate_story_index_entry"` branch in `buildNextActionFromDecisionTreeAction(...)` immediately after `case "resolve_existing_project_artifact"`; it must call `return this.validateStoryIndexEntryNextAction({ taskState, action, sourceRoute })`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 243.5. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, add private helper `normalizeExistingProjectArtifactIdentity(args: { familyDefinition: WorkflowArtifactFamilyDefinition; rawIdentity: string }): string` before `resolveEpicStoriesIndexPath(...)`; it must call `this.normalizeWorkflowArtifactIdentityInput(args.rawIdentity)`, switch on `args.familyDefinition.family`, return `args.familyDefinition.singletonIdentity` only when singleton-family normalized identity equals that singleton identity, return parsed dotted identity only when `EpicDeliverySpec` and `EpicStoriesIndex` have no story/remediation segment, return parsed dotted identity only when `Story` has a story segment and no remediation segment, return parsed dotted identity only when `RemediationStory` has both story and remediation segments, return parsed dotted identity only when review-output families have a story segment, and throw `Error` for every incompatible family/identity combination.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 243.6. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, add private helper `async resolveExistingProjectArtifactNextAction(args: { taskState: TaskState; action: ResolveExistingProjectArtifactAction; sourceRoute: WorkflowStepResolutionSourceRoute }): Promise<WorkflowNextAction>` before `resolveEpicStoriesIndexPath(...)`; it must return `{ kind: "no_op" }` when `args.taskState.activeWorkflowSession` is undefined, read the raw identity with `readRequiredStringWorkflowValue(...)` using context `existing project artifact resolution route ${args.sourceRoute.branchId}/${args.sourceRoute.routeId}`, resolve `familyDefinition` from `WORKFLOW_ARTIFACT_FAMILY_REGISTRY[args.action.artifactFamily]`, call `normalizeExistingProjectArtifactIdentity(...)`, derive the filename with `this.buildWorkflowArtifactFilename({ familyDefinition, artifactIdentity })`, resolve `selectedProjectRoot` through `this.resolveWorkflowProjectOutputFolder(session)`, resolve the target folder through `resolveWorkflowDiscoveryTargetDirectory({ rootDirectory: selectedProjectRoot, targetPathSegments: args.action.projectSubfolderSegments })`, build `artifactAbsolutePath` with `join(targetFolderPath, artifactFilename)`, call `this.assertWorkspacePathAllowed(targetFolderPath)` and `this.assertWorkspacePathAllowed(artifactAbsolutePath)` before `await stat(artifactAbsolutePath)`, require `artifactStats.isFile() === true`, write `{ [args.action.outputWorkflowValueKey]: artifactAbsolutePath }` through `this.applyWorkflowValueWrites(...)`, and return `this.resolveNextAction({ taskState: args.taskState })`; it must catch all thrown errors and return `this.buildTerminalErrorNextAction({ taskState: args.taskState, errorMessage: args.action.missingArtifactErrorMessage })`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 243.7. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, add private helper `async validateStoryIndexEntryNextAction(args: { taskState: TaskState; action: ValidateStoryIndexEntryAction; sourceRoute: WorkflowStepResolutionSourceRoute }): Promise<WorkflowNextAction>` before `resolveEpicStoriesIndexPath(...)`; it must return `{ kind: "no_op" }` when `args.taskState.activeWorkflowSession` is undefined; inside one `try` block, read `storiesIndex` with context `story index entry validation route ${args.sourceRoute.branchId}/${args.sourceRoute.routeId} storyIndexWorkflowValueKey`, read `storyIdentity` with context `story index entry validation route ${args.sourceRoute.branchId}/${args.sourceRoute.routeId} storyIdentityWorkflowValueKey`, read `storyFilename` with context `story index entry validation route ${args.sourceRoute.branchId}/${args.sourceRoute.routeId} storyFilenameWorkflowValueKey`, resolve `epicIdentity` with `this.resolveEpicIdentityFromStoryIdentity(storyIdentity)`, resolve `expectedStoryIndexAbsolutePath` with `this.resolveEpicStoriesIndexPath({ session, epicIdentity })`, return `this.buildTerminalErrorNextAction({ taskState: args.taskState, errorMessage: args.action.missingOrMalformedIndexErrorMessage })` when `storiesIndex !== expectedStoryIndexAbsolutePath`, call `this.assertWorkspacePathAllowed(storiesIndex)` before `await readFile(storiesIndex, "utf8")`, parse with `parseWorkflowStoryIndexJson(...)`, and store the parsed index; the helper must catch errors from those reads, canonical path resolution, path-policy validation, file read, or parser operations and return `this.buildTerminalErrorNextAction({ taskState: args.taskState, errorMessage: args.action.missingOrMalformedIndexErrorMessage })`; after the `try` block, it must find the entry where `entry.story_identity === storyIdentity`, map a missing entry to `missingEntryErrorMessage`, map `entry.story_type !== args.action.requiredStoryType`, `entry.story_file_name !== storyFilename`, or `entry.status !== args.action.requiredStatus` to `invalidEntryErrorMessage`, and return `this.resolveNextAction({ taskState: args.taskState })` without workflow value writes when validation succeeds.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 243.8. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, add workflow-definition validation for `resolve_existing_project_artifact` immediately after the existing `update_story_index_status` validation case; it must reject an unregistered `artifactFamily` with `Workflow step ${step.id} route ${route.id} resolve_existing_project_artifact artifactFamily ${route.action.artifactFamily} is not registered.`, reject every invalid `projectSubfolderSegments` entry with `Workflow step ${step.id} route ${route.id} resolve_existing_project_artifact projectSubfolderSegments entry ${projectSubfolderSegment} is invalid.`, reject blank workflow-value keys with `Workflow step ${step.id} route ${route.id} resolve_existing_project_artifact ${workflowValueKeyCheck.name} must not be empty.`, reject untrimmed workflow-value keys with `Workflow step ${step.id} route ${route.id} resolve_existing_project_artifact ${workflowValueKeyCheck.name} ${workflowValueKeyCheck.key} must already be trimmed.`, reject undeclared workflow-value keys with `Workflow step ${step.id} route ${route.id} resolve_existing_project_artifact ${workflowValueKeyCheck.name} ${workflowValueKeyCheck.key} must be declared in workflowValueKeys.`, and reject blank `missingArtifactErrorMessage` with `Workflow step ${step.id} route ${route.id} resolve_existing_project_artifact missingArtifactErrorMessage must not be empty.`
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Subtask 243.9. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, add workflow-definition validation for `validate_story_index_entry` immediately after the new `resolve_existing_project_artifact` validation case; it must reject blank workflow-value keys with `Workflow step ${step.id} route ${route.id} validate_story_index_entry ${workflowValueKeyCheck.name} must not be empty.`, reject untrimmed workflow-value keys with `Workflow step ${step.id} route ${route.id} validate_story_index_entry ${workflowValueKeyCheck.name} ${workflowValueKeyCheck.key} must already be trimmed.`, reject undeclared workflow-value keys with `Workflow step ${step.id} route ${route.id} validate_story_index_entry ${workflowValueKeyCheck.name} ${workflowValueKeyCheck.key} must be declared in workflowValueKeys.`, reject invalid `requiredStoryType` with `Workflow step ${step.id} route ${route.id} validate_story_index_entry requiredStoryType ${route.action.requiredStoryType} is invalid.`, reject invalid `requiredStatus` with `Workflow step ${step.id} route ${route.id} validate_story_index_entry requiredStatus ${route.action.requiredStatus} is invalid.`, reject blank terminal error messages with `Workflow step ${step.id} route ${route.id} validate_story_index_entry ${errorMessageCheck.name} must not be empty.`, and use `isWorkflowStoryType(...)` and `isWorkflowStoryStatus(...)` for the type/status checks.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[ ] Task 244. Add typed test fixtures for runtime-owned artifact resolution and story-index validation actions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 244.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update the `../storyArtifacts` import to include type import `WorkflowStoryType` alongside the existing `WorkflowStoryStatus` import.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 244.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add constants after `UPDATE_STORY_INDEX_STATUS_STORY_IDENTITY_KEY`: `RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY = "existing_artifact_identity"`, `RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY = "existing_artifact_absolute_path"`, `RESOLVE_EXISTING_PROJECT_ARTIFACT_ERROR_MESSAGE = "Existing project artifact could not be resolved."`, `VALIDATE_STORY_INDEX_STORIES_INDEX_KEY = "validated_stories_index"`, `VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY = "validated_story_identity"`, `VALIDATE_STORY_INDEX_STORY_FILENAME_KEY = "validated_story_filename"`, `VALIDATE_STORY_INDEX_MISSING_OR_MALFORMED_ERROR_MESSAGE = "Story index is missing or malformed."`, `VALIDATE_STORY_INDEX_MISSING_ENTRY_ERROR_MESSAGE = "Story index entry is missing."`, and `VALIDATE_STORY_INDEX_INVALID_ENTRY_ERROR_MESSAGE = "Story index entry is invalid."`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 244.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add type aliases after `WorkflowContinueFormDecisionAction`: `type WorkflowResolveExistingProjectArtifactDecisionAction = Extract<WorkflowDecisionAction, { kind: "resolve_existing_project_artifact" }>` and `type WorkflowValidateStoryIndexEntryDecisionAction = Extract<WorkflowDecisionAction, { kind: "validate_story_index_entry" }>`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 244.4. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add helper `createResolveExistingProjectArtifactAction(args?: { artifactFamily?: WorkflowArtifactFamily; artifactIdentityWorkflowValueKey?: string; projectSubfolderSegments?: readonly string[]; outputWorkflowValueKey?: string; missingArtifactErrorMessage?: string }): WorkflowResolveExistingProjectArtifactDecisionAction`; it must return `{ kind: "resolve_existing_project_artifact", artifactFamily: args?.artifactFamily ?? WorkflowArtifactFamily.Story, artifactIdentityWorkflowValueKey: args?.artifactIdentityWorkflowValueKey ?? RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY, projectSubfolderSegments: args?.projectSubfolderSegments ?? ["implementation", "stories-complete"], outputWorkflowValueKey: args?.outputWorkflowValueKey ?? RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY, missingArtifactErrorMessage: args?.missingArtifactErrorMessage ?? RESOLVE_EXISTING_PROJECT_ARTIFACT_ERROR_MESSAGE }`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 244.5. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add helper `createValidateStoryIndexEntryAction(args?: { storyIndexWorkflowValueKey?: string; storyIdentityWorkflowValueKey?: string; storyFilenameWorkflowValueKey?: string; requiredStoryType?: WorkflowStoryType; requiredStatus?: WorkflowStoryStatus; missingOrMalformedIndexErrorMessage?: string; missingEntryErrorMessage?: string; invalidEntryErrorMessage?: string }): WorkflowValidateStoryIndexEntryDecisionAction`; it must return `{ kind: "validate_story_index_entry", storyIndexWorkflowValueKey: args?.storyIndexWorkflowValueKey ?? VALIDATE_STORY_INDEX_STORIES_INDEX_KEY, storyIdentityWorkflowValueKey: args?.storyIdentityWorkflowValueKey ?? VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY, storyFilenameWorkflowValueKey: args?.storyFilenameWorkflowValueKey ?? VALIDATE_STORY_INDEX_STORY_FILENAME_KEY, requiredStoryType: args?.requiredStoryType ?? "remediation", requiredStatus: args?.requiredStatus ?? "draft", missingOrMalformedIndexErrorMessage: args?.missingOrMalformedIndexErrorMessage ?? VALIDATE_STORY_INDEX_MISSING_OR_MALFORMED_ERROR_MESSAGE, missingEntryErrorMessage: args?.missingEntryErrorMessage ?? VALIDATE_STORY_INDEX_MISSING_ENTRY_ERROR_MESSAGE, invalidEntryErrorMessage: args?.invalidEntryErrorMessage ?? VALIDATE_STORY_INDEX_INVALID_ENTRY_ERROR_MESSAGE }`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 244.6. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add helper `createRuntimeOwnedDecisionActionTree(args: { startAction: WorkflowDecisionAction; nextAction?: WorkflowDecisionAction }): WorkflowDecisionTree` before `createToolBackedOperationDecisionTree(...)`; it must create entry branch `run-runtime-owned-action` with route `start-runtime-owned-action`, trigger `{ kind: "always" }`, the supplied `startAction`, and `followingBranchId: "after-runtime-owned-action"`, plus branch `after-runtime-owned-action` with route `after-runtime-owned-action-route`, trigger `{ kind: "always" }`, and action `args.nextAction ?? { kind: "project_prompt" }`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Task 245. Add workflow-definition validation tests for the new runtime-owned decision actions.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 245.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `rejects resolve_existing_project_artifact routes with invalid folder segments before activation`; it must iterate invalid segment cases `""`, `"."`, `".."`, `"nested/path"`, `"nested\\path"`, `join(cwd, "outside")`, and `"C:"`, build a workflow declaring `RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY` and `RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY`, use `createRuntimeOwnedDecisionActionTree({ startAction: createResolveExistingProjectArtifactAction({ projectSubfolderSegments: ["implementation", invalidFolderSegment.segment] }) })`, activate it, and assert the result is `{ kind: "no_op" }` with no active workflow name or session.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 245.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `rejects resolve_existing_project_artifact routes with invalid workflow-value keys or messages before activation`; it must use exactly these cases: `artifactIdentityWorkflowValueKey: ""`, `artifactIdentityWorkflowValueKey: " existing_artifact_identity"`, `artifactIdentityWorkflowValueKey: "missing_existing_artifact_identity"`, `outputWorkflowValueKey: ""`, `outputWorkflowValueKey: " existing_artifact_absolute_path"`, `outputWorkflowValueKey: "missing_existing_artifact_absolute_path"`, and `missingArtifactErrorMessage: ""`; each case must build a workflow declaring `RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY` and `RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY`, use `createRuntimeOwnedDecisionActionTree({ startAction: createResolveExistingProjectArtifactAction(caseOverrides) })`, activate it, and assert activation returns `{ kind: "no_op" }` with no active workflow name or session.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 245.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `rejects validate_story_index_entry routes with invalid workflow-value keys before activation`; it must use exactly these cases: `storyIndexWorkflowValueKey: ""`, `storyIndexWorkflowValueKey: " validated_stories_index"`, `storyIndexWorkflowValueKey: "missing_validated_stories_index"`, `storyIdentityWorkflowValueKey: ""`, `storyIdentityWorkflowValueKey: " validated_story_identity"`, `storyIdentityWorkflowValueKey: "missing_validated_story_identity"`, `storyFilenameWorkflowValueKey: ""`, `storyFilenameWorkflowValueKey: " validated_story_filename"`, and `storyFilenameWorkflowValueKey: "missing_validated_story_filename"`; each case must build a workflow declaring `VALIDATE_STORY_INDEX_STORIES_INDEX_KEY`, `VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY`, and `VALIDATE_STORY_INDEX_STORY_FILENAME_KEY`, use `createRuntimeOwnedDecisionActionTree({ startAction: createValidateStoryIndexEntryAction(caseOverrides) })`, activate it, and assert activation returns `{ kind: "no_op" }` with no active workflow name or session.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 245.4. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `rejects validate_story_index_entry routes with invalid required story type or status before activation`; it must create valid actions with `createValidateStoryIndexEntryAction()`, mutate one action with `Object.assign(action, { requiredStoryType: "feature" })`, mutate another action with `Object.assign(action, { requiredStatus: "ready" })`, build workflows declaring all three validate-story-index workflow value keys, activate each workflow, and assert activation returns `{ kind: "no_op" }` with no active workflow name or session.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 245.5. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `rejects validate_story_index_entry routes with blank terminal error messages before activation`; it must use exactly these cases: `missingOrMalformedIndexErrorMessage: ""`, `missingEntryErrorMessage: ""`, and `invalidEntryErrorMessage: ""`; each case must build a workflow declaring `VALIDATE_STORY_INDEX_STORIES_INDEX_KEY`, `VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY`, and `VALIDATE_STORY_INDEX_STORY_FILENAME_KEY`, use `createRuntimeOwnedDecisionActionTree({ startAction: createValidateStoryIndexEntryAction(caseOverrides) })`, activate it, and assert activation returns `{ kind: "no_op" }` with no active workflow name or session.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 245.6. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `rejects resolve_existing_project_artifact routes with unregistered artifact families before activation`; it must create `const action = createResolveExistingProjectArtifactAction()`, mutate it with `Object.assign(action, { artifactFamily: "module_owned_family" })`, build a workflow declaring `RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY` and `RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY`, use `createRuntimeOwnedDecisionActionTree({ startAction: action })`, activate it, and assert activation returns `{ kind: "no_op" }` with no active workflow name or session.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Task 246. Add runtime behavior tests for `resolve_existing_project_artifact`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 246.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `resolves existing primary story artifacts through runtime-owned artifact metadata`; it must create `docs/projects/resolve-existing-story/implementation/stories-complete/Story-1-1.md`, activate a workflow declaring `RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY` and `RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY`, set the identity workflow value to `"1.1"`, set Step 1 `decisionTree` to `createRuntimeOwnedDecisionActionTree({ startAction: createResolveExistingProjectArtifactAction({ artifactFamily: WorkflowArtifactFamily.Story, projectSubfolderSegments: ["implementation", "stories-complete"] }) })`, submit new project title `"Resolve Existing Story"`, assert the returned action is `project_prompt`, and assert `getActiveWorkflowSession(taskState).workflowValues[RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY]` equals the created absolute path.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 246.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `resolves existing remediation story artifacts through runtime-owned artifact metadata`; it must create `docs/projects/resolve-existing-remediation/implementation/stories-review/Remediation-story-1-1-2.md`, activate a workflow declaring `RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY` and `RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY`, set the identity workflow value to `"1.1.2"`, set Step 1 `decisionTree` to `createRuntimeOwnedDecisionActionTree({ startAction: createResolveExistingProjectArtifactAction({ artifactFamily: WorkflowArtifactFamily.RemediationStory, projectSubfolderSegments: ["implementation", "stories-review"] }) })`, submit new project title `"Resolve Existing Remediation"`, assert the returned action is `project_prompt`, and assert `getActiveWorkflowSession(taskState).workflowValues[RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY]` equals the created absolute path.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 246.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `terminal-errors when existing artifact resolution cannot find the required file`; it must activate a workflow declaring `RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY` and `RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY`, set identity `"1.1"`, set Step 1 `decisionTree` to `createRuntimeOwnedDecisionActionTree({ startAction: createResolveExistingProjectArtifactAction({ artifactFamily: WorkflowArtifactFamily.Story, projectSubfolderSegments: ["implementation", "stories-complete"] }) })`, not create `docs/projects/missing-existing-story/implementation/stories-complete/Story-1-1.md`, submit new project title `"Missing Existing Story"`, assert the returned action is `terminal_error`, assert `errorMessage` equals `RESOLVE_EXISTING_PROJECT_ARTIFACT_ERROR_MESSAGE`, and assert workflow state is cleared.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 246.4. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `terminal-errors when existing artifact identity does not match the declared artifact family`; it must activate a workflow declaring `RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY` and `RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY`, set identity `"1.1.2"`, set Step 1 `decisionTree` to `createRuntimeOwnedDecisionActionTree({ startAction: createResolveExistingProjectArtifactAction({ artifactFamily: WorkflowArtifactFamily.Story, projectSubfolderSegments: ["implementation", "stories-complete"] }) })`, submit new project title `"Mismatched Existing Artifact"`, assert the returned action is `terminal_error`, assert `errorMessage` equals `RESOLVE_EXISTING_PROJECT_ARTIFACT_ERROR_MESSAGE`, and assert workflow state is cleared.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 246.5. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `terminal-errors when workspace path policy denies existing artifact resolution`; it must create `artifactAbsolutePath = join(cwd, "docs", "projects", "denied-existing-story", "implementation", "stories-complete", "Story-1-1.md")`, replace `runtime` with `new WorkflowRuntime({ cwd, workspacePathPolicy: { validateAccess: (filePath) => filePath !== artifactAbsolutePath } })`, activate a workflow declaring `RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY` and `RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY`, set identity `"1.1"`, set Step 1 `decisionTree` to `createRuntimeOwnedDecisionActionTree({ startAction: createResolveExistingProjectArtifactAction({ artifactFamily: WorkflowArtifactFamily.Story, projectSubfolderSegments: ["implementation", "stories-complete"] }) })`, submit new project title `"Denied Existing Story"`, assert the returned action is `terminal_error`, assert `errorMessage` equals `RESOLVE_EXISTING_PROJECT_ARTIFACT_ERROR_MESSAGE`, and assert workflow state is cleared.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Task 247. Add runtime behavior tests for `validate_story_index_entry`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 247.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `validates existing remediation story index entries without mutating the story index`; it must write `docs/projects/validate-story-index/implementation/epic-1-stories.index.json` with one remediation entry `{ story_identity: "1.1.1", story_file_name: "Remediation-story-1-1-1.md", story_type: "remediation", parent_story_identity: "1.1", story_file_generated: true, status: "draft" }`, activate a workflow declaring `VALIDATE_STORY_INDEX_STORIES_INDEX_KEY`, `VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY`, and `VALIDATE_STORY_INDEX_STORY_FILENAME_KEY`, set those workflow values to the index path, `"1.1.1"`, and `"Remediation-story-1-1-1.md"`, set Step 1 `decisionTree` to `createRuntimeOwnedDecisionActionTree({ startAction: createValidateStoryIndexEntryAction({ requiredStoryType: "remediation", requiredStatus: "draft" }) })`, submit new project title `"Validate Story Index"`, assert the returned action is `project_prompt`, and assert the file contents after validation equal the file contents before validation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 247.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `terminal-errors when validate_story_index_entry receives a noncanonical story index path`; it must activate a workflow declaring `VALIDATE_STORY_INDEX_STORIES_INDEX_KEY`, `VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY`, and `VALIDATE_STORY_INDEX_STORY_FILENAME_KEY`, set `VALIDATE_STORY_INDEX_STORIES_INDEX_KEY` to `join(cwd, "docs", "projects", "validate-wrong-index-path", "implementation", "wrong.index.json")`, set story identity `"1.1.1"` and filename `"Remediation-story-1-1-1.md"`, set Step 1 `decisionTree` to `createRuntimeOwnedDecisionActionTree({ startAction: createValidateStoryIndexEntryAction({ requiredStoryType: "remediation", requiredStatus: "draft" }) })`, submit new project title `"Validate Wrong Index Path"`, assert the returned action is `terminal_error`, assert `errorMessage` equals `VALIDATE_STORY_INDEX_MISSING_OR_MALFORMED_ERROR_MESSAGE`, and assert workflow state is cleared.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 247.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `terminal-errors when validate_story_index_entry cannot parse the story index`; it must write `{` to `join(cwd, "docs", "projects", "validate-malformed-index", "implementation", "epic-1-stories.index.json")`, activate a workflow declaring `VALIDATE_STORY_INDEX_STORIES_INDEX_KEY`, `VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY`, and `VALIDATE_STORY_INDEX_STORY_FILENAME_KEY`, set those workflow values to the canonical index path, `"1.1.1"`, and `"Remediation-story-1-1-1.md"`, set Step 1 `decisionTree` to `createRuntimeOwnedDecisionActionTree({ startAction: createValidateStoryIndexEntryAction({ requiredStoryType: "remediation", requiredStatus: "draft" }) })`, submit new project title `"Validate Malformed Index"`, assert the returned action is `terminal_error`, assert `errorMessage` equals `VALIDATE_STORY_INDEX_MISSING_OR_MALFORMED_ERROR_MESSAGE`, and assert workflow state is cleared.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 247.4. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `terminal-errors when validate_story_index_entry cannot find the selected entry`; it must write `join(cwd, "docs", "projects", "validate-missing-entry", "implementation", "epic-1-stories.index.json")` with one primary entry `{ story_identity: "1.2", story_file_name: "Story-1-2.md", story_type: "primary", parent_story_identity: null, story_file_generated: true, status: "draft" }`, activate a workflow declaring `VALIDATE_STORY_INDEX_STORIES_INDEX_KEY`, `VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY`, and `VALIDATE_STORY_INDEX_STORY_FILENAME_KEY`, set those workflow values to the index path, `"1.1.1"`, and `"Remediation-story-1-1-1.md"`, set Step 1 `decisionTree` to `createRuntimeOwnedDecisionActionTree({ startAction: createValidateStoryIndexEntryAction({ requiredStoryType: "remediation", requiredStatus: "draft" }) })`, submit new project title `"Validate Missing Entry"`, assert the returned action is `terminal_error`, assert `errorMessage` equals `VALIDATE_STORY_INDEX_MISSING_ENTRY_ERROR_MESSAGE`, and assert workflow state is cleared.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 247.5. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `terminal-errors when validate_story_index_entry finds an invalid selected entry`; it must run exactly three cases: `required story type mismatch` with entry `{ story_identity: "1.1", story_file_name: "Story-1-1.md", story_type: "primary", parent_story_identity: null, story_file_generated: true, status: "draft" }`, workflow values story identity `"1.1"` and filename `"Story-1-1.md"`, and action `createValidateStoryIndexEntryAction({ requiredStoryType: "remediation", requiredStatus: "draft" })`; `story filename mismatch` with entry `{ story_identity: "1.1.1", story_file_name: "Remediation-story-1-1-1.md", story_type: "remediation", parent_story_identity: "1.1", story_file_generated: true, status: "draft" }`, workflow values story identity `"1.1.1"` and filename `"Different.md"`, and action `createValidateStoryIndexEntryAction({ requiredStoryType: "remediation", requiredStatus: "draft" })`; and `status mismatch` with the same remediation entry, workflow values story identity `"1.1.1"` and filename `"Remediation-story-1-1-1.md"`, and action `createValidateStoryIndexEntryAction({ requiredStoryType: "remediation", requiredStatus: "backlog" })`; each case must write the entry to `docs/projects/validate-invalid-entry-${caseIndex}/implementation/epic-1-stories.index.json`, set Step 1 `decisionTree` to `createRuntimeOwnedDecisionActionTree({ startAction: caseAction })`, submit the corresponding project title, and assert the returned action is `terminal_error`, `errorMessage` equals `VALIDATE_STORY_INDEX_INVALID_ENTRY_ERROR_MESSAGE`, and workflow state is cleared.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Subtask 247.6. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `terminal-errors when workspace path policy denies validate_story_index_entry reads`; it must write `storiesIndexPath = join(cwd, "docs", "projects", "validate-denied-index", "implementation", "epic-1-stories.index.json")` with one remediation entry `{ story_identity: "1.1.1", story_file_name: "Remediation-story-1-1-1.md", story_type: "remediation", parent_story_identity: "1.1", story_file_generated: true, status: "draft" }`, replace `runtime` with `new WorkflowRuntime({ cwd, workspacePathPolicy: { validateAccess: (filePath) => filePath !== storiesIndexPath } })`, activate a workflow declaring `VALIDATE_STORY_INDEX_STORIES_INDEX_KEY`, `VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY`, and `VALIDATE_STORY_INDEX_STORY_FILENAME_KEY`, set workflow values to the canonical index path, `"1.1.1"`, and `"Remediation-story-1-1-1.md"`, set Step 1 `decisionTree` to `createRuntimeOwnedDecisionActionTree({ startAction: createValidateStoryIndexEntryAction({ requiredStoryType: "remediation", requiredStatus: "draft" }) })`, submit new project title `"Validate Denied Index"`, assert the returned action is `terminal_error`, assert `errorMessage` equals `VALIDATE_STORY_INDEX_MISSING_OR_MALFORMED_ERROR_MESSAGE`, and assert workflow state is cleared.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[ ] Task 248. Run Phase 69 focused unit validation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Subtask 248.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/storyArtifacts.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Task 249. Run Phase 69 static validation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Subtask 249.1. Run `npm run check-types`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Subtask 249.2. Run `npm run lint`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Task 250. Run Phase 69 scope-diff validation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Subtask 250.1. Run `git diff --name-only`; confirm Phase 69 implementation changed only `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`, `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`, `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`, `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/storyArtifacts.ts`, `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, and `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/storyArtifacts.test.ts`; if `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/requirements.md`, `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md`, or `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/acceptance-audit-review/action-plan.md` appear in the diff, treat them as pre-existing dirty files unless their Phase 69 diff changed during this phase.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`

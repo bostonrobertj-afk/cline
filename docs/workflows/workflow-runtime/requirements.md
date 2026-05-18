@@ -187,7 +187,7 @@ The canonical in-scope workflow mapping for this requirements set is:
 | `quick-spec` | `quick-flow-solo-dev` | `planning` |
 | `review-adversarial-general` | `quality-control` | `review` |
 | `edge-case-hunter-review` | `quality-control` | `review` |
-| `write-remediation-story` | `developer` | `planning` |
+| `write-remediation-story` | `scrum-master` | `planning` |
 
 `problem-solving` is the target migrated workflow name for this initiative and replaces the legacy `cis-problem-solving.md` naming in the in-scope runtime contract.
 
@@ -373,6 +373,10 @@ The functional requirements below are grouped by the primary implementation phas
 - `FR-20j8f`: Optional prerequisite no-match, cancel, or rejection must not render the workflow-cannot-continue panel and must allow the workflow to continue without the optional prerequisite path.
 - `FR-20j8g`: When a prerequisite file is selected, WorkflowRuntime must persist the selected full absolute file path according to the module's prerequisite declaration before canonical next-action re-evaluation.
 - `FR-20j9`: Runtime must provide a backend-owned workflow file-move capability that workflow decision trees can invoke for existing project files. Moves must stay inside the selected project folder, satisfy workspace path-policy checks, and must not be exposed through model-facing tool schemas unless explicitly projected by a module.
+- `FR-20j10`: Runtime must provide a dedicated `resolve_existing_project_artifact` workflow decision action for resolving an existing selected-project artifact path from runtime-owned artifact-family metadata. This action must not be exposed through model-facing tool schemas.
+- `FR-20j10a`: `resolve_existing_project_artifact` must accept `artifactFamily`, `artifactIdentityWorkflowValueKey`, `projectSubfolderSegments`, `outputWorkflowValueKey`, and `missingArtifactErrorMessage`.
+- `FR-20j10b`: `resolve_existing_project_artifact` must normalize the artifact identity using the runtime-owned artifact identity normalization rules, derive the canonical filename from the runtime-owned artifact-family registry, resolve the path under the selected project folder and declared `projectSubfolderSegments`, enforce selected-project containment, enforce workspace path-policy validation before disk access, and require the resolved path to exist as a file.
+- `FR-20j10c`: On success, `resolve_existing_project_artifact` must persist the resolved absolute path to `outputWorkflowValueKey` through the workflow-value seam and re-enter canonical next-action evaluation. On failure, it must return a terminal error using `missingArtifactErrorMessage`.
 - `FR-20k`: Workflow modules must not prescribe canonical artifact filenames, increment artifact numbers, or compute canonical artifact paths.
 - `FR-20l`: The artifact allocation/create capability must resolve the active project, allocate or derive the canonical artifact identity, produce the canonical filename, project-relative path, and absolute path, and persist those outputs into workflow session values.
 - `FR-20l1`: When entry artifact resolution selects an existing singleton artifact, runtime must persist the same artifact output values that allocation would have produced, including project context, artifact family, artifact identity, artifact filename, artifact relative path, and artifact absolute path, without creating, overwriting, or rebuilding the file.
@@ -388,6 +392,11 @@ The functional requirements below are grouped by the primary implementation phas
 - `FR-20s`: Runtime/tooling must provide `generate_story_files` to read `epic-{E}-stories.index.json`, create missing primary and remediation draft story files in `implementation/drafts`, populate prescribed story headings, and set `story_file_generated` to `true`.
 - `FR-20t`: AI agents must not provide canonical story numbers or canonical story filenames. Runtime-owned story planning tools must assign them.
 - `FR-20u`: Runtime/tooling must provide backend-only `update_story_index_status` for governed updates to an existing story entry's `status` in `epic-{E}-stories.index.json`.
+- `FR-20v`: Runtime must provide a dedicated `validate_story_index_entry` workflow decision action for validating an existing entry in `epic-{E}-stories.index.json`. This action must not be exposed through model-facing tool schemas.
+- `FR-20v1`: `validate_story_index_entry` must accept `storyIndexWorkflowValueKey`, `storyIdentityWorkflowValueKey`, `storyFilenameWorkflowValueKey`, `requiredStoryType`, `requiredStatus`, `missingOrMalformedIndexErrorMessage`, `missingEntryErrorMessage`, and `invalidEntryErrorMessage`.
+- `FR-20v2`: `validate_story_index_entry` must resolve the expected `epic-{E}-stories.index.json` path from the selected project folder and selected story identity, require the persisted story-index path to match that canonical path, enforce workspace path-policy validation before reading, parse the index through the canonical story-index parser, and validate that the selected entry exists.
+- `FR-20v3`: `validate_story_index_entry` must validate that the selected entry's `story_type`, `story_file_name`, and `status` match the declared action requirements. Missing or malformed index failures must use `missingOrMalformedIndexErrorMessage`; missing entry failures must use `missingEntryErrorMessage`; wrong type, filename, or status failures must use `invalidEntryErrorMessage`.
+- `FR-20v4`: On success, `validate_story_index_entry` must not mutate the story index and must re-enter canonical next-action evaluation.
 - `FR-21`: Each workflow module must define references to workflow-specific evaluators or handlers only where imperative logic is truly required.
 - `FR-21a`: Each workflow module must define any workflow-specific workflow-value expectations and any explicit child-session workflow-value inheritance rules needed for that workflow.
 - `FR-21b`: Each workflow module must define the workflow-value keys that workflow supports, which of those keys are AI-writable, and any step-specific restrictions on AI-writable workflow values.

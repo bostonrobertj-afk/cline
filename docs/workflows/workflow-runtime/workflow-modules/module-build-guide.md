@@ -200,6 +200,16 @@ Project setup creates `implementation/drafts`, `implementation/stories-backlog`,
 
 Use backend-only `update_story_index_status` for governed runtime status updates to existing story index entries. Modules may route to it through runtime-owned decision actions, but it must not be included in model-facing tool schemas.
 
+Use runtime-owned `resolve_existing_project_artifact` when a workflow already has a canonical artifact identity in workflow values and needs runtime to resolve an existing selected-project artifact path. This action is for existing files only: runtime normalizes the identity through artifact-family rules, derives the canonical filename from `WORKFLOW_ARTIFACT_FAMILY_REGISTRY`, resolves the declared selected-project-relative folder, enforces workspace path-policy checks, requires the file to exist, persists the resolved absolute path, and re-enters decision-tree evaluation. Modules must not use direct `fs` reads, `stat`, `access`, custom filename builders, or custom selected-project path construction for this case.
+
+`resolve_existing_project_artifact` routes must declare the artifact family, the workflow value key containing the artifact identity, the selected-project-relative `projectSubfolderSegments`, the output workflow value key that receives the absolute path, and the exact terminal error message to show when resolution fails. If a user choice can refer to either a primary story or a remediation story, the module must route through separate decision-tree branches so each branch declares the exact `WorkflowArtifactFamily.Story` or `WorkflowArtifactFamily.RemediationStory` contract.
+
+Use runtime-owned `validate_story_index_entry` when a workflow must verify an existing selected story or remediation story entry in `implementation/epic-{E}-stories.index.json` before model-driven work, deterministic lifecycle actions, or project file moves. Runtime resolves the canonical story index path from the selected project and story identity, requires the persisted index path to match, enforces workspace path-policy checks before reading, parses through the canonical story-index parser, verifies the selected entry exists, and validates the entry's `story_type`, `story_file_name`, and `status`.
+
+`validate_story_index_entry` routes must declare workflow value keys for the story index path, story identity, and story filename; the required story type; the required status; and exact terminal error messages for missing or malformed index, missing entry, and invalid entry. This action does not mutate the story index; status changes still use backend-only `update_story_index_status`.
+
+`resolve_existing_project_artifact` and `validate_story_index_entry` are runtime-only decision actions. They must never be projected in model-facing tool schemas, response-tool schemas, or prompt-visible backend tool dictionaries. They do not replace prerequisite file selection, `selectorDiscovery`, JSON-backed form options, `plan_story_artifacts`, `plan_remediation_story_artifact`, `generate_story_files`, `update_story_index_status`, or `move_project_file`.
+
 ### Deterministic Procedures
 
 Use deterministic procedures for code-owned state changes that should not be AI-callable tools.

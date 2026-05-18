@@ -335,7 +335,7 @@ Pause for QA after Phase 3 validation passes.
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/acceptance-audit-review/action-plan.md`
 
-[ ] Task 14: Run final validation for Acceptance Audit Review.
+[x] Task 14: Run final validation for Acceptance Audit Review.
   [x] Subtask 14.1: Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/acceptance-audit-review/__tests__/acceptanceAuditReviewToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/acceptance-audit-review/__tests__/acceptanceAuditReviewWorkflow.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts`.
   [x] Subtask 14.2: Run `npm run check-types`; if it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos` and rerun `npm run check-types` before treating the failure as a code defect.
   [x] Subtask 14.3: Run `npm run lint`.
