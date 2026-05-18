@@ -108,7 +108,11 @@ The acceptance-audit-review workflow owns creation of `acceptance_audit_output`.
 
 For user-facing main-agent activation, the acceptance-audit-review workflow also owns creation and population of `review_scope_manifest`, mirroring the review-scope manifest behavior used by the `code-review` and `edge-case-hunter-review` workflows. For child/subagent activation, the workflow must inherit `review_scope_manifest` from the parent workflow session and must not create or replace that inherited manifest.
 
-The module must derive a module-owned `selected_story_identity` workflow value from `target_story` after prerequisite resolution or child inheritance. The derived value must be the story or remediation-story identity in dotted numeric form, such as `1.1` or `1.1.1`, parsed only from the basename of `target_story` using the approved story filename patterns. The artifact definitions for `review_scope_manifest` and `acceptance_audit_output` must use `selected_story_identity` as `targetIdentitySource`.
+For user-facing main-agent activation, the module must derive a module-owned `selected_story_identity` workflow value from `target_story` after prerequisite resolution. The derived value must be the story or remediation-story identity in dotted numeric form, such as `1.1` or `1.1.1`, parsed only from the basename of `target_story` using the approved story filename patterns.
+
+For child/subagent activation, the module must inherit `selected_story_identity` from the parent workflow session, trust the inherited value, validate it as a non-empty string, and use it for `acceptance_audit_output` artifact allocation. Child/subagent activation must not rederive `selected_story_identity` from `target_story`.
+
+The artifact definitions for `review_scope_manifest` and `acceptance_audit_output` must use `selected_story_identity` as `targetIdentitySource`.
 
 The module must not parse acceptance-audit output artifact filenames, replace output artifact separators, derive lineage segments from output artifact paths, or compute target artifact identities from any source other than the basename of `target_story` using the approved story filename patterns.
 
@@ -150,13 +154,14 @@ When activated as a child/subagent workflow, the acceptance-audit-review workflo
 - `review_commit_hash`
 - `review_commit_parent`
 - `target_story`
+- `selected_story_identity`
 - `epics_document`
 - `architecture_document`
 - `review_scope_manifest`
 
 Child/subagent workflow activation must copy project selection from the parent workflow session as runtime activation context, not through the workflow-value inheritance map.
 
-The workflow must not require runtime to persist whether acceptance-audit-review was activated as a main-agent workflow or child/subagent workflow. Instead, Step 1 must use workflow-value state as the gate for progression: `acceptance_audit_output` must not be generated and Step 2 must not be projected unless `target_story`, `epics_document`, `architecture_document`, `review_commit_hash`, `review_commit_parent`, and `review_scope_manifest` are all present as non-empty strings.
+The workflow must not require runtime to persist whether acceptance-audit-review was activated as a main-agent workflow or child/subagent workflow. Instead, Step 1 must use workflow-value state as the gate for progression: `acceptance_audit_output` must not be generated and Step 2 must not be projected unless `target_story`, `selected_story_identity`, `epics_document`, `architecture_document`, `review_commit_hash`, `review_commit_parent`, and `review_scope_manifest` are all present as non-empty strings.
 
 When activated as a child/subagent workflow, the acceptance-audit-review workflow must bypass:
 
@@ -190,7 +195,7 @@ The module must define these two steps, using these exact `checklistLabel` value
 
 | Step id | Step number | `checklistLabel` | Required runtime shape |
 | --- | --- | --- | --- |
-| `step-1` | 1 | `Gather Inputs & Generate Output File` | For main-agent activation, resolve `target_story`, derive `epics_document` and `architecture_document`, collect and validate the commit hash, persist `review_commit_hash` and `review_commit_parent`, generate and persist `review_scope_manifest`, create `acceptance_audit_output`, and transition to Step 2 only after valid project documentation, review evidence, manifest, and output artifact exist. For child/subagent activation, validate inherited workflow values, create `acceptance_audit_output`, and transition to Step 2 without rendering any forms or generating a new review-scope manifest. |
+| `step-1` | 1 | `Gather Inputs & Generate Output File` | For main-agent activation, resolve `target_story`, derive `epics_document` and `architecture_document`, collect and validate the commit hash, persist `review_commit_hash` and `review_commit_parent`, generate and persist `review_scope_manifest`, create `acceptance_audit_output`, and transition to Step 2 only after valid project documentation, review evidence, manifest, and output artifact exist. For child/subagent activation, validate inherited workflow values including `selected_story_identity`, create `acceptance_audit_output`, and transition to Step 2 without rendering any forms, deriving project documentation, deriving `selected_story_identity`, or generating a new review-scope manifest. |
 | `step-2` | 2 | `Conduct Acceptance Audit` | Model-driven acceptance audit step. Project the source-prescribed prompt, expose only the model-visible tools required for local CLI inspection, implementation/source review, output document writing, ordinary user messaging, and final completion, and complete the workflow after successful `attempt_completion`. |
 
 The acceptance-audit-review workflow has no entry singleton artifacts. Its Step 1 decision tree must not branch on `entry_artifact_resolution_completed`, must not inspect `creationRequired`, and must not use the singleton artifact startup flow described in the module build guide. Runtime-owned entry artifact resolution may complete with an empty artifact resolution list before Step 1 orchestration, and the module must proceed through its Step 1 entry branch using normal prerequisite, deterministic procedure, and target-derived artifact allocation routes.
@@ -415,6 +420,19 @@ Step 2 must expose only the model-callable tools required for the source-prescri
 - `send_user_message`, so the AI can send an ordinary user-visible message if it encounters a blocker before final completion
 - `attempt_completion`, so the AI can complete the workflow after documenting the review
 
+The Step 2 tool schema builder must use the exact `ClineToolSpec` descriptions and parameter instructions/descriptions approved below. No additional model-facing parameters are approved.
+
+- `execute_command`: description `Request to execute a CLI command on the system. Use this when you need to inspect git-backed implementation evidence.` Parameters: `command` required string instruction/description `The CLI command to execute.`; `requires_approval` required boolean instruction/description `Whether this command requires explicit user approval before execution.`
+- `list_files`: description `Request to list files and directories within the specified directory for acceptance audit review source inspection.` Parameters: `path` required string instruction/description `The path of the directory to list contents for.`; `recursive` optional boolean instruction/description `Whether to list files recursively.`
+- `search_files`: description `Request to perform a regex search across files in a specified directory.` Parameters: `path` required string instruction/description `The path of the directory to search in.`; `regex` required string instruction/description `The regular expression pattern to search for.`; `file_pattern` optional string instruction/description `Glob pattern to filter files.`
+- `list_code_definition_names`: description `Request to list definition names used in source code files at the top level of the specified directory.` Parameter: `path` required string instruction/description `The path of a directory, not a file.`
+- `read_file`: description `Request to read the contents of a file at the specified path. Do NOT use this tool to list the contents of a directory.` Parameter: `path` required string instruction/description `The path of the file to read.`
+- `read_file_range`: description `Request to read only a specific 1-based line range from a text file.` Parameters: `path` required string instruction/description `The path of the file to read.`; `start_line` required integer instruction/description `The first line to include, using 1-based line numbers.`; `end_line` required integer instruction/description `The last line to include, using 1-based line numbers.`
+- `apply_patch`: description `Apply a structured patch to one or more files using the repository apply_patch format.` Parameter: `input` required string instruction/description `The apply_patch command that you wish to execute.`
+- `write_to_file`: description `Request to write content to a file at the specified absolute path. If the file exists, it will be overwritten with the provided content.` Parameters: `absolutePath` required string instruction/description `The absolute path to the file to write to.`; `content` required string instruction/description `The content to write to the file.`
+- `send_user_message`: description `Send a direct user-visible message when other response tools are not appropriate or available. On success, this tool displays the message to the user and ends your current turn.` Parameter: `message` required string instruction/description `The direct message to show to the user.`
+- `attempt_completion`: description `Deliver the final acceptance audit review completion message to the user.` Parameter: `result` required string instruction/description `Final user-facing completion message.`
+
 Step 2 must not expose `web_search`, `web_fetch`, `browser_action`, `ask_followup_question`, `use_subagents`, `use_skill`, `set_workflow_values`, `build_workflow_document`, `create_workflow_artifact`, `archive_workflow_artifact`, `delete_workflow_artifact`, `move_workflow_project_file`, `workflow_progress_request`, MCP tools, or retired blind-review/code-review/edge-case-hunter/acceptance-audit tools.
 
 When `attempt_completion_succeeded` occurs in Step 2, the workflow must complete. Acceptance-audit-review completion must not update story index status, move story files, generate remediation stories, dispatch subagents, or mutate parent workflow state.
@@ -473,7 +491,7 @@ The module build must include focused unit tests covering:
 - prerequisite declaration for `target_story` using `implementation/stories-review`, required mode, producing workflow `dev-story`, naming pattern for `Story-{E}-{S}.md` and `Remediation-story-{E}-{S}-{R}.md`, workflow value key `target_story`, and `outputDocumentReference: "none"`
 - artifact definitions for `review_scope_manifest` and `acceptance_audit_output`, using runtime-owned target-derived artifact families, derived intent mode, `selected_story_identity` target identity source, and output value key mappings
 - main-agent Step 1 routing through prerequisite resolution, Epics/architecture document derivation, commit-hash form Panel A, invalid-commit Panel B, review-scope manifest generation, acceptance-audit output artifact creation, and transition to Step 2 after valid documentation paths, commit metadata, manifest, and output artifact allocation
-- child/subagent Step 1 routing that bypasses shared entry UI, prerequisite selection, Epics/architecture derivation, commit-hash workflow forms, and review-scope manifest creation; validates inherited `review_commit_hash`, `review_commit_parent`, `target_story`, `epics_document`, `architecture_document`, and `review_scope_manifest`; creates `acceptance_audit_output`; and transitions to Step 2
+- child/subagent Step 1 routing that bypasses shared entry UI, prerequisite selection, Epics/architecture derivation, `selected_story_identity` derivation, commit-hash workflow forms, and review-scope manifest creation; validates inherited `review_commit_hash`, `review_commit_parent`, `target_story`, `selected_story_identity`, `epics_document`, `architecture_document`, and `review_scope_manifest`; creates `acceptance_audit_output`; and transitions to Step 2
 - Step 1 value-gated routing that refuses to generate `acceptance_audit_output` or project Step 2 until `target_story`, `epics_document`, `architecture_document`, `review_commit_hash`, `review_commit_parent`, and `review_scope_manifest` are present
 - deterministic commit validation behavior, including successful persistence of normalized commit hash and parent hash, invalid hash routing to Panel B without writing commit values, parent-hash failure routing to Panel B, and selected project not being inside a Git work tree routing to Panel B
 - Epics/architecture document derivation from the selected project and persistence to `epics_document` and `architecture_document`

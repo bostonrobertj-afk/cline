@@ -45,7 +45,7 @@ Add only real risks discovered during code inspection: dirty worktree constraint
 
 ## Step 3: Identify the Appropriate Action Plan Phases:
 - If possible, the action plan should be divided into ordered phases, each of which end in a repo-valid intermediate state during which targeted testing and validation can be run during phase quality assessment.
-- An action plan phase must never prescribe addition of imports, helpers, or functions which are not wired into their legitimate runtime use in the same phase.
+- An action plan phase must not end with unused imports, unreachable private helpers, dead branches, or unvalidated new exports. A phase may introduce exported builders or helper modules before runtime integration when they are compile-safe, directly covered by phase validation, and wired into their runtime consumer in a later prescribed phase.
 - Likewise, an action plan must never prescribe removal of code which leaves behind "dead code" at the end of the action plan phase in which the code's deletion is prescribed.
 - Phase boundaries must be implementation-cohesive, not merely topical. Each phase must represent a valid, reviewable increment that can be committed cleanly.
 - Before moving on, add clear phase headings with brief descriptions to the action plan document, then add a subheading for each phase indicating the requirements which are relevant during the phase's implementation.
@@ -76,6 +76,7 @@ Add only real risks discovered during code inspection: dirty worktree constraint
     - Do NOT introduce hardcoded strings or values when they represent configuration, thresholds, labels, messages, or anything reasonably likely to change. ALL user-facing or UI strings MUST go into a strings.xml (or similar).
     - Avoid common low-quality development practices, including "any" typing, "as any" in tests, optional properties when it is possible to model the existing and non-existing combinations, bang bang operators, != null, not declaring function return types, inappropriate or overuse of type assertions, failure to use utility types, failing to use enums to manage constants, failing to use appropriate type narrowing, semantic aliasing, stale domain naming, unauthorized preservation of legacy concepts via compatiblity remaps, reading variant-specific fields from a union before narrowing on the discriminant, relying on TypeScript inference for complex test helpers, and using test fixture objects that omit required fields from typed runtime events, sessions, route actions, tool requests, workflow values, or metadata contracts.
     - Do not introduce architecture that is not clearly backed by the provided requirements.
+    - user or AI Agent-facing prose, descriptions, and instructions must be prescribed via the requirements and reflected exactly as the requirments prescribe in the action plan. If requirements do not provide the necessary content, stop and ask the user to add approved content to the requirements. 
     Example task & subtask configuration:
     [ ] Task 1: In <target file path a>, add two helper functions:
         [ ] Subtask 1.1: In <target file path a>, add <helper function 1 exact prescribed code>

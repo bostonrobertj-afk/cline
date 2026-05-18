@@ -45,6 +45,7 @@ This workflow may be activated for a subagent via use_skill. When the workflow i
 - epics_document
 - architecture_document
 - review_scope_manifest
+- selected_story_identity
 
 If inheritance of these keys fails for any reason, the workflow must fail terminally with a concrete error, visible to the main agent, so that they are able to shut down the subagent and retry.
 
