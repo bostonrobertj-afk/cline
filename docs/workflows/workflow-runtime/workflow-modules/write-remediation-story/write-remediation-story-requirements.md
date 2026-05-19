@@ -187,6 +187,7 @@ Panel B:
 - `title`: `Replace Story Document`
 - `promptMarkdown`: `Please select a drafted Remediation Story compatible with Findings Document: {code review document file name from prerequisite file resolution}`
 - field kind: `dropdown`
+- field label: `remediation story`
 - options: all canonical remediation story files present in the selected project's `implementation/drafts` folder, populated through runtime-owned `selectorDiscovery`
 - required: `true`
 - allowed actions: `submit`, `back`
@@ -200,6 +201,7 @@ Panel C:
 - `title`: `Replace Findings Document`
 - `promptMarkdown`: `Please select a drafted Code Review findings document compatible with the Remediation Story: {remediation story document file name from prerequisite file resolution}`
 - field kind: `dropdown`
+- field label: `review findings`
 - options: all canonical code-review findings documents present in the selected project's `review` folder, populated through runtime-owned `selectorDiscovery`
 - required: `true`
 - allowed actions: `submit`, `back`
