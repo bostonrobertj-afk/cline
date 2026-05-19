@@ -14,7 +14,7 @@ import type {
 	WorkflowToolBackedOperationExecutionRequest,
 } from "@/core/task/workflow-step-resolution/types"
 import type { ClineDefaultTool } from "@/shared/tools"
-import type { WorkflowStoryStatus } from "./storyArtifacts"
+import type { WorkflowStoryStatus, WorkflowStoryType } from "./storyArtifacts"
 
 export type WorkflowName = string
 export type WorkflowValue = string | number | boolean | WorkflowValue[] | { [key: string]: WorkflowValue }
@@ -329,6 +329,25 @@ export type WorkflowDecisionAction =
 			storyIdentityWorkflowValueKey: string
 			status: WorkflowStoryStatus
 			expectedCurrentStatus?: WorkflowStoryStatus
+	  }
+	| {
+			kind: "resolve_existing_project_artifact"
+			artifactFamily: WorkflowArtifactFamily
+			artifactIdentityWorkflowValueKey: string
+			projectSubfolderSegments: readonly string[]
+			outputWorkflowValueKey: string
+			missingArtifactErrorMessage: string
+	  }
+	| {
+			kind: "validate_story_index_entry"
+			storyIndexWorkflowValueKey: string
+			storyIdentityWorkflowValueKey: string
+			storyFilenameWorkflowValueKey: string
+			requiredStoryType: WorkflowStoryType
+			requiredStatus: WorkflowStoryStatus
+			missingOrMalformedIndexErrorMessage: string
+			missingEntryErrorMessage: string
+			invalidEntryErrorMessage: string
 	  }
 	| { kind: "resolve_prerequisite_files"; prerequisiteIds: readonly string[] }
 	| { kind: "transition_step"; target: WorkflowStepTransitionTarget }

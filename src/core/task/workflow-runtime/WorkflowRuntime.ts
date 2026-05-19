@@ -46,6 +46,8 @@ import {
 	buildEpicStoriesIndexFilename,
 	buildPrimaryStoryIndexEntry,
 	buildRemediationStoryIndexEntry,
+	isWorkflowStoryStatus,
+	isWorkflowStoryType,
 	parseWorkflowStoryIndexJson,
 	stringifyWorkflowStoryIndex,
 	type WorkflowStoryIndex,
@@ -200,6 +202,9 @@ export interface WorkflowUpdateStoryIndexStatusResult {
 	previousStatus: WorkflowStoryStatus
 	status: WorkflowStoryStatus
 }
+
+type ResolveExistingProjectArtifactAction = Extract<WorkflowDecisionAction, { kind: "resolve_existing_project_artifact" }>
+type ValidateStoryIndexEntryAction = Extract<WorkflowDecisionAction, { kind: "validate_story_index_entry" }>
 
 interface WorkflowArtifactIdentityResolution {
 	artifactIdentity: string
@@ -6110,6 +6115,10 @@ export class WorkflowRuntime {
 					},
 				}
 			}
+			case "resolve_existing_project_artifact":
+				return this.resolveExistingProjectArtifactNextAction({ taskState, action, sourceRoute })
+			case "validate_story_index_entry":
+				return this.validateStoryIndexEntryNextAction({ taskState, action, sourceRoute })
 			case "resolve_prerequisite_files":
 				return this.buildResolvePrerequisiteFilesNextAction({
 					taskState,
@@ -6195,6 +6204,178 @@ export class WorkflowRuntime {
 		}
 
 		return join(this.resolveWorkflowProjectOutputRoot(), session.projectSelection.projectFolderName)
+	}
+
+	private normalizeExistingProjectArtifactIdentity(args: {
+		familyDefinition: WorkflowArtifactFamilyDefinition
+		rawIdentity: string
+	}): string {
+		const normalizedIdentity = this.normalizeWorkflowArtifactIdentityInput(args.rawIdentity)
+		switch (args.familyDefinition.family) {
+			case WorkflowArtifactFamily.Epics:
+			case WorkflowArtifactFamily.EpicsIndex:
+			case WorkflowArtifactFamily.BrainstormingSession:
+			case WorkflowArtifactFamily.ArchitectureDocument:
+				if (normalizedIdentity === args.familyDefinition.singletonIdentity) {
+					return args.familyDefinition.singletonIdentity
+				}
+				break
+			case WorkflowArtifactFamily.EpicDeliverySpec:
+			case WorkflowArtifactFamily.EpicStoriesIndex: {
+				const parsedIdentity = this.parseDottedWorkflowArtifactIdentity(normalizedIdentity)
+				if (parsedIdentity.storyNumber === undefined && parsedIdentity.remediationStoryNumber === undefined) {
+					return parsedIdentity.artifactIdentity
+				}
+				break
+			}
+			case WorkflowArtifactFamily.Story: {
+				const parsedIdentity = this.parseDottedWorkflowArtifactIdentity(normalizedIdentity)
+				if (parsedIdentity.storyNumber !== undefined && parsedIdentity.remediationStoryNumber === undefined) {
+					return parsedIdentity.artifactIdentity
+				}
+				break
+			}
+			case WorkflowArtifactFamily.RemediationStory: {
+				const parsedIdentity = this.parseDottedWorkflowArtifactIdentity(normalizedIdentity)
+				if (parsedIdentity.storyNumber !== undefined && parsedIdentity.remediationStoryNumber !== undefined) {
+					return parsedIdentity.artifactIdentity
+				}
+				break
+			}
+			case WorkflowArtifactFamily.BlindReviewOutput:
+			case WorkflowArtifactFamily.AcceptanceAuditOutput:
+			case WorkflowArtifactFamily.EdgeCaseReviewOutput:
+			case WorkflowArtifactFamily.CodeReviewOutput:
+			case WorkflowArtifactFamily.ReviewScopeManifest: {
+				const parsedIdentity = this.parseDottedWorkflowArtifactIdentity(normalizedIdentity)
+				if (parsedIdentity.storyNumber !== undefined) {
+					return parsedIdentity.artifactIdentity
+				}
+				break
+			}
+		}
+
+		throw new Error(
+			`Workflow artifact identity ${args.rawIdentity} is incompatible with artifact family ${args.familyDefinition.family}.`,
+		)
+	}
+
+	private async resolveExistingProjectArtifactNextAction(args: {
+		taskState: TaskState
+		action: ResolveExistingProjectArtifactAction
+		sourceRoute: WorkflowStepResolutionSourceRoute
+	}): Promise<WorkflowNextAction> {
+		const session = args.taskState.activeWorkflowSession
+		if (session === undefined) {
+			return { kind: "no_op" }
+		}
+
+		try {
+			const rawIdentity = readRequiredStringWorkflowValue({
+				workflowValues: session.workflowValues,
+				key: args.action.artifactIdentityWorkflowValueKey,
+				context: `existing project artifact resolution route ${args.sourceRoute.branchId}/${args.sourceRoute.routeId}`,
+			})
+			const familyDefinition = WORKFLOW_ARTIFACT_FAMILY_REGISTRY[args.action.artifactFamily]
+			const artifactIdentity = this.normalizeExistingProjectArtifactIdentity({ familyDefinition, rawIdentity })
+			const artifactFilename = this.buildWorkflowArtifactFilename({ familyDefinition, artifactIdentity })
+			const selectedProjectRoot = this.resolveWorkflowProjectOutputFolder(session)
+			const targetFolderPath = resolveWorkflowDiscoveryTargetDirectory({
+				rootDirectory: selectedProjectRoot,
+				targetPathSegments: args.action.projectSubfolderSegments,
+			})
+			const artifactAbsolutePath = join(targetFolderPath, artifactFilename)
+
+			this.assertWorkspacePathAllowed(targetFolderPath)
+			this.assertWorkspacePathAllowed(artifactAbsolutePath)
+
+			const artifactStats = await stat(artifactAbsolutePath)
+			if (artifactStats.isFile() === false) {
+				throw new Error(`Resolved workflow artifact path is not a file: ${artifactAbsolutePath}`)
+			}
+
+			await this.applyWorkflowValueWrites({
+				taskState: args.taskState,
+				values: { [args.action.outputWorkflowValueKey]: artifactAbsolutePath },
+			})
+
+			return this.resolveNextAction({ taskState: args.taskState })
+		} catch {
+			return this.buildTerminalErrorNextAction({
+				taskState: args.taskState,
+				errorMessage: args.action.missingArtifactErrorMessage,
+			})
+		}
+	}
+
+	private async validateStoryIndexEntryNextAction(args: {
+		taskState: TaskState
+		action: ValidateStoryIndexEntryAction
+		sourceRoute: WorkflowStepResolutionSourceRoute
+	}): Promise<WorkflowNextAction> {
+		const session = args.taskState.activeWorkflowSession
+		if (session === undefined) {
+			return { kind: "no_op" }
+		}
+
+		let storyIndex: WorkflowStoryIndex
+		let storyIdentity: string
+		let storyFilename: string
+		try {
+			const routeContext = `story index entry validation route ${args.sourceRoute.branchId}/${args.sourceRoute.routeId}`
+			const storiesIndex = readRequiredStringWorkflowValue({
+				workflowValues: session.workflowValues,
+				key: args.action.storyIndexWorkflowValueKey,
+				context: `${routeContext} storyIndexWorkflowValueKey`,
+			})
+			storyIdentity = readRequiredStringWorkflowValue({
+				workflowValues: session.workflowValues,
+				key: args.action.storyIdentityWorkflowValueKey,
+				context: `${routeContext} storyIdentityWorkflowValueKey`,
+			})
+			storyFilename = readRequiredStringWorkflowValue({
+				workflowValues: session.workflowValues,
+				key: args.action.storyFilenameWorkflowValueKey,
+				context: `${routeContext} storyFilenameWorkflowValueKey`,
+			})
+			const epicIdentity = this.resolveEpicIdentityFromStoryIdentity(storyIdentity)
+			const expectedStoryIndexAbsolutePath = this.resolveEpicStoriesIndexPath({ session, epicIdentity })
+			if (storiesIndex !== expectedStoryIndexAbsolutePath) {
+				return this.buildTerminalErrorNextAction({
+					taskState: args.taskState,
+					errorMessage: args.action.missingOrMalformedIndexErrorMessage,
+				})
+			}
+
+			this.assertWorkspacePathAllowed(storiesIndex)
+			storyIndex = parseWorkflowStoryIndexJson(await readFile(storiesIndex, "utf8"))
+		} catch {
+			return this.buildTerminalErrorNextAction({
+				taskState: args.taskState,
+				errorMessage: args.action.missingOrMalformedIndexErrorMessage,
+			})
+		}
+
+		const selectedEntry = storyIndex.stories.find((entry) => entry.story_identity === storyIdentity)
+		if (selectedEntry === undefined) {
+			return this.buildTerminalErrorNextAction({
+				taskState: args.taskState,
+				errorMessage: args.action.missingEntryErrorMessage,
+			})
+		}
+
+		if (
+			selectedEntry.story_type !== args.action.requiredStoryType ||
+			selectedEntry.story_file_name !== storyFilename ||
+			selectedEntry.status !== args.action.requiredStatus
+		) {
+			return this.buildTerminalErrorNextAction({
+				taskState: args.taskState,
+				errorMessage: args.action.invalidEntryErrorMessage,
+			})
+		}
+
+		return this.resolveNextAction({ taskState: args.taskState })
 	}
 
 	private resolveEpicStoriesIndexPath(args: { session: ActiveWorkflowSession; epicIdentity: string }): string {
@@ -7704,6 +7885,130 @@ export class WorkflowRuntime {
 									return {
 										valid: false,
 										errorMessage: `Workflow step ${step.id} route ${route.id} update_story_index_status ${workflowValueKeyCheck.name} ${workflowValueKeyCheck.key} must be declared in workflowValueKeys.`,
+									}
+								}
+							}
+							break
+						}
+						case "resolve_existing_project_artifact": {
+							if (this.isWorkflowArtifactFamily(route.action.artifactFamily) === false) {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} resolve_existing_project_artifact artifactFamily ${route.action.artifactFamily} is not registered.`,
+								}
+							}
+							for (const projectSubfolderSegment of route.action.projectSubfolderSegments) {
+								if (!isWorkflowDiscoveryTargetPathSegment(projectSubfolderSegment)) {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} resolve_existing_project_artifact projectSubfolderSegments entry ${projectSubfolderSegment} is invalid.`,
+									}
+								}
+							}
+							const workflowValueKeyChecks = [
+								{
+									name: "artifactIdentityWorkflowValueKey",
+									key: route.action.artifactIdentityWorkflowValueKey,
+								},
+								{
+									name: "outputWorkflowValueKey",
+									key: route.action.outputWorkflowValueKey,
+								},
+							] as const
+							for (const workflowValueKeyCheck of workflowValueKeyChecks) {
+								if (workflowValueKeyCheck.key.trim() === "") {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} resolve_existing_project_artifact ${workflowValueKeyCheck.name} must not be empty.`,
+									}
+								}
+								if (workflowValueKeyCheck.key.trim() !== workflowValueKeyCheck.key) {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} resolve_existing_project_artifact ${workflowValueKeyCheck.name} ${workflowValueKeyCheck.key} must already be trimmed.`,
+									}
+								}
+								if (!workflowValueKeys.has(workflowValueKeyCheck.key)) {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} resolve_existing_project_artifact ${workflowValueKeyCheck.name} ${workflowValueKeyCheck.key} must be declared in workflowValueKeys.`,
+									}
+								}
+							}
+							if (route.action.missingArtifactErrorMessage.trim() === "") {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} resolve_existing_project_artifact missingArtifactErrorMessage must not be empty.`,
+								}
+							}
+							break
+						}
+						case "validate_story_index_entry": {
+							const workflowValueKeyChecks = [
+								{
+									name: "storyIndexWorkflowValueKey",
+									key: route.action.storyIndexWorkflowValueKey,
+								},
+								{
+									name: "storyIdentityWorkflowValueKey",
+									key: route.action.storyIdentityWorkflowValueKey,
+								},
+								{
+									name: "storyFilenameWorkflowValueKey",
+									key: route.action.storyFilenameWorkflowValueKey,
+								},
+							] as const
+							for (const workflowValueKeyCheck of workflowValueKeyChecks) {
+								if (workflowValueKeyCheck.key.trim() === "") {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} validate_story_index_entry ${workflowValueKeyCheck.name} must not be empty.`,
+									}
+								}
+								if (workflowValueKeyCheck.key.trim() !== workflowValueKeyCheck.key) {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} validate_story_index_entry ${workflowValueKeyCheck.name} ${workflowValueKeyCheck.key} must already be trimmed.`,
+									}
+								}
+								if (!workflowValueKeys.has(workflowValueKeyCheck.key)) {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} validate_story_index_entry ${workflowValueKeyCheck.name} ${workflowValueKeyCheck.key} must be declared in workflowValueKeys.`,
+									}
+								}
+							}
+							if (isWorkflowStoryType(route.action.requiredStoryType) === false) {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} validate_story_index_entry requiredStoryType ${route.action.requiredStoryType} is invalid.`,
+								}
+							}
+							if (isWorkflowStoryStatus(route.action.requiredStatus) === false) {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} validate_story_index_entry requiredStatus ${route.action.requiredStatus} is invalid.`,
+								}
+							}
+							const errorMessageChecks = [
+								{
+									name: "missingOrMalformedIndexErrorMessage",
+									errorMessage: route.action.missingOrMalformedIndexErrorMessage,
+								},
+								{
+									name: "missingEntryErrorMessage",
+									errorMessage: route.action.missingEntryErrorMessage,
+								},
+								{
+									name: "invalidEntryErrorMessage",
+									errorMessage: route.action.invalidEntryErrorMessage,
+								},
+							] as const
+							for (const errorMessageCheck of errorMessageChecks) {
+								if (errorMessageCheck.errorMessage.trim() === "") {
+									return {
+										valid: false,
+										errorMessage: `Workflow step ${step.id} route ${route.id} validate_story_index_entry ${errorMessageCheck.name} must not be empty.`,
 									}
 								}
 							}

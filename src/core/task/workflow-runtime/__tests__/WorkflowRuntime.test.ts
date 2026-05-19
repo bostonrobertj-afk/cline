@@ -27,6 +27,7 @@ import {
 	stringifyWorkflowStoryIndex,
 	type WorkflowStoryIndex,
 	type WorkflowStoryStatus,
+	type WorkflowStoryType,
 } from "../storyArtifacts"
 import { buildWorkflowStoryFileTemplate } from "../storyFileTemplate"
 import type {
@@ -76,6 +77,11 @@ type ObservedDecisionPredicateInput = {
 
 type WorkflowRenderFormDecisionAction = Extract<WorkflowDecisionAction, { kind: "render_workflow_form" }>
 type WorkflowContinueFormDecisionAction = Extract<WorkflowDecisionAction, { kind: "continue_workflow_form" }>
+type WorkflowResolveExistingProjectArtifactDecisionAction = Extract<
+	WorkflowDecisionAction,
+	{ kind: "resolve_existing_project_artifact" }
+>
+type WorkflowValidateStoryIndexEntryDecisionAction = Extract<WorkflowDecisionAction, { kind: "validate_story_index_entry" }>
 type WorkflowExecuteToolBackedOperationNextAction = Extract<WorkflowNextAction, { kind: "execute_tool_backed_operation" }>
 type WorkflowRenderWorkflowFormNextAction = Extract<WorkflowNextAction, { kind: "render_workflow_form" }>
 
@@ -120,6 +126,15 @@ describe("WorkflowRuntime", () => {
 	const MOVE_PROJECT_FILE_FILENAME_KEY = "selected_story_filename"
 	const UPDATE_STORY_INDEX_STATUS_STORIES_INDEX_KEY = "selected_stories_index"
 	const UPDATE_STORY_INDEX_STATUS_STORY_IDENTITY_KEY = "selected_story_identity"
+	const RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY = "existing_artifact_identity"
+	const RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY = "existing_artifact_absolute_path"
+	const RESOLVE_EXISTING_PROJECT_ARTIFACT_ERROR_MESSAGE = "Existing project artifact could not be resolved."
+	const VALIDATE_STORY_INDEX_STORIES_INDEX_KEY = "validated_stories_index"
+	const VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY = "validated_story_identity"
+	const VALIDATE_STORY_INDEX_STORY_FILENAME_KEY = "validated_story_filename"
+	const VALIDATE_STORY_INDEX_MISSING_OR_MALFORMED_ERROR_MESSAGE = "Story index is missing or malformed."
+	const VALIDATE_STORY_INDEX_MISSING_ENTRY_ERROR_MESSAGE = "Story index entry is missing."
+	const VALIDATE_STORY_INDEX_INVALID_ENTRY_ERROR_MESSAGE = "Story index entry is invalid."
 
 	let sandbox: sinon.SinonSandbox
 	let cwd: string
@@ -533,6 +548,38 @@ describe("WorkflowRuntime", () => {
 		}
 	}
 
+	function createRuntimeOwnedDecisionActionTree(args: {
+		startAction: WorkflowDecisionAction
+		nextAction?: WorkflowDecisionAction
+	}): WorkflowDecisionTree {
+		return {
+			entryBranchId: "run-runtime-owned-action",
+			branches: {
+				"run-runtime-owned-action": {
+					id: "run-runtime-owned-action",
+					routes: [
+						{
+							id: "start-runtime-owned-action",
+							trigger: { kind: "always" },
+							action: args.startAction,
+							followingBranchId: "after-runtime-owned-action",
+						},
+					],
+				},
+				"after-runtime-owned-action": {
+					id: "after-runtime-owned-action",
+					routes: [
+						{
+							id: "after-runtime-owned-action-route",
+							trigger: { kind: "always" },
+							action: args.nextAction ?? { kind: "project_prompt" },
+						},
+					],
+				},
+			},
+		}
+	}
+
 	function createToolBackedOperationDecisionTree(args?: {
 		startAction?: WorkflowDecisionAction
 		successAction?: WorkflowDecisionAction
@@ -820,6 +867,48 @@ describe("WorkflowRuntime", () => {
 			storyIdentityWorkflowValueKey: args?.storyIdentityWorkflowValueKey ?? UPDATE_STORY_INDEX_STATUS_STORY_IDENTITY_KEY,
 			status: args?.status ?? "backlog",
 			...(args?.expectedCurrentStatus === undefined ? {} : { expectedCurrentStatus: args.expectedCurrentStatus }),
+		}
+	}
+
+	function createResolveExistingProjectArtifactAction(args?: {
+		artifactFamily?: WorkflowArtifactFamily
+		artifactIdentityWorkflowValueKey?: string
+		projectSubfolderSegments?: readonly string[]
+		outputWorkflowValueKey?: string
+		missingArtifactErrorMessage?: string
+	}): WorkflowResolveExistingProjectArtifactDecisionAction {
+		return {
+			kind: "resolve_existing_project_artifact",
+			artifactFamily: args?.artifactFamily ?? WorkflowArtifactFamily.Story,
+			artifactIdentityWorkflowValueKey:
+				args?.artifactIdentityWorkflowValueKey ?? RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY,
+			projectSubfolderSegments: args?.projectSubfolderSegments ?? ["implementation", "stories-complete"],
+			outputWorkflowValueKey: args?.outputWorkflowValueKey ?? RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY,
+			missingArtifactErrorMessage: args?.missingArtifactErrorMessage ?? RESOLVE_EXISTING_PROJECT_ARTIFACT_ERROR_MESSAGE,
+		}
+	}
+
+	function createValidateStoryIndexEntryAction(args?: {
+		storyIndexWorkflowValueKey?: string
+		storyIdentityWorkflowValueKey?: string
+		storyFilenameWorkflowValueKey?: string
+		requiredStoryType?: WorkflowStoryType
+		requiredStatus?: WorkflowStoryStatus
+		missingOrMalformedIndexErrorMessage?: string
+		missingEntryErrorMessage?: string
+		invalidEntryErrorMessage?: string
+	}): WorkflowValidateStoryIndexEntryDecisionAction {
+		return {
+			kind: "validate_story_index_entry",
+			storyIndexWorkflowValueKey: args?.storyIndexWorkflowValueKey ?? VALIDATE_STORY_INDEX_STORIES_INDEX_KEY,
+			storyIdentityWorkflowValueKey: args?.storyIdentityWorkflowValueKey ?? VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY,
+			storyFilenameWorkflowValueKey: args?.storyFilenameWorkflowValueKey ?? VALIDATE_STORY_INDEX_STORY_FILENAME_KEY,
+			requiredStoryType: args?.requiredStoryType ?? "remediation",
+			requiredStatus: args?.requiredStatus ?? "draft",
+			missingOrMalformedIndexErrorMessage:
+				args?.missingOrMalformedIndexErrorMessage ?? VALIDATE_STORY_INDEX_MISSING_OR_MALFORMED_ERROR_MESSAGE,
+			missingEntryErrorMessage: args?.missingEntryErrorMessage ?? VALIDATE_STORY_INDEX_MISSING_ENTRY_ERROR_MESSAGE,
+			invalidEntryErrorMessage: args?.invalidEntryErrorMessage ?? VALIDATE_STORY_INDEX_INVALID_ENTRY_ERROR_MESSAGE,
 		}
 	}
 
@@ -2783,6 +2872,267 @@ describe("WorkflowRuntime", () => {
 			expect(invalidDestinationState.activeWorkflowName, `destination ${invalidFolderSegment.label}`).to.be.undefined
 			expect(invalidDestinationState.activeWorkflowSession, `destination ${invalidFolderSegment.label}`).to.be.undefined
 		}
+	})
+
+	it("rejects resolve_existing_project_artifact routes with invalid folder segments before activation", async () => {
+		const invalidFolderSegments: ReadonlyArray<{ readonly label: string; readonly segment: string }> = [
+			{ label: "empty string", segment: "" },
+			{ label: "current directory", segment: "." },
+			{ label: "parent directory", segment: ".." },
+			{ label: "slash", segment: "nested/path" },
+			{ label: "backslash", segment: "nested\\path" },
+			{ label: "absolute path", segment: join(cwd, "outside") },
+			{ label: "Windows drive syntax", segment: "C:" },
+		]
+
+		for (const invalidFolderSegment of invalidFolderSegments) {
+			const invalidState = new TaskState()
+			const invalidWorkflow = createWorkflowDefinition({
+				workflowValueKeys: [RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY, RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY],
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createRuntimeOwnedDecisionActionTree({
+							startAction: createResolveExistingProjectArtifactAction({
+								projectSubfolderSegments: ["implementation", invalidFolderSegment.segment],
+							}),
+						}),
+					}),
+				},
+			})
+
+			const result = await activateWorkflow(invalidState, invalidWorkflow)
+			expect(result, invalidFolderSegment.label).to.deep.equal({ kind: "no_op" })
+			expect(invalidState.activeWorkflowName, invalidFolderSegment.label).to.be.undefined
+			expect(invalidState.activeWorkflowSession, invalidFolderSegment.label).to.be.undefined
+		}
+	})
+
+	it("rejects resolve_existing_project_artifact routes with invalid workflow-value keys or messages before activation", async () => {
+		const invalidRouteCases: ReadonlyArray<{
+			readonly label: string
+			readonly caseOverrides: NonNullable<Parameters<typeof createResolveExistingProjectArtifactAction>[0]>
+		}> = [
+			{
+				label: "blank identity key",
+				caseOverrides: { artifactIdentityWorkflowValueKey: "" },
+			},
+			{
+				label: "untrimmed identity key",
+				caseOverrides: { artifactIdentityWorkflowValueKey: " existing_artifact_identity" },
+			},
+			{
+				label: "undeclared identity key",
+				caseOverrides: { artifactIdentityWorkflowValueKey: "missing_existing_artifact_identity" },
+			},
+			{
+				label: "blank output key",
+				caseOverrides: { outputWorkflowValueKey: "" },
+			},
+			{
+				label: "untrimmed output key",
+				caseOverrides: { outputWorkflowValueKey: " existing_artifact_absolute_path" },
+			},
+			{
+				label: "undeclared output key",
+				caseOverrides: { outputWorkflowValueKey: "missing_existing_artifact_absolute_path" },
+			},
+			{
+				label: "blank missing artifact message",
+				caseOverrides: { missingArtifactErrorMessage: "" },
+			},
+		]
+
+		for (const invalidRouteCase of invalidRouteCases) {
+			const invalidState = new TaskState()
+			const invalidWorkflow = createWorkflowDefinition({
+				workflowValueKeys: [RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY, RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY],
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createRuntimeOwnedDecisionActionTree({
+							startAction: createResolveExistingProjectArtifactAction(invalidRouteCase.caseOverrides),
+						}),
+					}),
+				},
+			})
+
+			const result = await activateWorkflow(invalidState, invalidWorkflow)
+			expect(result, invalidRouteCase.label).to.deep.equal({ kind: "no_op" })
+			expect(invalidState.activeWorkflowName, invalidRouteCase.label).to.be.undefined
+			expect(invalidState.activeWorkflowSession, invalidRouteCase.label).to.be.undefined
+		}
+	})
+
+	it("rejects validate_story_index_entry routes with invalid workflow-value keys before activation", async () => {
+		const invalidRouteCases: ReadonlyArray<{
+			readonly label: string
+			readonly caseOverrides: NonNullable<Parameters<typeof createValidateStoryIndexEntryAction>[0]>
+		}> = [
+			{
+				label: "blank story index key",
+				caseOverrides: { storyIndexWorkflowValueKey: "" },
+			},
+			{
+				label: "untrimmed story index key",
+				caseOverrides: { storyIndexWorkflowValueKey: " validated_stories_index" },
+			},
+			{
+				label: "undeclared story index key",
+				caseOverrides: { storyIndexWorkflowValueKey: "missing_validated_stories_index" },
+			},
+			{
+				label: "blank story identity key",
+				caseOverrides: { storyIdentityWorkflowValueKey: "" },
+			},
+			{
+				label: "untrimmed story identity key",
+				caseOverrides: { storyIdentityWorkflowValueKey: " validated_story_identity" },
+			},
+			{
+				label: "undeclared story identity key",
+				caseOverrides: { storyIdentityWorkflowValueKey: "missing_validated_story_identity" },
+			},
+			{
+				label: "blank story filename key",
+				caseOverrides: { storyFilenameWorkflowValueKey: "" },
+			},
+			{
+				label: "untrimmed story filename key",
+				caseOverrides: { storyFilenameWorkflowValueKey: " validated_story_filename" },
+			},
+			{
+				label: "undeclared story filename key",
+				caseOverrides: { storyFilenameWorkflowValueKey: "missing_validated_story_filename" },
+			},
+		]
+
+		for (const invalidRouteCase of invalidRouteCases) {
+			const invalidState = new TaskState()
+			const invalidWorkflow = createWorkflowDefinition({
+				workflowValueKeys: [
+					VALIDATE_STORY_INDEX_STORIES_INDEX_KEY,
+					VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY,
+					VALIDATE_STORY_INDEX_STORY_FILENAME_KEY,
+				],
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createRuntimeOwnedDecisionActionTree({
+							startAction: createValidateStoryIndexEntryAction(invalidRouteCase.caseOverrides),
+						}),
+					}),
+				},
+			})
+
+			const result = await activateWorkflow(invalidState, invalidWorkflow)
+			expect(result, invalidRouteCase.label).to.deep.equal({ kind: "no_op" })
+			expect(invalidState.activeWorkflowName, invalidRouteCase.label).to.be.undefined
+			expect(invalidState.activeWorkflowSession, invalidRouteCase.label).to.be.undefined
+		}
+	})
+
+	it("rejects validate_story_index_entry routes with invalid required story type or status before activation", async () => {
+		const invalidStoryTypeAction = createValidateStoryIndexEntryAction()
+		Object.assign(invalidStoryTypeAction, { requiredStoryType: "feature" })
+		const invalidStatusAction = createValidateStoryIndexEntryAction()
+		Object.assign(invalidStatusAction, { requiredStatus: "ready" })
+		const invalidActions: ReadonlyArray<{
+			readonly label: string
+			readonly action: WorkflowDecisionAction
+		}> = [
+			{ label: "invalid required story type", action: invalidStoryTypeAction },
+			{ label: "invalid required status", action: invalidStatusAction },
+		]
+
+		for (const invalidAction of invalidActions) {
+			const invalidState = new TaskState()
+			const invalidWorkflow = createWorkflowDefinition({
+				workflowValueKeys: [
+					VALIDATE_STORY_INDEX_STORIES_INDEX_KEY,
+					VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY,
+					VALIDATE_STORY_INDEX_STORY_FILENAME_KEY,
+				],
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createRuntimeOwnedDecisionActionTree({
+							startAction: invalidAction.action,
+						}),
+					}),
+				},
+			})
+
+			const result = await activateWorkflow(invalidState, invalidWorkflow)
+			expect(result, invalidAction.label).to.deep.equal({ kind: "no_op" })
+			expect(invalidState.activeWorkflowName, invalidAction.label).to.be.undefined
+			expect(invalidState.activeWorkflowSession, invalidAction.label).to.be.undefined
+		}
+	})
+
+	it("rejects validate_story_index_entry routes with blank terminal error messages before activation", async () => {
+		const invalidRouteCases: ReadonlyArray<{
+			readonly label: string
+			readonly caseOverrides: NonNullable<Parameters<typeof createValidateStoryIndexEntryAction>[0]>
+		}> = [
+			{
+				label: "blank missing or malformed index message",
+				caseOverrides: { missingOrMalformedIndexErrorMessage: "" },
+			},
+			{
+				label: "blank missing entry message",
+				caseOverrides: { missingEntryErrorMessage: "" },
+			},
+			{
+				label: "blank invalid entry message",
+				caseOverrides: { invalidEntryErrorMessage: "" },
+			},
+		]
+
+		for (const invalidRouteCase of invalidRouteCases) {
+			const invalidState = new TaskState()
+			const invalidWorkflow = createWorkflowDefinition({
+				workflowValueKeys: [
+					VALIDATE_STORY_INDEX_STORIES_INDEX_KEY,
+					VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY,
+					VALIDATE_STORY_INDEX_STORY_FILENAME_KEY,
+				],
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createRuntimeOwnedDecisionActionTree({
+							startAction: createValidateStoryIndexEntryAction(invalidRouteCase.caseOverrides),
+						}),
+					}),
+				},
+			})
+
+			const result = await activateWorkflow(invalidState, invalidWorkflow)
+			expect(result, invalidRouteCase.label).to.deep.equal({ kind: "no_op" })
+			expect(invalidState.activeWorkflowName, invalidRouteCase.label).to.be.undefined
+			expect(invalidState.activeWorkflowSession, invalidRouteCase.label).to.be.undefined
+		}
+	})
+
+	it("rejects resolve_existing_project_artifact routes with unregistered artifact families before activation", async () => {
+		const action = createResolveExistingProjectArtifactAction()
+		Object.assign(action, { artifactFamily: "module_owned_family" })
+		const invalidWorkflow = createWorkflowDefinition({
+			workflowValueKeys: [RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY, RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createRuntimeOwnedDecisionActionTree({ startAction: action }),
+				}),
+			},
+		})
+
+		const invalidState = new TaskState()
+		const result = await activateWorkflow(invalidState, invalidWorkflow)
+
+		expect(result).to.deep.equal({ kind: "no_op" })
+		expect(invalidState.activeWorkflowName).to.be.undefined
+		expect(invalidState.activeWorkflowSession).to.be.undefined
 	})
 
 	it("rejects move_project_file routes with invalid filename workflow-value keys before activation", async () => {
@@ -11018,6 +11368,541 @@ describe("WorkflowRuntime", () => {
 			story_identity: "11.1",
 			story_file_generated: true,
 		})
+	})
+
+	it("resolves existing primary story artifacts through runtime-owned artifact metadata", async () => {
+		const existingStoryPath = join(
+			cwd,
+			"docs",
+			"projects",
+			"resolve-existing-story",
+			"implementation",
+			"stories-complete",
+			"Story-1-1.md",
+		)
+		await mkdir(dirname(existingStoryPath), { recursive: true })
+		await writeFile(existingStoryPath, "# Existing story\n", "utf8")
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY, RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createRuntimeOwnedDecisionActionTree({
+						startAction: createResolveExistingProjectArtifactAction({
+							artifactFamily: WorkflowArtifactFamily.Story,
+							projectSubfolderSegments: ["implementation", "stories-complete"],
+						}),
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		getActiveWorkflowSession(taskState).workflowValues[RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY] = "1.1"
+		const result = await submitNewProjectSelection(taskState, "Resolve Existing Story")
+
+		expect(result.kind).to.equal("project_prompt")
+		expect(getActiveWorkflowSession(taskState).workflowValues[RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY]).to.equal(
+			existingStoryPath,
+		)
+	})
+
+	it("resolves existing remediation story artifacts through runtime-owned artifact metadata", async () => {
+		const existingRemediationStoryPath = join(
+			cwd,
+			"docs",
+			"projects",
+			"resolve-existing-remediation",
+			"implementation",
+			"stories-review",
+			"Remediation-story-1-1-2.md",
+		)
+		await mkdir(dirname(existingRemediationStoryPath), { recursive: true })
+		await writeFile(existingRemediationStoryPath, "# Existing remediation story\n", "utf8")
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY, RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createRuntimeOwnedDecisionActionTree({
+						startAction: createResolveExistingProjectArtifactAction({
+							artifactFamily: WorkflowArtifactFamily.RemediationStory,
+							projectSubfolderSegments: ["implementation", "stories-review"],
+						}),
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		getActiveWorkflowSession(taskState).workflowValues[RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY] = "1.1.2"
+		const result = await submitNewProjectSelection(taskState, "Resolve Existing Remediation")
+
+		expect(result.kind).to.equal("project_prompt")
+		expect(getActiveWorkflowSession(taskState).workflowValues[RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY]).to.equal(
+			existingRemediationStoryPath,
+		)
+	})
+
+	it("terminal-errors when existing artifact resolution cannot find the required file", async () => {
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY, RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createRuntimeOwnedDecisionActionTree({
+						startAction: createResolveExistingProjectArtifactAction({
+							artifactFamily: WorkflowArtifactFamily.Story,
+							projectSubfolderSegments: ["implementation", "stories-complete"],
+						}),
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		getActiveWorkflowSession(taskState).workflowValues[RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY] = "1.1"
+		const result = await submitNewProjectSelection(taskState, "Missing Existing Story")
+
+		expect(result.kind).to.equal("terminal_error")
+		if (result.kind !== "terminal_error") {
+			throw new Error(`Expected terminal_error, received ${result.kind}.`)
+		}
+		expect(result.errorMessage).to.equal(RESOLVE_EXISTING_PROJECT_ARTIFACT_ERROR_MESSAGE)
+		expectWorkflowStateCleared(taskState)
+	})
+
+	it("terminal-errors when existing artifact identity does not match the declared artifact family", async () => {
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY, RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createRuntimeOwnedDecisionActionTree({
+						startAction: createResolveExistingProjectArtifactAction({
+							artifactFamily: WorkflowArtifactFamily.Story,
+							projectSubfolderSegments: ["implementation", "stories-complete"],
+						}),
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		getActiveWorkflowSession(taskState).workflowValues[RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY] = "1.1.2"
+		const result = await submitNewProjectSelection(taskState, "Mismatched Existing Artifact")
+
+		expect(result.kind).to.equal("terminal_error")
+		if (result.kind !== "terminal_error") {
+			throw new Error(`Expected terminal_error, received ${result.kind}.`)
+		}
+		expect(result.errorMessage).to.equal(RESOLVE_EXISTING_PROJECT_ARTIFACT_ERROR_MESSAGE)
+		expectWorkflowStateCleared(taskState)
+	})
+
+	it("terminal-errors when workspace path policy denies existing artifact resolution", async () => {
+		const artifactAbsolutePath = join(
+			cwd,
+			"docs",
+			"projects",
+			"denied-existing-story",
+			"implementation",
+			"stories-complete",
+			"Story-1-1.md",
+		)
+		runtime = new WorkflowRuntime({
+			cwd,
+			workspacePathPolicy: { validateAccess: (filePath) => filePath !== artifactAbsolutePath },
+		})
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY, RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createRuntimeOwnedDecisionActionTree({
+						startAction: createResolveExistingProjectArtifactAction({
+							artifactFamily: WorkflowArtifactFamily.Story,
+							projectSubfolderSegments: ["implementation", "stories-complete"],
+						}),
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		getActiveWorkflowSession(taskState).workflowValues[RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY] = "1.1"
+		const result = await submitNewProjectSelection(taskState, "Denied Existing Story")
+
+		expect(result.kind).to.equal("terminal_error")
+		if (result.kind !== "terminal_error") {
+			throw new Error(`Expected terminal_error, received ${result.kind}.`)
+		}
+		expect(result.errorMessage).to.equal(RESOLVE_EXISTING_PROJECT_ARTIFACT_ERROR_MESSAGE)
+		expectWorkflowStateCleared(taskState)
+	})
+
+	it("validates existing remediation story index entries without mutating the story index", async () => {
+		const storiesIndexPath = join(
+			cwd,
+			"docs",
+			"projects",
+			"validate-story-index",
+			"implementation",
+			"epic-1-stories.index.json",
+		)
+		const storiesIndexText = stringifyWorkflowStoryIndex({
+			version: 1,
+			stories: [
+				{
+					story_identity: "1.1.1",
+					story_file_name: "Remediation-story-1-1-1.md",
+					story_type: "remediation",
+					parent_story_identity: "1.1",
+					story_file_generated: true,
+					status: "draft",
+				},
+			],
+		})
+		await mkdir(dirname(storiesIndexPath), { recursive: true })
+		await writeFile(storiesIndexPath, storiesIndexText, "utf8")
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [
+				VALIDATE_STORY_INDEX_STORIES_INDEX_KEY,
+				VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY,
+				VALIDATE_STORY_INDEX_STORY_FILENAME_KEY,
+			],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createRuntimeOwnedDecisionActionTree({
+						startAction: createValidateStoryIndexEntryAction({
+							requiredStoryType: "remediation",
+							requiredStatus: "draft",
+						}),
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		const session = getActiveWorkflowSession(taskState)
+		session.workflowValues[VALIDATE_STORY_INDEX_STORIES_INDEX_KEY] = storiesIndexPath
+		session.workflowValues[VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY] = "1.1.1"
+		session.workflowValues[VALIDATE_STORY_INDEX_STORY_FILENAME_KEY] = "Remediation-story-1-1-1.md"
+		const result = await submitNewProjectSelection(taskState, "Validate Story Index")
+
+		expect(result.kind).to.equal("project_prompt")
+		expect(await readFile(storiesIndexPath, "utf8")).to.equal(storiesIndexText)
+	})
+
+	it("terminal-errors when validate_story_index_entry receives a noncanonical story index path", async () => {
+		const wrongStoriesIndexPath = join(
+			cwd,
+			"docs",
+			"projects",
+			"validate-wrong-index-path",
+			"implementation",
+			"wrong.index.json",
+		)
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [
+				VALIDATE_STORY_INDEX_STORIES_INDEX_KEY,
+				VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY,
+				VALIDATE_STORY_INDEX_STORY_FILENAME_KEY,
+			],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createRuntimeOwnedDecisionActionTree({
+						startAction: createValidateStoryIndexEntryAction({
+							requiredStoryType: "remediation",
+							requiredStatus: "draft",
+						}),
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		const session = getActiveWorkflowSession(taskState)
+		session.workflowValues[VALIDATE_STORY_INDEX_STORIES_INDEX_KEY] = wrongStoriesIndexPath
+		session.workflowValues[VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY] = "1.1.1"
+		session.workflowValues[VALIDATE_STORY_INDEX_STORY_FILENAME_KEY] = "Remediation-story-1-1-1.md"
+		const result = await submitNewProjectSelection(taskState, "Validate Wrong Index Path")
+
+		expect(result.kind).to.equal("terminal_error")
+		if (result.kind !== "terminal_error") {
+			throw new Error(`Expected terminal_error, received ${result.kind}.`)
+		}
+		expect(result.errorMessage).to.equal(VALIDATE_STORY_INDEX_MISSING_OR_MALFORMED_ERROR_MESSAGE)
+		expectWorkflowStateCleared(taskState)
+	})
+
+	it("terminal-errors when validate_story_index_entry cannot parse the story index", async () => {
+		const storiesIndexPath = join(
+			cwd,
+			"docs",
+			"projects",
+			"validate-malformed-index",
+			"implementation",
+			"epic-1-stories.index.json",
+		)
+		await mkdir(dirname(storiesIndexPath), { recursive: true })
+		await writeFile(storiesIndexPath, "{", "utf8")
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [
+				VALIDATE_STORY_INDEX_STORIES_INDEX_KEY,
+				VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY,
+				VALIDATE_STORY_INDEX_STORY_FILENAME_KEY,
+			],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createRuntimeOwnedDecisionActionTree({
+						startAction: createValidateStoryIndexEntryAction({
+							requiredStoryType: "remediation",
+							requiredStatus: "draft",
+						}),
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		const session = getActiveWorkflowSession(taskState)
+		session.workflowValues[VALIDATE_STORY_INDEX_STORIES_INDEX_KEY] = storiesIndexPath
+		session.workflowValues[VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY] = "1.1.1"
+		session.workflowValues[VALIDATE_STORY_INDEX_STORY_FILENAME_KEY] = "Remediation-story-1-1-1.md"
+		const result = await submitNewProjectSelection(taskState, "Validate Malformed Index")
+
+		expect(result.kind).to.equal("terminal_error")
+		if (result.kind !== "terminal_error") {
+			throw new Error(`Expected terminal_error, received ${result.kind}.`)
+		}
+		expect(result.errorMessage).to.equal(VALIDATE_STORY_INDEX_MISSING_OR_MALFORMED_ERROR_MESSAGE)
+		expectWorkflowStateCleared(taskState)
+	})
+
+	it("terminal-errors when validate_story_index_entry cannot find the selected entry", async () => {
+		const storiesIndexPath = join(
+			cwd,
+			"docs",
+			"projects",
+			"validate-missing-entry",
+			"implementation",
+			"epic-1-stories.index.json",
+		)
+		await mkdir(dirname(storiesIndexPath), { recursive: true })
+		await writeFile(
+			storiesIndexPath,
+			stringifyWorkflowStoryIndex({
+				version: 1,
+				stories: [
+					{
+						story_identity: "1.2",
+						story_file_name: "Story-1-2.md",
+						story_type: "primary",
+						parent_story_identity: null,
+						story_file_generated: true,
+						status: "draft",
+					},
+				],
+			}),
+			"utf8",
+		)
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [
+				VALIDATE_STORY_INDEX_STORIES_INDEX_KEY,
+				VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY,
+				VALIDATE_STORY_INDEX_STORY_FILENAME_KEY,
+			],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createRuntimeOwnedDecisionActionTree({
+						startAction: createValidateStoryIndexEntryAction({
+							requiredStoryType: "remediation",
+							requiredStatus: "draft",
+						}),
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		const session = getActiveWorkflowSession(taskState)
+		session.workflowValues[VALIDATE_STORY_INDEX_STORIES_INDEX_KEY] = storiesIndexPath
+		session.workflowValues[VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY] = "1.1.1"
+		session.workflowValues[VALIDATE_STORY_INDEX_STORY_FILENAME_KEY] = "Remediation-story-1-1-1.md"
+		const result = await submitNewProjectSelection(taskState, "Validate Missing Entry")
+
+		expect(result.kind).to.equal("terminal_error")
+		if (result.kind !== "terminal_error") {
+			throw new Error(`Expected terminal_error, received ${result.kind}.`)
+		}
+		expect(result.errorMessage).to.equal(VALIDATE_STORY_INDEX_MISSING_ENTRY_ERROR_MESSAGE)
+		expectWorkflowStateCleared(taskState)
+	})
+
+	it("terminal-errors when validate_story_index_entry finds an invalid selected entry", async () => {
+		const remediationEntry: WorkflowStoryIndex["stories"][number] = {
+			story_identity: "1.1.1",
+			story_file_name: "Remediation-story-1-1-1.md",
+			story_type: "remediation",
+			parent_story_identity: "1.1",
+			story_file_generated: true,
+			status: "draft",
+		}
+		const invalidEntryCases: ReadonlyArray<{
+			readonly label: string
+			readonly entry: WorkflowStoryIndex["stories"][number]
+			readonly storyIdentity: string
+			readonly storyFilename: string
+			readonly caseAction: WorkflowValidateStoryIndexEntryDecisionAction
+		}> = [
+			{
+				label: "required story type mismatch",
+				entry: {
+					story_identity: "1.1",
+					story_file_name: "Story-1-1.md",
+					story_type: "primary",
+					parent_story_identity: null,
+					story_file_generated: true,
+					status: "draft",
+				},
+				storyIdentity: "1.1",
+				storyFilename: "Story-1-1.md",
+				caseAction: createValidateStoryIndexEntryAction({ requiredStoryType: "remediation", requiredStatus: "draft" }),
+			},
+			{
+				label: "story filename mismatch",
+				entry: remediationEntry,
+				storyIdentity: "1.1.1",
+				storyFilename: "Different.md",
+				caseAction: createValidateStoryIndexEntryAction({ requiredStoryType: "remediation", requiredStatus: "draft" }),
+			},
+			{
+				label: "status mismatch",
+				entry: remediationEntry,
+				storyIdentity: "1.1.1",
+				storyFilename: "Remediation-story-1-1-1.md",
+				caseAction: createValidateStoryIndexEntryAction({ requiredStoryType: "remediation", requiredStatus: "backlog" }),
+			},
+		]
+
+		for (const [caseIndex, invalidEntryCase] of invalidEntryCases.entries()) {
+			const failureState = new TaskState()
+			const storiesIndexPath = join(
+				cwd,
+				"docs",
+				"projects",
+				`validate-invalid-entry-${caseIndex}`,
+				"implementation",
+				"epic-1-stories.index.json",
+			)
+			await mkdir(dirname(storiesIndexPath), { recursive: true })
+			await writeFile(
+				storiesIndexPath,
+				stringifyWorkflowStoryIndex({
+					version: 1,
+					stories: [invalidEntryCase.entry],
+				}),
+				"utf8",
+			)
+			const workflow = createWorkflowDefinition({
+				name: `validate-invalid-entry-${caseIndex}`,
+				workflowValueKeys: [
+					VALIDATE_STORY_INDEX_STORIES_INDEX_KEY,
+					VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY,
+					VALIDATE_STORY_INDEX_STORY_FILENAME_KEY,
+				],
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createRuntimeOwnedDecisionActionTree({ startAction: invalidEntryCase.caseAction }),
+					}),
+				},
+			})
+
+			await activateWorkflow(failureState, workflow)
+			const session = getActiveWorkflowSession(failureState)
+			session.workflowValues[VALIDATE_STORY_INDEX_STORIES_INDEX_KEY] = storiesIndexPath
+			session.workflowValues[VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY] = invalidEntryCase.storyIdentity
+			session.workflowValues[VALIDATE_STORY_INDEX_STORY_FILENAME_KEY] = invalidEntryCase.storyFilename
+			const result = await submitNewProjectSelection(failureState, `Validate Invalid Entry ${caseIndex}`)
+
+			expect(result.kind, invalidEntryCase.label).to.equal("terminal_error")
+			if (result.kind !== "terminal_error") {
+				throw new Error(`Expected terminal_error, received ${result.kind}.`)
+			}
+			expect(result.errorMessage, invalidEntryCase.label).to.equal(VALIDATE_STORY_INDEX_INVALID_ENTRY_ERROR_MESSAGE)
+			expectWorkflowStateCleared(failureState)
+		}
+	})
+
+	it("terminal-errors when workspace path policy denies validate_story_index_entry reads", async () => {
+		const storiesIndexPath = join(
+			cwd,
+			"docs",
+			"projects",
+			"validate-denied-index",
+			"implementation",
+			"epic-1-stories.index.json",
+		)
+		await mkdir(dirname(storiesIndexPath), { recursive: true })
+		await writeFile(
+			storiesIndexPath,
+			stringifyWorkflowStoryIndex({
+				version: 1,
+				stories: [
+					{
+						story_identity: "1.1.1",
+						story_file_name: "Remediation-story-1-1-1.md",
+						story_type: "remediation",
+						parent_story_identity: "1.1",
+						story_file_generated: true,
+						status: "draft",
+					},
+				],
+			}),
+			"utf8",
+		)
+		runtime = new WorkflowRuntime({
+			cwd,
+			workspacePathPolicy: { validateAccess: (filePath) => filePath !== storiesIndexPath },
+		})
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [
+				VALIDATE_STORY_INDEX_STORIES_INDEX_KEY,
+				VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY,
+				VALIDATE_STORY_INDEX_STORY_FILENAME_KEY,
+			],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createRuntimeOwnedDecisionActionTree({
+						startAction: createValidateStoryIndexEntryAction({
+							requiredStoryType: "remediation",
+							requiredStatus: "draft",
+						}),
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		const session = getActiveWorkflowSession(taskState)
+		session.workflowValues[VALIDATE_STORY_INDEX_STORIES_INDEX_KEY] = storiesIndexPath
+		session.workflowValues[VALIDATE_STORY_INDEX_STORY_IDENTITY_KEY] = "1.1.1"
+		session.workflowValues[VALIDATE_STORY_INDEX_STORY_FILENAME_KEY] = "Remediation-story-1-1-1.md"
+		const result = await submitNewProjectSelection(taskState, "Validate Denied Index")
+
+		expect(result.kind).to.equal("terminal_error")
+		if (result.kind !== "terminal_error") {
+			throw new Error(`Expected terminal_error, received ${result.kind}.`)
+		}
+		expect(result.errorMessage).to.equal(VALIDATE_STORY_INDEX_MISSING_OR_MALFORMED_ERROR_MESSAGE)
+		expectWorkflowStateCleared(taskState)
 	})
 
 	it("fails epic delivery spec allocation for missing, malformed, or path-policy-denied Epics.index.json", async () => {

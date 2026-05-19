@@ -4,6 +4,8 @@ import {
 	buildEpicStoriesIndexFilename,
 	buildPrimaryStoryIndexEntry,
 	buildRemediationStoryIndexEntry,
+	isWorkflowStoryStatus,
+	isWorkflowStoryType,
 	parseWorkflowStoryIndexJson,
 	stringifyWorkflowStoryIndex,
 } from "../storyArtifacts"
@@ -201,5 +203,16 @@ describe("storyArtifacts", () => {
   ]
 }
 `)
+	})
+
+	it("exports story type and status guards", () => {
+		expect(isWorkflowStoryType("primary")).to.equal(true)
+		expect(isWorkflowStoryType("remediation")).to.equal(true)
+		expect(isWorkflowStoryType("feature")).to.equal(false)
+		expect(isWorkflowStoryStatus("draft")).to.equal(true)
+		expect(isWorkflowStoryStatus("backlog")).to.equal(true)
+		expect(isWorkflowStoryStatus("review")).to.equal(true)
+		expect(isWorkflowStoryStatus("complete")).to.equal(true)
+		expect(isWorkflowStoryStatus("ready")).to.equal(false)
 	})
 })

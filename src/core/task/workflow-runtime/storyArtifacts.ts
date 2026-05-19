@@ -64,11 +64,11 @@ function assertOnlyKeys(args: { record: Record<string, unknown>; allowedKeys: re
 	}
 }
 
-function isWorkflowStoryType(value: unknown): value is WorkflowStoryType {
+export function isWorkflowStoryType(value: unknown): value is WorkflowStoryType {
 	return value === "primary" || value === "remediation"
 }
 
-function isWorkflowStoryStatus(value: unknown): value is WorkflowStoryStatus {
+export function isWorkflowStoryStatus(value: unknown): value is WorkflowStoryStatus {
 	return typeof value === "string" && STORY_STATUSES.some((status) => status === value)
 }
 
