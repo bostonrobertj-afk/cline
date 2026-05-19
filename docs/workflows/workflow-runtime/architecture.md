@@ -71,24 +71,24 @@ This architecture covers:
 - progression, completion, teardown, persistence, and resume
 - subagent-local workflow sessions
 - the following in-scope workflow set only:
-  - `brainstorming`
+  - `brainstorming`- done
   - `create-prd`
-  - `create-architecture`
-  - `create-epics`
-  - `pi-planning`
-  - `create-story`
-  - `dev-story`
-  - `code-review`
-  - `review-adversarial-general`
-  - `edge-case-hunter-review`
-  - `blind-review`
+  - `create-architecture`- done
+  - `create-epics`- done
+  - `pi-planning`- done
+  - `create-story`- done
+  - `dev-story`- done
+  - `code-review`- done
+  - `acceptability-audit`- done
+  - `edge-case-hunter-review`- done
+  - `blind-review`- done
   - `problem-solving`
   - `create-product-brief`
   - `document-project`
   - `quick-spec`
   - `quick-dev`
   - `correct-course`
-  - `write-remediation-story`
+  - `write-remediation-story`- done
 
 ### 3.3 Out of Scope
 
