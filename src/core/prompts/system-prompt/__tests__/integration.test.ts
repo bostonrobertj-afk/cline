@@ -71,6 +71,11 @@ import {
 	edgeCaseHunterReviewWorkflowDefinition,
 } from "@/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review"
 import { piPlanningWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/pi-planning"
+import {
+	buildWriteRemediationStoryStep3ToolSchemas,
+	WriteRemediationStoryWorkflowValueKey,
+	writeRemediationStoryWorkflowDefinition,
+} from "@/core/task/workflow-runtime/workflow-modules/write-remediation-story"
 import type { McpHub } from "@/services/mcp/McpHub"
 import type { McpServer } from "@/shared/mcp"
 import { ModelFamily } from "@/shared/prompts"
@@ -1336,6 +1341,109 @@ async function buildCodeReviewPromptContext(
 	const taskState = new TaskState()
 	taskState.activeWorkflowName = "code-review"
 	taskState.activeWorkflowSession = createCodeReviewWorkflowSession(activeStepNumber, workflowValues)
+	taskState.apiRequestCount = 1
+	const workflowProjection = await runtime.buildTurnProjection({ taskState })
+
+	return {
+		...baseContext,
+		mcpHub: makeMcpHub([]),
+		providerInfo: makeProviderInfo("gpt-5-codex", "openai"),
+		enableNativeToolCalls: true,
+		useMinimalGptPrompt: true,
+		...workflowProjection,
+	}
+}
+
+const WRITE_REMEDIATION_STORY_PROJECT_ROOT = "/tmp/write-remediation-story-project"
+const WRITE_REMEDIATION_STORY_CODE_REVIEW_OUTPUT = `${WRITE_REMEDIATION_STORY_PROJECT_ROOT}/review/code-review-1-1.md`
+const WRITE_REMEDIATION_STORY_TARGET_STORY = `${WRITE_REMEDIATION_STORY_PROJECT_ROOT}/implementation/drafts/Remediation-story-1-1-1.md`
+const WRITE_REMEDIATION_STORY_TARGET_STORY_FILENAME = "Remediation-story-1-1-1.md"
+const WRITE_REMEDIATION_STORY_SELECTED_STORY_IDENTITY = "1.1.1"
+const WRITE_REMEDIATION_STORY_ORIGINATING_STORY = `${WRITE_REMEDIATION_STORY_PROJECT_ROOT}/implementation/stories-complete/Story-1-1.md`
+const WRITE_REMEDIATION_STORY_ORIGINATING_STORY_IDENTITY = "1.1"
+const WRITE_REMEDIATION_STORY_EPIC_IDENTITY = "1"
+const WRITE_REMEDIATION_STORY_STORIES_INDEX = `${WRITE_REMEDIATION_STORY_PROJECT_ROOT}/implementation/epic-1-stories.index.json`
+const WRITE_REMEDIATION_STORY_FORBIDDEN_PROMPT_TOOL_NAMES: readonly string[] = [
+	"web_search",
+	"web_fetch",
+	"browser_action",
+	"ask_followup_question",
+	"use_subagents",
+	"use_skill",
+	"set_workflow_values",
+	"build_workflow_document",
+	"create_workflow_artifact",
+	"archive_workflow_artifact",
+	"delete_workflow_artifact",
+	"move_workflow_project_file",
+	"update_story_index_status",
+	"workflow_progress_request",
+	"use_mcp_tool",
+	"access_mcp_resource",
+	"load_mcp_documentation",
+	"plan_story_artifacts",
+	"plan_remediation_story_artifact",
+	"generate_story_files",
+	"build_review_input",
+	"build_review_diff_output",
+	"code_review_spec_update",
+	"record_findings",
+]
+
+function createWriteRemediationStoryWorkflowValues(overrides: WorkflowValues = {}): WorkflowValues {
+	return {
+		[WriteRemediationStoryWorkflowValueKey.ProjectMode]: "existing",
+		[WriteRemediationStoryWorkflowValueKey.ProjectTitle]: "Write Remediation Story Session",
+		[WriteRemediationStoryWorkflowValueKey.ProjectFolderName]: "write-remediation-story-project",
+		[WriteRemediationStoryWorkflowValueKey.CodeReviewOutput]: WRITE_REMEDIATION_STORY_CODE_REVIEW_OUTPUT,
+		[WriteRemediationStoryWorkflowValueKey.TargetStory]: WRITE_REMEDIATION_STORY_TARGET_STORY,
+		[WriteRemediationStoryWorkflowValueKey.TargetStoryFilename]: WRITE_REMEDIATION_STORY_TARGET_STORY_FILENAME,
+		[WriteRemediationStoryWorkflowValueKey.SelectedStoryIdentity]: WRITE_REMEDIATION_STORY_SELECTED_STORY_IDENTITY,
+		[WriteRemediationStoryWorkflowValueKey.OriginatingStory]: WRITE_REMEDIATION_STORY_ORIGINATING_STORY,
+		[WriteRemediationStoryWorkflowValueKey.OriginatingStoryIdentity]: WRITE_REMEDIATION_STORY_ORIGINATING_STORY_IDENTITY,
+		[WriteRemediationStoryWorkflowValueKey.EpicIdentity]: WRITE_REMEDIATION_STORY_EPIC_IDENTITY,
+		[WriteRemediationStoryWorkflowValueKey.StoriesIndex]: WRITE_REMEDIATION_STORY_STORIES_INDEX,
+		...overrides,
+	}
+}
+
+function createWriteRemediationStoryWorkflowSession(
+	workflowValues: WorkflowValues = createWriteRemediationStoryWorkflowValues(),
+): ActiveWorkflowSession {
+	return {
+		activeStepNumber: 3,
+		workflowValues,
+		projectSelection: {
+			projectMode: "existing",
+			projectTitle: "Write Remediation Story Session",
+			projectFolderName: "write-remediation-story-project",
+		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
+		entryArtifactResolution: undefined,
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: {
+			activeBranchId: writeRemediationStoryWorkflowDefinition.steps["step-3"].decisionTree.entryBranchId,
+		},
+	}
+}
+
+async function buildWriteRemediationStoryPromptContext(
+	workflowValues: WorkflowValues = createWriteRemediationStoryWorkflowValues(),
+): Promise<SystemPromptContext & WorkflowPromptProjection> {
+	const workspacePathPolicy: WorkflowWorkspacePathPolicy = {
+		validateAccess: () => true,
+	}
+	const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })
+	const taskState = new TaskState()
+	taskState.activeWorkflowName = "write-remediation-story"
+	taskState.activeWorkflowSession = createWriteRemediationStoryWorkflowSession(workflowValues)
 	taskState.apiRequestCount = 1
 	const workflowProjection = await runtime.buildTurnProjection({ taskState })
 
@@ -2745,6 +2853,68 @@ describe("Prompt System Integration Tests", () => {
 			for (const payloadBlock of payloadBlockValues) {
 				expect(payloadBlock).to.not.include(CODE_REVIEW_REMEDIATION_STORY)
 			}
+		})
+
+		it("projects active write-remediation-story Step 3 tools from module-owned builders into native GPT-5 prompts", async function () {
+			const context = await buildWriteRemediationStoryPromptContext()
+			expect(context.workflowToolSchemaOverride).to.deep.equal(buildWriteRemediationStoryStep3ToolSchemas())
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ tools }) => {
+				expect(getNativeToolNames(tools)).to.deep.equal(
+					buildWriteRemediationStoryStep3ToolSchemas().map((tool) => tool.name),
+				)
+			})
+		})
+
+		it("projects write-remediation-story Step 3 materialized values into full-turn and continuation payloads", async () => {
+			const context = await buildWriteRemediationStoryPromptContext()
+			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+			const continuationWorkflowInputPayloadBlock = context.continuationWorkflowInputPayloadBlock
+			if (workflowInputPayloadBlock === undefined || workflowInputPayloadBlock === "") {
+				throw new Error("Expected write-remediation-story Step 3 workflow input payload.")
+			}
+			if (continuationWorkflowInputPayloadBlock === undefined || continuationWorkflowInputPayloadBlock === "") {
+				throw new Error("Expected write-remediation-story Step 3 continuation workflow input payload.")
+			}
+
+			const payloadBlocks: readonly string[] = [workflowInputPayloadBlock, continuationWorkflowInputPayloadBlock]
+			for (const payloadBlock of payloadBlocks) {
+				expect(payloadBlock.trim()).to.not.equal("")
+				expect(payloadBlock).to.include(WRITE_REMEDIATION_STORY_ORIGINATING_STORY)
+				expect(payloadBlock).to.include(WRITE_REMEDIATION_STORY_CODE_REVIEW_OUTPUT)
+				expect(payloadBlock).to.include(WRITE_REMEDIATION_STORY_TARGET_STORY)
+				expect(payloadBlock).to.not.include("originating_story")
+				expect(payloadBlock).to.not.include("code_review_output")
+				expect(payloadBlock).to.not.include("target_story")
+			}
+		})
+
+		it("does not expose forbidden tools in write-remediation-story Step 3 prompt projection", async () => {
+			const context = await buildWriteRemediationStoryPromptContext()
+			const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
+			for (const forbiddenToolName of WRITE_REMEDIATION_STORY_FORBIDDEN_PROMPT_TOOL_NAMES) {
+				expect(projectedToolNames).to.not.include(forbiddenToolName)
+			}
+		})
+
+		it("renders write-remediation-story Step 3 tools through non-native prompt text without forbidden tools", async function () {
+			const nativeContext = await buildWriteRemediationStoryPromptContext()
+			const context: SystemPromptContext = {
+				...nativeContext,
+				providerInfo: makeProviderInfo("gpt-3", "openai"),
+				enableNativeToolCalls: false,
+			}
+			const approvedToolNames = buildWriteRemediationStoryStep3ToolSchemas().map((tool) => tool.name)
+
+			await runPromptTest(this, context, "gpt-3", async ({ systemPrompt, tools }) => {
+				expect(tools).to.equal(undefined)
+				for (const approvedToolName of approvedToolNames) {
+					expect(systemPrompt).to.include(approvedToolName)
+				}
+				for (const forbiddenToolName of WRITE_REMEDIATION_STORY_FORBIDDEN_PROMPT_TOOL_NAMES) {
+					expect(systemPrompt).to.not.include(forbiddenToolName)
+				}
+			})
 		})
 
 		it("projects dev-story Step 2 story tools only while Step 2 is active", async () => {

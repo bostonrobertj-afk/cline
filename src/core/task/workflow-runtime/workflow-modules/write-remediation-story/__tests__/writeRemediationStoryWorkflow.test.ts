@@ -6,6 +6,11 @@ import type {
 } from "@shared/ExtensionMessage"
 import { expect } from "chai"
 import { describe, it } from "mocha"
+import {
+	resolveWorkflowBySlashCommand,
+	resolveWorkflowByUseSkillName,
+	resolveWorkflowDefinition,
+} from "@/core/task/workflow-runtime/WorkflowRegistry"
 import { WorkflowArtifactFamily } from "../../../artifactFamilies"
 import type {
 	ActiveWorkflowSession,
@@ -312,6 +317,19 @@ describe("writeRemediationStoryWorkflow", () => {
 		expect(writeRemediationStoryWorkflowDefinition.projectSubfolder).to.equal(
 			WRITE_REMEDIATION_STORY_WORKFLOW_PROJECT_SUBFOLDER,
 		)
+	})
+
+	it("resolves from the shipped workflow registry by canonical names only", () => {
+		expect(resolveWorkflowDefinition(WRITE_REMEDIATION_STORY_WORKFLOW_NAME)).to.equal(writeRemediationStoryWorkflowDefinition)
+		expect(resolveWorkflowBySlashCommand(WRITE_REMEDIATION_STORY_WORKFLOW_SLASH_COMMAND_NAME)).to.equal(
+			writeRemediationStoryWorkflowDefinition,
+		)
+		expect(resolveWorkflowByUseSkillName(WRITE_REMEDIATION_STORY_WORKFLOW_USE_SKILL_NAME)).to.equal(
+			writeRemediationStoryWorkflowDefinition,
+		)
+		expect(resolveWorkflowDefinition("write-remediation-story.md")).to.equal(undefined)
+		expect(resolveWorkflowBySlashCommand("write-remediation-story.md")).to.equal(undefined)
+		expect(resolveWorkflowByUseSkillName("write-remediation-story.md")).to.equal(undefined)
 	})
 
 	it("declares the approved workflow persona and entry panel description", () => {
