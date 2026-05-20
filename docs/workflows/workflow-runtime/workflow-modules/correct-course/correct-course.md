@@ -57,19 +57,21 @@ Field:
     options: yes, no
     label: response
 allowedActions/ Labels:
-    submit / back
+    submit / submit
     back / back
 previousworkflowPanelId: Panel A
 
 Persist the provided response as the epic_source_indicator workflow session key.
+
 
 Panel C: only shown on "yes" response to panel B
 title: Identify Originating Epic
 promptMarkdown: Which epic?
 Field:
     kind: dropdown
+    label: epic selection
     required: yes
-    options: Each epic listed in a epics index file in the selected project.
+    options: Each epic listed in the epics index file in the selected project.
 allowedActions/ Labels:
     submit/ submit
     back/ back
@@ -77,7 +79,9 @@ previousWorkflowPanelId: Panel B
 
 Persist the provided response as the epic_source_identifier workflow session key.
 
-runtime must derive the Epics.md file that the selected epic belongs to and set it as epics_document
+runtime must derive the Epics.md file that the selected epic belongs to and set it as epics_document.
+
+If no epics index file is available within the selected project's folders, workflow form panel F must be shown.
 
 
 Panel D: comes after panel B on "no"
@@ -89,17 +93,20 @@ Field:
     options: yes, no
     label: response
 allowedActions/ Labels:
-    submit / back
+    submit / submit
     back / back
 previousworkflowPanelId: Panel B
 
 Persist the provided response as the story_source_indicator workflow session key.
+
+If no story index files are available within the selected project's folders, workflow form panel G must be shown.
 
 Panel E: only shown on "yes" response to panel D
 title: Identify Originating Story
 promptMarkdown: Which story?
 Field:
     kind: dropdown
+    label: story selection
     required: yes
     options: Each story listed in a story index file in the selected project's subfolders. There can be more than one story index file.
 allowedActions/ Labels:
@@ -108,6 +115,37 @@ allowedActions/ Labels:
 previousWorkflowPanelId: Panel D
 
 Persist the provided response as the story_source_identifier workflow session key.
+
+Panel F:
+title: Missing Epics Index
+promptMarkdown: There is no epics index file for this project. Proceed anyway?
+Field:
+    kind: boolean
+    label: select one
+    options: continue, end workflow
+    required: yes
+allowedactions/ Labels:
+    submit/ submit
+    back/ back
+previousWorkflowPanelId: panel B
+
+continue to step 2 on "yes". end workflow on "no"
+
+Panel G:
+title: Missing Story Index
+promptMarkdown: There are no story index files for this project. Proceed anyway?
+Field:
+    kind: boolean
+    label: select one
+    options: continue, end workflow
+    required: yes
+allowedactions/ Labels:
+    submit/ submit
+    back/ back
+previousWorkflowPanelId: panel D
+
+continue to step 2 on "yes". end workflow on "no"
+
 
 ## Step 2: Generate Change Management Document
 
@@ -214,7 +252,7 @@ For each prescribed workflow, include details regarding what should be done to r
 
 Add the action plan under the "Change Management Implementation" heading in output_document.
 
-Provide an overview of what you've documented to the user including the full file path for output_file. Revise as needed based on their feedback. Once they are satisfied with your documentation, use attempt_completion to provide them with a closing set of instructions which include the following where relevant:
+Provide an overview of what you've documented to the user including the full file path for output_document. Revise as needed based on their feedback. Once they are satisfied with your documentation, use attempt_completion to provide them with a closing set of instructions which include the following where relevant:
     - if the user needs to run the create-architecture or create-epics workflows, they must provide the full file path to output_document when prompted for context files.
     - if epics are to be deleted, added, or resequenced, or if stories are to be added, deleted, or resequenced, the user must run the following workflows in order:
         - create-epics (once)
