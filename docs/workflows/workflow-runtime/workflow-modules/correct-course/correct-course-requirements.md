@@ -69,6 +69,7 @@ The module must include workflow-value keys for:
 - `epic_source_indicator`, the user-provided `yes` or `no` response from Panel B
 - `epic_source_identifier`, the selected epic identity from Panel C or the exact fallback value `not found` from Panel F
 - `epics_document`, the absolute path to the selected project's `planning/Epics.md`, the exact fallback value `not found` from Panel F, or the exact fallback value `missing` from Panel H
+- `epics_document_artifact_identity`, the internal runtime artifact identity value `epics` used only to resolve the selected project's singleton `planning/Epics.md` through `resolve_existing_project_artifact`; this value must not be rendered in prompts, collected from workflow forms, or exposed to the AI agent
 - `story_source_indicator`, the user-provided `yes` or `no` response from Panel D or the exact fallback value `not found` from Panel G
 - `story_source_identifier`, the selected story identity from Panel E
 - `output_document`, the absolute path to the generated change management plan
@@ -176,7 +177,9 @@ The Panel C label template is the existing repo pattern used for epic-selection 
 
 If the selected project's `planning/Epics.index.json` file is unavailable before Panel C renders, the workflow must render Panel F instead of Panel C.
 
-After Panel C submission, runtime/module logic must derive the selected project's `planning/Epics.md` absolute path and persist it as `epics_document`.
+After Panel C submission, runtime/module logic may perform a missing-file routing check for selected-project `planning/Epics.md` only to choose between Panel H and runtime artifact resolution. When `planning/Epics.md` appears present, the workflow must persist `epics_document_artifact_identity` as `epics`, then resolve `epics_document` through runtime-owned `resolve_existing_project_artifact` using `WorkflowArtifactFamily.Epics`, `artifactIdentityWorkflowValueKey: "epics_document_artifact_identity"`, `projectSubfolderSegments: ["planning"]`, and `outputWorkflowValueKey: "epics_document"`.
+
+If runtime-owned `resolve_existing_project_artifact` fails to resolve `planning/Epics.md` as a file inside the selected project or rejects it through workspace path-policy validation, the workflow must route to `terminal_error` with this exact message: `The selected project's Epics.md file could not be resolved. Please ensure planning/Epics.md exists as a file inside the selected project's planning folder and is permitted by workspace path policy before retrying this workflow.`
 
 If `planning/Epics.md` is missing after an epic is selected, the workflow must render Panel H.
 
@@ -612,7 +615,7 @@ The module build must include focused unit tests covering:
 - workflow identity, `slashCommandName`, `useSkillName`, display name, description, project subfolder, persona fields, and entry panel description reuse
 - workflow registry resolution by workflow name, slash command, and use-skill name
 - negative registry coverage proving `correct-course.md` does not resolve as a workflow name, slash command, or use-skill name
-- workflow value inventory, including entry project keys, `architecture_document`, `issue_description`, `epic_source_indicator`, `epic_source_identifier`, `epics_document`, `story_source_indicator`, `story_source_identifier`, `output_document`, and output artifact metadata keys
+- workflow value inventory, including entry project keys, `architecture_document`, `issue_description`, `epic_source_indicator`, `epic_source_identifier`, `epics_document`, `epics_document_artifact_identity`, `story_source_indicator`, `story_source_identifier`, `output_document`, and output artifact metadata keys
 - prerequisite declaration for `architecture_document`, including required mode, producing workflow `create-architecture`, selected-project subfolder `planning`, exact filename `architecture.md`, workflow value key, and `outputDocumentReference: "none"`
 - change management plan artifact definition using runtime-owned `WorkflowArtifactFamily.ChangeManagementPlan`, `intentMode: "new"`, undefined parent and target identity sources, and standalone output value key mappings
 - document builder output with the exact required heading order and `issue_description` rendered under `# Identified Issue`
@@ -621,7 +624,7 @@ The module build must include focused unit tests covering:
 - Panel B routing from `yes` to Panel F when `planning/Epics.index.json` is unavailable
 - Panel B routing from `no` to Panel D while clearing `epic_source_identifier` and `epics_document`
 - Panel C JSON option source contract, including exact-file mode, `sourcePathSegments`, `itemsPath`, `valueProperty`, label template, and no option descriptions
-- Panel C submission resolving selected-project `planning/Epics.md`, persisting `epics_document`, and proceeding to Step 2 when the file exists
+- Panel C submission routing to runtime-owned `resolve_existing_project_artifact` when selected-project `planning/Epics.md` appears present, including `WorkflowArtifactFamily.Epics`, `artifactIdentityWorkflowValueKey: "epics_document_artifact_identity"`, `projectSubfolderSegments: ["planning"]`, `outputWorkflowValueKey: "epics_document"`, persisted artifact identity value `epics`, and the exact terminal error message prescribed for failed runtime resolution
 - Panel C submission routing to Panel H when selected-project `planning/Epics.md` is missing
 - Panel D routing from `yes` to Panel E when one or more `implementation/epic-{E}-stories.index.json` files are available
 - Panel D routing from `yes` to Panel G when no story index files are available
