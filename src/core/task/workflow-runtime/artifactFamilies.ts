@@ -3,6 +3,7 @@ export enum WorkflowArtifactFamily {
 	EpicsIndex = "epics_index",
 	BrainstormingSession = "brainstorming_session",
 	ArchitectureDocument = "architecture_document",
+	ChangeManagementPlan = "change_management_plan",
 	EpicDeliverySpec = "epic_delivery_spec",
 	EpicStoriesIndex = "epic_stories_index",
 	Story = "story",
@@ -27,6 +28,7 @@ export type WorkflowArtifactIdentityRequirement =
 	| "target_story_or_remediation_story"
 export type WorkflowArtifactNumberingScope =
 	| "project_singleton"
+	| "project_numbered"
 	| "epic_index"
 	| "parent_epic"
 	| "parent_story"
@@ -61,11 +63,18 @@ export interface WorkflowEpicIndexDerivedArtifactFamilyDefinition extends Workfl
 	numberingScope: "epic_index"
 }
 
-export interface WorkflowNewNumberedArtifactFamilyDefinition extends WorkflowArtifactFamilyDefinitionBase {
+export interface WorkflowParentScopedNewNumberedArtifactFamilyDefinition extends WorkflowArtifactFamilyDefinitionBase {
 	family: WorkflowArtifactFamily.Story | WorkflowArtifactFamily.RemediationStory
 	allocationMode: "new_numbered"
 	identityRequirement: "parent_epic_delivery_spec" | "parent_story"
 	numberingScope: "parent_epic" | "parent_story"
+}
+
+export interface WorkflowProjectScopedNewNumberedArtifactFamilyDefinition extends WorkflowArtifactFamilyDefinitionBase {
+	family: WorkflowArtifactFamily.ChangeManagementPlan
+	allocationMode: "new_numbered"
+	identityRequirement: "none"
+	numberingScope: "project_numbered"
 }
 
 export interface WorkflowTargetDerivedArtifactFamilyDefinition extends WorkflowArtifactFamilyDefinitionBase {
@@ -83,7 +92,8 @@ export interface WorkflowTargetDerivedArtifactFamilyDefinition extends WorkflowA
 export type WorkflowArtifactFamilyDefinition =
 	| WorkflowSingletonProjectArtifactFamilyDefinition
 	| WorkflowEpicIndexDerivedArtifactFamilyDefinition
-	| WorkflowNewNumberedArtifactFamilyDefinition
+	| WorkflowParentScopedNewNumberedArtifactFamilyDefinition
+	| WorkflowProjectScopedNewNumberedArtifactFamilyDefinition
 	| WorkflowTargetDerivedArtifactFamilyDefinition
 
 export const WORKFLOW_ARTIFACT_FAMILY_REGISTRY: Readonly<Record<WorkflowArtifactFamily, WorkflowArtifactFamilyDefinition>> = {
@@ -130,6 +140,16 @@ export const WORKFLOW_ARTIFACT_FAMILY_REGISTRY: Readonly<Record<WorkflowArtifact
 		numberingScope: "project_singleton",
 		singletonIdentity: "architecture_document",
 		discoveryPattern: /^architecture\.md$/,
+	},
+	[WorkflowArtifactFamily.ChangeManagementPlan]: {
+		family: WorkflowArtifactFamily.ChangeManagementPlan,
+		allocationMode: "new_numbered",
+		identityRequirement: "none",
+		filenamePattern: "change-management-plan-{C}.md",
+		fileExtension: ".md",
+		contentKind: "markdown",
+		numberingScope: "project_numbered",
+		discoveryPattern: /^change-management-plan-(\d+)\.md$/,
 	},
 	[WorkflowArtifactFamily.EpicDeliverySpec]: {
 		family: WorkflowArtifactFamily.EpicDeliverySpec,

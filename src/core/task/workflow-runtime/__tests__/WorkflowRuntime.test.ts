@@ -10259,6 +10259,51 @@ describe("WorkflowRuntime", () => {
 		expect(artifactDiscoveryRequest.workspacePathPolicy).to.equal(workspacePathPolicy)
 	})
 
+	it("passes constructor workspace path policy into project-numbered artifact discovery", async () => {
+		const changeManagementKeys = createStandaloneArtifactOutputValueKeys("project_numbered_policy")
+		const workflow = createWorkflowDefinition({
+			projectSubfolder: "planning",
+			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(changeManagementKeys),
+			artifacts: {
+				change_management_plan: {
+					id: "change_management_plan",
+					family: WorkflowArtifactFamily.ChangeManagementPlan,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys: changeManagementKeys,
+				},
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Project Numbered Discovery Policy Project")
+		await runtime.prepareWorkflowArtifactCreation({
+			taskState,
+			artifactId: "change_management_plan",
+		})
+
+		const artifactDiscoveryRequest = discoverWorkflowCandidatesStub
+			.getCalls()
+			.map((call) => call.args[0])
+			.find(
+				(request: WorkflowDiscoveryRequest) =>
+					request.rootDirectory === join(cwd, "docs", "projects") && request.entryType === "file",
+			)
+		expect(artifactDiscoveryRequest).to.not.equal(undefined)
+		if (artifactDiscoveryRequest === undefined) {
+			throw new Error("Expected project-numbered artifact discovery to run.")
+		}
+		expect(artifactDiscoveryRequest.workspacePathPolicy).to.equal(workspacePathPolicy)
+		expect(artifactDiscoveryRequest.targetPathSegments).to.deep.equal([
+			"project-numbered-discovery-policy-project",
+			"planning",
+		])
+		expect(artifactDiscoveryRequest.namingPattern?.test("change-management-plan-9.md")).to.equal(true)
+		expect(artifactDiscoveryRequest.namingPattern?.test("Story-1-1.md")).to.equal(false)
+	})
+
 	it("allocates and creates canonical workflow artifacts with persisted output values", async () => {
 		discoverWorkflowCandidatesStub.restore()
 		const epicsKeys = createStandaloneArtifactOutputValueKeys("epics")
@@ -10645,6 +10690,115 @@ describe("WorkflowRuntime", () => {
 			[edgeCaseReviewKeys.artifactFilename]: "edge-case-hunter-1-1-1.md",
 			[codeReviewKeys.artifactFilename]: "code-review-1-1-1.md",
 			[reviewScopeKeys.artifactFilename]: "review-scope-1-1-1.md",
+		})
+	})
+
+	it("allocates project-numbered artifacts with persisted standalone metadata", async () => {
+		discoverWorkflowCandidatesStub.restore()
+		const changeManagementKeys = createStandaloneArtifactOutputValueKeys("change_management_plan")
+		const expectedRelativePath = join("planning", "change-management-plan-1.md")
+		const expectedAbsolutePath = join(
+			cwd,
+			"docs",
+			"projects",
+			"project-numbered-artifact",
+			"planning",
+			"change-management-plan-1.md",
+		)
+		const workflow = createWorkflowDefinition({
+			projectSubfolder: "planning",
+			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(changeManagementKeys),
+			artifacts: {
+				change_management_plan: {
+					id: "change_management_plan",
+					family: WorkflowArtifactFamily.ChangeManagementPlan,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys: changeManagementKeys,
+				},
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Project Numbered Artifact")
+		const result = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "change_management_plan",
+			expectedArtifactAbsolutePath: undefined,
+		})
+
+		expect(result).to.deep.include({
+			artifactIdentity: "1",
+			artifactFilename: "change-management-plan-1.md",
+			artifactRelativePath: expectedRelativePath,
+			artifactAbsolutePath: expectedAbsolutePath,
+			parentIdentity: undefined,
+			targetIdentity: undefined,
+		})
+		await access(result.artifactAbsolutePath)
+		expect(await readFile(result.artifactAbsolutePath, "utf8")).to.equal("")
+		expect(getActiveWorkflowSession(taskState).workflowValues).to.deep.include({
+			[changeManagementKeys.projectTitle]: "Project Numbered Artifact",
+			[changeManagementKeys.projectFolderName]: "project-numbered-artifact",
+			[changeManagementKeys.artifactFamily]: WorkflowArtifactFamily.ChangeManagementPlan,
+			[changeManagementKeys.artifactIdentity]: "1",
+			[changeManagementKeys.artifactFilename]: "change-management-plan-1.md",
+			[changeManagementKeys.artifactRelativePath]: expectedRelativePath,
+			[changeManagementKeys.artifactAbsolutePath]: expectedAbsolutePath,
+		})
+	})
+
+	it("allocates the next project-numbered identity from existing files in the workflow project subfolder", async () => {
+		discoverWorkflowCandidatesStub.restore()
+		const changeManagementKeys = createStandaloneArtifactOutputValueKeys("change_management_plan_next")
+		const planningFolder = join(cwd, "docs", "projects", "project-numbered-next", "planning")
+		const reviewFolder = join(cwd, "docs", "projects", "project-numbered-next", "review")
+		const workflow = createWorkflowDefinition({
+			projectSubfolder: "planning",
+			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(changeManagementKeys),
+			artifacts: {
+				change_management_plan: {
+					id: "change_management_plan",
+					family: WorkflowArtifactFamily.ChangeManagementPlan,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys: changeManagementKeys,
+				},
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Project Numbered Next")
+		await mkdir(planningFolder, { recursive: true })
+		await mkdir(reviewFolder, { recursive: true })
+		await writeFile(join(planningFolder, "change-management-plan-1.md"), "existing 1", "utf8")
+		await writeFile(join(planningFolder, "change-management-plan-3.md"), "existing 3", "utf8")
+		await writeFile(join(planningFolder, "change-management-plan-draft.md"), "ignored", "utf8")
+		await writeFile(join(reviewFolder, "change-management-plan-20.md"), "ignored outside workflow subfolder", "utf8")
+		const result = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "change_management_plan",
+			expectedArtifactAbsolutePath: undefined,
+		})
+
+		expect(result).to.deep.include({
+			artifactIdentity: "4",
+			artifactFilename: "change-management-plan-4.md",
+			artifactRelativePath: join("planning", "change-management-plan-4.md"),
+			artifactAbsolutePath: join(
+				cwd,
+				"docs",
+				"projects",
+				"project-numbered-next",
+				"planning",
+				"change-management-plan-4.md",
+			),
+			parentIdentity: undefined,
+			targetIdentity: undefined,
 		})
 	})
 
@@ -11441,6 +11595,43 @@ describe("WorkflowRuntime", () => {
 		expect(result.kind).to.equal("project_prompt")
 		expect(getActiveWorkflowSession(taskState).workflowValues[RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY]).to.equal(
 			existingRemediationStoryPath,
+		)
+	})
+
+	it("resolves existing project-numbered artifacts through runtime-owned artifact metadata", async () => {
+		const artifactAbsolutePath = join(
+			cwd,
+			"docs",
+			"projects",
+			"resolve-existing-change-plan",
+			"planning",
+			"change-management-plan-7.md",
+		)
+		await mkdir(dirname(artifactAbsolutePath), { recursive: true })
+		await writeFile(artifactAbsolutePath, "change plan", "utf8")
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: [RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY, RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createRuntimeOwnedDecisionActionTree({
+						startAction: createResolveExistingProjectArtifactAction({
+							artifactFamily: WorkflowArtifactFamily.ChangeManagementPlan,
+							projectSubfolderSegments: ["planning"],
+						}),
+					}),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		getActiveWorkflowSession(taskState).workflowValues[RESOLVE_EXISTING_PROJECT_ARTIFACT_IDENTITY_KEY] =
+			"change-management-plan-7.md"
+		const result = await submitNewProjectSelection(taskState, "Resolve Existing Change Plan")
+
+		expect(result.kind).to.equal("project_prompt")
+		expect(getActiveWorkflowSession(taskState).workflowValues[RESOLVE_EXISTING_PROJECT_ARTIFACT_OUTPUT_KEY]).to.equal(
+			artifactAbsolutePath,
 		)
 	})
 

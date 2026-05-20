@@ -88,6 +88,12 @@ Module artifact definitions should reference runtime-owned artifact families and
 
 For model-facing steps, persist the resolved artifact path into a workflow value such as `output_file`, then render that value into prompts. The AI should not recompute the artifact path.
 
+Use `project_numbered` artifact families when a workflow must create a new artifact that receives the next number within the artifact family in the selected project without a parent or target artifact identity. The artifact family must be registered in `WORKFLOW_ARTIFACT_FAMILY_REGISTRY` with `allocationMode: "new_numbered"`, `identityRequirement: "none"`, and `numberingScope: "project_numbered"`.
+
+A workflow module using a project-numbered family declares a standalone `WorkflowArtifactDefinition` with `intentMode: "new"`, `parentIdentitySource: undefined`, `targetIdentitySource: undefined`, and standalone `outputValueKeys`. The module must route through `allocate_artifact`; it must not compute `{C}`, scan files, parse filenames, or construct artifact paths.
+
+Project-numbered artifacts use the workflow's `projectSubfolder` as the numbering and destination folder. Runtime discovers existing filenames matching the family discovery pattern in that folder, allocates the highest existing `{C}` plus one, creates the empty artifact, and persists the same standalone artifact metadata keys as singleton project artifacts.
+
 For singleton artifacts with `intentMode: "new"`, existing-project conflict handling is runtime-owned. The module must not inspect the filesystem, compute whether the artifact already exists, archive files, delete files, or expose archive/delete tools to the model.
 
 Project selection completion is runtime lifecycle state only; workflow modules must not branch on `project_selection_completed`. After project selection and any runtime-owned entry singleton artifact resolution, runtime emits `entry_artifact_resolution_completed`. The module decision tree must branch on that event:

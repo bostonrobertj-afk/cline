@@ -6220,6 +6220,19 @@ export class WorkflowRuntime {
 					return args.familyDefinition.singletonIdentity
 				}
 				break
+			case WorkflowArtifactFamily.ChangeManagementPlan: {
+				const parsedFilenameNumber = this.parseProjectNumberedArtifactFilenameNumber(
+					args.familyDefinition,
+					args.rawIdentity,
+				)
+				if (parsedFilenameNumber !== undefined) {
+					return `${parsedFilenameNumber}`
+				}
+				if (/^[1-9]\d*$/.test(normalizedIdentity) === true) {
+					return normalizedIdentity
+				}
+				break
+			}
 			case WorkflowArtifactFamily.EpicDeliverySpec:
 			case WorkflowArtifactFamily.EpicStoriesIndex: {
 				const parsedIdentity = this.parseDottedWorkflowArtifactIdentity(normalizedIdentity)
@@ -6538,6 +6551,25 @@ export class WorkflowRuntime {
 					targetIdentity: undefined,
 				}
 			}
+			case WorkflowArtifactFamily.ChangeManagementPlan: {
+				if (
+					args.familyDefinition.allocationMode !== "new_numbered" ||
+					args.familyDefinition.identityRequirement !== "none" ||
+					args.familyDefinition.numberingScope !== "project_numbered"
+				) {
+					throw new Error(`Workflow artifact ${args.artifactDefinition.id} requires a project-numbered family.`)
+				}
+
+				return {
+					artifactIdentity: await this.allocateNextProjectNumberedArtifactIdentity({
+						workflow: args.workflow,
+						session: args.session,
+						familyDefinition: args.familyDefinition,
+					}),
+					parentIdentity: undefined,
+					targetIdentity: undefined,
+				}
+			}
 			case WorkflowArtifactFamily.EpicDeliverySpec:
 				return {
 					artifactIdentity: await this.deriveNextEpicDeliverySpecIdentity(args),
@@ -6822,6 +6854,24 @@ export class WorkflowRuntime {
 		}
 	}
 
+	private async allocateNextProjectNumberedArtifactIdentity(args: {
+		workflow: WorkflowDefinition
+		session: ActiveWorkflowSession
+		familyDefinition: WorkflowArtifactFamilyDefinition
+	}): Promise<string> {
+		const discoveredFilenames = await this.discoverWorkflowArtifactFilenames({
+			workflow: args.workflow,
+			session: args.session,
+			familyDefinition: args.familyDefinition,
+			searchProjectWide: false,
+		})
+		const existingProjectNumbers = discoveredFilenames
+			.map((filename) => this.parseProjectNumberedArtifactFilenameNumber(args.familyDefinition, filename))
+			.filter((projectNumber): projectNumber is number => projectNumber !== undefined)
+
+		return `${this.getNextPositiveInteger(existingProjectNumbers)}`
+	}
+
 	private async allocateNextStoryIdentity(args: {
 		workflow: WorkflowDefinition
 		session: ActiveWorkflowSession
@@ -6925,6 +6975,7 @@ export class WorkflowRuntime {
 			case WorkflowArtifactFamily.EpicsIndex:
 			case WorkflowArtifactFamily.BrainstormingSession:
 			case WorkflowArtifactFamily.ArchitectureDocument:
+			case WorkflowArtifactFamily.ChangeManagementPlan:
 				return undefined
 			case WorkflowArtifactFamily.EpicDeliverySpec:
 			case WorkflowArtifactFamily.EpicStoriesIndex:
@@ -6940,6 +6991,28 @@ export class WorkflowRuntime {
 			case WorkflowArtifactFamily.ReviewScopeManifest:
 				return this.parseDottedWorkflowArtifactIdentity(match[1].replace(/-/g, "."))
 		}
+	}
+
+	private parseProjectNumberedArtifactFilenameNumber(
+		familyDefinition: WorkflowArtifactFamilyDefinition,
+		filename: string,
+	): number | undefined {
+		if (
+			familyDefinition.allocationMode !== "new_numbered" ||
+			familyDefinition.identityRequirement !== "none" ||
+			familyDefinition.numberingScope !== "project_numbered"
+		) {
+			return undefined
+		}
+
+		familyDefinition.discoveryPattern.lastIndex = 0
+		const match = familyDefinition.discoveryPattern.exec(filename.trim())
+		const projectNumber = match?.[1]
+		if (projectNumber === undefined || /^[1-9]\d*$/.test(projectNumber) === false) {
+			return undefined
+		}
+
+		return Number.parseInt(projectNumber, 10)
 	}
 
 	private normalizeWorkflowArtifactIdentityInput(rawIdentity: string): string {
@@ -7020,6 +7093,7 @@ export class WorkflowRuntime {
 			.replace("{S}", identitySegments[1] ?? "")
 			.replace("{R}", identitySegments[2] ?? "")
 			.replace("{target}", hyphenatedIdentity)
+			.replace("{C}", identitySegments[0] ?? "")
 	}
 
 	private buildWorkflowArtifactOutputValueWrites(args: {

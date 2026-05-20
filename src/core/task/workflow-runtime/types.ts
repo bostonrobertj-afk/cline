@@ -451,6 +451,14 @@ export type WorkflowArtifactDefinition =
 	  }
 	| {
 			id: string
+			family: WorkflowArtifactFamily.ChangeManagementPlan
+			intentMode: "new"
+			parentIdentitySource: undefined
+			targetIdentitySource: undefined
+			outputValueKeys: WorkflowStandaloneArtifactOutputValueKeys
+	  }
+	| {
+			id: string
 			family: WorkflowArtifactFamily.EpicDeliverySpec
 			intentMode: "new"
 			parentIdentitySource: undefined
