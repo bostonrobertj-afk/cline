@@ -14,6 +14,14 @@ numberingScope: project_numbered
 fileExtension: .md
 contentKind: markdown
 
+# Tool Schema Override:
+Step 1: empty
+Step 2: empty
+Step 3: agent must be able to:
+    - write to files
+    - read files
+    - send user general message
+    - provide final recap message to the user via attempt_completion
 
 # Persona
 - `name` must be `Bob`.
@@ -63,6 +71,7 @@ previousworkflowPanelId: Panel A
 
 Persist the provided response as the epic_source_indicator workflow session key.
 
+Runtime must check for existing epics index file in order to derive dropdown options on panel C. If no epics index file is available within the selected project's folders, workflow form panel F must be shown.
 
 Panel C: only shown on "yes" response to panel B
 title: Identify Originating Epic
@@ -79,10 +88,7 @@ previousWorkflowPanelId: Panel B
 
 Persist the provided response as the epic_source_identifier workflow session key.
 
-runtime must derive the Epics.md file that the selected epic belongs to and set it as epics_document.
-
-If no epics index file is available within the selected project's folders, workflow form panel F must be shown.
-
+runtime must derive the Epics.md file that the selected epic belongs to and set it as epics_document. If the Epics.md file is missing, route to panel H.
 
 Panel D: comes after panel B on "no"
 title: Check Story Source
@@ -99,7 +105,7 @@ previousworkflowPanelId: Panel B
 
 Persist the provided response as the story_source_indicator workflow session key.
 
-If no story index files are available within the selected project's folders, workflow form panel G must be shown.
+Runtime must locate all story index files in the project's implementation subfolder in order to derive the dropdown options for panel E. If no story index files are available within the selected project's folders, workflow form panel G must be shown.
 
 Panel E: only shown on "yes" response to panel D
 title: Identify Originating Story
@@ -120,7 +126,7 @@ Panel F:
 title: Missing Epics Index
 promptMarkdown: There is no epics index file for this project. Proceed anyway?
 Field:
-    kind: boolean
+    kind: radio_group
     label: select one
     options: continue, end workflow
     required: yes
@@ -129,13 +135,14 @@ allowedactions/ Labels:
     back/ back
 previousWorkflowPanelId: panel B
 
-continue to step 2 on "yes". end workflow on "no"
+continue to step 2 on "continue". end workflow on "end workflow"
+on "continue", set epic_source_identifier to "not found" and set epics_document to "not found"
 
 Panel G:
 title: Missing Story Index
 promptMarkdown: There are no story index files for this project. Proceed anyway?
 Field:
-    kind: boolean
+    kind: radio_group
     label: select one
     options: continue, end workflow
     required: yes
@@ -144,7 +151,23 @@ allowedactions/ Labels:
     back/ back
 previousWorkflowPanelId: panel D
 
-continue to step 2 on "yes". end workflow on "no"
+continue to step 2 on "continue". end workflow on "end workflow"
+on "continue", set story_source_indicator to "not found"
+
+Panel H:
+title: Missing Epics File
+promptMarkdown: The Epics.md file for the selected epic is missing. Proceed Anyway?
+Field:
+    kind: radio_group
+    label: select one
+    required: yes
+    options: continue, end workflow
+allowedActions/ labels:
+    submit/ submit
+    back/ back
+previousworkflowPanelId: panel C
+
+on "continue", set epics_document to "missing" and continue to step 2. on "end workflow", the workflow must end. 
 
 
 ## Step 2: Generate Change Management Document
@@ -212,7 +235,7 @@ Assess the project's stories:
 Keep analysis and modification constrained to stories belonging to a single epic whenever feasible. Consider the following:
 - Can the issue be addressed by modifying existing stories?
 - Should new stories be added within the current epic structure?
-- Would this approach maintain project timeline and scope as documented in architecture_document and epics_document?
+- Would this approach maintain project timeline and scope as documented in architecture_document?
 - Would reverting work from recently-completed stories simplify addressing this issue?
 - If so, which stories' changes should be rolled back?
 
