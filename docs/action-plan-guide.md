@@ -81,6 +81,18 @@ Add only real risks discovered during code inspection: dirty worktree constraint
     - Do not introduce architecture that is not clearly backed by the provided requirements.
     - user or AI Agent-facing prose, descriptions, and instructions must be prescribed via the requirements and reflected exactly as the requirments prescribe in the action plan. If requirements do not provide the necessary content, stop and ask the user to add approved content to the requirements. 
         - You do not need error messaging for missing required prerequisite files after the prerequisite resolution stage of the workflow. The workflow will end in terminal error during prerequisite file resolution if required files are missing.
+    - Before accepting any drafted task or subtask, perform these exactness checks:
+        - Requirements-backed strings: every user-facing, AI Agent-facing, terminal-error, tool-description, panel label, option label, and prompt-schema string must be traceable to exact requirements text or existing repo-owned strings. If not, stop and require requirements approval.
+        - Symbol lifecycle: every referenced helper, constant, type, builder, and test utility must be created, exported, and imported before first use. Import subtasks must list exact symbol names; phrases like "all helpers", "all exports", "the builders", or "matching sibling imports" are not permitted.
+        - Live contract verification: every prescribed constructor call, method call, return type, runtime action object, path-policy object, session object, form-session object, event object, and submitted-value payload must match the live exported TypeScript contract or a symbol created earlier in the same plan.
+        - Single-change granularity: a subtask must not bundle multiple helpers, multiple unrelated tests, or multiple runtime branches when splitting them would make sequencing, imports, or exact assertions clearer.
+        - Stable object assertions: tests for machine-consumed contracts must use exact deep-equality or exact field assertions, not "include", "deep-include", "transition type", or "action kind", when the requirements prescribe stable object fields. This includes workflow route actions, `continue_workflow_form`, `transition_step`, workflow-form transitions, stale-clearing arrays, artifact actions, persisted workflow writes, and backend failure result objects.
+        - Fixture completeness: every test fixture must prescribe exact required object fields and exact setup calls/data, including `WorkflowUiSessionState`, `WorkflowFormSessionState`, `WorkflowFormSubmittedValuePayload`, runtime sessions, workflow values, temp files, write data, cleanup, and second/fresh fixture setup where isolation is required.
+        - Deterministic helper behavior: helper subtasks must prescribe exact narrowing, intermediate variables, empty checks, return values, and error paths. Internally contradictory wording is not permitted.
+        - Filesystem/path-policy behavior: if a requirement involves selected-project containment, file type, workspace path policy, or runtime-owned artifact resolution, the action plan must prescribe that exact validation path. `existsSync(...)` alone is only acceptable when the requirements authorize an existence-only precheck.
+        - Prompt placeholder coverage: prompt tests must include raw-placeholder negative assertions for every placeholder required by the requirements, including conditional placeholders.
+        - Legacy/forbidden coverage: unit tests and final validation guards must enumerate every forbidden legacy concept required by the requirements, including source markdown dependencies, placeholder or managed-workflow state, workflow-specific retired handlers, and legacy tool matrices.
+
     Example task & subtask configuration:
     [ ] Task 1: In <target file path a>, add two helper functions:
         [ ] Subtask 1.1: In <target file path a>, add <helper function 1 exact prescribed code>
@@ -109,7 +121,7 @@ focused unit tests, integration tests, check-types, lint, negative guards for re
 - Prescribe exact tests to be executed after all tasks and subtasks are complete
 - Review the test expectations/ assertions and ensure that they will not be stale due to changes made during action plan implementation
 - Ensure that prescribed testing is supported by the repo
-- For phased plans, prescribe phase-level validation at every QA pause, including the repo’s formatting/lint/typecheck gates needed for a clean commit.
+- For phased plans, prescribe phase-level validation at every QA pause, including the repo’s formatting/lint/typecheck gates needed for a clean commit and a scope-diff check that covers both tracked diffs and untracked files, such as `git diff --name-only` plus `git ls-files --others --exclude-standard`.
 - If `npm run check-types` fails in files modified by the current phase, treat it as an action-plan prescription gap unless investigation proves it is unrelated drift or environment failure.
 
 ### Test Prescription Calibration
