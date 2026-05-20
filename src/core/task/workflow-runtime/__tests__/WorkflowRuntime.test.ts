@@ -219,10 +219,11 @@ describe("WorkflowRuntime", () => {
 	}
 
 	type JsonOptionsFieldKind = Extract<WorkflowFormFieldKind, "dropdown" | "radio_group" | "multi_select" | "checkbox_group">
+	type JsonOptionsSource = NonNullable<WorkflowFormFieldDefinition["jsonOptionsSource"]>
+	type ExactFileJsonOptionsSource = Extract<JsonOptionsSource, { sourceFileDiscovery?: undefined }>
+	type DiscoveredFilesJsonOptionsSource = Extract<JsonOptionsSource, { sourcePathSegments?: undefined }>
 
-	function createEpicsJsonOptionsSource(
-		args?: Partial<NonNullable<WorkflowFormFieldDefinition["jsonOptionsSource"]>>,
-	): NonNullable<WorkflowFormFieldDefinition["jsonOptionsSource"]> {
+	function createEpicsJsonOptionsSource(args?: Partial<ExactFileJsonOptionsSource>): ExactFileJsonOptionsSource {
 		return {
 			root: {
 				kind: "selected_project_root",
@@ -231,6 +232,33 @@ describe("WorkflowRuntime", () => {
 			itemsPath: args?.itemsPath ?? "epics",
 			valueProperty: args?.valueProperty ?? "identity",
 			labelTemplate: args?.labelTemplate ?? "Epic {identity}: {title}",
+			...(args?.descriptionTemplate !== undefined ? { descriptionTemplate: args.descriptionTemplate } : {}),
+		}
+	}
+
+	function createDiscoveredStoryIndexJsonOptionsSource(args?: {
+		targetPathSegments?: readonly string[]
+		namingPattern?: string
+		immediateChildrenOnly?: boolean
+		sort?: "alpha_asc" | "alpha_desc"
+		itemsPath?: string
+		valueProperty?: string
+		labelTemplate?: string
+		descriptionTemplate?: string
+	}): DiscoveredFilesJsonOptionsSource {
+		return {
+			root: {
+				kind: "selected_project_root",
+			},
+			sourceFileDiscovery: {
+				targetPathSegments: args?.targetPathSegments ?? ["implementation"],
+				namingPattern: args?.namingPattern ?? "^epic-\\d+-stories\\.index\\.json$",
+				immediateChildrenOnly: args?.immediateChildrenOnly ?? true,
+				sort: args?.sort ?? "alpha_asc",
+			},
+			itemsPath: args?.itemsPath ?? "stories",
+			valueProperty: args?.valueProperty ?? "story_identity",
+			labelTemplate: args?.labelTemplate ?? "Story {story_identity}: {story_file_name}",
 			...(args?.descriptionTemplate !== undefined ? { descriptionTemplate: args.descriptionTemplate } : {}),
 		}
 	}
@@ -6863,6 +6891,249 @@ describe("WorkflowRuntime", () => {
 		)
 	})
 
+	it("renders dropdown options from discovered selected-project story index files", async () => {
+		discoverWorkflowCandidatesStub.restore()
+		const workflowFormId = "json-options-discovered-story-indexes-form"
+		const projectFolderName = "json-options-discovered-story-indexes-project"
+		await writeStoryIndex(join(cwd, "docs", "projects", projectFolderName, "implementation", "epic-2-stories.index.json"), [
+			{
+				story_identity: "2.1",
+				story_file_name: "Story-2-1.md",
+				story_type: "primary",
+				parent_story_identity: null,
+				story_file_generated: true,
+				status: "draft",
+			},
+			{
+				story_identity: "2.2",
+				story_file_name: "Story-2-2.md",
+				story_type: "primary",
+				parent_story_identity: null,
+				story_file_generated: true,
+				status: "backlog",
+			},
+		])
+		await writeStoryIndex(join(cwd, "docs", "projects", projectFolderName, "implementation", "epic-1-stories.index.json"), [
+			{
+				story_identity: "1.1",
+				story_file_name: "Story-1-1.md",
+				story_type: "primary",
+				parent_story_identity: null,
+				story_file_generated: true,
+				status: "draft",
+			},
+		])
+		await writeFile(join(cwd, "docs", "projects", projectFolderName, "implementation", "notes.index.json"), "{}", "utf8")
+
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["selected_story"],
+			workflowForms: {
+				[workflowFormId]: createJsonOptionsWorkflowForm({
+					workflowFormId,
+					fields: [
+						createEpicsJsonOptionsField({
+							key: "story",
+							kind: "dropdown",
+							workflowValueKey: "selected_story",
+							jsonOptionsSource: createDiscoveredStoryIndexJsonOptionsSource({
+								descriptionTemplate: "Status: {status}",
+							}),
+						}),
+					],
+				}),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({ workflowFormId }),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		const renderFormAction = await submitNewProjectSelection(taskState, projectFolderName)
+
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+
+		const expectedOptions = [
+			{ value: "1.1", label: "Story 1.1: Story-1-1.md", description: "Status: draft" },
+			{ value: "2.1", label: "Story 2.1: Story-2-1.md", description: "Status: draft" },
+			{ value: "2.2", label: "Story 2.2: Story-2-2.md", description: "Status: backlog" },
+		]
+		expect(renderFormAction.payload.panel?.fields.find((field) => field.key === "story")?.options).to.deep.equal(
+			expectedOptions,
+		)
+		expect(
+			renderFormAction.formSession.definitionPayload.panels["json-options"].fields.find((field) => field.key === "story")
+				?.options,
+		).to.deep.equal(expectedOptions)
+	})
+
+	it("renders an empty option list when discovered JSON option files have no matches", async () => {
+		discoverWorkflowCandidatesStub.restore()
+		const workflowFormId = "json-options-no-discovered-story-indexes-form"
+		const projectFolderName = "json-options-no-discovered-story-indexes-project"
+		const ignoredSourcePath = join(cwd, "docs", "projects", projectFolderName, "implementation", "notes.index.json")
+		await mkdir(dirname(ignoredSourcePath), { recursive: true })
+		await writeFile(ignoredSourcePath, "{}", "utf8")
+
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["selected_story"],
+			workflowForms: {
+				[workflowFormId]: createJsonOptionsWorkflowForm({
+					workflowFormId,
+					fields: [
+						createEpicsJsonOptionsField({
+							key: "story",
+							kind: "dropdown",
+							workflowValueKey: "selected_story",
+							jsonOptionsSource: createDiscoveredStoryIndexJsonOptionsSource(),
+						}),
+					],
+				}),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({ workflowFormId }),
+				}),
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		const renderFormAction = await submitNewProjectSelection(taskState, projectFolderName)
+
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+
+		expect(renderFormAction.payload.panel?.fields.find((field) => field.key === "story")?.options).to.deep.equal([])
+		expect(
+			renderFormAction.formSession.definitionPayload.panels["json-options"].fields.find((field) => field.key === "story")
+				?.options,
+		).to.deep.equal([])
+	})
+
+	it("fails clearly when a discovered JSON option source file is malformed", async () => {
+		discoverWorkflowCandidatesStub.restore()
+		const workflowFormId = "json-options-malformed-discovered-story-index-form"
+		const projectFolderName = "json-options-malformed-discovered-story-index-project"
+		const sourcePath = join(cwd, "docs", "projects", projectFolderName, "implementation", "epic-1-stories.index.json")
+		await mkdir(dirname(sourcePath), { recursive: true })
+		await writeFile(sourcePath, "{", "utf8")
+
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["selected_story"],
+			workflowForms: {
+				[workflowFormId]: createJsonOptionsWorkflowForm({
+					workflowFormId,
+					fields: [
+						createEpicsJsonOptionsField({
+							key: "story",
+							kind: "dropdown",
+							workflowValueKey: "selected_story",
+							jsonOptionsSource: createDiscoveredStoryIndexJsonOptionsSource(),
+						}),
+					],
+				}),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({ workflowFormId }),
+				}),
+			},
+		})
+		await activateWorkflow(taskState, workflow)
+
+		let thrownError: Error | undefined
+		try {
+			await submitNewProjectSelection(taskState, projectFolderName)
+		} catch (error) {
+			if (error instanceof Error) {
+				thrownError = error
+			}
+		}
+
+		expect(thrownError).to.not.equal(undefined)
+		if (thrownError === undefined) {
+			throw new Error("Expected malformed discovered JSON option source rendering to fail.")
+		}
+		expect(thrownError.message).to.contain("jsonOptionsSource file")
+		expect(thrownError.message).to.contain("epic-1-stories.index.json")
+		expect(thrownError.message).to.contain("is malformed JSON")
+	})
+
+	it("rejects duplicate discovered JSON option values across source files", async () => {
+		discoverWorkflowCandidatesStub.restore()
+		const workflowFormId = "json-options-duplicate-discovered-story-index-form"
+		const projectFolderName = "json-options-duplicate-discovered-story-index-project"
+		await writeStoryIndex(join(cwd, "docs", "projects", projectFolderName, "implementation", "epic-1-stories.index.json"), [
+			{
+				story_identity: "1.1",
+				story_file_name: "Story-1-1.md",
+				story_type: "primary",
+				parent_story_identity: null,
+				story_file_generated: true,
+				status: "draft",
+			},
+		])
+		await writeStoryIndex(join(cwd, "docs", "projects", projectFolderName, "implementation", "epic-2-stories.index.json"), [
+			{
+				story_identity: "1.1",
+				story_file_name: "Story-2-1.md",
+				story_type: "primary",
+				parent_story_identity: null,
+				story_file_generated: true,
+				status: "draft",
+			},
+		])
+
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["selected_story"],
+			workflowForms: {
+				[workflowFormId]: createJsonOptionsWorkflowForm({
+					workflowFormId,
+					fields: [
+						createEpicsJsonOptionsField({
+							key: "story",
+							kind: "dropdown",
+							workflowValueKey: "selected_story",
+							jsonOptionsSource: createDiscoveredStoryIndexJsonOptionsSource(),
+						}),
+					],
+				}),
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createWorkflowFormDecisionTree({ workflowFormId }),
+				}),
+			},
+		})
+		await activateWorkflow(taskState, workflow)
+
+		let thrownError: Error | undefined
+		try {
+			await submitNewProjectSelection(taskState, projectFolderName)
+		} catch (error) {
+			if (error instanceof Error) {
+				thrownError = error
+			}
+		}
+
+		expect(thrownError).to.not.equal(undefined)
+		if (thrownError === undefined) {
+			throw new Error("Expected duplicate discovered JSON option source rendering to fail.")
+		}
+		expect(thrownError.message).to.contain("jsonOptionsSource generated duplicate option value 1.1")
+		expect(thrownError.message).to.contain("epic-2-stories.index.json")
+	})
+
 	it("fails before reading JSON options when dynamic source path placeholders stay unresolved", async () => {
 		const workflowFormId = "json-options-unresolved-source-path-form"
 		const projectFolderName = "json-options-unresolved-source-path-project"
@@ -7364,6 +7635,16 @@ describe("WorkflowRuntime", () => {
 					}),
 				),
 			})),
+			{
+				label: "unsafe sourceFileDiscovery targetPathSegments",
+				field: createDropdownField(
+					createDiscoveredStoryIndexJsonOptionsSource({ targetPathSegments: ["implementation", ".."] }),
+				),
+			},
+			{
+				label: "empty sourceFileDiscovery namingPattern",
+				field: createDropdownField(createDiscoveredStoryIndexJsonOptionsSource({ namingPattern: "" })),
+			},
 			{
 				label: "selectorDiscovery conflict",
 				field: {

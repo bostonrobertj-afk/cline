@@ -482,14 +482,36 @@ export type WorkflowFormJsonOptionsSourceRoot = {
 	kind: "selected_project_root"
 }
 
-export interface WorkflowFormJsonOptionsSourceConfig {
+export interface WorkflowFormJsonOptionsSourceFileDiscoveryConfig {
+	targetPathSegments: readonly string[]
+	namingPattern: string
+	immediateChildrenOnly: boolean
+	sort: "alpha_asc" | "alpha_desc"
+}
+
+export interface WorkflowFormExactFileJsonOptionsSourceConfig {
 	root: WorkflowFormJsonOptionsSourceRoot
 	sourcePathSegments: readonly string[]
+	sourceFileDiscovery?: undefined
 	itemsPath: string
 	valueProperty: string
 	labelTemplate: string
 	descriptionTemplate?: string
 }
+
+export interface WorkflowFormDiscoveredFilesJsonOptionsSourceConfig {
+	root: WorkflowFormJsonOptionsSourceRoot
+	sourcePathSegments?: undefined
+	sourceFileDiscovery: WorkflowFormJsonOptionsSourceFileDiscoveryConfig
+	itemsPath: string
+	valueProperty: string
+	labelTemplate: string
+	descriptionTemplate?: string
+}
+
+export type WorkflowFormJsonOptionsSourceConfig =
+	| WorkflowFormExactFileJsonOptionsSourceConfig
+	| WorkflowFormDiscoveredFilesJsonOptionsSourceConfig
 
 export interface WorkflowFormWorkflowValueOptionsSourceConfig {
 	workflowValueKey: string

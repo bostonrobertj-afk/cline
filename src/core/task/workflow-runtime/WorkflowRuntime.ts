@@ -2,8 +2,11 @@ import type {
 	ClineWorkflowStepResolutionStatus,
 	WorkflowFormConditionDefinition,
 	WorkflowFormDefinitionPayload,
+	WorkflowFormDiscoveredFilesJsonOptionsSourceConfig,
+	WorkflowFormExactFileJsonOptionsSourceConfig,
 	WorkflowFormFieldDefinition,
 	WorkflowFormJsonOptionsSourceConfig,
+	WorkflowFormJsonOptionsSourceFileDiscoveryConfig,
 	WorkflowFormOptionDefinition,
 	WorkflowFormPanelAction,
 	WorkflowFormPanelDefinition,
@@ -4729,6 +4732,39 @@ export class WorkflowRuntime {
 		})
 	}
 
+	private isWorkflowFormExactFileJsonOptionsSourceConfig(
+		sourceConfig: WorkflowFormJsonOptionsSourceConfig,
+	): sourceConfig is WorkflowFormExactFileJsonOptionsSourceConfig {
+		return sourceConfig.sourcePathSegments !== undefined
+	}
+
+	private isWorkflowFormDiscoveredFilesJsonOptionsSourceConfig(
+		sourceConfig: WorkflowFormJsonOptionsSourceConfig,
+	): sourceConfig is WorkflowFormDiscoveredFilesJsonOptionsSourceConfig {
+		return sourceConfig.sourceFileDiscovery !== undefined
+	}
+
+	private async readWorkflowFormJsonOptionsSource(args: { fieldKey: string; sourcePath: string }): Promise<unknown> {
+		let sourceText: string
+		try {
+			sourceText = await readFile(args.sourcePath, "utf8")
+		} catch (error) {
+			const errorMessage = error instanceof Error ? ` ${error.message}` : ""
+			throw new Error(
+				`Workflow form field ${args.fieldKey} jsonOptionsSource file ${args.sourcePath} could not be read.${errorMessage}`,
+			)
+		}
+
+		try {
+			return JSON.parse(sourceText)
+		} catch (error) {
+			const errorMessage = error instanceof Error ? ` ${error.message}` : ""
+			throw new Error(
+				`Workflow form field ${args.fieldKey} jsonOptionsSource file ${args.sourcePath} is malformed JSON.${errorMessage}`,
+			)
+		}
+	}
+
 	private async loadWorkflowFormJsonOptions(args: {
 		taskState: TaskState
 		workflow: WorkflowDefinition
@@ -4740,53 +4776,145 @@ export class WorkflowRuntime {
 			return undefined
 		}
 
+		if (this.isWorkflowFormExactFileJsonOptionsSourceConfig(sourceConfig)) {
+			return this.loadWorkflowFormExactFileJsonOptions({
+				taskState: args.taskState,
+				formSession: args.formSession,
+				fieldKey: args.field.key,
+				sourceConfig,
+			})
+		}
+
+		if (this.isWorkflowFormDiscoveredFilesJsonOptionsSourceConfig(sourceConfig)) {
+			return this.loadWorkflowFormDiscoveredFilesJsonOptions({
+				taskState: args.taskState,
+				fieldKey: args.field.key,
+				sourceConfig,
+			})
+		}
+
+		return undefined
+	}
+
+	private async loadWorkflowFormExactFileJsonOptions(args: {
+		taskState: TaskState
+		formSession: WorkflowFormSessionState
+		fieldKey: string
+		sourceConfig: WorkflowFormExactFileJsonOptionsSourceConfig
+	}): Promise<WorkflowFormOptionDefinition[]> {
 		const sourcePath = this.resolveWorkflowFormJsonOptionsSourcePath({
 			taskState: args.taskState,
 			formSession: args.formSession,
-			fieldKey: args.field.key,
-			sourceConfig,
+			fieldKey: args.fieldKey,
+			sourceConfig: args.sourceConfig,
 		})
-
-		let sourceText: string
-		try {
-			sourceText = await readFile(sourcePath, "utf8")
-		} catch (error) {
-			const errorMessage = error instanceof Error ? ` ${error.message}` : ""
-			throw new Error(
-				`Workflow form field ${args.field.key} jsonOptionsSource file ${sourcePath} could not be read.${errorMessage}`,
-			)
-		}
-
-		let parsedSource: unknown
-		try {
-			parsedSource = JSON.parse(sourceText)
-		} catch (error) {
-			const errorMessage = error instanceof Error ? ` ${error.message}` : ""
-			throw new Error(
-				`Workflow form field ${args.field.key} jsonOptionsSource file ${sourcePath} is malformed JSON.${errorMessage}`,
-			)
-		}
-
+		const parsedSource = await this.readWorkflowFormJsonOptionsSource({
+			fieldKey: args.fieldKey,
+			sourcePath,
+		})
 		const items = this.resolveWorkflowFormJsonOptionItems({
-			fieldKey: args.field.key,
-			sourceConfig,
+			fieldKey: args.fieldKey,
+			sourceConfig: args.sourceConfig,
 			sourcePath,
 			parsedSource,
 		})
 
 		return this.buildWorkflowFormJsonOptions({
-			fieldKey: args.field.key,
-			sourceConfig,
+			fieldKey: args.fieldKey,
+			sourceConfig: args.sourceConfig,
 			sourcePath,
 			items,
+			seenValues: new Set<string>(),
 		})
+	}
+
+	private async resolveWorkflowFormJsonOptionsDiscoveredSourcePaths(args: {
+		taskState: TaskState
+		fieldKey: string
+		sourceFileDiscovery: WorkflowFormJsonOptionsSourceFileDiscoveryConfig
+	}): Promise<string[]> {
+		const session = args.taskState.activeWorkflowSession
+		if (session === undefined) {
+			throw new Error(`Workflow form field ${args.fieldKey} jsonOptionsSource requires an active workflow session.`)
+		}
+
+		const selectedProjectRoot = resolve(this.resolveWorkflowProjectOutputFolder(session))
+		const candidates = await discoverWorkflowCandidates({
+			rootDirectory: selectedProjectRoot,
+			workspacePathPolicy: this.workspacePathPolicy,
+			targetPathSegments: args.sourceFileDiscovery.targetPathSegments,
+			entryType: "file",
+			immediateChildrenOnly: args.sourceFileDiscovery.immediateChildrenOnly,
+			namingPattern: new RegExp(args.sourceFileDiscovery.namingPattern),
+			sort: args.sourceFileDiscovery.sort,
+		})
+		if (candidates.length === 0) {
+			return []
+		}
+
+		const sourceDirectory = resolveWorkflowDiscoveryTargetDirectory({
+			rootDirectory: selectedProjectRoot,
+			targetPathSegments: args.sourceFileDiscovery.targetPathSegments,
+		})
+
+		return candidates.map((candidate) => {
+			const sourcePath = resolve(sourceDirectory, candidate.value)
+			const relativeSourcePath = relative(selectedProjectRoot, sourcePath)
+			if (relativeSourcePath === ".." || relativeSourcePath.startsWith(`..${sep}`) || isAbsolute(relativeSourcePath)) {
+				throw new Error(
+					`Workflow form field ${args.fieldKey} jsonOptionsSource file must stay under selected project root: ${sourcePath}`,
+				)
+			}
+
+			this.assertWorkspacePathAllowed(sourcePath)
+			return sourcePath
+		})
+	}
+
+	private async loadWorkflowFormDiscoveredFilesJsonOptions(args: {
+		taskState: TaskState
+		fieldKey: string
+		sourceConfig: WorkflowFormDiscoveredFilesJsonOptionsSourceConfig
+	}): Promise<WorkflowFormOptionDefinition[]> {
+		const sourcePaths = await this.resolveWorkflowFormJsonOptionsDiscoveredSourcePaths({
+			taskState: args.taskState,
+			fieldKey: args.fieldKey,
+			sourceFileDiscovery: args.sourceConfig.sourceFileDiscovery,
+		})
+		const seenValues = new Set<string>()
+		const options: WorkflowFormOptionDefinition[] = []
+
+		for (const sourcePath of sourcePaths) {
+			const parsedSource = await this.readWorkflowFormJsonOptionsSource({
+				fieldKey: args.fieldKey,
+				sourcePath,
+			})
+			const items = this.resolveWorkflowFormJsonOptionItems({
+				fieldKey: args.fieldKey,
+				sourceConfig: args.sourceConfig,
+				sourcePath,
+				parsedSource,
+			})
+
+			options.push(
+				...this.buildWorkflowFormJsonOptions({
+					fieldKey: args.fieldKey,
+					sourceConfig: args.sourceConfig,
+					sourcePath,
+					items,
+					seenValues,
+				}),
+			)
+		}
+
+		return options
 	}
 
 	private resolveWorkflowFormJsonOptionsSourcePath(args: {
 		taskState: TaskState
 		formSession: WorkflowFormSessionState
 		fieldKey: string
-		sourceConfig: WorkflowFormJsonOptionsSourceConfig
+		sourceConfig: WorkflowFormExactFileJsonOptionsSourceConfig
 	}): string {
 		const session = args.taskState.activeWorkflowSession
 		if (session === undefined) {
@@ -4867,8 +4995,8 @@ export class WorkflowRuntime {
 		sourceConfig: WorkflowFormJsonOptionsSourceConfig
 		sourcePath: string
 		items: Record<string, unknown>[]
+		seenValues: Set<string>
 	}): WorkflowFormOptionDefinition[] {
-		const seenValues = new Set<string>()
 		const options: WorkflowFormOptionDefinition[] = []
 
 		for (const [index, item] of args.items.entries()) {
@@ -4879,12 +5007,12 @@ export class WorkflowRuntime {
 				)
 			}
 
-			if (seenValues.has(optionValue)) {
+			if (args.seenValues.has(optionValue)) {
 				throw new Error(
 					`Workflow form field ${args.fieldKey} jsonOptionsSource generated duplicate option value ${optionValue} in ${args.sourcePath}.`,
 				)
 			}
-			seenValues.add(optionValue)
+			args.seenValues.add(optionValue)
 
 			const option: WorkflowFormOptionDefinition = {
 				value: optionValue,
@@ -5037,11 +5165,35 @@ export class WorkflowRuntime {
 			}
 		}
 
-		for (const sourcePathSegment of sourceConfig.sourcePathSegments) {
-			if (isWorkflowDiscoveryTargetPathSegment(sourcePathSegment) === false) {
-				return {
-					valid: false,
-					errorMessage: `Workflow form ${args.workflowFormId} field ${args.field.key} jsonOptionsSource sourcePathSegments entry ${sourcePathSegment} is invalid.`,
+		const hasSourcePathSegments = sourceConfig.sourcePathSegments !== undefined
+		const hasSourceFileDiscovery = sourceConfig.sourceFileDiscovery !== undefined
+		if (hasSourcePathSegments === hasSourceFileDiscovery) {
+			return {
+				valid: false,
+				errorMessage: `Workflow form ${args.workflowFormId} field ${args.field.key} jsonOptionsSource must define exactly one of sourcePathSegments or sourceFileDiscovery.`,
+			}
+		}
+
+		if (sourceConfig.sourcePathSegments !== undefined) {
+			const sourcePathSegments = sourceConfig.sourcePathSegments
+			for (const sourcePathSegment of sourcePathSegments) {
+				if (isWorkflowDiscoveryTargetPathSegment(sourcePathSegment) === false) {
+					return {
+						valid: false,
+						errorMessage: `Workflow form ${args.workflowFormId} field ${args.field.key} jsonOptionsSource sourcePathSegments entry ${sourcePathSegment} is invalid.`,
+					}
+				}
+			}
+		}
+
+		if (sourceConfig.sourceFileDiscovery !== undefined) {
+			const sourceFileDiscovery = sourceConfig.sourceFileDiscovery
+			for (const targetPathSegment of sourceFileDiscovery.targetPathSegments) {
+				if (isWorkflowDiscoveryTargetPathSegment(targetPathSegment) === false) {
+					return {
+						valid: false,
+						errorMessage: `Workflow form ${args.workflowFormId} field ${args.field.key} jsonOptionsSource sourceFileDiscovery targetPathSegments entry ${targetPathSegment} is invalid.`,
+					}
 				}
 			}
 		}
@@ -5053,6 +5205,13 @@ export class WorkflowRuntime {
 		]
 		if (sourceConfig.descriptionTemplate !== undefined) {
 			requiredStrings.push({ propertyName: "descriptionTemplate", value: sourceConfig.descriptionTemplate })
+		}
+		if (sourceConfig.sourceFileDiscovery !== undefined) {
+			const sourceFileDiscovery = sourceConfig.sourceFileDiscovery
+			requiredStrings.push({
+				propertyName: "sourceFileDiscovery.namingPattern",
+				value: sourceFileDiscovery.namingPattern,
+			})
 		}
 
 		for (const requiredString of requiredStrings) {
