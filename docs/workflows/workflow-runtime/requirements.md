@@ -187,6 +187,7 @@ The canonical in-scope workflow mapping for this requirements set is:
 | `quick-spec` | `quick-flow-solo-dev` | `planning` |
 | `review-adversarial-general` | `quality-control` | `review` |
 | `edge-case-hunter-review` | `quality-control` | `review` |
+| `validate-story` | `scrum-master` | `planning` |
 | `write-remediation-story` | `scrum-master` | `planning` |
 
 `problem-solving` is the target migrated workflow name for this initiative and replaces the legacy `cis-problem-solving.md` naming in the in-scope runtime contract.

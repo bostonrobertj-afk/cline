@@ -1,8 +1,9 @@
 ## FrontMatter
 - Read this plan from top to bottom before making any changes.
-- Read each step in full immediately before executing it.
+- Read each task and subtask in full immediately before executing it.
 - Execute only one task or subtask at a time- return to this file and read the next task or subtask before executing. Do not rely on your internal memory when switching to a new task or subtask.
-- After completing a task or subtask, update that step's checkbox from "[ ]" to "[x]".
+  - Exception: You may execute multiple sequential subtasks with one patch only if they are scoped to the same file, but must review each subtask vs the landed code after the patch to ensure that every subtask was implemented exactly as prescribed before marking the subtask as complete.
+  - After completing a task or subtask, update that step's checkbox from "[ ]" to "[x]".
 - Checkbox updates to this plan file are allowed in every step in addition to the listed allowed-files set.
 - Do not edit any file not listed in the current step's allowed-files list.
 - If any ambiguity is discovered, or if any change is needed outside the allowed-files list for the current step, stop and ask the user before proceeding.
@@ -37,9 +38,9 @@ This plan also includes the approved shared handler support needed for module-ow
 Approved implementation decisions:
 
 - Panel A stores the selected epic's canonical `identity` as `epic_identity` using `jsonOptionsSource.valueProperty = "identity"`.
-- `target_epic` and `stories_index` are derived deterministically after the Step 1 workflow form completes by reading the selected project's `planning/Epics.index.json`.
+- `target_epic`, `stories_index`, and `stories_index_existed_at_workflow_start` are derived deterministically after Panel A submission by reading the selected project's `planning/Epics.index.json`.
 - `implementation_folder` and `drafts_folder` are derived from the resolved `epics_index` path using `projectRoot = dirname(dirname(epics_index))`, then `implementation_folder = join(projectRoot, "implementation")` and `drafts_folder = join(projectRoot, "implementation", "drafts")`.
-- Panel B is an informational confirmation panel with no fields and `allowedActions: ["submit"]`.
+- The removed Required Context panel must not remain in the active Step 1 workflow form. Panel B is the edit-intent panel, Panel C is the story-selection panel, and Panel D is the additional-context panel.
 
 Sibling-pattern audit summary:
 
@@ -888,10 +889,324 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/pi-planning/action-plan.md`
 
-[x] Subtask 14.4. Run `rg -n "toolBackedOperation|tool_backed_operation" src/core/task/workflow-runtime/workflow-modules/pi-planning` and confirm no matches.
+[x] Subtask 14.4. This static guard was superseded by Phase 8 because pi-planning now requires a workflow-owned `execute_tool_backed_operation` route for deterministic missing-story generation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/pi-planning/action-plan.md`
+
+### Phase 8 - Existing Story Edit Path
+
+Relevant requirements:
+
+- `pi-planning-requirements.md` Step 1 Panel B, Panel C, Panel D, edit-intent routing, missing-story generation, and `target_story` resolution requirements.
+- `pi-planning-requirements.md` Step 6 initial-buildout and edit-existing-story prompt/tool-schema variant requirements.
+- `pi-planning-requirements.md` Testing Requirements covering Required Context panel absence, edit-intent/story-selection panels, direct Step 6 routing, `target_story` fail-closed behavior, and conditional prompt/tool projection.
+
+After completing this phase, pause for QA review.
+
+[ ] Task 15. Add runtime-owned target-story resolution support.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/storyArtifacts.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/storyArtifacts.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+    [ ] Subtask 15.1: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/storyArtifacts.ts`, export `WORKFLOW_STORY_STATUS_FOLDER_SEGMENTS: Readonly<Record<WorkflowStoryStatus, readonly string[]>>` with exact mapping `{ draft: ["implementation", "drafts"], backlog: ["implementation", "stories-backlog"], review: ["implementation", "stories-review"], complete: ["implementation", "stories-complete"] }`.
+
+    [ ] Subtask 15.2: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/storyArtifacts.test.ts`, import `WORKFLOW_STORY_STATUS_FOLDER_SEGMENTS` and add exact deep-equality coverage for the mapping added in Subtask 15.1.
+
+    [ ] Subtask 15.3: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`, add exported interface `WorkflowResolveStoryIndexTargetStoryErrorMessages` with exact string fields `missingStoryIdentity`, `missingStoryIndex`, `unreadableOrMalformedStoryIndex`, `missingEntry`, `unsupportedStatus`, `invalidStoryFileName`, `outsideSelectedProject`, `workspacePathRejected`, `missingFile`, and `notFile`.
+
+    [ ] Subtask 15.4: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`, add exported interface `WorkflowResolveStoryIndexTargetStoryAction` with exact fields `kind: "resolve_story_index_target_story"`, `storyIndexWorkflowValueKey: string`, `storyIdentityWorkflowValueKey: string`, `outputWorkflowValueKey: string`, and `errorMessages: WorkflowResolveStoryIndexTargetStoryErrorMessages`.
+
+    [ ] Subtask 15.5: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`, add `WorkflowResolveStoryIndexTargetStoryAction` to the `WorkflowDecisionAction` union.
+
+    [ ] Subtask 15.6: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, extend the existing story-artifacts import to include `WORKFLOW_STORY_STATUS_FOLDER_SEGMENTS`.
+
+    [ ] Subtask 15.7: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, add `type ResolveStoryIndexTargetStoryAction = Extract<WorkflowDecisionAction, { kind: "resolve_story_index_target_story" }>` beside the existing action type aliases.
+
+    [ ] Subtask 15.8: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, add private helper `isPathWithinSelectedProjectRoot(args: { selectedProjectRoot: string; filePath: string }): boolean` that resolves both paths, computes `relative(resolvedProjectRoot, resolvedFilePath)`, and returns `false` when the relative path is `".."`, starts with `` `..${sep}` ``, or is absolute; otherwise returns `true`.
+
+    [ ] Subtask 15.9: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, add private async method `resolveStoryIndexTargetStoryNextAction(args: { taskState: TaskState; action: ResolveStoryIndexTargetStoryAction; sourceRoute: WorkflowStepResolutionSourceRoute }): Promise<WorkflowNextAction>`.
+
+    [ ] Subtask 15.10: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, in `resolveStoryIndexTargetStoryNextAction(...)`, when `taskState.activeWorkflowSession` is `undefined`, return `{ kind: "no_op" }`.
+
+    [ ] Subtask 15.11: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, in `resolveStoryIndexTargetStoryNextAction(...)`, read `selected_story_identity` through `readRequiredStringWorkflowValue(...)` using `args.action.storyIdentityWorkflowValueKey`; on thrown error, return `buildTerminalErrorNextAction({ taskState: args.taskState, errorMessage: args.action.errorMessages.missingStoryIdentity })`.
+
+    [ ] Subtask 15.12: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, in `resolveStoryIndexTargetStoryNextAction(...)`, read `stories_index` through `readRequiredStringWorkflowValue(...)` using `args.action.storyIndexWorkflowValueKey`; on thrown error, return `buildTerminalErrorNextAction({ taskState: args.taskState, errorMessage: args.action.errorMessages.missingStoryIndex })`.
+
+    [ ] Subtask 15.13: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, in `resolveStoryIndexTargetStoryNextAction(...)`, call `this.assertWorkspacePathAllowed(storiesIndex)` before reading the story index; if `assertWorkspacePathAllowed(...)`, `readFile(storiesIndex, "utf8")`, `JSON.parse(...)`, root object validation, `version === 1` validation, or `Array.isArray(stories)` validation fails, return `buildTerminalErrorNextAction({ taskState: args.taskState, errorMessage: args.action.errorMessages.unreadableOrMalformedStoryIndex })`.
+
+    [ ] Subtask 15.14: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, in `resolveStoryIndexTargetStoryNextAction(...)`, find the selected story by scanning the parsed `stories` array for a record whose `story_identity` string exactly equals the selected story identity; when no matching record exists, return `buildTerminalErrorNextAction({ taskState: args.taskState, errorMessage: args.action.errorMessages.missingEntry })`.
+
+    [ ] Subtask 15.15: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, in `resolveStoryIndexTargetStoryNextAction(...)`, read the selected record's `status`; when `isWorkflowStoryStatus(status)` is false, return `buildTerminalErrorNextAction({ taskState: args.taskState, errorMessage: args.action.errorMessages.unsupportedStatus })`.
+
+    [ ] Subtask 15.16: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, in `resolveStoryIndexTargetStoryNextAction(...)`, read the selected record's `story_file_name`; when it is not a non-empty string, return `buildTerminalErrorNextAction({ taskState: args.taskState, errorMessage: args.action.errorMessages.invalidStoryFileName })`.
+
+    [ ] Subtask 15.17: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, in `resolveStoryIndexTargetStoryNextAction(...)`, derive `selectedProjectRoot = this.resolveWorkflowProjectOutputFolder(session)` and `targetStoryPath = resolve(selectedProjectRoot, ...WORKFLOW_STORY_STATUS_FOLDER_SEGMENTS[status], storyFileName)`, then call `isPathWithinSelectedProjectRoot({ selectedProjectRoot, filePath: targetStoryPath })`; when it returns false, return `buildTerminalErrorNextAction({ taskState: args.taskState, errorMessage: args.action.errorMessages.outsideSelectedProject })`.
+
+    [ ] Subtask 15.18: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, in `resolveStoryIndexTargetStoryNextAction(...)`, after the selected-project containment check, validate `storyFileName` with `isWorkflowDiscoveryTargetPathSegment(storyFileName)`; when false, return `buildTerminalErrorNextAction({ taskState: args.taskState, errorMessage: args.action.errorMessages.invalidStoryFileName })`.
+
+    [ ] Subtask 15.19: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, in `resolveStoryIndexTargetStoryNextAction(...)`, call `this.assertWorkspacePathAllowed(dirname(targetStoryPath))` and `this.assertWorkspacePathAllowed(targetStoryPath)`; when either call throws, return `buildTerminalErrorNextAction({ taskState: args.taskState, errorMessage: args.action.errorMessages.workspacePathRejected })`.
+
+    [ ] Subtask 15.20: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, in `resolveStoryIndexTargetStoryNextAction(...)`, call `stat(targetStoryPath)`; when `stat(...)` throws, return `buildTerminalErrorNextAction({ taskState: args.taskState, errorMessage: args.action.errorMessages.missingFile })`.
+
+    [ ] Subtask 15.21: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, in `resolveStoryIndexTargetStoryNextAction(...)`, when `stat(targetStoryPath).isFile()` is false, return `buildTerminalErrorNextAction({ taskState: args.taskState, errorMessage: args.action.errorMessages.notFile })`.
+
+    [ ] Subtask 15.22: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, in `resolveStoryIndexTargetStoryNextAction(...)`, after successful file validation, call `applyWorkflowValueWrites({ taskState: args.taskState, values: { [args.action.outputWorkflowValueKey]: targetStoryPath } })`, then return `this.resolveNextAction({ taskState: args.taskState })`.
+
+    [ ] Subtask 15.23: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, add a `case "resolve_story_index_target_story"` branch to `buildNextActionFromDecisionTreeAction(...)` that delegates to `resolveStoryIndexTargetStoryNextAction({ taskState, action, sourceRoute })`.
+
+    [ ] Subtask 15.24: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, add workflow-definition validation for `resolve_story_index_target_story` requiring `storyIndexWorkflowValueKey`, `storyIdentityWorkflowValueKey`, and `outputWorkflowValueKey` to be non-empty, already-trimmed strings declared in `workflowValueKeys`, and requiring every `errorMessages` field from `WorkflowResolveStoryIndexTargetStoryErrorMessages` to be a non-empty string.
+
+    [ ] Subtask 15.25: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add an exact workflow-definition validation test for a valid `resolve_story_index_target_story` action object using workflow value keys `stories_index`, `selected_story_identity`, and `target_story`, and using all ten approved PI Planning error messages.
+
+    [ ] Subtask 15.26: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add workflow-definition validation failure coverage proving `resolve_story_index_target_story` rejects an undeclared `storyIndexWorkflowValueKey`.
+
+    [ ] Subtask 15.27: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add workflow-definition validation failure coverage proving `resolve_story_index_target_story` rejects an undeclared `storyIdentityWorkflowValueKey`.
+
+    [ ] Subtask 15.28: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add workflow-definition validation failure coverage proving `resolve_story_index_target_story` rejects an undeclared `outputWorkflowValueKey`.
+
+    [ ] Subtask 15.29: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add workflow-definition validation failure coverage proving `resolve_story_index_target_story` rejects an empty `errorMessages.missingStoryIdentity` value.
+
+    [ ] Subtask 15.30: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add runtime success coverage that creates a selected-project story index with one draft story, creates the target draft story file, executes a `resolve_story_index_target_story` route, and asserts the resulting session workflow values include exact `target_story` absolute path under `implementation/drafts/Story-1-1.md`.
+
+    [ ] Subtask 15.31: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add fail-closed runtime coverage for missing `selected_story_identity`; the fixture must omit `selected_story_identity`, execute a `resolve_story_index_target_story` route, and assert exact terminal error message `PI Planning requires a selected story identity before resolving the target story.`.
+
+    [ ] Subtask 15.32: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add fail-closed runtime coverage for missing `stories_index`; the fixture must include `selected_story_identity: "1.1"` and omit `stories_index`, execute a `resolve_story_index_target_story` route, and assert exact terminal error message `PI Planning requires a resolved stories_index path before resolving the target story.`.
+
+    [ ] Subtask 15.33: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add fail-closed runtime coverage for unreadable or malformed story index JSON; the fixture must write malformed JSON to the selected `stories_index` path, execute a `resolve_story_index_target_story` route, and assert exact terminal error message `I could not read or parse the selected story index before resolving the target story.`.
+
+    [ ] Subtask 15.34: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add fail-closed runtime coverage for selected story identity absent from the index; the fixture must write a valid version-1 story index whose `stories` array does not contain `story_identity: "1.1"`, execute a `resolve_story_index_target_story` route, and assert exact terminal error message `The selected story was not found in the selected story index.`.
+
+    [ ] Subtask 15.35: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add fail-closed runtime coverage for unsupported story status; the fixture must write a selected story entry with `status: "unsupported"`, execute a `resolve_story_index_target_story` route, and assert exact terminal error message `The selected story has an unsupported story status.`.
+
+    [ ] Subtask 15.36: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add fail-closed runtime coverage for missing `story_file_name`; the fixture must write a selected story entry without `story_file_name`, execute a `resolve_story_index_target_story` route, and assert exact terminal error message `The selected story has an invalid story_file_name.`.
+
+    [ ] Subtask 15.37: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add fail-closed runtime coverage for invalid `story_file_name`; the fixture must write a selected story entry with `story_file_name: ".."`, execute a `resolve_story_index_target_story` route, and assert exact terminal error message `The selected story has an invalid story_file_name.`.
+
+    [ ] Subtask 15.38: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add fail-closed runtime coverage for a resolved target story path outside the selected project; the fixture must write a selected story entry with path-traversal `story_file_name: "../../../../outside.md"`, execute a `resolve_story_index_target_story` route, and assert exact terminal error message `The target story path is outside the selected project.`.
+
+    [ ] Subtask 15.39: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add fail-closed runtime coverage for workspace path-policy rejection; the fixture must use a runtime `workspacePathPolicy.validateAccess(filePath)` implementation that rejects the resolved target story path, execute a `resolve_story_index_target_story` route, and assert exact terminal error message `The target story path is not allowed by workspace path policy.`.
+
+    [ ] Subtask 15.40: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add fail-closed runtime coverage for missing resolved target file; the fixture must write a valid selected story index entry but not create the resolved target story file, execute a `resolve_story_index_target_story` route, and assert exact terminal error message `The target story path does not exist.`.
+
+    [ ] Subtask 15.41: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add fail-closed runtime coverage for a resolved target path that exists as a directory; the fixture must create the resolved target story path as a directory, execute a `resolve_story_index_target_story` route, and assert exact terminal error message `The target story path is not a file.`.
+
+[ ] Task 16. Update PI Planning Step 1 values, form panels, and routing.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
+
+    [ ] Subtask 16.1: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, update imports so the `@shared/ExtensionMessage` type import includes exact symbols `WorkflowFormDefinitionPayload`, `WorkflowFormPanelAction`, `WorkflowFormOptionDefinition`, `WorkflowFormPanelDefinition`, and `WorkflowStepResolutionStatusDefinition`.
+
+    [ ] Subtask 16.2: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add type import from `@/core/task/workflow-step-resolution/types` with exact symbols `WorkflowToolBackedActionInstruction`, `WorkflowToolBackedOperationEvaluationResult`, and `WorkflowToolBackedOperationExecutionRequest`.
+
+    [ ] Subtask 16.3: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, update the `../../types` import to include exact symbols `WorkflowDecisionAction` and `WorkflowFormContinuationReplacement`.
+
+    [ ] Subtask 16.4: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add exported enum `PiPlanningEditIntent` with exact values `CompleteInitialStoryBuildout = "Complete initial story buildout"` and `EditExistingStoryFile = "edit existing story file"`.
+
+    [ ] Subtask 16.5: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add exact `PiPlanningWorkflowValueKey` enum members `EditIntent = "edit_intent"`, `SelectedStoryIdentity = "selected_story_identity"`, and `TargetStory = "target_story"`.
+
+    [ ] Subtask 16.6: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, delete constant `STEP_1_REQUIRED_CONTEXT_PANEL_ID`.
+
+    [ ] Subtask 16.7: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add constants `STEP_1_EDIT_INTENT_PANEL_ID = "step-1-edit-intent-panel"` and `STEP_1_SELECT_STORY_PANEL_ID = "step-1-select-story-panel"`.
+
+    [ ] Subtask 16.8: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add `function buildRuntimeRoutedTransition(): WorkflowFormPanelDefinition["transition"]` returning exactly `{ type: "runtime_routed" }`.
+
+    [ ] Subtask 16.9: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add `function buildOption(value: string): WorkflowFormOptionDefinition` returning exactly `{ value, label: value }`.
+
+    [ ] Subtask 16.10: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add `function sourceRouteMatches(sourceRoute: { branchId: string; routeId: string }, branchId: string, routeId: string): boolean` returning `sourceRoute.branchId === branchId && sourceRoute.routeId === routeId`.
+
+    [ ] Subtask 16.11: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add `function toolBackedOperationSucceeded(branchId: string, routeId: string): WorkflowDecisionBranchTrigger` returning an `event_predicate` trigger whose `matches` function first narrows `triggerEvent.kind === "tool_backed_operation_succeeded"` and then returns `sourceRouteMatches(triggerEvent.sourceRoute, branchId, routeId)`.
+
+    [ ] Subtask 16.12: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add `function toolBackedOperationFailed(branchId: string, routeId: string): WorkflowDecisionBranchTrigger` returning an `event_predicate` trigger whose `matches` function first narrows `triggerEvent.kind === "tool_backed_operation_failed"` and then returns `sourceRouteMatches(triggerEvent.sourceRoute, branchId, routeId)`.
+
+    [ ] Subtask 16.13: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add `function workflowFormPanelSubmitted(panelId: string, action: WorkflowFormPanelAction): WorkflowDecisionBranchTrigger` whose predicate requires `triggerEvent.kind === "workflow_form_panel_submitted"`, `triggerEvent.workflowFormId === STEP_1_INPUT_FORM_ID`, `triggerEvent.panelId === panelId`, and `triggerEvent.action === action`.
+
+    [ ] Subtask 16.14: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add `function selectedEpicHasStoriesIndex(): WorkflowDecisionBranchTrigger` as a `session_predicate` that returns true only when `readWorkflowStringValue(workflowValues, PiPlanningWorkflowValueKey.StoriesIndex) !== undefined`.
+
+    [ ] Subtask 16.15: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add `function selectedEpicDoesNotHaveStoriesIndex(): WorkflowDecisionBranchTrigger` as a `session_predicate` that returns true only when `readWorkflowStringValue(workflowValues, PiPlanningWorkflowValueKey.StoriesIndex) === undefined`.
+
+    [ ] Subtask 16.16: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add `function editIntentMatches(editIntent: PiPlanningEditIntent): WorkflowDecisionBranchTrigger` as a `session_predicate` that returns true only when `readWorkflowStringValue(workflowValues, PiPlanningWorkflowValueKey.EditIntent) === editIntent`.
+
+    [ ] Subtask 16.17: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add `function workflowFormCompletedWithStoriesIndexExistedAtWorkflowStart(expected: boolean): WorkflowDecisionBranchTrigger` returning an `event_predicate` trigger whose `matches` function narrows `triggerEvent.kind === "workflow_form_completed"`, requires `triggerEvent.workflowFormId === STEP_1_INPUT_FORM_ID`, and compares `readWorkflowBooleanValue(workflowValues, PiPlanningWorkflowValueKey.StoriesIndexExistedAtWorkflowStart) === expected`.
+
+    [ ] Subtask 16.18: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add `function workflowFormCompletedWithEditIntent(editIntent: PiPlanningEditIntent): WorkflowDecisionBranchTrigger` returning an `event_predicate` trigger whose `matches` function narrows `triggerEvent.kind === "workflow_form_completed"`, requires `triggerEvent.workflowFormId === STEP_1_INPUT_FORM_ID`, and compares `readWorkflowStringValue(workflowValues, PiPlanningWorkflowValueKey.EditIntent) === editIntent`.
+
+    [ ] Subtask 16.19: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, in `deriveSelectedEpicValuesFromForm(...)`, preserve the existing success behavior and ensure the success write set for an existing-index epic is exactly `target_epic`, `stories_index`, and `stories_index_existed_at_workflow_start: true`.
+
+    [ ] Subtask 16.20: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, in `deriveSelectedEpicValuesFromForm(...)`, ensure the success write set for a missing-index epic is exactly `target_epic` and `stories_index_existed_at_workflow_start: false`, and does not write `stories_index`.
+
+    [ ] Subtask 16.21: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add `function buildGenerateMissingStoryFilesInstruction(): WorkflowToolBackedActionInstruction` whose returned object has `toolName: ClineDefaultTool.GENERATE_STORY_FILES`, `buildStatusDefinition: (): WorkflowStepResolutionStatusDefinition => ({ title: "Generate Missing Story Files", pendingLabel: "Generating missing story files", successLabel: "Generated missing story files", failureLabel: "Failed to generate missing story files" })`, `buildToolExecutionRequest: ({ activeWorkflowSession }): WorkflowToolBackedOperationExecutionRequest => ({ toolName: ClineDefaultTool.GENERATE_STORY_FILES, toolInput: {}, toolParams: { epic_identity: readWorkflowStringValue(activeWorkflowSession.workflowValues, PiPlanningWorkflowValueKey.EpicIdentity) ?? "" } })`, and `evaluateToolExecutionResult: (): WorkflowToolBackedOperationEvaluationResult => ({ succeeded: true })`.
+
+    [ ] Subtask 16.22: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add `function buildStep1TargetEpicPanel(): WorkflowFormPanelDefinition` returning the existing Target Epic panel, but with `transition: buildRuntimeRoutedTransition()`.
+
+    [ ] Subtask 16.23: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add `function buildStep1EditIntentPanel(): WorkflowFormPanelDefinition` returning panel id `STEP_1_EDIT_INTENT_PANEL_ID`, title `Provide Edit Intent`, promptMarkdown `It looks like the selected epic already has a story index file with generated story files. Please select one of the following options:`, one required dropdown field keyed and persisted to `PiPlanningWorkflowValueKey.EditIntent`, label `select one`, `allowedValueType: "string"`, options `[buildOption(PiPlanningEditIntent.CompleteInitialStoryBuildout), buildOption(PiPlanningEditIntent.EditExistingStoryFile)]`, `allowedActions: ["submit", "back"]`, action labels `{ submit: "Continue", back: "Back" }`, `backDestinationPanelId: STEP_1_TARGET_EPIC_PANEL_ID`, and `transition: buildRuntimeRoutedTransition()`.
+
+    [ ] Subtask 16.24: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add `function buildStep1SelectStoryPanel(): WorkflowFormPanelDefinition` returning panel id `STEP_1_SELECT_STORY_PANEL_ID`, title `Select Story`, promptMarkdown `Which story would you like to edit?`, one required dropdown field keyed and persisted to `PiPlanningWorkflowValueKey.SelectedStoryIdentity`, label `Select Story`, `allowedValueType: "string"`, `jsonOptionsSource` with root `{ kind: "selected_project_root" }`, `sourcePathSegments: ["implementation", "epic-{workflow.epic_identity}-stories.index.json"]`, `itemsPath: "stories"`, `valueProperty: "story_identity"`, `labelTemplate: "Story {story_identity}: {story_file_name}"`, and `descriptionTemplate: "Status: {status}; generated: {story_file_generated}"`, `allowedActions: ["submit", "back"]`, action labels `{ submit: "Continue", back: "Back" }`, `backDestinationPanelId: STEP_1_EDIT_INTENT_PANEL_ID`, and `transition: buildRuntimeRoutedTransition()`.
+
+    [ ] Subtask 16.25: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add `function buildStep1AdditionalContextPanel(): WorkflowFormPanelDefinition` returning the existing Additional Context panel with id `STEP_1_ADDITIONAL_CONTEXT_PANEL_ID`, promptMarkdown `If you'd like to include any other files as workflow context please provide their full file paths below.`, optional large-text field persisted to `PiPlanningWorkflowValueKey.AdditionalContext`, `allowedActions: ["submit", "back"]`, action labels `{ submit: "Continue", back: "Back" }`, and `transition: buildTerminalTransition()`.
+
+    [ ] Subtask 16.26: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, in `buildStep1InputWorkflowForm()`, replace the inline panel object construction with panels from `buildStep1TargetEpicPanel()`, `buildStep1EditIntentPanel()`, `buildStep1SelectStoryPanel()`, and `buildStep1AdditionalContextPanel()`, and ensure there is no `step-1-required-context-panel` key in the `panels` object.
+
+    [ ] Subtask 16.27: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add `function buildStep1ContinuationReplacement(panel: WorkflowFormPanelDefinition): WorkflowFormContinuationReplacement` returning exact object `{ panel, data: {} }`.
+
+    [ ] Subtask 16.28: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, add `function buildResolveTargetStoryAction(): WorkflowDecisionAction` returning exact action `{ kind: "resolve_story_index_target_story", storyIndexWorkflowValueKey: PiPlanningWorkflowValueKey.StoriesIndex, storyIdentityWorkflowValueKey: PiPlanningWorkflowValueKey.SelectedStoryIdentity, outputWorkflowValueKey: PiPlanningWorkflowValueKey.TargetStory, errorMessages: { missingStoryIdentity: "PI Planning requires a selected story identity before resolving the target story.", missingStoryIndex: "PI Planning requires a resolved stories_index path before resolving the target story.", unreadableOrMalformedStoryIndex: "I could not read or parse the selected story index before resolving the target story.", missingEntry: "The selected story was not found in the selected story index.", unsupportedStatus: "The selected story has an unsupported story status.", invalidStoryFileName: "The selected story has an invalid story_file_name.", outsideSelectedProject: "The target story path is outside the selected project.", workspacePathRejected: "The target story path is not allowed by workspace path policy.", missingFile: "The target story path does not exist.", notFile: "The target story path is not a file." } }`.
+
+    [ ] Subtask 16.29: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, in `buildStep1DecisionTree()`, replace the old completed-form derivation route with a Panel A submitted route `step-1-derive-selected-epic-values` in branch `step-1-await-target-epic-panel`, triggered by `workflowFormPanelSubmitted(STEP_1_TARGET_EPIC_PANEL_ID, "submit")`, using action `{ kind: "run_deterministic_procedure", instruction: { run: deriveSelectedEpicValuesFromForm } }`, and `followingBranchId: "step-1-route-after-target-epic-panel"`.
+
+    [ ] Subtask 16.30: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, in `buildStep1DecisionTree()`, add branch `step-1-route-after-target-epic-panel` with route `step-1-continue-to-edit-intent-panel` triggered by `selectedEpicHasStoriesIndex()`, action `{ kind: "continue_workflow_form", workflowFormId: STEP_1_INPUT_FORM_ID, panelId: STEP_1_EDIT_INTENT_PANEL_ID, buildReplacement: () => buildStep1ContinuationReplacement(buildStep1EditIntentPanel()) }`, and `followingBranchId: "step-1-await-edit-intent-panel"`.
+
+    [ ] Subtask 16.31: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, in `buildStep1DecisionTree()`, add route `step-1-continue-to-additional-context-after-new-index-epic` in branch `step-1-route-after-target-epic-panel`, triggered by `selectedEpicDoesNotHaveStoriesIndex()`, action `{ kind: "continue_workflow_form", workflowFormId: STEP_1_INPUT_FORM_ID, panelId: STEP_1_ADDITIONAL_CONTEXT_PANEL_ID, buildReplacement: () => buildStep1ContinuationReplacement(buildStep1AdditionalContextPanel()) }`, and `followingBranchId: "step-1-await-final-form-submit"`.
+
+    [ ] Subtask 16.32: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, in `buildStep1DecisionTree()`, add branch `step-1-await-edit-intent-panel` with route `step-1-route-after-edit-intent` triggered by `workflowFormPanelSubmitted(STEP_1_EDIT_INTENT_PANEL_ID, "submit")`, action `{ kind: "no_op" }`, and `followingBranchId: "step-1-route-after-edit-intent-panel"`.
+
+    [ ] Subtask 16.33: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, in `buildStep1DecisionTree()`, add branch `step-1-route-after-edit-intent-panel` with route `step-1-continue-to-additional-context-after-complete-initial-buildout` triggered by `editIntentMatches(PiPlanningEditIntent.CompleteInitialStoryBuildout)`, action `{ kind: "continue_workflow_form", workflowFormId: STEP_1_INPUT_FORM_ID, panelId: STEP_1_ADDITIONAL_CONTEXT_PANEL_ID, buildReplacement: () => buildStep1ContinuationReplacement(buildStep1AdditionalContextPanel()) }`, and `followingBranchId: "step-1-await-final-form-submit"`.
+
+    [ ] Subtask 16.34: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, in `buildStep1DecisionTree()`, add route `step-1-continue-to-select-story-panel` in branch `step-1-route-after-edit-intent-panel`, triggered by `editIntentMatches(PiPlanningEditIntent.EditExistingStoryFile)`, action `{ kind: "continue_workflow_form", workflowFormId: STEP_1_INPUT_FORM_ID, panelId: STEP_1_SELECT_STORY_PANEL_ID, buildReplacement: () => buildStep1ContinuationReplacement(buildStep1SelectStoryPanel()) }`, and `followingBranchId: "step-1-await-select-story-panel"`.
+
+    [ ] Subtask 16.35: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, in `buildStep1DecisionTree()`, add branch `step-1-await-select-story-panel` with route `step-1-continue-to-additional-context-after-story-selection` triggered by `workflowFormPanelSubmitted(STEP_1_SELECT_STORY_PANEL_ID, "submit")`, action `{ kind: "continue_workflow_form", workflowFormId: STEP_1_INPUT_FORM_ID, panelId: STEP_1_ADDITIONAL_CONTEXT_PANEL_ID, buildReplacement: () => buildStep1ContinuationReplacement(buildStep1AdditionalContextPanel()) }`, and `followingBranchId: "step-1-await-final-form-submit"`.
+
+    [ ] Subtask 16.36: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, in `buildStep1DecisionTree()`, add branch `step-1-await-final-form-submit` with route `step-1-transition-to-step-2-after-new-index-epic` triggered by `workflowFormCompletedWithStoriesIndexExistedAtWorkflowStart(false)` and action `{ kind: "transition_step", target: { kind: "entry_branch", stepNumber: 2 } }`.
+
+    [ ] Subtask 16.37: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, in `buildStep1DecisionTree()`, add route `step-1-transition-to-step-2-after-complete-initial-buildout` in branch `step-1-await-final-form-submit`, triggered by `workflowFormCompletedWithEditIntent(PiPlanningEditIntent.CompleteInitialStoryBuildout)`, and action `{ kind: "transition_step", target: { kind: "entry_branch", stepNumber: 2 } }`.
+
+    [ ] Subtask 16.38: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, in `buildStep1DecisionTree()`, add route `step-1-generate-missing-story-files-before-edit` in branch `step-1-await-final-form-submit`, triggered by `workflowFormCompletedWithEditIntent(PiPlanningEditIntent.EditExistingStoryFile)`, action `{ kind: "execute_tool_backed_operation", instruction: buildGenerateMissingStoryFilesInstruction() }`, and `followingBranchId: "step-1-await-missing-story-generation"`.
+
+    [ ] Subtask 16.39: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, in `buildStep1DecisionTree()`, add branch `step-1-await-missing-story-generation` with route `step-1-resolve-target-story-after-missing-story-generation` triggered by `toolBackedOperationSucceeded("step-1-await-final-form-submit", "step-1-generate-missing-story-files-before-edit")`, action `buildResolveTargetStoryAction()`, and `followingBranchId: "step-1-await-target-story-resolution"`.
+
+    [ ] Subtask 16.40: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, in `buildStep1DecisionTree()`, add route `step-1-fail-after-missing-story-generation` in branch `step-1-await-missing-story-generation`, triggered by `toolBackedOperationFailed("step-1-await-final-form-submit", "step-1-generate-missing-story-files-before-edit")`, action `{ kind: "terminal_error", errorMessage: "Failed to generate missing story files" }`.
+
+    [ ] Subtask 16.41: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, in `buildStep1DecisionTree()`, add branch `step-1-await-target-story-resolution` with route `step-1-transition-to-step-6-after-target-story-resolution` triggered by `workflowValuesPersisted(PiPlanningWorkflowValueKey.TargetStory)` and action `{ kind: "transition_step", target: { kind: "entry_branch", stepNumber: 6 } }`.
+
+[ ] Task 17. Update PI Planning Step 6 prompt and tool-schema variants.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
+
+    [ ] Subtask 17.1: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, update `buildStep6PromptSource(...)` to branch on `readWorkflowStringValue(input.session.workflowValues, PiPlanningWorkflowValueKey.EditIntent) === PiPlanningEditIntent.EditExistingStoryFile`.
+
+    [ ] Subtask 17.2: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, in the Step 6 edit-existing-story branch, render only the approved edit-existing-story prompt variant and materialize workflow values for `projectTitle`, `projectFolderName`, `architecture_document`, `epics_document`, and `target_story` through the existing prompt rendering helpers.
+
+    [ ] Subtask 17.3: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, in the Step 6 initial-buildout branch, preserve the existing initial story-details prompt behavior for absent `edit_intent` and for `PiPlanningEditIntent.CompleteInitialStoryBuildout`.
+
+    [ ] Subtask 17.4: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`, import type `WorkflowPromptBuilderInput` from `../../types`.
+
+    [ ] Subtask 17.5: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`, change `buildPiPlanningStep6ToolSchemas()` to `buildPiPlanningStep6ToolSchemas(input: WorkflowPromptBuilderInput): readonly ClineToolSpec[]`.
+
+    [ ] Subtask 17.6: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`, in `buildPiPlanningStep6ToolSchemas(input)`, return exactly `read_file`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `attempt_completion` when `input.session.workflowValues.edit_intent === "edit existing story file"`.
+
+    [ ] Subtask 17.7: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`, in `buildPiPlanningStep6ToolSchemas(input)`, return the existing exact initial-buildout schema order `list_files`, `read_file`, `apply_patch`, `plan_story_artifacts`, `generate_story_files`, `send_user_message`, `ask_followup_question`, and `attempt_completion` when `input.session.workflowValues.edit_intent` is absent or equals `"Complete initial story buildout"`.
+
+[ ] Task 18. Update PI Planning workflow module tests.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts`
+
+    [ ] Subtask 18.1: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, update `SAMPLE_WORKFLOW_VALUES` to include `edit_intent: "Complete initial story buildout"`, `selected_story_identity: "1.1"`, and `target_story: "/tmp/pi-planning-project/implementation/drafts/Story-1-1.md"`.
+
+    [ ] Subtask 18.2: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, update workflow value inventory coverage to include `PiPlanningWorkflowValueKey.EditIntent`, `PiPlanningWorkflowValueKey.SelectedStoryIdentity`, and `PiPlanningWorkflowValueKey.TargetStory` in exact enum order.
+
+    [ ] Subtask 18.3: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, replace the Required Context panel test with a test asserting `getStep1InputForm().panels["step-1-required-context-panel"] === undefined`.
+
+    [ ] Subtask 18.4: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, update Panel A coverage to assert exact `transition` deep-equals `{ type: "runtime_routed" }`.
+
+    [ ] Subtask 18.5: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, add Panel B coverage asserting exact panel id `step-1-edit-intent-panel`, title `Provide Edit Intent`, promptMarkdown `It looks like the selected epic already has a story index file with generated story files. Please select one of the following options:`, required dropdown field persisted to `edit_intent`, label `select one`, options exactly `Complete initial story buildout` and `edit existing story file`, actions `["submit", "back"]`, labels `{ submit: "Continue", back: "Back" }`, `backDestinationPanelId: "step-1-target-epic-panel"`, and runtime-routed transition.
+
+    [ ] Subtask 18.6: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, add Panel C coverage asserting exact panel id `step-1-select-story-panel`, title `Select Story`, promptMarkdown `Which story would you like to edit?`, required dropdown field persisted to `selected_story_identity`, label `Select Story`, exact JSON options source from `implementation/epic-{workflow.epic_identity}-stories.index.json`, actions `["submit", "back"]`, labels `{ submit: "Continue", back: "Back" }`, `backDestinationPanelId: "step-1-edit-intent-panel"`, and runtime-routed transition.
+
+    [ ] Subtask 18.7: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, update Additional Context coverage to call it Panel D and assert the existing prompt, optional large text field persisted to `additional_context`, actions `["submit", "back"]`, labels `{ submit: "Continue", back: "Back" }`, and terminal transition.
+
+    [ ] Subtask 18.8: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, add helper `expectContinueWorkflowFormAction(action: WorkflowDecisionAction, panelId: string): Extract<WorkflowDecisionAction, { kind: "continue_workflow_form" }>` that narrows `action.kind === "continue_workflow_form"`, asserts `action.workflowFormId === "step-1-input-form"`, asserts `action.panelId === panelId`, and returns the narrowed action.
+
+    [ ] Subtask 18.9: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, add helper `expectExecuteToolBackedOperationAction(action: WorkflowDecisionAction): Extract<WorkflowDecisionAction, { kind: "execute_tool_backed_operation" }>` that narrows `action.kind === "execute_tool_backed_operation"` and returns the narrowed action.
+
+    [ ] Subtask 18.10: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, add helper `expectResolveStoryIndexTargetStoryAction(action: WorkflowDecisionAction): Extract<WorkflowDecisionAction, { kind: "resolve_story_index_target_story" }>` that narrows `action.kind === "resolve_story_index_target_story"` and returns the narrowed action.
+
+    [ ] Subtask 18.11: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, replace the old Step 1 route-structure test's prerequisite resolution, project-folder persistence, and form-rendering assertions with exact assertions that route `step-1-resolve-prerequisites` in branch `step-1-resolve-prerequisites` has trigger `{ kind: "always" }`, action `{ kind: "resolve_prerequisite_files", prerequisiteIds: ["architecture_document", "epics_document", "epics_index", "brainstorming_document"] }`, and `followingBranchId === "step-1-persist-project-folder-values"`; route `step-1-persist-project-folder-values` in branch `step-1-persist-project-folder-values` has trigger `{ kind: "always" }`, action kind `run_deterministic_procedure`, and `followingBranchId === "step-1-render-input-form"`; route `step-1-render-input-form` in branch `step-1-render-input-form` has trigger `{ kind: "always" }`, action kind `render_workflow_form`, `workflowFormId === "step-1-input-form"`, a compile-safe `"buildSessionData" in route.action` narrowing before asserting `typeof route.action.buildSessionData === "function"`, and `followingBranchId === "step-1-await-target-epic-panel"`.
+
+    [ ] Subtask 18.12: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, add Step 1 route coverage for Panel A submission: route `step-1-derive-selected-epic-values` in branch `step-1-await-target-epic-panel` must use an `event_predicate` trigger matching `workflow_form_panel_submitted` for form `step-1-input-form`, panel `step-1-target-epic-panel`, action `submit`; action kind must be `run_deterministic_procedure`; `followingBranchId` must equal `step-1-route-after-target-epic-panel`.
+
+    [ ] Subtask 18.13: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, add Step 1 route coverage for existing-index Panel B continuation: route `step-1-continue-to-edit-intent-panel` in branch `step-1-route-after-target-epic-panel` must match when `stories_index` is present, use `expectContinueWorkflowFormAction(route.action, "step-1-edit-intent-panel")`, and have `followingBranchId === "step-1-await-edit-intent-panel"`.
+
+    [ ] Subtask 18.14: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, add Step 1 route coverage for missing-index Panel D continuation: route `step-1-continue-to-additional-context-after-new-index-epic` in branch `step-1-route-after-target-epic-panel` must match when `stories_index` is absent, use `expectContinueWorkflowFormAction(route.action, "step-1-additional-context-panel")`, and have `followingBranchId === "step-1-await-final-form-submit"`.
+
+    [ ] Subtask 18.15: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, add Step 1 route coverage for Panel B submission: route `step-1-route-after-edit-intent` in branch `step-1-await-edit-intent-panel` must use an `event_predicate` trigger matching `workflow_form_panel_submitted` for form `step-1-input-form`, panel `step-1-edit-intent-panel`, action `submit`; action must deep-equal `{ kind: "no_op" }`; `followingBranchId` must equal `step-1-route-after-edit-intent-panel`.
+
+    [ ] Subtask 18.16: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, add Step 1 route coverage for Panel B complete-initial-buildout routing: route `step-1-continue-to-additional-context-after-complete-initial-buildout` in branch `step-1-route-after-edit-intent-panel` must match when `edit_intent === "Complete initial story buildout"`, use `expectContinueWorkflowFormAction(route.action, "step-1-additional-context-panel")`, and have `followingBranchId === "step-1-await-final-form-submit"`.
+
+    [ ] Subtask 18.17: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, add Step 1 route coverage for Panel B edit-existing-story routing: route `step-1-continue-to-select-story-panel` in branch `step-1-route-after-edit-intent-panel` must match when `edit_intent === "edit existing story file"`, use `expectContinueWorkflowFormAction(route.action, "step-1-select-story-panel")`, and have `followingBranchId === "step-1-await-select-story-panel"`.
+
+    [ ] Subtask 18.18: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, add Step 1 route coverage for Panel C story selection routing: route `step-1-continue-to-additional-context-after-story-selection` in branch `step-1-await-select-story-panel` must match `workflow_form_panel_submitted` for form `step-1-input-form`, panel `step-1-select-story-panel`, action `submit`, use `expectContinueWorkflowFormAction(route.action, "step-1-additional-context-panel")`, and have `followingBranchId === "step-1-await-final-form-submit"`.
+
+    [ ] Subtask 18.19: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, add Step 1 final-form route coverage for no existing index: route `step-1-transition-to-step-2-after-new-index-epic` in branch `step-1-await-final-form-submit` must match a `workflow_form_completed` event only when `stories_index_existed_at_workflow_start === false`, and its action must deep-equal `{ kind: "transition_step", target: { kind: "entry_branch", stepNumber: 2 } }`.
+
+    [ ] Subtask 18.20: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, add Step 1 final-form route coverage for complete initial buildout: route `step-1-transition-to-step-2-after-complete-initial-buildout` in branch `step-1-await-final-form-submit` must match a `workflow_form_completed` event only when `edit_intent === "Complete initial story buildout"`, and its action must deep-equal `{ kind: "transition_step", target: { kind: "entry_branch", stepNumber: 2 } }`.
+
+    [ ] Subtask 18.21: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, add Step 1 final-form route coverage for edit-existing-story generation: route `step-1-generate-missing-story-files-before-edit` in branch `step-1-await-final-form-submit` must match a `workflow_form_completed` event only when `edit_intent === "edit existing story file"`; `expectExecuteToolBackedOperationAction(route.action)` must assert `instruction.toolName === ClineDefaultTool.GENERATE_STORY_FILES`, exact status definition labels `Generate Missing Story Files`, `Generating missing story files`, `Generated missing story files`, and `Failed to generate missing story files`, exact tool request `{ toolName: ClineDefaultTool.GENERATE_STORY_FILES, toolInput: {}, toolParams: { epic_identity: "1" } }`, and `followingBranchId === "step-1-await-missing-story-generation"`.
+
+    [ ] Subtask 18.22: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, add Step 1 generation-success route coverage: route `step-1-resolve-target-story-after-missing-story-generation` in branch `step-1-await-missing-story-generation` must match `tool_backed_operation_succeeded` with source route `{ branchId: "step-1-await-final-form-submit", routeId: "step-1-generate-missing-story-files-before-edit" }`; `expectResolveStoryIndexTargetStoryAction(route.action)` must assert exact keys `stories_index`, `selected_story_identity`, `target_story`, and the full approved error-message object; `followingBranchId` must equal `step-1-await-target-story-resolution`.
+
+    [ ] Subtask 18.23: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, add Step 1 generation-failure route coverage: route `step-1-fail-after-missing-story-generation` in branch `step-1-await-missing-story-generation` must match `tool_backed_operation_failed` with source route `{ branchId: "step-1-await-final-form-submit", routeId: "step-1-generate-missing-story-files-before-edit" }`, and its action must deep-equal `{ kind: "terminal_error", errorMessage: "Failed to generate missing story files" }`.
+
+    [ ] Subtask 18.24: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, add Step 1 target-story persistence route coverage: route `step-1-transition-to-step-6-after-target-story-resolution` in branch `step-1-await-target-story-resolution` must match `workflow_values_persisted` with changed key `target_story`, and its action must deep-equal `{ kind: "transition_step", target: { kind: "entry_branch", stepNumber: 6 } }`.
+
+    [ ] Subtask 18.25: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, update selected epic derivation coverage to assert existing-index write set exactly equals `{ target_epic: "Epic 1: Existing story index epic", stories_index: join(projectRoot, "implementation", "epic-1-stories.index.json"), stories_index_existed_at_workflow_start: true }` and missing-index write set exactly equals `{ target_epic: "Epic 2: New story index epic", stories_index_existed_at_workflow_start: false }`.
+
+    [ ] Subtask 18.26: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, split Step 6 prompt coverage into an initial-buildout case asserting the prompt includes `drafts_folder`, `Scope`, `Scope Boundary`, `Requirements`, `Objective`, `Known Issues/ Risks/ Technical Debt`, and `attempt_completion`, and excludes raw placeholder `target_story`.
+
+    [ ] Subtask 18.27: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, add Step 6 edit-existing-story prompt coverage using `edit_intent: "edit existing story file"` and asserting the prompt includes rendered `projectTitle`, `projectFolderName`, `architecture_document`, `epics_document`, `target_story`, `Scope`, `Scope Boundary`, `Requirements`, `Objective`, and `Known Issues/ Risks/ Technical Debt`; excludes `drafts_folder`, `plan_story_artifacts`, `generate_story_files`, `create_story`, and raw placeholders `projectTitle`, `projectFolderName`, `architecture_document`, `epics_document`, and `target_story`.
+
+    [ ] Subtask 18.28: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, update the Step 3 through Step 5 conditional prompt test to remain focused on `stories_index_existed_at_workflow_start` and not infer Step 6 behavior from `stories_index` presence.
+
+    [ ] Subtask 18.29: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts`, import type `WorkflowPromptBuilderInput`, import `PiPlanningWorkflowValueKey` and `piPlanningWorkflowDefinition`, and replace the zero-argument Step 6 schema call with a helper `createStep6ToolSchemaInput(editIntent: string | undefined): WorkflowPromptBuilderInput` that returns a fully shaped `ActiveWorkflowSession` with `activeStepNumber: 6`, declared workflow values, project selection, lifecycle, `entryArtifactResolution: undefined`, full `ui` object with `formSession: undefined`, `stepResolutionSession: undefined`, `suppressedWorkflowFormIds: []`, and `suppressedWorkflowStepResolutionRoutes: []`, and branch context `{ activeBranchId: "step-6-project-prompt" }`.
+
+    [ ] Subtask 18.30: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts`, update exact-order coverage so Step 6 initial-buildout schema with absent `edit_intent` equals `list_files`, `read_file`, `apply_patch`, `plan_story_artifacts`, `generate_story_files`, `send_user_message`, `ask_followup_question`, and `attempt_completion`.
+
+    [ ] Subtask 18.31: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts`, add exact-order coverage so Step 6 edit-existing-story schema with `edit_intent: "edit existing story file"` equals `read_file`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `attempt_completion`.
+
+    [ ] Subtask 18.32: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts`, update forbidden-tool coverage to call Step 6 with both initial-buildout and edit-existing-story fixtures.
+
+[ ] Task 19. Update prompt projection integration coverage.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+    [ ] Subtask 19.1: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`, update `createPiPlanningWorkflowSession(activeStepNumber)` to accept optional second parameter `{ editIntent?: string }` and persist `edit_intent` only when the parameter is provided.
+
+    [ ] Subtask 19.2: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`, update `buildPiPlanningPromptContext(activeStepNumber)` to accept and forward optional `{ editIntent?: string }`.
+
+    [ ] Subtask 19.3: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`, keep the active Step 6 initial-buildout projection test and call `buildPiPlanningPromptContext(6, { editIntent: "Complete initial story buildout" })`; assert exact native tool names `list_files`, `read_file`, `apply_patch`, `plan_story_artifacts`, `generate_story_files`, `send_user_message`, `ask_followup_question`, and `attempt_completion`.
+
+    [ ] Subtask 19.4: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`, add active Step 6 edit-existing-story projection coverage using `buildPiPlanningPromptContext(6, { editIntent: "edit existing story file" })`; assert exact native tool names `read_file`, `apply_patch`, `send_user_message`, `ask_followup_question`, and `attempt_completion`.
+
+    [ ] Subtask 19.5: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`, update pi-planning backend-only prompt projection coverage so the active step cases include Step 6 initial-buildout and Step 6 edit-existing-story projections, and assert `plan_story_artifacts` and `generate_story_files` are absent from the Step 6 edit-existing-story native tool list.
+
+[ ] Task 20. Run Phase 8 validation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/pi-planning/action-plan.md`
+
+    [ ] Subtask 20.1: Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/storyArtifacts.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`.
+
+    [ ] Subtask 20.2: Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts`.
+
+    [ ] Subtask 20.3: Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts`.
+
+    [ ] Subtask 20.4: Run `npm run check-types`.
+
+    [ ] Subtask 20.5: Run `npm run lint`.
+
+    [ ] Subtask 20.6: Run `rg -n "step-1-required-context-panel|Required Context|Confirm the required context files" src/core/task/workflow-runtime/workflow-modules/pi-planning` and confirm no runtime source matches.
+
+    [ ] Subtask 20.7: Run `rg -n "build_workflow_document|create_workflow_artifact|archive_workflow_artifact|delete_workflow_artifact|move_workflow_project_file|execute_command" src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts` and confirm no matches.
+
+    [ ] Subtask 20.8: Run `git diff --name-only && git ls-files --others --exclude-standard` and confirm persistent diffs and untracked files are limited to the Phase 8 allowed files.
 
 ## Validation
 
@@ -899,15 +1214,17 @@ Required validation after all phases are complete:
 
 ```bash
 npm run test:unit -- src/core/task/tools/handlers/__tests__/PlanStoryArtifactsToolHandler.test.ts src/core/task/tools/handlers/__tests__/GenerateStoryFilesToolHandler.test.ts
+npm run test:unit -- src/core/task/workflow-runtime/__tests__/storyArtifacts.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts
 npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts
-npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts
 npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts
 npm run check-types
 npm run lint
 rg -n "Epic-\\{E\\}-delivery-spec|epic-delivery-spec|BuildEpicDeliverySpecToolHandler" src/core/task/workflow-runtime/workflow-modules/pi-planning
+rg -n "step-1-required-context-panel|Required Context|Confirm the required context files" src/core/task/workflow-runtime/workflow-modules/pi-planning
 rg -n "build_workflow_document|create_workflow_artifact|archive_workflow_artifact|delete_workflow_artifact|move_workflow_project_file|execute_command" src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts
 rg -n "pi-planning\\.md|/Users/robertboston/Documents/Cline/Workflows/pi-planning.md|_bmad/bmm/agents/pm.md|\\.cline/workflow-config.yaml" src/core/task/workflow-runtime/workflow-modules/pi-planning src/core/task/workflow-runtime/WorkflowRegistry.ts
-rg -n "toolBackedOperation|tool_backed_operation" src/core/task/workflow-runtime/workflow-modules/pi-planning
+git diff --name-only
+git ls-files --others --exclude-standard
 ```
 
 Expected `rg` result:

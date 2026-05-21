@@ -79,6 +79,10 @@ The module must include workflow-value keys for:
 - `target_epic`, the selected epic's user-facing label or title
 - `epic_identity`, the selected epic's canonical positive numeric identity
 - optional `stories_index`, the selected epic's `implementation/epic-{E}-stories.index.json` absolute path when it exists at workflow start or after story planning
+- `stories_index_existed_at_workflow_start`, a boolean indicating whether the selected epic already had a story index when Step 1 derived selected-epic values
+- optional `edit_intent`, the user's Panel B selection, with exact allowed values `Complete initial story buildout` and `edit existing story file`
+- optional `selected_story_identity`, the story identity selected in Panel C when `edit_intent` is `edit existing story file`
+- optional `target_story`, the full absolute path resolved from `selected_story_identity` and the selected epic's story index
 
 Any workflow form field whose submitted value must survive beyond form-local state must declare a durable workflow-value destination and persist through the runtime value seam, per `FR-39f` through `FR-39m`.
 
@@ -150,7 +154,7 @@ The module must define these six steps, using these exact `checklistLabel` value
 
 | Step id | Step number | `checklistLabel` | Required runtime shape |
 | --- | --- | --- | --- |
-| `step-1` | 1 | `Gather Inputs` | Resolve required and optional prerequisites, set implementation folder values, render the target-epic and context confirmation workflow form, and transition to Step 2. |
+| `step-1` | 1 | `Gather Inputs` | Resolve required and optional prerequisites, set implementation folder values, render the target-epic, edit-intent, story-selection, and additional-context workflow form, and transition to Step 2 or Step 6 according to the user's edit intent. |
 | `step-2` | 2 | `Review Context` | Model-driven context review step; progression requires `workflow_progress_request` confirmation. |
 | `step-3` | 3 | `Determine How Many Stories Are Needed` | Model-driven story-count analysis step; progression requires `workflow_progress_request` confirmation. |
 | `step-4` | 4 | `Generate an Updated Story Index` | Model-driven story-index planning step; progression occurs after `plan_story_artifacts` succeeds or after `workflow_progress_request` confirms no additional stories are needed. |
@@ -172,9 +176,10 @@ Step 1 must render one module-owned workflow form containing these panels:
 
 | Panel | Trigger | Field behavior |
 | --- | --- | --- |
-| Panel A | First panel | Ask `Which epic are we working on during this workflow?`; render a required dropdown populated from `epics_index`; option labels must identify the epic clearly; selected value must persist `target_epic` and `epic_identity`; if the selected epic has `story-index-generated: true`, runtime/module logic must set `stories_index` to the selected epic's `implementation/epic-{E}-stories.index.json` absolute path. |
-| Panel B | After Panel A | Show the required context files `Epics.index.json`, `Epics.md`, and `architecture.md` as friendly file-name hyperlinks; require confirmation before continuing. |
-| Panel C | After Panel B | Ask `If you'd like to include any other files as workflow context please provide their full file paths below.`; collect optional large-text-area input into `additional_context`. |
+| Panel A | First panel | Ask `Which epic are we working on during this workflow?`; render a required dropdown populated from `epics_index`; option labels must identify the epic clearly; selected value must persist `target_epic` and `epic_identity`; runtime/module logic must determine whether the selected epic has an existing story index, set `stories_index_existed_at_workflow_start`, and set `stories_index` to the selected epic's `implementation/epic-{E}-stories.index.json` absolute path when the story index exists. |
+| Panel B | Only when the selected epic has an existing story index | Title `Provide Edit Intent`; promptMarkdown `It looks like the selected epic already has a story index file with generated story files. Please select one of the following options:`; render a required dropdown field with label `select one`; options must be exactly `Complete initial story buildout` and `edit existing story file`; persist the selected value to `edit_intent`. |
+| Panel C | Only after Panel B when `edit_intent` is `edit existing story file` | Title `Select Story`; promptMarkdown `Which story would you like to edit?`; render a required dropdown field with label `Select Story`; options must be JSON-derived from `stories_index`, use `itemsPath: "stories"`, use `valueProperty: "story_identity"`, and persist the selected story identity to `selected_story_identity`. |
+| Panel D | After Panel A when no story index exists, after Panel B when `edit_intent` is `Complete initial story buildout`, or after Panel C when `edit_intent` is `edit existing story file` | Ask `If you'd like to include any other files as workflow context please provide their full file paths below.`; collect optional large-text-area input into `additional_context`. |
 
 Panel A must derive its dropdown from `Epics.index.json`, not from markdown parsing of `Epics.md`.
 
@@ -182,7 +187,37 @@ Panel A must reject or fail clearly if `Epics.index.json` contains no epics.
 
 The module must not allow the user to type arbitrary epic identities in Panel A.
 
-Step 1 must transition to Step 2 only after required prerequisites are confirmed, folder values are set, a target epic is selected, and the workflow form completes successfully.
+The existing Required Context panel that displays `Epics.index.json`, `Epics.md`, and `architecture.md` as friendly file-name hyperlinks must be removed because prerequisite file resolution already handles prerequisite-file confirmation and path persistence.
+
+When Panel C completes, runtime/module logic must resolve `selected_story_identity` through `stories_index`, derive the selected story's full absolute file path from the indexed `story_file_name` and the canonical story status folder mapping, validate the resolved path through selected-project containment and workspace path-policy checks, require the resolved path to exist as a file after any required missing-story generation has completed, and persist the full path to `target_story`.
+
+Target-story resolution must fail closed before Step 6 model-driven work if `selected_story_identity` is missing, `stories_index` is missing, the story index cannot be read or parsed, the selected story identity is absent from the index, the selected story entry has an unsupported status, the selected story entry has an invalid or missing `story_file_name`, the resolved path is outside the selected project, workspace path-policy validation fails, or the resolved path is not an existing file.
+
+The Step 1 deterministic `generate_story_files` route must use this exact workflow-step status definition:
+
+- `title`: `Generate Missing Story Files`
+- `pendingLabel`: `Generating missing story files`
+- `successLabel`: `Generated missing story files`
+- `failureLabel`: `Failed to generate missing story files`
+
+`target_story` resolution must fail closed with these exact terminal error messages:
+
+- Missing `selected_story_identity`: `PI Planning requires a selected story identity before resolving the target story.`
+- Missing `stories_index`: `PI Planning requires a resolved stories_index path before resolving the target story.`
+- Unreadable or malformed story index: `I could not read or parse the selected story index before resolving the target story.`
+- Selected story identity absent from index: `The selected story was not found in the selected story index.`
+- Unsupported status: `The selected story has an unsupported story status.`
+- Invalid or missing `story_file_name`: `The selected story has an invalid story_file_name.`
+- Resolved path outside selected project: `The target story path is outside the selected project.`
+- Workspace path-policy rejection: `The target story path is not allowed by workspace path policy.`
+- Resolved path missing: `The target story path does not exist.`
+- Resolved path not a file: `The target story path is not a file.`
+
+Step 1 must transition according to the completed form state:
+
+- If no story index existed at workflow start, Panel B and Panel C must not render, Panel D must render after Panel A, and the workflow must transition to Step 2 after Panel D completes.
+- If a story index existed at workflow start and `edit_intent` is `Complete initial story buildout`, Panel C must not render, Panel D must render after Panel B, and the workflow must transition to Step 2 after Panel D completes.
+- If a story index existed at workflow start and `edit_intent` is `edit existing story file`, Panel C must render after Panel B, Panel D must render after Panel C, runtime/module logic must generate any missing draft story files from the selected epic's story index by invoking the existing `generate_story_files` backend workflow tool through a workflow-owned deterministic route before Step 6, `target_story` must be resolved and persisted, and the workflow must transition directly to Step 6 without entering Steps 2 through 5.
 
 Step 1 must be runtime-driven and must expose an empty tool schema through an exported builder from `piPlanningToolSchemas.ts`.
 
@@ -365,17 +400,51 @@ Step 5 must transition to Step 6 after successful `generate_story_files`.
 
 Step 6 must enter model-driven work through a `project_prompt` decision action.
 
-Step 6 `buildPromptSource` must construct the Step 6 prompt from module-owned code. The prompt must instruct the AI to:
+Step 6 `buildPromptSource` must construct the Step 6 prompt from module-owned code using `edit_intent`.
+
+When `edit_intent` is `edit existing story file`, the Step 6 prompt must render only the edit-existing-story prompt variant. The prompt must preserve this exact source prompt text, with the listed placeholder labels populated from workflow values:
+
+```text
+You have been called inside a workflow designed to revise the initial sections of an implementation-ready story file in response to violations found during pre-implementation validation.
+- Project: projectTitle
+- Project Folder: projectFolderName
+- Architecture Document: architecture_document
+- Epics Documentation: epics_document
+- Target Story: target_story
+
+First, ask the user to share the feedback gathered during story validation. Then, review the following sections in the story document, identify the exact revisions needed to address the violations, and provide them to the user as a proposed story revision.
+Once the user approves of your revisions, update the story document. Do not edit the tasks section of the story document.
+Sections to review and revise based on validation findings:
+- Scope
+- Scope Boundary
+- Requirements
+- Objective
+- Known Issues/ Risks/ Technical Debt
+
+Once the approved revisions are saved to the story document, use attempt_completion to provide the user with final confirmation and end this workflow.
+```
+
+The edit-existing-story prompt variant must render:
+
+- `projectTitle`
+- `projectFolderName`
+- `architecture_document`
+- `epics_document`
+- `target_story`
+
+The edit-existing-story prompt variant must not include initial-buildout instructions, `drafts_folder`, `plan_story_artifacts`, `generate_story_files`, or the instruction to run `create_story` for each generated story.
+
+When `edit_intent` is `Complete initial story buildout` or `edit_intent` is absent, the Step 6 prompt must render only the initial-buildout prompt variant. The prompt must instruct the AI to:
 
 - populate generated story files in `drafts_folder`
 - set implementation sequence and story-specific details
 - sequence stories by dependency in this order:
-  - contracts, state shape, and invariants
-  - core runtime/backend behavior
-  - user-facing forms or lifecycle flows
-  - prompt/tool/schema behavior
-  - workflow/module consumers
-  - cleanup, migration, and validation
+  - `Contracts, state shape, and invariants.`
+  - `Core runtime/backend behavior.`
+  - `User-facing forms or lifecycle flows.`
+  - `Prompt/tool/schema behavior.`
+  - `Workflow/module consumers.`
+  - `Cleanup, migration, and validation.`
 - read each story file with `read_file`
 - use `apply_patch` to add story-specific content under existing headings
 - populate `Scope`
@@ -392,7 +461,17 @@ Step 6 `buildPromptSource` must construct the Step 6 prompt from module-owned co
 - use `attempt_completion` only after the user is fully aligned with the story set and story content
 - remind the user in the final recap to run `create_story` for each generated story to generate story tasks before implementation
 
-Step 6 tool schema must expose exactly:
+The initial-buildout prompt variant must not include the edit-existing-story validation-feedback instructions or `target_story`.
+
+When `edit_intent` is `edit existing story file`, Step 6 tool schema must expose exactly:
+
+- `read_file`
+- `apply_patch`
+- `send_user_message`
+- `ask_followup_question`
+- `attempt_completion`
+
+When `edit_intent` is `Complete initial story buildout` or `edit_intent` is absent, Step 6 tool schema must expose exactly:
 
 - `list_files`
 - `read_file`
@@ -442,19 +521,26 @@ The pi-planning module must include module tests for:
 - prerequisite declarations for `architecture_document`, `epics_document`, `epics_index`, and `brainstorming_document`
 - runtime-owned prerequisite resolution routes
 - implementation and drafts folder workflow-value persistence
-- Step 1 workflow form panels
-- target epic dropdown population from `Epics.index.json`
-- persistence of `target_epic`, `epic_identity`, and existing `stories_index`
-- required context confirmation panel behavior
-- optional `additional_context` persistence
-- Step 1 transition to Step 2 after setup completion
+- Step 1 workflow form Panel A target-epic dropdown population from `Epics.index.json`
+- persistence of `target_epic`, `epic_identity`, `stories_index`, and `stories_index_existed_at_workflow_start` after Panel A submission
+- absence of the removed Required Context panel from the Step 1 workflow form
+- Step 1 workflow form Panel B edit-intent dropdown behavior, including exact allowed values `Complete initial story buildout` and `edit existing story file`
+- Step 1 workflow form Panel C story-selection dropdown behavior, including JSON-derived options from `stories_index`
+- Step 1 workflow form Panel D optional `additional_context` persistence
+- Step 1 transition to Step 2 when no story index existed at workflow start
+- Step 1 transition to Step 2 when `edit_intent` is `Complete initial story buildout`
+- Step 1 deterministic generation of missing story files, `target_story` resolution, and direct transition to Step 6 when `edit_intent` is `edit existing story file`
+- `target_story` resolution fail-closed behavior for missing, malformed, invalid, outside-project, path-policy-rejected, non-file, or missing-file targets
 - Step 2 prompt source output
 - Step 3 prompt source output, including the existing-story-index conditional prompt block
 - Step 4 prompt source output for existing and missing story-index branches
 - Step 5 prompt source output for existing and missing story-index branches
-- Step 6 prompt source output
+- Step 6 prompt source output for the initial-buildout variant
+- Step 6 prompt source output for the edit-existing-story variant
 - Step 2 through Step 6 decision-tree route structure
-- exact Step 1 through Step 6 tool-schema outputs
+- exact Step 1 through Step 5 tool-schema outputs
+- exact Step 6 initial-buildout tool-schema output
+- exact Step 6 edit-existing-story tool-schema output
 - Step 4 `set_workflow_values` schema restriction to `stories_index`
 - Step 4 transition after successful existing-index `plan_story_artifacts` re-entry and after new-index `stories_index` persistence
 - Step 4 transition after confirmed no-additional-stories progression
@@ -478,8 +564,8 @@ Prompt integration tests must prove:
 - current step details appear in the input payload, not system instructions
 - runtime-projected workflow schema is the exact native tool surface for each active pi-planning step
 - response-tool guidance matches the projected schema
-- `plan_story_artifacts` appears only when Step 4 or Step 6 is active
-- `generate_story_files` appears only when Step 5 or Step 6 is active
+- `plan_story_artifacts` appears in Step 4 and Step 6 initial-buildout projection, and is absent from Step 6 edit-existing-story projection
+- `generate_story_files` appears in Step 5 and Step 6 initial-buildout projection, and is absent from Step 6 edit-existing-story projection
 - backend-only runtime tools such as `build_workflow_document` are not statically exposed
 
 Validation must include:

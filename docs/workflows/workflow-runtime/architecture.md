@@ -88,6 +88,7 @@ This architecture covers:
   - `quick-spec`
   - `quick-dev`
   - `correct-course`
+  - `validate-story`
   - `write-remediation-story`- done
 
 ### 3.3 Out of Scope
@@ -685,6 +686,7 @@ The canonical in-scope workflow mapping for this architecture is:
 | `quick-spec` | `quick-flow-solo-dev` | `planning` |
 | `review-adversarial-general` | `quality-control` | `review` |
 | `edge-case-hunter-review` | `quality-control` | `review` |
+| `validate-story` | `scrum-master` | `planning` |
 | `write-remediation-story` | `developer` | `planning` |
 
 `problem-solving` is the target migrated workflow name for this initiative and replaces the legacy `cis-problem-solving` naming in the in-scope runtime design.

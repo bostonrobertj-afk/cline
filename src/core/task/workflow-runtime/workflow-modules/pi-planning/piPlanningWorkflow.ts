@@ -562,7 +562,7 @@ function buildStep1InputWorkflowForm(): WorkflowFormDefinitionPayload {
 						key: PiPlanningWorkflowValueKey.EpicIdentity,
 						workflowValueKey: PiPlanningWorkflowValueKey.EpicIdentity,
 						kind: "dropdown",
-						label: "Target epic",
+						label: "Target Epic",
 						required: true,
 						allowedValueType: "string",
 						jsonOptionsSource: {
