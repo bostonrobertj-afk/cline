@@ -48,6 +48,11 @@ import {
 	buildCodeReviewStep3ToolSchemas,
 	buildCodeReviewStep4ToolSchemas,
 } from "@/core/task/workflow-runtime/workflow-modules/code-review/codeReviewToolSchemas"
+import {
+	buildCorrectCourseStep3ToolSchemas,
+	CorrectCourseWorkflowValueKey,
+	correctCourseWorkflowDefinition,
+} from "@/core/task/workflow-runtime/workflow-modules/correct-course"
 import { createArchitectureWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-architecture"
 import { createEpicsWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-epics"
 import {
@@ -1355,6 +1360,38 @@ async function buildCodeReviewPromptContext(
 }
 
 const WRITE_REMEDIATION_STORY_PROJECT_ROOT = "/tmp/write-remediation-story-project"
+const CORRECT_COURSE_PROJECT_ROOT = "/tmp/correct-course-project"
+const CORRECT_COURSE_ARCHITECTURE_DOCUMENT = `${CORRECT_COURSE_PROJECT_ROOT}/planning/architecture.md`
+const CORRECT_COURSE_EPICS_DOCUMENT = `${CORRECT_COURSE_PROJECT_ROOT}/planning/Epics.md`
+const CORRECT_COURSE_OUTPUT_DOCUMENT = `${CORRECT_COURSE_PROJECT_ROOT}/planning/change-management-plan-1.md`
+const CORRECT_COURSE_FORBIDDEN_PROMPT_TOOL_NAMES: readonly string[] = [
+	"execute_command",
+	"replace_in_file",
+	"web_search",
+	"web_fetch",
+	"browser_action",
+	"ask_followup_question",
+	"use_subagents",
+	"use_skill",
+	"set_workflow_values",
+	"build_workflow_document",
+	"create_workflow_artifact",
+	"archive_workflow_artifact",
+	"delete_workflow_artifact",
+	"move_workflow_project_file",
+	"update_story_index_status",
+	"workflow_progress_request",
+	"use_mcp_tool",
+	"access_mcp_resource",
+	"load_mcp_documentation",
+	"plan_story_artifacts",
+	"plan_remediation_story_artifact",
+	"generate_story_files",
+	"build_review_input",
+	"build_review_diff_output",
+	"code_review_spec_update",
+	"record_findings",
+]
 const WRITE_REMEDIATION_STORY_CODE_REVIEW_OUTPUT = `${WRITE_REMEDIATION_STORY_PROJECT_ROOT}/review/code-review-1-1.md`
 const WRITE_REMEDIATION_STORY_TARGET_STORY = `${WRITE_REMEDIATION_STORY_PROJECT_ROOT}/implementation/drafts/Remediation-story-1-1-1.md`
 const WRITE_REMEDIATION_STORY_TARGET_STORY_FILENAME = "Remediation-story-1-1-1.md"
@@ -1389,6 +1426,71 @@ const WRITE_REMEDIATION_STORY_FORBIDDEN_PROMPT_TOOL_NAMES: readonly string[] = [
 	"code_review_spec_update",
 	"record_findings",
 ]
+
+function createCorrectCourseWorkflowValues(overrides: WorkflowValues = {}): WorkflowValues {
+	return {
+		[CorrectCourseWorkflowValueKey.ProjectMode]: "existing",
+		[CorrectCourseWorkflowValueKey.ProjectTitle]: "Correct Course Session",
+		[CorrectCourseWorkflowValueKey.ProjectFolderName]: "correct-course-project",
+		[CorrectCourseWorkflowValueKey.ArchitectureDocument]: CORRECT_COURSE_ARCHITECTURE_DOCUMENT,
+		[CorrectCourseWorkflowValueKey.IssueDescription]: "OAuth callback fails in staging.",
+		[CorrectCourseWorkflowValueKey.EpicSourceIndicator]: "yes",
+		[CorrectCourseWorkflowValueKey.EpicSourceIdentifier]: "1",
+		[CorrectCourseWorkflowValueKey.EpicsDocument]: CORRECT_COURSE_EPICS_DOCUMENT,
+		[CorrectCourseWorkflowValueKey.EpicsDocumentArtifactIdentity]: "epics",
+		[CorrectCourseWorkflowValueKey.StorySourceIndicator]: "yes",
+		[CorrectCourseWorkflowValueKey.StorySourceIdentifier]: "1.1",
+		[CorrectCourseWorkflowValueKey.OutputDocument]: CORRECT_COURSE_OUTPUT_DOCUMENT,
+		[CorrectCourseWorkflowValueKey.OutputDocumentArtifactFamily]: "change_management_plan",
+		[CorrectCourseWorkflowValueKey.OutputDocumentArtifactIdentity]: "1",
+		[CorrectCourseWorkflowValueKey.OutputDocumentArtifactFilename]: "change-management-plan-1.md",
+		[CorrectCourseWorkflowValueKey.OutputDocumentArtifactRelativePath]: "planning/change-management-plan-1.md",
+		...overrides,
+	}
+}
+
+function createCorrectCourseWorkflowSession(
+	workflowValues: WorkflowValues = createCorrectCourseWorkflowValues(),
+): ActiveWorkflowSession {
+	return {
+		activeStepNumber: 3,
+		workflowValues,
+		projectSelection: {
+			projectMode: "existing",
+			projectTitle: "Correct Course Session",
+			projectFolderName: "correct-course-project",
+		},
+		lifecycle: { projectSelectionCompleted: true },
+		entryArtifactResolution: undefined,
+		ui: { suppressedWorkflowFormIds: [], suppressedWorkflowStepResolutionRoutes: [] },
+		branchContext: {
+			activeBranchId: correctCourseWorkflowDefinition.steps["step-3"].decisionTree.entryBranchId,
+		},
+	}
+}
+
+async function buildCorrectCoursePromptContext(
+	workflowValues: WorkflowValues = createCorrectCourseWorkflowValues(),
+): Promise<SystemPromptContext & WorkflowPromptProjection> {
+	const workspacePathPolicy: WorkflowWorkspacePathPolicy = {
+		validateAccess: () => true,
+	}
+	const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })
+	const taskState = new TaskState()
+	taskState.activeWorkflowName = "correct-course"
+	taskState.activeWorkflowSession = createCorrectCourseWorkflowSession(workflowValues)
+	taskState.apiRequestCount = 1
+	const workflowProjection = await runtime.buildTurnProjection({ taskState })
+
+	return {
+		...baseContext,
+		mcpHub: makeMcpHub([]),
+		providerInfo: makeProviderInfo("gpt-5-codex", "openai"),
+		enableNativeToolCalls: true,
+		useMinimalGptPrompt: true,
+		...workflowProjection,
+	}
+}
 
 function createWriteRemediationStoryWorkflowValues(overrides: WorkflowValues = {}): WorkflowValues {
 	return {
@@ -2853,6 +2955,109 @@ describe("Prompt System Integration Tests", () => {
 			for (const payloadBlock of payloadBlockValues) {
 				expect(payloadBlock).to.not.include(CODE_REVIEW_REMEDIATION_STORY)
 			}
+		})
+
+		it("projects active correct-course Step 3 tools from module-owned builders into native GPT-5 prompts", async function () {
+			const context = await buildCorrectCoursePromptContext()
+			expect(context.workflowToolSchemaOverride).to.deep.equal(buildCorrectCourseStep3ToolSchemas())
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ tools }) => {
+				expect(getNativeToolNames(tools)).to.deep.equal(buildCorrectCourseStep3ToolSchemas().map((tool) => tool.name))
+			})
+		})
+
+		it("projects correct-course Step 3 materialized values into full-turn and continuation payloads", async () => {
+			const context = await buildCorrectCoursePromptContext()
+			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+			const continuationWorkflowInputPayloadBlock = context.continuationWorkflowInputPayloadBlock
+			if (workflowInputPayloadBlock === undefined || workflowInputPayloadBlock === "") {
+				throw new Error("Expected correct-course Step 3 workflow input payload.")
+			}
+			if (continuationWorkflowInputPayloadBlock === undefined || continuationWorkflowInputPayloadBlock === "") {
+				throw new Error("Expected correct-course Step 3 continuation workflow input payload.")
+			}
+
+			const payloadBlocks: readonly string[] = [workflowInputPayloadBlock, continuationWorkflowInputPayloadBlock]
+			for (const payloadBlock of payloadBlocks) {
+				expect(payloadBlock.trim()).to.not.equal("")
+				for (const materializedValue of [
+					CORRECT_COURSE_ARCHITECTURE_DOCUMENT,
+					CORRECT_COURSE_EPICS_DOCUMENT,
+					CORRECT_COURSE_OUTPUT_DOCUMENT,
+					"Correct Course Session",
+					"correct-course-project",
+					"yes",
+					"1",
+					"1.1",
+				]) {
+					expect(payloadBlock).to.include(materializedValue)
+				}
+				for (const rawPlaceholder of [
+					"projectTitle",
+					"projectFolderName",
+					"architecture_document",
+					"output_document",
+					"epic_source_indicator",
+					"epic_source_identifier",
+					"epics_document",
+					"story_source_indicator",
+					"story_source_identifier",
+				]) {
+					expect(payloadBlock).to.not.include(rawPlaceholder)
+				}
+			}
+		})
+
+		it("omits correct-course conditional prompt blocks when source indicators are not yes", async () => {
+			const context = await buildCorrectCoursePromptContext(
+				createCorrectCourseWorkflowValues({
+					epic_source_indicator: "no",
+					story_source_indicator: "not found",
+				}),
+			)
+			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+			const continuationWorkflowInputPayloadBlock = context.continuationWorkflowInputPayloadBlock
+			if (workflowInputPayloadBlock === undefined || workflowInputPayloadBlock === "") {
+				throw new Error("Expected correct-course Step 3 workflow input payload.")
+			}
+			if (continuationWorkflowInputPayloadBlock === undefined || continuationWorkflowInputPayloadBlock === "") {
+				throw new Error("Expected correct-course Step 3 continuation workflow input payload.")
+			}
+
+			const payloadBlocks: readonly string[] = [workflowInputPayloadBlock, continuationWorkflowInputPayloadBlock]
+			for (const payloadBlock of payloadBlocks) {
+				expect(payloadBlock.trim()).to.not.equal("")
+				expect(payloadBlock).to.not.include("Discovered while authoring a specific epic:")
+				expect(payloadBlock).to.not.include("Discovered while authoring, implementing, or reviewing a specific story:")
+			}
+		})
+
+		it("does not expose forbidden tools in correct-course Step 3 prompt projection", async () => {
+			const context = await buildCorrectCoursePromptContext()
+			const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
+			for (const forbiddenToolName of CORRECT_COURSE_FORBIDDEN_PROMPT_TOOL_NAMES) {
+				expect(projectedToolNames).to.not.include(forbiddenToolName)
+			}
+		})
+
+		it("renders correct-course Step 3 tools through non-native prompt tool catalog without forbidden tool headings", async function () {
+			const nativeContext = await buildCorrectCoursePromptContext()
+			const context: SystemPromptContext = {
+				...nativeContext,
+				providerInfo: makeProviderInfo("gpt-3", "openai"),
+				enableNativeToolCalls: false,
+			}
+			const approvedToolNames = buildCorrectCourseStep3ToolSchemas().map((tool) => tool.name)
+
+			await runPromptTest(this, context, "gpt-3", async ({ systemPrompt, tools }) => {
+				expect(tools).to.equal(undefined)
+				for (const approvedToolName of approvedToolNames) {
+					expect(systemPrompt).to.include(`## ${approvedToolName}`)
+				}
+				for (const forbiddenToolName of CORRECT_COURSE_FORBIDDEN_PROMPT_TOOL_NAMES) {
+					expect(systemPrompt).to.not.include(`## ${forbiddenToolName}`)
+				}
+			})
 		})
 
 		it("projects active write-remediation-story Step 3 tools from module-owned builders into native GPT-5 prompts", async function () {

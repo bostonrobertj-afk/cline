@@ -3,6 +3,7 @@ import { acceptanceAuditReviewWorkflowDefinition } from "@/core/task/workflow-ru
 import { blindReviewWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/blind-review"
 import { brainstormingWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/brainstorming"
 import { codeReviewWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/code-review"
+import { correctCourseWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/correct-course"
 import { createArchitectureWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-architecture"
 import { createEpicsWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-epics"
 import { createStoryWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-story"
@@ -19,6 +20,7 @@ const shippedWorkflowDefinitions: WorkflowDefinition[] = [
 	devStoryWorkflowDefinition,
 	piPlanningWorkflowDefinition,
 	codeReviewWorkflowDefinition,
+	correctCourseWorkflowDefinition,
 	writeRemediationStoryWorkflowDefinition,
 	blindReviewWorkflowDefinition,
 	acceptanceAuditReviewWorkflowDefinition,

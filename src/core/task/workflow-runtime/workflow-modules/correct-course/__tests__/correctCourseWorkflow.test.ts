@@ -4,6 +4,11 @@ import { join } from "node:path"
 import type { WorkflowFormFieldDefinition, WorkflowFormPanelDefinition } from "@shared/ExtensionMessage"
 import { expect } from "chai"
 import { afterEach, describe, it } from "mocha"
+import {
+	resolveWorkflowBySlashCommand,
+	resolveWorkflowByUseSkillName,
+	resolveWorkflowDefinition,
+} from "@/core/task/workflow-runtime/WorkflowRegistry"
 import { WorkflowArtifactFamily } from "../../../artifactFamilies"
 import type {
 	ActiveWorkflowSession,
@@ -309,6 +314,17 @@ describe("correctCourseWorkflow", () => {
 			CorrectCourseWorkflowValueKey.OutputDocumentArtifactRelativePath,
 		])
 		expect(correctCourseWorkflowDefinition.entryProjectValueKeys).to.deep.equal(CORRECT_COURSE_ENTRY_PROJECT_VALUE_KEYS)
+	})
+
+	it("resolves from the shipped workflow registry by canonical names only", () => {
+		expect(resolveWorkflowDefinition(CORRECT_COURSE_WORKFLOW_NAME)).to.equal(correctCourseWorkflowDefinition)
+		expect(resolveWorkflowBySlashCommand(CORRECT_COURSE_WORKFLOW_SLASH_COMMAND_NAME)).to.equal(
+			correctCourseWorkflowDefinition,
+		)
+		expect(resolveWorkflowByUseSkillName(CORRECT_COURSE_WORKFLOW_USE_SKILL_NAME)).to.equal(correctCourseWorkflowDefinition)
+		expect(resolveWorkflowDefinition("correct-course.md")).to.equal(undefined)
+		expect(resolveWorkflowBySlashCommand("correct-course.md")).to.equal(undefined)
+		expect(resolveWorkflowByUseSkillName("correct-course.md")).to.equal(undefined)
 	})
 
 	it("declares architecture prerequisite and change management artifact contracts", () => {
