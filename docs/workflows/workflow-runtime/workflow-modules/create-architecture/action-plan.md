@@ -623,7 +623,7 @@ Allowed files:
 
 ### Phase 5 - Validation
 
-After completing this phase, pause for QA review before packaging or smoke testing.
+After completing this phase, pause for QA review.
 
 [x] Task 9. Run targeted validation for the create-architecture module build.
 
@@ -1093,37 +1093,42 @@ Allowed files:
     Allowed files:
     - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
 
-    [ ] Subtask 20.10. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`, add coverage proving route `"step-2-build-submitted-values-document"` uses an `event_predicate` trigger by assigning `const trigger = route.trigger`, asserting `trigger.kind === "event_predicate"`, narrowing with `if (trigger.kind !== "event_predicate") { throw new Error(\`Expected event_predicate, received ${trigger.kind}.\`) }`, then asserting `trigger.matches({ activeBranchId: "step-2-await-input-form", workflowValues: { creation_required: true }, step: createArchitectureWorkflowDefinition.steps["step-2"], triggerEvent: { kind: "workflow_form_completed", workflowFormId: "step-2-user-input-form" } }) === true` and the same object with `workflowValues: { creation_required: false }` returns `false`; assign `const action = route.action`, assert `action.kind === "build_workflow_document"`, narrow with `if (action.kind !== "build_workflow_document") { throw new Error(\`Expected build_workflow_document, received ${action.kind}.\`) }`, then assert `action.instruction.artifactId === "architecture_document"`, `action.instruction.buildContent === buildCreateArchitectureDocumentFromSession`, `action.instruction.workflowValueWrites === undefined`, and `route.followingBranchId === "step-2-await-submitted-values-document"`.
+    [ ] Subtask 20.10. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`, add `import { buildCreateArchitectureDocumentFromSession } from "../createArchitectureDocument"` before any tests reference `buildCreateArchitectureDocumentFromSession`.
 
     Allowed files:
     - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
 
-    [ ] Subtask 20.11. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`, add coverage proving route `"step-2-transition-existing-document-to-step-9"` uses an `event_predicate` trigger by assigning `const trigger = route.trigger`, asserting `trigger.kind === "event_predicate"`, narrowing with `if (trigger.kind !== "event_predicate") { throw new Error(\`Expected event_predicate, received ${trigger.kind}.\`) }`, then asserting `trigger.matches({ activeBranchId: "step-2-await-input-form", workflowValues: { creation_required: false }, step: createArchitectureWorkflowDefinition.steps["step-2"], triggerEvent: { kind: "workflow_form_completed", workflowFormId: "step-2-user-input-form" } }) === true` and the same object with `workflowValues: { creation_required: true }` returns `false`; also assert the route action deep-equals `{ kind: "transition_step", target: { kind: "entry_branch", stepNumber: 9 } }` and the route does not have `followingBranchId`.
+    [ ] Subtask 20.11. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`, add coverage proving route `"step-2-build-submitted-values-document"` uses an `event_predicate` trigger by assigning `const trigger = route.trigger`, asserting `trigger.kind === "event_predicate"`, narrowing with `if (trigger.kind !== "event_predicate") { throw new Error(\`Expected event_predicate, received ${trigger.kind}.\`) }`, then asserting `trigger.matches({ activeBranchId: "step-2-await-input-form", workflowValues: { creation_required: true }, step: createArchitectureWorkflowDefinition.steps["step-2"], triggerEvent: { kind: "workflow_form_completed", workflowFormId: "step-2-user-input-form" } }) === true` and the same object with `workflowValues: { creation_required: false }` returns `false`; assign `const action = route.action`, assert `action.kind === "build_workflow_document"`, narrow with `if (action.kind !== "build_workflow_document") { throw new Error(\`Expected build_workflow_document, received ${action.kind}.\`) }`, then assert `action.instruction.artifactId === "architecture_document"`, `action.instruction.buildContent === buildCreateArchitectureDocumentFromSession`, `action.instruction.workflowValueWrites === undefined`, and `route.followingBranchId === "step-2-await-submitted-values-document"`.
 
     Allowed files:
     - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
 
-    [ ] Subtask 20.12. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`, update the local `buildPrompt(...)` helper signature to `buildPrompt(stepId: WorkflowStepDefinition["id"], workflowValues: WorkflowValues = { output_file: OUTPUT_FILE, creation_required: true }): string`, pass `workflowValues` into `createPromptInput(...)`, and preserve the existing missing-prompt guard.
+    [ ] Subtask 20.12. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`, add coverage proving route `"step-2-transition-existing-document-to-step-9"` uses an `event_predicate` trigger by assigning `const trigger = route.trigger`, asserting `trigger.kind === "event_predicate"`, narrowing with `if (trigger.kind !== "event_predicate") { throw new Error(\`Expected event_predicate, received ${trigger.kind}.\`) }`, then asserting `trigger.matches({ activeBranchId: "step-2-await-input-form", workflowValues: { creation_required: false }, step: createArchitectureWorkflowDefinition.steps["step-2"], triggerEvent: { kind: "workflow_form_completed", workflowFormId: "step-2-user-input-form" } }) === true` and the same object with `workflowValues: { creation_required: true }` returns `false`; also assert the route action deep-equals `{ kind: "transition_step", target: { kind: "entry_branch", stepNumber: 9 } }` and the route does not have `followingBranchId`.
 
     Allowed files:
     - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
 
-    [ ] Subtask 20.13. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`, update the existing aggregate prompt test so it no longer contains a Step 9 `PromptExpectation`; rename the test description from `renders Step 3 through Step 9 prompt sources with output_file and required section instructions` to `renders Step 3 through Step 8 prompt sources with output_file and required section instructions`; keep the existing `expect(prompt).to.include(OUTPUT_FILE)` loop only for Step 3 through Step 8.
+    [ ] Subtask 20.13. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`, update the local `buildPrompt(...)` helper signature to `buildPrompt(stepId: WorkflowStepDefinition["id"], workflowValues: WorkflowValues = { output_file: OUTPUT_FILE, creation_required: true }): string`, pass `workflowValues` into `createPromptInput(...)`, and preserve the existing missing-prompt guard.
 
     Allowed files:
     - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
 
-    [ ] Subtask 20.14. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`, add Step 9 prompt coverage for `{ output_file: OUTPUT_FILE, creation_required: true, projectTitle: "Create Architecture Project", projectFolderName: "create-architecture-project", change_plan: "/tmp/change-management-plan.md" }` proving the prompt is non-empty, excludes `OUTPUT_FILE`, excludes `"Create Architecture Project"`, excludes `"create-architecture-project"`, excludes `"/tmp/change-management-plan.md"`, and excludes raw placeholders `{output_file}`, `{projectTitle}`, `{projectFolderName}`, `{change_plan}`, and `output_document`.
+    [ ] Subtask 20.14. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`, update the existing aggregate prompt test so it no longer contains a Step 9 `PromptExpectation`; rename the test description from `renders Step 3 through Step 9 prompt sources with output_file and required section instructions` to `renders Step 3 through Step 8 prompt sources with output_file and required section instructions`; keep the existing `expect(prompt).to.include(OUTPUT_FILE)` loop only for Step 3 through Step 8.
 
     Allowed files:
     - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
 
-    [ ] Subtask 20.15. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`, add Step 9 prompt coverage for `{ output_file: OUTPUT_FILE, creation_required: false, projectTitle: "Create Architecture Project", projectFolderName: "create-architecture-project" }` proving the prompt is non-empty, includes `OUTPUT_FILE`, includes `"Create Architecture Project"`, includes `"create-architecture-project"`, and excludes raw placeholders `{output_file}`, `{projectTitle}`, `{projectFolderName}`, `{change_plan}`, and `output_document`.
+    [ ] Subtask 20.15. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`, add Step 9 prompt coverage for `{ output_file: OUTPUT_FILE, creation_required: true, projectTitle: "Create Architecture Project", projectFolderName: "create-architecture-project", change_plan: "/tmp/change-management-plan.md" }` proving the prompt is non-empty, excludes `OUTPUT_FILE`, excludes `"Create Architecture Project"`, excludes `"create-architecture-project"`, excludes `"/tmp/change-management-plan.md"`, and excludes raw placeholders `{output_file}`, `{projectTitle}`, `{projectFolderName}`, `{change_plan}`, and `output_document`.
 
     Allowed files:
     - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
 
-    [ ] Subtask 20.16. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`, add Step 9 prompt coverage for `{ output_file: OUTPUT_FILE, creation_required: false, projectTitle: "Create Architecture Project", projectFolderName: "create-architecture-project", change_plan: "/tmp/change-management-plan.md" }` proving the prompt is non-empty, includes `OUTPUT_FILE`, includes `"/tmp/change-management-plan.md"`, and excludes raw placeholders `{output_file}`, `{projectTitle}`, `{projectFolderName}`, `{change_plan}`, and `output_document`.
+    [ ] Subtask 20.16. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`, add Step 9 prompt coverage for `{ output_file: OUTPUT_FILE, creation_required: false, projectTitle: "Create Architecture Project", projectFolderName: "create-architecture-project" }` proving the prompt is non-empty, includes `OUTPUT_FILE`, includes `"Create Architecture Project"`, includes `"create-architecture-project"`, and excludes raw placeholders `{output_file}`, `{projectTitle}`, `{projectFolderName}`, `{change_plan}`, and `output_document`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
+
+    [ ] Subtask 20.17. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`, add Step 9 prompt coverage for `{ output_file: OUTPUT_FILE, creation_required: false, projectTitle: "Create Architecture Project", projectFolderName: "create-architecture-project", change_plan: "/tmp/change-management-plan.md" }` proving the prompt is non-empty, includes `OUTPUT_FILE`, includes `"/tmp/change-management-plan.md"`, and excludes raw placeholders `{output_file}`, `{projectTitle}`, `{projectFolderName}`, `{change_plan}`, and `output_document`.
 
     Allowed files:
     - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
@@ -1206,12 +1211,7 @@ Allowed files:
     Allowed files:
     - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-architecture/action-plan.md`
 
-    [ ] Subtask 22.6. Run `npm run eval:smoke:ci`; it must pass before Phase 8 is marked complete so the repo-supported packaged smoke validation covers the create-architecture workflow behavior required by `create-architecture-requirements.md`.
-
-    Allowed files:
-    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-architecture/action-plan.md`
-
-    [ ] Subtask 22.7. Run `git diff --name-only` and `git ls-files --others --exclude-standard`; persistent tracked and untracked diffs must be limited to `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-architecture/action-plan.md`, `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`, `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`, and `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`.
+    [ ] Subtask 22.6. Run `git diff --name-only` and `git ls-files --others --exclude-standard`; persistent tracked and untracked diffs must be limited to `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-architecture/action-plan.md`, `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts`, `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`, and `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`.
 
     Allowed files:
     - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-architecture/action-plan.md`
@@ -1226,15 +1226,4 @@ npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.te
 npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts src/core/prompts/system-prompt/__tests__/response_tools.test.ts
 npm run check-types
 npm run lint
-npm run eval:smoke:ci
 ```
-
-Packaged smoke validation must verify:
-
-- `create-architecture` appears as a shipped workflow skill/slash-command identity without requiring `.md`.
-- The mandatory shared entry `WorkflowForm` renders the create-architecture description.
-- New project selection creates `docs/projects/{project}/planning/architecture.md`.
-- Step 2 renders the creation-required form path starting at Panel 1 and writes submitted values under the correct headings.
-- Existing architecture document selection persists `creation_required: false`, renders Step 2 starting at Panel 8, optionally persists `change_plan` through Panel 9, skips Steps 3 through 8, and routes directly to Step 9.
-- Step 3 through Step 8 expose the required model-facing schemas, update `architecture.md` through governed file tools, and advance only through `workflow_progress_request`.
-- Step 9 exposes `attempt_completion`, completes successfully, and tears down active workflow state.

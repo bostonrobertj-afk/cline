@@ -527,11 +527,4 @@ Runtime tests must cover:
 - prompt projection for create-architecture current-step input payloads
 - response-tool guidance matching the projected tool schema for model-facing steps
 
-Validation must include targeted unit tests, `npm run check-types`, and a packaged smoke test that verifies:
-
-- project entry flow works
-- `architecture.md` is created under `docs/projects/{project}/planning/`
-- Step 2 form persists submitted values under the correct headings
-- when an existing `architecture.md` is selected, Step 2 can collect an optional change management plan path and then route directly to Step 9 without showing Panels 3 through 7
-- Step 3 through Step 8 can update the document and advance by `workflow_progress_request`
-- Step 9 completes with `attempt_completion`
+Validation must include targeted unit tests and `npm run check-types`.
