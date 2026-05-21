@@ -1742,6 +1742,14 @@ describe("WorkflowRuntime", () => {
 		return existingArtifactPath
 	}
 
+	async function writeExistingArchitectureArtifact(projectName: string, content: string): Promise<string> {
+		const planningPath = join(cwd, "docs", "projects", projectName, "planning")
+		const existingArtifactPath = join(cwd, "docs", "projects", projectName, "planning", "architecture.md")
+		await mkdir(planningPath, { recursive: true })
+		await writeFile(existingArtifactPath, content, "utf8")
+		return existingArtifactPath
+	}
+
 	async function submitActiveWorkflowFormPanel(state: TaskState) {
 		const activeFormSession = getActiveFormSession(state)
 		expect(activeFormSession.sessionId).to.be.a("string").and.not.equal("")
@@ -1797,6 +1805,11 @@ describe("WorkflowRuntime", () => {
 		projectTitle: string,
 	): Promise<WorkflowRenderWorkflowFormNextAction> {
 		const { documentBuildAction } = await startCreateArchitectureInitialDocumentBuild(state, projectTitle)
+		const writeResult = await runtime.applyWorkflowValueWrites({
+			taskState: state,
+			values: { creation_required: true },
+		})
+		expect(writeResult.changedValues).to.deep.equal({ creation_required: true })
 		const stepTwoFormAction = await runtime.handleToolBackedOperationToolResult({
 			taskState: state,
 			toolResultText: JSON.stringify({ ok: true }),
@@ -2236,6 +2249,11 @@ describe("WorkflowRuntime", () => {
 			destination_path: artifactResult.artifactAbsolutePath,
 			content: buildInitialCreateArchitectureDocument(),
 		})
+		expect(documentBuildAction.toolRequest.toolInput).to.deep.equal({
+			workflow_value_writes: {
+				creation_required: true,
+			},
+		})
 	})
 
 	it("transitions create-architecture to Step 2 after the initial shell build succeeds", async () => {
@@ -2264,6 +2282,11 @@ describe("WorkflowRuntime", () => {
 			throw new Error(`Expected execute_tool_backed_operation, received ${documentBuildAction.kind}.`)
 		}
 
+		const writeResult = await runtime.applyWorkflowValueWrites({
+			taskState,
+			values: { creation_required: true },
+		})
+		expect(writeResult.changedValues).to.deep.equal({ creation_required: true })
 		const stepTwoFormAction = await runtime.handleToolBackedOperationToolResult({
 			taskState,
 			toolResultText: JSON.stringify({ ok: true }),
@@ -2274,6 +2297,7 @@ describe("WorkflowRuntime", () => {
 		if (stepTwoFormAction.kind !== "render_workflow_form") {
 			throw new Error(`Expected render_workflow_form, received ${stepTwoFormAction.kind}.`)
 		}
+		expect(getActiveWorkflowSession(taskState).workflowValues.creation_required).to.equal(true)
 		expect(getActiveWorkflowSession(taskState).activeStepNumber).to.equal(2)
 		expect(stepTwoFormAction.formSession.workflowFormId).to.equal("step-2-user-input-form")
 		expect(stepTwoFormAction.payload.panel?.panelId).to.equal("step-2-context-files-check-panel")
@@ -2375,6 +2399,158 @@ describe("WorkflowRuntime", () => {
 			})
 			expect(confirmedAction.kind).to.equal("project_prompt")
 			expect(getActiveWorkflowSession(taskState).activeStepNumber).to.equal(stepNumber + 1)
+		}
+	})
+
+	it("starts existing create-architecture documents at the Step 2 change-plan panel", async () => {
+		const existingArchitecturePath = await writeExistingArchitectureArtifact(
+			"create-architecture-existing",
+			"# Existing Architecture\n",
+		)
+		registerResolvedWorkflow(createArchitectureWorkflowDefinition)
+		await runtime.activateWorkflow({
+			taskState,
+			workflowName: createArchitectureWorkflowDefinition.name,
+		})
+		setDiscoveredProjects(["create-architecture-existing"])
+		const conflictAction = await submitExistingProjectSelectionFromExistingFolder(taskState, "create-architecture-existing")
+		expect(conflictAction.kind).to.equal("render_workflow_form")
+		if (conflictAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${conflictAction.kind}.`)
+		}
+		const conflictPanel = conflictAction.payload.panel
+		if (conflictPanel === undefined) {
+			throw new Error("Expected entry artifact conflict panel.")
+		}
+		expect(conflictPanel.panelId).to.equal(ENTRY_ARTIFACT_CONFLICT_PANEL_ID)
+		const renderFormAction = await submitEntryArtifactConflictAction(taskState, "continue_existing")
+		expect(renderFormAction.kind).to.equal("render_workflow_form")
+		if (renderFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${renderFormAction.kind}.`)
+		}
+		const panel = renderFormAction.payload.panel
+		if (panel === undefined) {
+			throw new Error("Expected rendered workflow form panel.")
+		}
+		const activeSession = getActiveWorkflowSession(taskState)
+		expect(activeSession.activeStepNumber).to.equal(2)
+		expect(activeSession.workflowValues.output_file).to.equal(existingArchitecturePath)
+		expect(activeSession.workflowValues.creation_required).to.equal(false)
+		expect(renderFormAction.formSession.workflowFormId).to.equal("step-2-user-input-form")
+		expect(panel.panelId).to.equal("step-2-change-plan-check-panel")
+	})
+
+	it("transitions existing create-architecture documents without a change plan directly to Step 9", async () => {
+		await writeExistingArchitectureArtifact("create-architecture-existing-no-plan", "# Existing Architecture\n")
+		registerResolvedWorkflow(createArchitectureWorkflowDefinition)
+		await runtime.activateWorkflow({
+			taskState,
+			workflowName: createArchitectureWorkflowDefinition.name,
+		})
+		setDiscoveredProjects(["create-architecture-existing-no-plan"])
+		const conflictAction = await submitExistingProjectSelectionFromExistingFolder(
+			taskState,
+			"create-architecture-existing-no-plan",
+		)
+		expect(conflictAction.kind).to.equal("render_workflow_form")
+		if (conflictAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${conflictAction.kind}.`)
+		}
+		expect(conflictAction.formSession.currentPanelId).to.equal(ENTRY_ARTIFACT_CONFLICT_PANEL_ID)
+		await submitEntryArtifactConflictAction(taskState, "continue_existing")
+		const noPlanAction = await submitActiveWorkflowFormPanelFields(taskState, [
+			{ key: "has_change_plan", value: { booleanValue: false } },
+		])
+		const activeSession = getActiveWorkflowSession(taskState)
+
+		expect(noPlanAction.kind).to.equal("project_prompt")
+		expect(noPlanAction.kind).not.to.equal("execute_tool_backed_operation")
+		expect(activeSession.activeStepNumber).to.equal(9)
+		expect(activeSession.workflowValues.creation_required).to.equal(false)
+		expect(activeSession.workflowValues).not.to.have.property("change_plan")
+	})
+
+	it("collects an existing create-architecture change plan before Step 9", async () => {
+		await writeExistingArchitectureArtifact("create-architecture-existing-with-plan", "# Existing Architecture\n")
+		registerResolvedWorkflow(createArchitectureWorkflowDefinition)
+		await runtime.activateWorkflow({
+			taskState,
+			workflowName: createArchitectureWorkflowDefinition.name,
+		})
+		setDiscoveredProjects(["create-architecture-existing-with-plan"])
+		const conflictAction = await submitExistingProjectSelectionFromExistingFolder(
+			taskState,
+			"create-architecture-existing-with-plan",
+		)
+		expect(conflictAction.kind).to.equal("render_workflow_form")
+		if (conflictAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${conflictAction.kind}.`)
+		}
+		expect(conflictAction.formSession.currentPanelId).to.equal(ENTRY_ARTIFACT_CONFLICT_PANEL_ID)
+		await submitEntryArtifactConflictAction(taskState, "continue_existing")
+		const changePlanFormAction = await submitActiveWorkflowFormPanelFields(taskState, [
+			{ key: "has_change_plan", value: { booleanValue: true } },
+		])
+		expect(changePlanFormAction.kind).to.equal("render_workflow_form")
+		if (changePlanFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${changePlanFormAction.kind}.`)
+		}
+		const panel = changePlanFormAction.payload.panel
+		if (panel === undefined) {
+			throw new Error("Expected rendered workflow form panel.")
+		}
+		expect(panel.panelId).to.equal("step-2-change-plan-detail-panel")
+		const promptAction = await submitActiveWorkflowFormPanelFields(taskState, [
+			{ key: "change_plan", value: { stringValue: "/tmp/change-management-plan.md" } },
+		])
+		const activeSession = getActiveWorkflowSession(taskState)
+
+		expect(promptAction.kind).to.equal("project_prompt")
+		expect(activeSession.activeStepNumber).to.equal(9)
+		expect(activeSession.workflowValues.change_plan).to.equal("/tmp/change-management-plan.md")
+	})
+
+	it("projects the existing create-architecture Step 9 prompt with artifact and change-plan context", async () => {
+		const existingArchitecturePath = await writeExistingArchitectureArtifact(
+			"create-architecture-existing-projection",
+			"# Existing Architecture\n",
+		)
+		registerResolvedWorkflow(createArchitectureWorkflowDefinition)
+		await runtime.activateWorkflow({
+			taskState,
+			workflowName: createArchitectureWorkflowDefinition.name,
+		})
+		setDiscoveredProjects(["create-architecture-existing-projection"])
+		const conflictAction = await submitExistingProjectSelectionFromExistingFolder(
+			taskState,
+			"create-architecture-existing-projection",
+		)
+		expect(conflictAction.kind).to.equal("render_workflow_form")
+		if (conflictAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${conflictAction.kind}.`)
+		}
+		expect(conflictAction.formSession.currentPanelId).to.equal(ENTRY_ARTIFACT_CONFLICT_PANEL_ID)
+		await submitEntryArtifactConflictAction(taskState, "continue_existing")
+		await submitActiveWorkflowFormPanelFields(taskState, [{ key: "has_change_plan", value: { booleanValue: true } }])
+		await submitActiveWorkflowFormPanelFields(taskState, [
+			{ key: "change_plan", value: { stringValue: "/tmp/change-management-plan.md" } },
+		])
+
+		const projection = await runtime.buildTurnProjection({ taskState })
+		const workflowInputPayloadBlock = projection.workflowInputPayloadBlock
+		if (workflowInputPayloadBlock === undefined || workflowInputPayloadBlock.length === 0) {
+			throw new Error("Expected non-empty workflow input payload block.")
+		}
+		expect(workflowInputPayloadBlock).to.contain(existingArchitecturePath)
+		expect(workflowInputPayloadBlock).to.contain("/tmp/change-management-plan.md")
+		for (const forbiddenSnippet of [
+			"{output_file}",
+			"{projectTitle}",
+			"{projectFolderName}",
+			"{change_plan}",
+			"output_document",
+		]) {
+			expect(workflowInputPayloadBlock).not.to.contain(forbiddenSnippet)
 		}
 	})
 

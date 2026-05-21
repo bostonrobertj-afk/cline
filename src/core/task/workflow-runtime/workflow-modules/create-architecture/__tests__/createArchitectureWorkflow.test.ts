@@ -14,6 +14,7 @@ import type {
 	WorkflowValue,
 	WorkflowValues,
 } from "../../../types"
+import { buildCreateArchitectureDocumentFromSession } from "../createArchitectureDocument"
 import {
 	buildCreateArchitectureStep1ToolSchemas,
 	buildCreateArchitectureStep2ToolSchemas,
@@ -202,13 +203,12 @@ function createPromptInput(step: WorkflowStepDefinition, workflowValues: Workflo
 	}
 }
 
-function buildPrompt(stepId: WorkflowStepDefinition["id"]): string {
+function buildPrompt(
+	stepId: WorkflowStepDefinition["id"],
+	workflowValues: WorkflowValues = { output_file: OUTPUT_FILE, creation_required: true },
+): string {
 	const step = createArchitectureWorkflowDefinition.steps[stepId]
-	const promptSource = step.buildPromptSource(
-		createPromptInput(step, {
-			output_file: OUTPUT_FILE,
-		}),
-	)
+	const promptSource = step.buildPromptSource(createPromptInput(step, workflowValues))
 	const prompt = promptSource.currentStepInstructions
 	if (prompt === undefined) {
 		throw new Error(`Missing prompt for ${stepId}.`)
@@ -256,8 +256,10 @@ describe("createArchitectureWorkflowDefinition", () => {
 			"projectMode",
 			"projectTitle",
 			"projectFolderName",
+			"creation_required",
 			"has_context_files",
 			"context_files",
+			"change_plan",
 			"scope",
 			"has_architectural_goals",
 			"architectural_goals",
@@ -310,6 +312,8 @@ describe("createArchitectureWorkflowDefinition", () => {
 			"step-2-architectural-goals-detail-panel",
 			"step-2-core-rules-check-panel",
 			"step-2-core-rules-detail-panel",
+			"step-2-change-plan-check-panel",
+			"step-2-change-plan-detail-panel",
 		])
 
 		const contextCheckPanel = getPanel(form, "step-2-context-files-check-panel")
@@ -438,6 +442,70 @@ describe("createArchitectureWorkflowDefinition", () => {
 			branches: [],
 			defaultTerminal: true,
 		})
+
+		expect(getPanel(form, "step-2-change-plan-check-panel")).to.deep.equal({
+			panelId: "step-2-change-plan-check-panel",
+			title: "Existing Architecture Document",
+			promptMarkdown:
+				"It looks like this project already has an architecture document. Do you have a change management plan to provide?",
+			fields: [
+				{
+					key: "has_change_plan",
+					kind: "boolean",
+					label: "select one",
+					required: true,
+					allowedValueType: "boolean",
+					trueLabel: "yes",
+					falseLabel: "no",
+				},
+			],
+			allowedActions: ["submit"],
+			actionLabels: {
+				submit: "submit",
+			},
+			transition: {
+				type: "conditional",
+				conditionSourceKey: "has_change_plan",
+				branches: [
+					{ matchValue: true, nextPanelId: "step-2-change-plan-detail-panel" },
+					{
+						matchValue: false,
+						terminal: true,
+						staleValueKeysToClear: ["change_plan"],
+					},
+				],
+				defaultTerminal: true,
+			},
+		})
+
+		expect(getPanel(form, "step-2-change-plan-detail-panel")).to.deep.equal({
+			panelId: "step-2-change-plan-detail-panel",
+			title: "Provide File Path",
+			promptMarkdown: "Please provide the full file path for your change management plan.",
+			fields: [
+				{
+					key: "change_plan",
+					workflowValueKey: "change_plan",
+					kind: "small_text",
+					label: "file path",
+					required: true,
+					allowedValueType: "string",
+				},
+			],
+			allowedActions: ["submit", "back"],
+			actionLabels: {
+				submit: "submit",
+				back: "back",
+			},
+			backDestinationPanelId: "step-2-change-plan-check-panel",
+			backStaleValueKeysToClear: ["change_plan"],
+			transition: {
+				type: "conditional",
+				conditionSourceKey: "__terminal__",
+				branches: [],
+				defaultTerminal: true,
+			},
+		})
 	})
 
 	it("uses entry artifact resolution as the Step 1 entry branch", () => {
@@ -456,21 +524,40 @@ describe("createArchitectureWorkflowDefinition", () => {
 		expect(creationRequiredRoute.followingBranchId).to.equal("step-1-await-allocation")
 	})
 
-	it("continues existing architecture documents directly to Step 3 without setup actions", () => {
+	it("persists existing architecture document selection before Step 2", async () => {
 		const continueExistingRoute = findRoute("step-1", "step-1-resolve-entry-artifact", "step-1-continue-existing-artifact")
 
 		expectRouteMatchesEntryArtifactResolution(continueExistingRoute, false)
-		expect(continueExistingRoute.action).to.deep.equal({
+		const continueExistingAction = continueExistingRoute.action
+		expect(continueExistingAction.kind).to.equal("run_deterministic_procedure")
+		if (continueExistingAction.kind !== "run_deterministic_procedure") {
+			throw new Error(`Expected run_deterministic_procedure, received ${continueExistingAction.kind}.`)
+		}
+		const result = await Promise.resolve(continueExistingAction.instruction.run(createSession({})))
+		expect(result).to.deep.equal({
+			kind: "succeeded",
+			workflowValueWrites: {
+				creation_required: false,
+			},
+		})
+		expect(continueExistingRoute.followingBranchId).to.equal("step-1-transition-existing-artifact-to-step-2")
+	})
+
+	it("transitions existing architecture documents from Step 1 to Step 2", () => {
+		const transitionRoute = findRoute(
+			"step-1",
+			"step-1-transition-existing-artifact-to-step-2",
+			"step-1-transition-existing-artifact-to-step-2",
+		)
+
+		expect(transitionRoute.trigger).to.deep.equal({ kind: "always" })
+		expect(transitionRoute.action).to.deep.equal({
 			kind: "transition_step",
 			target: {
 				kind: "entry_branch",
-				stepNumber: 3,
+				stepNumber: 2,
 			},
 		})
-		expect(continueExistingRoute).not.to.have.property("followingBranchId")
-		expect(["allocate_artifact", "build_workflow_document", "render_workflow_form"]).not.to.include(
-			continueExistingRoute.action.kind,
-		)
 	})
 
 	it("listens for first allocation results from the entry artifact allocation route", () => {
@@ -491,11 +578,155 @@ describe("createArchitectureWorkflowDefinition", () => {
 		)
 	})
 
+	it("persists creation_required while building new architecture document shells", () => {
+		const initialShellRoute = findRoute("step-1", "step-1-await-allocation", "step-1-build-initial-shell")
+		const retryShellRoute = findRoute("step-1", "step-1-await-retry-allocation", "step-1-build-initial-shell-after-retry")
+		for (const route of [initialShellRoute, retryShellRoute]) {
+			const action = route.action
+			expect(action.kind).to.equal("build_workflow_document")
+			if (action.kind !== "build_workflow_document") {
+				throw new Error(`Expected build_workflow_document, received ${action.kind}.`)
+			}
+			expect(action.instruction.workflowValueWrites).to.deep.equal({
+				creation_required: true,
+			})
+		}
+	})
+
+	it("renders the creation Step 2 form from the initial input panel", () => {
+		const route = findRoute("step-2", "step-2-render-input-form", "step-2-render-creation-input-form")
+
+		expect(route.action).to.deep.equal({
+			kind: "render_workflow_form",
+			workflowFormId: "step-2-user-input-form",
+			startPanelId: "step-2-context-files-check-panel",
+		})
+		expect(route.followingBranchId).to.equal("step-2-await-input-form")
+		const trigger = route.trigger
+		expect(trigger.kind).to.equal("session_predicate")
+		if (trigger.kind !== "session_predicate") {
+			throw new Error(`Expected session_predicate, received ${trigger.kind}.`)
+		}
+		expect(
+			trigger.matches({
+				activeBranchId: "step-2-render-input-form",
+				workflowValues: { creation_required: true },
+				step: createArchitectureWorkflowDefinition.steps["step-2"],
+			}),
+		).to.equal(true)
+		expect(
+			trigger.matches({
+				activeBranchId: "step-2-render-input-form",
+				workflowValues: { creation_required: false },
+				step: createArchitectureWorkflowDefinition.steps["step-2"],
+			}),
+		).to.equal(false)
+	})
+
+	it("renders the existing-document Step 2 form from the change-plan panel", () => {
+		const route = findRoute("step-2", "step-2-render-input-form", "step-2-render-existing-document-form")
+
+		expect(route.action).to.deep.equal({
+			kind: "render_workflow_form",
+			workflowFormId: "step-2-user-input-form",
+			startPanelId: "step-2-change-plan-check-panel",
+		})
+		expect(route.followingBranchId).to.equal("step-2-await-input-form")
+		const trigger = route.trigger
+		expect(trigger.kind).to.equal("session_predicate")
+		if (trigger.kind !== "session_predicate") {
+			throw new Error(`Expected session_predicate, received ${trigger.kind}.`)
+		}
+		expect(
+			trigger.matches({
+				activeBranchId: "step-2-render-input-form",
+				workflowValues: { creation_required: false },
+				step: createArchitectureWorkflowDefinition.steps["step-2"],
+			}),
+		).to.equal(true)
+		expect(
+			trigger.matches({
+				activeBranchId: "step-2-render-input-form",
+				workflowValues: { creation_required: true },
+				step: createArchitectureWorkflowDefinition.steps["step-2"],
+			}),
+		).to.equal(false)
+	})
+
+	it("builds submitted Step 2 values only for new architecture documents", () => {
+		const route = findRoute("step-2", "step-2-await-input-form", "step-2-build-submitted-values-document")
+		const trigger = route.trigger
+		expect(trigger.kind).to.equal("event_predicate")
+		if (trigger.kind !== "event_predicate") {
+			throw new Error(`Expected event_predicate, received ${trigger.kind}.`)
+		}
+		expect(
+			trigger.matches({
+				activeBranchId: "step-2-await-input-form",
+				workflowValues: { creation_required: true },
+				step: createArchitectureWorkflowDefinition.steps["step-2"],
+				triggerEvent: { kind: "workflow_form_completed", workflowFormId: "step-2-user-input-form" },
+			}),
+		).to.equal(true)
+		expect(
+			trigger.matches({
+				activeBranchId: "step-2-await-input-form",
+				workflowValues: { creation_required: false },
+				step: createArchitectureWorkflowDefinition.steps["step-2"],
+				triggerEvent: { kind: "workflow_form_completed", workflowFormId: "step-2-user-input-form" },
+			}),
+		).to.equal(false)
+
+		const action = route.action
+		expect(action.kind).to.equal("build_workflow_document")
+		if (action.kind !== "build_workflow_document") {
+			throw new Error(`Expected build_workflow_document, received ${action.kind}.`)
+		}
+		expect(action.instruction.artifactId).to.equal("architecture_document")
+		expect(action.instruction.buildContent).to.equal(buildCreateArchitectureDocumentFromSession)
+		expect(action.instruction.workflowValueWrites).to.equal(undefined)
+		expect(route.followingBranchId).to.equal("step-2-await-submitted-values-document")
+	})
+
+	it("transitions existing architecture documents from Step 2 to Step 9", () => {
+		const route = findRoute("step-2", "step-2-await-input-form", "step-2-transition-existing-document-to-step-9")
+		const trigger = route.trigger
+		expect(trigger.kind).to.equal("event_predicate")
+		if (trigger.kind !== "event_predicate") {
+			throw new Error(`Expected event_predicate, received ${trigger.kind}.`)
+		}
+		expect(
+			trigger.matches({
+				activeBranchId: "step-2-await-input-form",
+				workflowValues: { creation_required: false },
+				step: createArchitectureWorkflowDefinition.steps["step-2"],
+				triggerEvent: { kind: "workflow_form_completed", workflowFormId: "step-2-user-input-form" },
+			}),
+		).to.equal(true)
+		expect(
+			trigger.matches({
+				activeBranchId: "step-2-await-input-form",
+				workflowValues: { creation_required: true },
+				step: createArchitectureWorkflowDefinition.steps["step-2"],
+				triggerEvent: { kind: "workflow_form_completed", workflowFormId: "step-2-user-input-form" },
+			}),
+		).to.equal(false)
+		expect(route.action).to.deep.equal({
+			kind: "transition_step",
+			target: {
+				kind: "entry_branch",
+				stepNumber: 9,
+			},
+		})
+		expect(route).not.to.have.property("followingBranchId")
+	})
+
 	it("keeps runtime-driven steps out of project prompts and routes progress decisions for Steps 3 through 8", () => {
 		const runtimeDrivenActionKinds: readonly WorkflowDecisionAction["kind"][] = [
 			"allocate_artifact",
 			"build_workflow_document",
 			"render_workflow_form",
+			"run_deterministic_procedure",
 			"transition_step",
 			"terminal_error",
 		]
@@ -627,7 +858,7 @@ describe("createArchitectureWorkflowDefinition", () => {
 		expect(source).not.to.match(/buildToolSchema:\s*\([^)]*\)\s*=>\s*\[\s*\]/)
 	})
 
-	it("renders Step 3 through Step 9 prompt sources with output_file and required section instructions", () => {
+	it("renders Step 3 through Step 8 prompt sources with output_file and required section instructions", () => {
 		const promptExpectations: readonly PromptExpectation[] = [
 			{
 				stepId: "step-3",
@@ -694,19 +925,6 @@ describe("createArchitectureWorkflowDefinition", () => {
 					"workflow_progress_request",
 				],
 			},
-			{
-				stepId: "step-9",
-				requiredSnippets: [
-					`in \`${OUTPUT_FILE}\``,
-					"coherence, pattern alignment, and structure alignment",
-					"critical, important, or minor",
-					"critical issues",
-					"important or minor issues",
-					"attempt_completion",
-					"technical source of truth",
-					"create-epics workflow",
-				],
-			},
 		]
 
 		const forbiddenSnippets = [
@@ -731,6 +949,77 @@ describe("createArchitectureWorkflowDefinition", () => {
 				expect(prompt).not.to.include(forbiddenSnippet)
 			}
 			expect(prompt.toLowerCase()).not.to.include("bmad")
+		}
+	})
+
+	it("renders the Step 9 new-document prompt without existing-document values", () => {
+		const prompt = buildPrompt("step-9", {
+			output_file: OUTPUT_FILE,
+			creation_required: true,
+			projectTitle: "Create Architecture Project",
+			projectFolderName: "create-architecture-project",
+			change_plan: "/tmp/change-management-plan.md",
+		})
+
+		expect(prompt).not.to.equal("")
+		expect(prompt).not.to.include(OUTPUT_FILE)
+		expect(prompt).not.to.include("Create Architecture Project")
+		expect(prompt).not.to.include("create-architecture-project")
+		expect(prompt).not.to.include("/tmp/change-management-plan.md")
+		for (const forbiddenSnippet of [
+			"{output_file}",
+			"{projectTitle}",
+			"{projectFolderName}",
+			"{change_plan}",
+			"output_document",
+		]) {
+			expect(prompt).not.to.include(forbiddenSnippet)
+		}
+	})
+
+	it("renders the Step 9 existing-document prompt without a change plan", () => {
+		const prompt = buildPrompt("step-9", {
+			output_file: OUTPUT_FILE,
+			creation_required: false,
+			projectTitle: "Create Architecture Project",
+			projectFolderName: "create-architecture-project",
+		})
+
+		expect(prompt).not.to.equal("")
+		expect(prompt).to.include(OUTPUT_FILE)
+		expect(prompt).to.include("Create Architecture Project")
+		expect(prompt).to.include("create-architecture-project")
+		for (const forbiddenSnippet of [
+			"{output_file}",
+			"{projectTitle}",
+			"{projectFolderName}",
+			"{change_plan}",
+			"output_document",
+		]) {
+			expect(prompt).not.to.include(forbiddenSnippet)
+		}
+	})
+
+	it("renders the Step 9 existing-document prompt with a change plan", () => {
+		const prompt = buildPrompt("step-9", {
+			output_file: OUTPUT_FILE,
+			creation_required: false,
+			projectTitle: "Create Architecture Project",
+			projectFolderName: "create-architecture-project",
+			change_plan: "/tmp/change-management-plan.md",
+		})
+
+		expect(prompt).not.to.equal("")
+		expect(prompt).to.include(OUTPUT_FILE)
+		expect(prompt).to.include("/tmp/change-management-plan.md")
+		for (const forbiddenSnippet of [
+			"{output_file}",
+			"{projectTitle}",
+			"{projectFolderName}",
+			"{change_plan}",
+			"output_document",
+		]) {
+			expect(prompt).not.to.include(forbiddenSnippet)
 		}
 	})
 })

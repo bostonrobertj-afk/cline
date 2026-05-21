@@ -1,9 +1,11 @@
 import type { WorkflowFormDefinitionPayload } from "@shared/ExtensionMessage"
 import { WorkflowArtifactFamily } from "../../artifactFamilies"
 import type {
+	WorkflowDecisionAction,
 	WorkflowDecisionBranchTrigger,
 	WorkflowDecisionTree,
 	WorkflowDefinition,
+	WorkflowDeterministicProcedureResult,
 	WorkflowPersonaDefinition,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
@@ -26,8 +28,10 @@ enum CreateArchitectureWorkflowValueKey {
 	ProjectMode = "projectMode",
 	ProjectTitle = "projectTitle",
 	ProjectFolderName = "projectFolderName",
+	CreationRequired = "creation_required",
 	HasContextFiles = "has_context_files",
 	ContextFiles = "context_files",
+	ChangePlan = "change_plan",
 	Scope = "scope",
 	HasArchitecturalGoals = "has_architectural_goals",
 	ArchitecturalGoals = "architectural_goals",
@@ -45,6 +49,8 @@ const CREATE_ARCHITECTURE_WORKFLOW_DESCRIPTION =
 	"Create a complete architecture document through collaborative discovery, explicit design decisions, and a final readiness review."
 const ARCHITECTURE_DOCUMENT_ARTIFACT_ID = "architecture_document"
 const STEP_2_INPUT_FORM_ID = "step-2-user-input-form"
+const STEP_2_CHANGE_PLAN_CHECK_PANEL_ID = "step-2-change-plan-check-panel"
+const STEP_2_CHANGE_PLAN_DETAIL_PANEL_ID = "step-2-change-plan-detail-panel"
 const CREATE_ARCHITECTURE_WORKFLOW_PERSONA: WorkflowPersonaDefinition = {
 	name: "Winston",
 	role: "Architect",
@@ -61,8 +67,10 @@ const CREATE_ARCHITECTURE_WORKFLOW_VALUE_KEYS = [
 	CreateArchitectureWorkflowValueKey.ProjectMode,
 	CreateArchitectureWorkflowValueKey.ProjectTitle,
 	CreateArchitectureWorkflowValueKey.ProjectFolderName,
+	CreateArchitectureWorkflowValueKey.CreationRequired,
 	CreateArchitectureWorkflowValueKey.HasContextFiles,
 	CreateArchitectureWorkflowValueKey.ContextFiles,
+	CreateArchitectureWorkflowValueKey.ChangePlan,
 	CreateArchitectureWorkflowValueKey.Scope,
 	CreateArchitectureWorkflowValueKey.HasArchitecturalGoals,
 	CreateArchitectureWorkflowValueKey.ArchitecturalGoals,
@@ -131,15 +139,15 @@ Build an implementation roadmap establishing high-level project implementation s
 
 Once Dependencies and Project Roadmap are populated with approved content, use \`workflow_progress_request\` to confirm and unlock the final workflow step.`
 
-const STEP_9_PROMPT = `Read and review the full architecture in \`{output_file}\` for coherence, pattern alignment, and structure alignment.
-
-Classify issues as critical, important, or minor.
-
-If critical issues exist, present them to the user and ask how they want to resolve them before implementation.
-
-If important or minor issues exist, present them as refinements and ask whether to address them now.
-
-When the document is ready, use \`attempt_completion\` to present a short completion summary. In that summary, explain that the architecture document is now the technical source of truth and is ready to inform the create-epics workflow.`
+const STEP_9_EXISTING_DOCUMENT_HEADER_PROMPT =
+	"You have been called inside a workflow focused on revising an existing architecture document within the following project:\n- Project: {projectTitle}\n- Project Folder: {projectFolderName}\n- Architecture Document: {output_file}"
+const STEP_9_CHANGE_PLAN_PROMPT_LINE = "- Change Management Plan: {change_plan}"
+const STEP_9_EXISTING_DOCUMENT_BODY_PROMPT =
+	'Steps 1-8 were automatically completed by the system.\nReview the architecture document and any files listed in the "Relevant Context" section.\nAfter reviewing, confirm the scope of revisions that the user wishes to make in the architecture document, then work with them to identify the correct revisions to the existing document and update {output_file} appropriately.'
+const STEP_9_NEW_DOCUMENT_REVIEW_PROMPT =
+	"Review the full architecture for coherence and pattern and structure alignment.\nClassify any issues as critical, important, or minor.\nIf there are critical issues, present them and ask how the user wants to resolve them before implementation. If there are important or minor issues, present them as refinements and ask whether to address them now."
+const STEP_9_FINAL_PROMPT =
+	"When finished, present a short completion summary using attempt_completion and explain that the architecture document is now the technical source of truth and is ready to inform the create-epics workflow."
 
 function buildTerminalTransition(): WorkflowFormDefinitionPayload["panels"][string]["transition"] {
 	return {
@@ -185,11 +193,32 @@ function entryArtifactResolutionCompletedWithCreationRequired(creationRequired: 
 	}
 }
 
-function workflowFormCompleted(workflowFormId: string): WorkflowDecisionBranchTrigger {
+function buildPersistCreationRequiredAction(
+	creationRequired: boolean,
+): Extract<WorkflowDecisionAction, { kind: "run_deterministic_procedure" }> {
+	return {
+		kind: "run_deterministic_procedure",
+		instruction: {
+			run: (): WorkflowDeterministicProcedureResult => ({
+				kind: "succeeded",
+				workflowValueWrites: {
+					[CreateArchitectureWorkflowValueKey.CreationRequired]: creationRequired,
+				},
+			}),
+		},
+	}
+}
+
+function workflowFormCompletedWithCreationRequired(
+	workflowFormId: string,
+	creationRequired: boolean,
+): WorkflowDecisionBranchTrigger {
 	return {
 		kind: "event_predicate",
-		matches: ({ triggerEvent }) =>
-			triggerEvent.kind === "workflow_form_completed" && triggerEvent.workflowFormId === workflowFormId,
+		matches: ({ triggerEvent, workflowValues }) =>
+			triggerEvent.kind === "workflow_form_completed" &&
+			triggerEvent.workflowFormId === workflowFormId &&
+			workflowValues[CreateArchitectureWorkflowValueKey.CreationRequired] === creationRequired,
 	}
 }
 
@@ -214,6 +243,44 @@ function replaceOutputFilePlaceholder(input: WorkflowPromptBuilderInput, prompt:
 	}
 
 	return prompt.replace(/\{output_file\}/g, input.renderWorkflowValue(outputFileValue))
+}
+
+function renderWorkflowValueByKey(input: WorkflowPromptBuilderInput, key: CreateArchitectureWorkflowValueKey): string {
+	const value = input.session.workflowValues[key]
+	if (value === undefined) {
+		return input.renderWorkflowValue(key)
+	}
+
+	return input.renderWorkflowValue(value)
+}
+
+function readBooleanWorkflowValue(
+	input: WorkflowPromptBuilderInput,
+	key: CreateArchitectureWorkflowValueKey,
+): boolean | undefined {
+	const value = input.session.workflowValues[key]
+	if (typeof value === "boolean") {
+		return value
+	}
+
+	return undefined
+}
+
+function readNonEmptyStringWorkflowValue(
+	input: WorkflowPromptBuilderInput,
+	key: CreateArchitectureWorkflowValueKey,
+): string | undefined {
+	const value = input.session.workflowValues[key]
+	if (typeof value !== "string") {
+		return undefined
+	}
+
+	const trimmedValue = value.trim()
+	if (trimmedValue.length > 0) {
+		return trimmedValue
+	}
+
+	return undefined
 }
 
 function createEmptyPromptSource(): WorkflowStepPromptSource {
@@ -463,6 +530,66 @@ function buildStep2InputWorkflowForm(): WorkflowFormDefinitionPayload {
 				},
 				transition: buildTerminalTransition(),
 			},
+			[STEP_2_CHANGE_PLAN_CHECK_PANEL_ID]: {
+				panelId: STEP_2_CHANGE_PLAN_CHECK_PANEL_ID,
+				title: "Existing Architecture Document",
+				promptMarkdown:
+					"It looks like this project already has an architecture document. Do you have a change management plan to provide?",
+				fields: [
+					{
+						key: "has_change_plan",
+						kind: "boolean",
+						label: "select one",
+						required: true,
+						allowedValueType: "boolean",
+						trueLabel: "yes",
+						falseLabel: "no",
+					},
+				],
+				allowedActions: ["submit"],
+				actionLabels: {
+					submit: "submit",
+				},
+				transition: {
+					type: "conditional",
+					conditionSourceKey: "has_change_plan",
+					branches: [
+						{
+							matchValue: true,
+							nextPanelId: STEP_2_CHANGE_PLAN_DETAIL_PANEL_ID,
+						},
+						{
+							matchValue: false,
+							terminal: true,
+							staleValueKeysToClear: [CreateArchitectureWorkflowValueKey.ChangePlan],
+						},
+					],
+					defaultTerminal: true,
+				},
+			},
+			[STEP_2_CHANGE_PLAN_DETAIL_PANEL_ID]: {
+				panelId: STEP_2_CHANGE_PLAN_DETAIL_PANEL_ID,
+				title: "Provide File Path",
+				promptMarkdown: "Please provide the full file path for your change management plan.",
+				fields: [
+					{
+						key: CreateArchitectureWorkflowValueKey.ChangePlan,
+						workflowValueKey: CreateArchitectureWorkflowValueKey.ChangePlan,
+						kind: "small_text",
+						label: "file path",
+						required: true,
+						allowedValueType: "string",
+					},
+				],
+				allowedActions: ["submit", "back"],
+				actionLabels: {
+					submit: "submit",
+					back: "back",
+				},
+				backDestinationPanelId: STEP_2_CHANGE_PLAN_CHECK_PANEL_ID,
+				backStaleValueKeysToClear: [CreateArchitectureWorkflowValueKey.ChangePlan],
+				transition: buildTerminalTransition(),
+			},
 		},
 	}
 }
@@ -486,11 +613,22 @@ function buildStep1DecisionTree(): WorkflowDecisionTree {
 					{
 						id: "step-1-continue-existing-artifact",
 						trigger: entryArtifactResolutionCompletedWithCreationRequired(false),
+						action: buildPersistCreationRequiredAction(false),
+						followingBranchId: "step-1-transition-existing-artifact-to-step-2",
+					},
+				],
+			},
+			"step-1-transition-existing-artifact-to-step-2": {
+				id: "step-1-transition-existing-artifact-to-step-2",
+				routes: [
+					{
+						id: "step-1-transition-existing-artifact-to-step-2",
+						trigger: { kind: "always" },
 						action: {
 							kind: "transition_step",
 							target: {
 								kind: "entry_branch",
-								stepNumber: 3,
+								stepNumber: 2,
 							},
 						},
 					},
@@ -507,6 +645,9 @@ function buildStep1DecisionTree(): WorkflowDecisionTree {
 							instruction: {
 								artifactId: ARCHITECTURE_DOCUMENT_ARTIFACT_ID,
 								buildContent: buildInitialCreateArchitectureDocument,
+								workflowValueWrites: {
+									[CreateArchitectureWorkflowValueKey.CreationRequired]: true,
+								},
 							},
 						},
 						followingBranchId: "step-1-await-initial-shell",
@@ -533,6 +674,9 @@ function buildStep1DecisionTree(): WorkflowDecisionTree {
 							instruction: {
 								artifactId: ARCHITECTURE_DOCUMENT_ARTIFACT_ID,
 								buildContent: buildInitialCreateArchitectureDocument,
+								workflowValueWrites: {
+									[CreateArchitectureWorkflowValueKey.CreationRequired]: true,
+								},
 							},
 						},
 						followingBranchId: "step-1-await-initial-shell",
@@ -611,11 +755,30 @@ function buildStep2DecisionTree(): WorkflowDecisionTree {
 				id: "step-2-render-input-form",
 				routes: [
 					{
-						id: "step-2-render-input-form",
-						trigger: { kind: "always" },
+						id: "step-2-render-creation-input-form",
+						trigger: {
+							kind: "session_predicate",
+							matches: ({ workflowValues }) =>
+								workflowValues[CreateArchitectureWorkflowValueKey.CreationRequired] === true,
+						},
 						action: {
 							kind: "render_workflow_form",
 							workflowFormId: STEP_2_INPUT_FORM_ID,
+							startPanelId: "step-2-context-files-check-panel",
+						},
+						followingBranchId: "step-2-await-input-form",
+					},
+					{
+						id: "step-2-render-existing-document-form",
+						trigger: {
+							kind: "session_predicate",
+							matches: ({ workflowValues }) =>
+								workflowValues[CreateArchitectureWorkflowValueKey.CreationRequired] === false,
+						},
+						action: {
+							kind: "render_workflow_form",
+							workflowFormId: STEP_2_INPUT_FORM_ID,
+							startPanelId: STEP_2_CHANGE_PLAN_CHECK_PANEL_ID,
 						},
 						followingBranchId: "step-2-await-input-form",
 					},
@@ -626,7 +789,7 @@ function buildStep2DecisionTree(): WorkflowDecisionTree {
 				routes: [
 					{
 						id: "step-2-build-submitted-values-document",
-						trigger: workflowFormCompleted(STEP_2_INPUT_FORM_ID),
+						trigger: workflowFormCompletedWithCreationRequired(STEP_2_INPUT_FORM_ID, true),
 						action: {
 							kind: "build_workflow_document",
 							instruction: {
@@ -635,6 +798,17 @@ function buildStep2DecisionTree(): WorkflowDecisionTree {
 							},
 						},
 						followingBranchId: "step-2-await-submitted-values-document",
+					},
+					{
+						id: "step-2-transition-existing-document-to-step-9",
+						trigger: workflowFormCompletedWithCreationRequired(STEP_2_INPUT_FORM_ID, false),
+						action: {
+							kind: "transition_step",
+							target: {
+								kind: "entry_branch",
+								stepNumber: 9,
+							},
+						},
 					},
 				],
 			},
@@ -789,8 +963,35 @@ function buildStep8PromptSource(input: WorkflowPromptBuilderInput): WorkflowStep
 }
 
 function buildStep9PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
+	const sections: string[] = []
+	const creationRequired = readBooleanWorkflowValue(input, CreateArchitectureWorkflowValueKey.CreationRequired)
+
+	if (creationRequired === false) {
+		const existingDocumentHeader = replaceOutputFilePlaceholder(input, STEP_9_EXISTING_DOCUMENT_HEADER_PROMPT)
+			.replace(/\{projectTitle\}/g, renderWorkflowValueByKey(input, CreateArchitectureWorkflowValueKey.ProjectTitle))
+			.replace(
+				/\{projectFolderName\}/g,
+				renderWorkflowValueByKey(input, CreateArchitectureWorkflowValueKey.ProjectFolderName),
+			)
+
+		sections.push(existingDocumentHeader)
+
+		const changePlan = readNonEmptyStringWorkflowValue(input, CreateArchitectureWorkflowValueKey.ChangePlan)
+		if (changePlan !== undefined) {
+			sections.push(STEP_9_CHANGE_PLAN_PROMPT_LINE.replace(/\{change_plan\}/g, input.renderWorkflowValue(changePlan)))
+		}
+
+		sections.push(replaceOutputFilePlaceholder(input, STEP_9_EXISTING_DOCUMENT_BODY_PROMPT))
+	}
+
+	if (creationRequired === true) {
+		sections.push(replaceOutputFilePlaceholder(input, STEP_9_NEW_DOCUMENT_REVIEW_PROMPT))
+	}
+
+	sections.push(STEP_9_FINAL_PROMPT)
+
 	return {
-		currentStepInstructions: replaceOutputFilePlaceholder(input, STEP_9_PROMPT),
+		currentStepInstructions: sections.join("\n\n"),
 	}
 }
 
