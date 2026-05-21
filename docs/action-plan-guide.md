@@ -72,7 +72,7 @@ Add only real risks discovered during code inspection: dirty worktree constraint
     - Subtasks must always include the full file path for the target file.
     - Tasks without subordinate subtasks and all subtasks must prescribe the exact complile-safe type narrowing, object construction, fixture shape, typing, imports, helper shapes, event/action/session objects, type guards, discriminant checks, typed intermediate objects, 'satisfies' clause, explicit return types, stable behavioral assertions, and legacy assertions required.
     - Prescribed changes must be thorough, deep architectural revisions aligned to the provided requirements and established conventions. Workarounds are not permitted without documented user authorization. "Plausible" is not sufficient when determining the exact prescribed change. Prescribed changes must be grounded in requirements, the module build guide, existing repo documentation (readme files), and sibling patterns.
-        - Prescribed changes must include exact shapes for helpers, functions, fixtures, transition objects, and object fields.
+        - Prescribed changes must include exact shapes for helpers, functions, fixtures, transition objects, discriminant narrowing, and object fields.
         - Common underspecifications to avoid include but are not limited to: "empty ui state", "all helpers", "all imports", "all exports", "transition to step" without prescribing exact step-transition action objects, and failure to prescribe exact call/write data in tests.
         - Other common guide violations to avoid include but are not limited to writing subtasks with invented helper names, using incorrect runtime contructor/policy shapes, and failure to prescribe tests with coverage 100% aligned to requirements. 
     - Prescribe removal of dead code including obsolete functions, unused imports, commented-out experiments, dead branches, or outdated patterns.
@@ -105,6 +105,7 @@ Add only real risks discovered during code inspection: dirty worktree constraint
 ### Validate the drafted phase's compliance with this guide:
 - Re-read the drafted phase line by line:
     - Validate that every task and subtask fullly complies with the rules outlined above.
+    - Validate that each prescribed revision 100% aligns with requirements.
     - If a dev agent would need to choose architecture, infer a type shape, discover an import path, design a fixture, or decide what proves correctness, rewrite the subtask.
     - Perform a symbol existence pass over every prescribed import and return type. Each must be classified as:
         - existing symbol verified in live code,

@@ -56,8 +56,10 @@ The module must declare `entryProjectValueKeys` with exactly these three destina
 The module must include workflow-value keys for:
 
 - entry project selection values
+- `creation_required`, the durable boolean workflow value persisted by Step 1 from the `entry_artifact_resolution_completed` result for `architecture_document`
 - `has_context_files`
 - optional `context_files`
+- optional `change_plan`, the user-provided file path from Panel 9 when revising an existing architecture document
 - `scope`
 - `has_architectural_goals`
 - optional `architectural_goals`
@@ -105,9 +107,9 @@ The artifact must be created in the selected project's `planning` subfolder bene
 
 Step 1 must begin by waiting for the runtime-owned `entry_artifact_resolution_completed` event for the `architecture_document` artifact instead of beginning with an unconditional `allocate_artifact` action.
 
-When `entry_artifact_resolution_completed` reports `creationRequired: true` for `architecture_document`, Step 1 must allocate/create `architecture.md`, build the initial architecture document shell, and transition to Step 2 after the shell build succeeds.
+When `entry_artifact_resolution_completed` reports `creationRequired: true` for `architecture_document`, Step 1 must allocate/create `architecture.md`, build the initial architecture document shell, persist `creation_required: true`, and transition to Step 2 after the shell build succeeds.
 
-When `entry_artifact_resolution_completed` reports `creationRequired: false` for `architecture_document`, Step 1 must skip `allocate_artifact`, skip the initial `build_workflow_document`, skip the Step 2 input form and submitted-values document build, use the runtime-persisted `output_file`, and transition directly to Step 3.
+When `entry_artifact_resolution_completed` reports `creationRequired: false` for `architecture_document`, Step 1 must skip `allocate_artifact`, skip the initial `build_workflow_document`, use the runtime-persisted `output_file`, persist `creation_required: false`, and transition to Step 2 so the user can optionally provide a change management plan before Step 9.
 
 Subsequent runtime-owned deterministic document population must use `build_workflow_document`, which consumes the runtime-resolved destination path and must not allocate identity, choose filenames, or choose folders, per `FR-20p`.
 
@@ -163,7 +165,7 @@ The template file is a migration reference only. The module-owned document build
 
 When artifact creation is required, Step 1 must build this shell immediately after artifact allocation.
 
-Step 2 must write submitted form values under the matching headings in the same document by using `build_workflow_document` with deterministic module-owned content construction. Later model-facing steps must update the document through governed file-edit tools.
+When `creation_required` is `true`, Step 2 must write submitted form values under the matching headings in the same document by using `build_workflow_document` with deterministic module-owned content construction. When `creation_required` is `false`, Step 2 must not run `build_workflow_document`; it may collect `change_plan` for Step 9 prompt materialization. Later model-facing steps must update the document through governed file-edit tools.
 
 ## Entry And Steps
 
@@ -184,8 +186,8 @@ The module must define these nine steps, using these exact `checklistLabel` valu
 
 | Step id | Step number | `checklistLabel` | Required runtime shape |
 | --- | --- | --- | --- |
-| `step-1` | 1 | `Generate Output Document` | Wait for entry artifact resolution; create and initialize `architecture.md` only when creation is required, otherwise continue the existing document directly at Step 3. |
-| `step-2` | 2 | `Gather User Inputs` | Render one multi-panel input form, write submitted values into the output document, and transition to Step 3. |
+| `step-1` | 1 | `Generate Output Document` | Wait for entry artifact resolution; create and initialize `architecture.md` only when creation is required, persist `creation_required`, and transition to Step 2. |
+| `step-2` | 2 | `Gather User Inputs` | Render one multi-panel input form; when `creation_required` is `true`, write submitted values into the output document and transition to Step 3; when `creation_required` is `false`, optionally collect `change_plan` and transition to Step 9. |
 | `step-3` | 3 | `Establish Architecture Foundational Elements` | Model-driven architecture foundation step; progression requires `workflow_progress_request` confirmation. |
 | `step-4` | 4 | `Revolve Responsibility & Ownership` | Model-driven responsibility and ownership step; progression requires `workflow_progress_request` confirmation. |
 | `step-5` | 5 | `Code Alignment Assessment` | Model-driven code and test assessment step; progression requires `workflow_progress_request` confirmation. |
@@ -198,9 +200,9 @@ The module must define these nine steps, using these exact `checklistLabel` valu
 
 Step 1 must model progression by first branching on `entry_artifact_resolution_completed` for `architecture_document`.
 
-When `creationRequired: true`, Step 1 must run explicit decision actions in this order: `allocate_artifact`, `build_workflow_document` for the initial document shell, then `transition_step` to Step 2.
+When `creationRequired: true`, Step 1 must run explicit decision actions in this order: `allocate_artifact`, `build_workflow_document` for the initial document shell while persisting `creation_required: true`, then `transition_step` to Step 2.
 
-When `creationRequired: false`, Step 1 must select a `transition_step` action targeting Step 3 and must not run `allocate_artifact`, `build_workflow_document`, or the Step 2 workflow form.
+When `creationRequired: false`, Step 1 must persist `creation_required: false`, select a `transition_step` action targeting Step 2, and must not run `allocate_artifact` or `build_workflow_document`.
 
 Step 1 must define success and failure routes for the first artifact-allocation result when creation is required. If the first allocation succeeds, the next action must build the initial document shell. If the first allocation fails, the next action must retry allocation exactly once.
 
@@ -212,25 +214,31 @@ Step 1 must be runtime-driven and must expose an empty tool schema through an ex
 
 ## Step 2: Gather User Inputs
 
-Step 2 must begin with one `render_workflow_form` decision action. Multi-panel behavior must live inside the form definition, not as separate decision actions per panel.
+Step 2 must render the Step 2 workflow form through creation-state-specific routes. When `creation_required` is `true`, the form must start at Panel 1. When `creation_required` is `false`, the form must start at Panel 8.
 
-The Step 2 workflow form must include these seven panels:
+The Step 2 workflow form must include these nine panels:
 
 | Panel | Trigger | Field behavior |
 | --- | --- | --- |
-| Panel 1 | First panel | Ask `Are there any files which you'd like to provide as context for this session?`; collect required yes/no value into `has_context_files`. |
+| Panel 1 | Only when `creation_required` is `true`; first creation panel | Ask `Are there any files which you'd like to provide as context for this session?`; collect required yes/no value into `has_context_files`. |
 | Panel 2 | Only when Panel 1 is yes | Ask `Please provide the full file path for each file you'd like to use as session context.`; collect required large text area value into `context_files`. |
-| Panel 3 | When Panel 1 is no, or after Panel 2 completes | Ask `Please describe the scope of this architecture document`; collect required large text area value into `scope`. |
+| Panel 3 | When Panel 1 is no, or after Panel 2 completes, only when `creation_required` is `true` | Ask `Please describe the scope of this architecture document`; collect required large text area value into `scope`. |
 | Panel 4 | After Panel 3 | Ask `Would you like to provide architectural goals?`; collect required yes/no value into `has_architectural_goals`. |
 | Panel 5 | Only when Panel 4 is yes | Ask `Please provide the architectural goals below.`; collect required large text area value into `architectural_goals`. |
 | Panel 6 | When Panel 4 is no, or after Panel 5 completes | Ask `Would you like to provide the core architectural rules now?`; collect required yes/no value into `has_core_architectural_rules`. |
 | Panel 7 | Only when Panel 6 is yes | Ask `Please provide the core architectural rules below.`; collect required large text area value into `core_architectural_rules`. |
+| Panel 8 | Only when `creation_required` is `false`; first existing-document panel | Title `Existing Architecture Document`; prompt `It looks like this project already has an architecture document. Do you have a change management plan to provide?`; collect required boolean form-local value using key `has_change_plan`, label `select one`, options `yes` and `no`, submit label `submit`. If `no`, complete the form and proceed to Step 9 without showing Panel 9. |
+| Panel 9 | Only when Panel 8 is yes | Title `Provide File Path`; prompt `Please provide the full file path for your change management plan.`; collect required `small_text` value into workflow value `change_plan`, label `file path`, submit label `submit`, back label `back`; terminal panel. |
+
+Panels 3 through 7 must not be shown when `creation_required` is `false`.
 
 The form must only collect and persist the user's input. It must not validate context-file existence, validate file access, read provided context files, normalize file paths, or reject paths based on workspace policy during form submission.
 
 If `has_context_files` changes from yes to no through navigation, stale `context_files` must be cleared. If `has_architectural_goals` changes from yes to no, stale `architectural_goals` must be cleared. If `has_core_architectural_rules` changes from yes to no, stale `core_architectural_rules` must be cleared.
 
-After the Step 2 workflow form completes, the next action must use `build_workflow_document` to populate the already-created architecture output artifact by writing:
+After the Step 2 workflow form completes, the next action depends on `creation_required`.
+
+When `creation_required` is `true`, the next action must use `build_workflow_document` to populate the newly-created architecture output artifact by writing:
 
 - `context_files` under `Relevant Context`, when provided
 - `scope` under `Scope`
@@ -238,6 +246,8 @@ After the Step 2 workflow form completes, the next action must use `build_workfl
 - `core_architectural_rules` under `Core architectural rules`, when provided
 
 When that `build_workflow_document` action succeeds, the Step 2 decision tree must select a `transition_step` action targeting Step 3. Step 2 must not rely on implicit completion, optional progression, or model-driven handoff to advance to Step 3.
+
+When `creation_required` is `false`, Step 2 must not run `build_workflow_document`; it must transition directly to Step 9. If Panel 9 was submitted, `change_plan` must already be persisted as a workflow value.
 
 Step 2 must be runtime-driven and must expose an empty tool schema through an exported builder from `createArchitectureToolSchemas.ts`.
 
@@ -405,14 +415,44 @@ When Step 8 receives a `workflow_progress_request_confirmed` event, the Step 8 d
 
 Step 9 must enter model-driven work through a `project_prompt` decision action.
 
-Step 9 `buildPromptSource` must construct the Step 9 prompt from the source workflow prompt, normalized to use `{output_file}` consistently. The prompt must instruct the AI to:
+Step 9 `buildPromptSource` must construct the Step 9 prompt from the source workflow prompt, normalized to use `{output_file}` consistently. Source references to `output_document` must render from the workflow value key `output_file`.
 
-- read and review the full architecture document for coherence, pattern alignment, and structure alignment
-- classify issues as critical, important, or minor
-- if critical issues exist, present them and ask how the user wants to resolve them before implementation
-- if important or minor issues exist, present them as refinements and ask whether to address them now
-- when the document is ready, use `attempt_completion` to present a short completion summary
-- explain in the completion summary that the architecture document is now the technical source of truth and is ready to inform the create-epics workflow
+When `creation_required` is `false`, Step 9 prompt construction must include this conditional prompt segment:
+
+```text
+You have been called inside a workflow focused on revising an existing architecture document within the following project:
+- Project: {projectTitle}
+- Project Folder: {projectFolderName}
+- Architecture Document: {output_file}
+```
+
+When `creation_required` is `false` and `change_plan` is set to a non-empty value, Step 9 prompt construction must include this additional line inside the same conditional segment:
+
+```text
+- Change Management Plan: {change_plan}
+```
+
+When `creation_required` is `false`, Step 9 prompt construction must then include this conditional prompt segment:
+
+```text
+Steps 1-8 were automatically completed by the system.
+Review the architecture document and any files listed in the "Relevant Context" section.
+After reviewing, confirm the scope of revisions that the user wishes to make in the architecture document, then work with them to identify the correct revisions to the existing document and update {output_file} appropriately.
+```
+
+When `creation_required` is `true`, Step 9 prompt construction must include this conditional prompt segment:
+
+```text
+Review the full architecture for coherence and pattern and structure alignment.
+Classify any issues as critical, important, or minor.
+If there are critical issues, present them and ask how the user wants to resolve them before implementation. If there are important or minor issues, present them as refinements and ask whether to address them now.
+```
+
+Step 9 prompt construction must always include this final prompt segment:
+
+```text
+When finished, present a short completion summary using attempt_completion and explain that the architecture document is now the technical source of truth and is ready to inform the create-epics workflow.
+```
 
 Step 9 tool schema must expose exactly:
 
@@ -457,11 +497,11 @@ The workflow is complete only after `attempt_completion` succeeds in Step 9 and 
 The implementation must include module tests proving:
 
 - workflow identity, display name, description, project subfolder, and persona match this document
-- workflow value inventory includes every declared value and no undeclared hidden runtime-written values
+- workflow value inventory includes every declared value, including `creation_required` and optional `change_plan`, and no undeclared hidden runtime-written values
 - entry project value keys map to declared workflow values
 - architecture artifact definition maps runtime output values into create-architecture workflow values, including `output_file`
 - `architecture.md` document builder produces the exact required heading structure without reading `architecture-template.md` at runtime
-- Step 2 form panels, transitions, required fields, and stale clears match this document
+- Step 2 form panels, transitions, required fields, and stale clears match this document, including Panel 1 start when `creation_required` is `true`, Panel 8 start when `creation_required` is `false`, Panel 8 no routing directly to Step 9 without setting `change_plan`, Panel 8 yes routing to Panel 9, Panel 9 persisting `change_plan`, and Panels 3 through 7 never appearing when `creation_required` is `false`
 - Step 1 and Step 2 are runtime-driven and expose empty schemas through named exported builders
 - Step 3 exposes exactly the required tool schema
 - Steps 4 through 8 expose exactly the required tool schema
@@ -470,13 +510,20 @@ The implementation must include module tests proving:
 - all workflow steps delegate `buildToolSchema(...)` directly to named exports from `createArchitectureToolSchemas.ts`
 - Step 3 through Step 8 denied progress requests return to `project_prompt`
 - Step 3 through Step 8 confirmed progress requests transition to the next step
+- Step 9 prompt projection includes the `creation_required: false` conditional prompt segments only when `creation_required` is `false`
+- Step 9 prompt projection includes the `Change Management Plan` line only when `change_plan` is set to a non-empty value
+- Step 9 prompt projection includes the `creation_required: true` conditional prompt segment only when `creation_required` is `true`
+- Step 9 prompt projection does not leak raw placeholders used by Step 9 prompt text: `change_plan`, `projectTitle`, `projectFolderName`, `output_document`, or `output_file`
 - Step 9 final delivery completes and triggers normal workflow teardown
 
 Runtime tests must cover:
 
 - architecture artifact family registry allocation and path resolution under the selected project's `planning` folder
-- successful Step 1 allocation, initial shell write, and transition to Step 2
-- successful Step 2 form completion, submitted-value document write, and transition to Step 3
+- successful Step 1 allocation, initial shell write, `creation_required: true` persistence, and transition to Step 2
+- successful Step 1 existing-document path, `creation_required: false` persistence, no allocation, no initial shell write, and transition to Step 2
+- successful Step 2 `creation_required: true` form completion, submitted-value document write, and transition to Step 3
+- successful Step 2 `creation_required: false` form completion without `change_plan`, no `build_workflow_document` action, and transition to Step 9
+- successful Step 2 `creation_required: false` form completion with `change_plan`, no `build_workflow_document` action, `change_plan` persistence, and transition to Step 9
 - prompt projection for create-architecture current-step input payloads
 - response-tool guidance matching the projected tool schema for model-facing steps
 
@@ -485,5 +532,6 @@ Validation must include targeted unit tests, `npm run check-types`, and a packag
 - project entry flow works
 - `architecture.md` is created under `docs/projects/{project}/planning/`
 - Step 2 form persists submitted values under the correct headings
+- when an existing `architecture.md` is selected, Step 2 can collect an optional change management plan path and then route directly to Step 9 without showing Panels 3 through 7
 - Step 3 through Step 8 can update the document and advance by `workflow_progress_request`
 - Step 9 completes with `attempt_completion`
