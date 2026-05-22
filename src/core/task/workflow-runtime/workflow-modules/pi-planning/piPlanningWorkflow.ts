@@ -1,14 +1,29 @@
 import { readFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
-import type { WorkflowFormDefinitionPayload } from "@shared/ExtensionMessage"
+import type {
+	WorkflowFormDefinitionPayload,
+	WorkflowFormOptionDefinition,
+	WorkflowFormPanelAction,
+	WorkflowFormPanelDefinition,
+	WorkflowStepResolutionStatusDefinition,
+} from "@shared/ExtensionMessage"
 import type { WorkflowFormSessionData } from "@/core/task/workflow-form/types"
+import type {
+	WorkflowToolBackedActionInstruction,
+	WorkflowToolBackedOperationEvaluationResult,
+	WorkflowToolBackedOperationExecutionRequest,
+} from "@/core/task/workflow-step-resolution/types"
 import { ClineDefaultTool } from "@/shared/tools"
+import { WorkflowArtifactFamily } from "../../artifactFamilies"
+import type { WorkflowStoryStatus } from "../../storyArtifacts"
 import type {
 	ActiveWorkflowSession,
+	WorkflowDecisionAction,
 	WorkflowDecisionBranchTrigger,
 	WorkflowDecisionTree,
 	WorkflowDefinition,
 	WorkflowDeterministicProcedureResult,
+	WorkflowFormContinuationReplacement,
 	WorkflowPersonaDefinition,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
@@ -23,6 +38,11 @@ import {
 	buildPiPlanningStep5ToolSchemas,
 	buildPiPlanningStep6ToolSchemas,
 } from "./piPlanningToolSchemas"
+
+export enum PiPlanningEditIntent {
+	CompleteInitialStoryBuildout = "Complete initial story buildout",
+	EditExistingStoryFile = "edit existing story file",
+}
 
 export enum PiPlanningWorkflowValueKey {
 	ProjectMode = "projectMode",
@@ -39,6 +59,11 @@ export enum PiPlanningWorkflowValueKey {
 	EpicIdentity = "epic_identity",
 	StoriesIndex = "stories_index",
 	StoriesIndexExistedAtWorkflowStart = "stories_index_existed_at_workflow_start",
+	EditIntent = "edit_intent",
+	SelectedStoryIdentity = "selected_story_identity",
+	SelectedStoryFileName = "selected_story_file_name",
+	SelectedStoryStatus = "selected_story_status",
+	TargetStory = "target_story",
 }
 
 const PI_PLANNING_WORKFLOW_NAME = "pi-planning"
@@ -64,7 +89,8 @@ const BRAINSTORMING_PREREQUISITE_ID = PiPlanningWorkflowValueKey.BrainstormingDo
 const POSITIVE_NUMERIC_ID_PATTERN = /^[1-9]\d*$/
 const STEP_1_INPUT_FORM_ID = "step-1-input-form"
 const STEP_1_TARGET_EPIC_PANEL_ID = "step-1-target-epic-panel"
-const STEP_1_REQUIRED_CONTEXT_PANEL_ID = "step-1-required-context-panel"
+const STEP_1_EDIT_INTENT_PANEL_ID = "step-1-edit-intent-panel"
+const STEP_1_SELECT_STORY_PANEL_ID = "step-1-select-story-panel"
 const STEP_1_ADDITIONAL_CONTEXT_PANEL_ID = "step-1-additional-context-panel"
 
 interface PiPlanningEpicIndexEntry {
@@ -85,6 +111,14 @@ function buildTerminalTransition(): WorkflowFormDefinitionPayload["panels"][stri
 		branches: [],
 		defaultTerminal: true,
 	}
+}
+
+function buildRuntimeRoutedTransition(): WorkflowFormPanelDefinition["transition"] {
+	return { type: "runtime_routed" }
+}
+
+function buildOption(value: string): WorkflowFormOptionDefinition {
+	return { value, label: value }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -156,6 +190,128 @@ function workflowFormCompleted(workflowFormId: string): WorkflowDecisionBranchTr
 		kind: "event_predicate",
 		matches: ({ triggerEvent }) =>
 			triggerEvent.kind === "workflow_form_completed" && triggerEvent.workflowFormId === workflowFormId,
+	}
+}
+
+function sourceRouteMatches(sourceRoute: { branchId: string; routeId: string }, branchId: string, routeId: string): boolean {
+	return sourceRoute.branchId === branchId && sourceRoute.routeId === routeId
+}
+
+function toolBackedOperationSucceeded(branchId: string, routeId: string): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "event_predicate",
+		matches: ({ triggerEvent }) => {
+			if (triggerEvent.kind !== "tool_backed_operation_succeeded") {
+				return false
+			}
+
+			return sourceRouteMatches(triggerEvent.sourceRoute, branchId, routeId)
+		},
+	}
+}
+
+function toolBackedOperationFailed(branchId: string, routeId: string): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "event_predicate",
+		matches: ({ triggerEvent }) => {
+			if (triggerEvent.kind !== "tool_backed_operation_failed") {
+				return false
+			}
+
+			return sourceRouteMatches(triggerEvent.sourceRoute, branchId, routeId)
+		},
+	}
+}
+
+function workflowFormPanelSubmitted(panelId: string, action: WorkflowFormPanelAction): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "event_predicate",
+		matches: ({ triggerEvent }) => {
+			if (triggerEvent.kind !== "workflow_form_panel_submitted") {
+				return false
+			}
+
+			return (
+				triggerEvent.workflowFormId === STEP_1_INPUT_FORM_ID &&
+				triggerEvent.panelId === panelId &&
+				triggerEvent.action === action
+			)
+		},
+	}
+}
+
+function selectedEpicHasStoriesIndex(): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "session_predicate",
+		matches: ({ workflowValues }) =>
+			readWorkflowStringValue(workflowValues, PiPlanningWorkflowValueKey.StoriesIndex) !== undefined,
+	}
+}
+
+function selectedEpicDoesNotHaveStoriesIndex(): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "session_predicate",
+		matches: ({ workflowValues }) =>
+			readWorkflowStringValue(workflowValues, PiPlanningWorkflowValueKey.StoriesIndex) === undefined,
+	}
+}
+
+function editIntentMatches(editIntent: PiPlanningEditIntent): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "session_predicate",
+		matches: ({ workflowValues }) =>
+			readWorkflowStringValue(workflowValues, PiPlanningWorkflowValueKey.EditIntent) === editIntent,
+	}
+}
+
+function selectedStoryStatusMatches(status: Extract<WorkflowStoryStatus, "draft" | "backlog">): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "session_predicate",
+		matches: ({ workflowValues }) =>
+			readWorkflowStringValue(workflowValues, PiPlanningWorkflowValueKey.SelectedStoryStatus) === status,
+	}
+}
+
+function selectedStoryStatusUnsupported(): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "session_predicate",
+		matches: ({ workflowValues }) => {
+			const selectedStoryStatus = readWorkflowStringValue(workflowValues, PiPlanningWorkflowValueKey.SelectedStoryStatus)
+			return selectedStoryStatus !== undefined && selectedStoryStatus !== "draft" && selectedStoryStatus !== "backlog"
+		},
+	}
+}
+
+function workflowFormCompletedWithStoriesIndexExistedAtWorkflowStart(expected: boolean): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "event_predicate",
+		matches: ({ triggerEvent, workflowValues }) => {
+			if (triggerEvent.kind !== "workflow_form_completed") {
+				return false
+			}
+
+			return (
+				triggerEvent.workflowFormId === STEP_1_INPUT_FORM_ID &&
+				readWorkflowBooleanValue(workflowValues, PiPlanningWorkflowValueKey.StoriesIndexExistedAtWorkflowStart) ===
+					expected
+			)
+		},
+	}
+}
+
+function workflowFormCompletedWithEditIntent(editIntent: PiPlanningEditIntent): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "event_predicate",
+		matches: ({ triggerEvent, workflowValues }) => {
+			if (triggerEvent.kind !== "workflow_form_completed") {
+				return false
+			}
+
+			return (
+				triggerEvent.workflowFormId === STEP_1_INPUT_FORM_ID &&
+				readWorkflowStringValue(workflowValues, PiPlanningWorkflowValueKey.EditIntent) === editIntent
+			)
+		},
 	}
 }
 
@@ -392,49 +548,76 @@ Generated story files can be found in \`${draftsFolder}\`.`,
 }
 
 function buildStep6PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
+	if (
+		readWorkflowStringValue(input.session.workflowValues, PiPlanningWorkflowValueKey.EditIntent) ===
+		PiPlanningEditIntent.EditExistingStoryFile
+	) {
+		const projectTitle = renderWorkflowValueByKey(input, PiPlanningWorkflowValueKey.ProjectTitle)
+		const projectFolderName = renderWorkflowValueByKey(input, PiPlanningWorkflowValueKey.ProjectFolderName)
+		const architectureDocument = renderWorkflowValueByKey(input, PiPlanningWorkflowValueKey.ArchitectureDocument)
+		const epicsDocument = renderWorkflowValueByKey(input, PiPlanningWorkflowValueKey.EpicsDocument)
+		const targetStory = renderWorkflowValueByKey(input, PiPlanningWorkflowValueKey.TargetStory)
+
+		return {
+			currentStepInstructions: `You have been called inside a workflow designed to revise the initial sections of an implementation-ready story file in response to violations found during pre-implementation validation.
+- Project: ${projectTitle}
+- Project Folder: ${projectFolderName}
+- Architecture Document: ${architectureDocument}
+- Epics Documentation: ${epicsDocument}
+- Target Story: ${targetStory}
+
+First, ask the user to share the feedback gathered during story validation. Then, review the following sections in the story document, identify the exact revisions needed to address the violations, and provide them to the user as a proposed story revision.
+Once the user approves of your revisions, update the story document. Do not edit the tasks section of the story document.
+Sections to review and revise based on validation findings:
+- Scope
+- Scope Boundary
+- Requirements
+- Objective
+- Known Issues/ Risks/ Technical Debt
+
+Once the approved revisions are saved to the story document, use attempt_completion to provide the user with final confirmation and end this workflow.`,
+		}
+	}
+
 	const draftsFolder = renderWorkflowValueByKey(input, PiPlanningWorkflowValueKey.DraftsFolder)
-
 	return {
-		currentStepInstructions: `Populate generated story files in \`${draftsFolder}\`.
+		currentStepInstructions: `Populate the generated story files in ${draftsFolder} to set implementation sequence and story-specific details.
 
-Set implementation sequence and story-specific details.
+Sequence stories by dependency:
+1. Contracts, state shape, and invariants.
+2. Core runtime/backend behavior.
+3. User-facing forms or lifecycle flows.
+4. Prompt/tool/schema behavior.
+5. Workflow/module consumers.
+6. Cleanup, migration, and validation.
 
-Sequence stories by dependency in this order:
+Read each story file with read_file, then use apply_patch to add story-specific content under these existing headings:
 
-1. contracts, state shape, and invariants
-2. core runtime/backend behavior
-3. user-facing forms or lifecycle flows
-4. prompt/tool/schema behavior
-5. workflow/module consumers
-6. cleanup, migration, and validation
+Scope:
+Define what is in-scope
 
-Read each story file with \`read_file\`.
+Scope Boundary:
+Define items which are out of scope. Should not be overly exhaustive- focus on the things that could be mistakenly interpreted as in-scope to establish a firm scope boundary.
 
-Use \`apply_patch\` to add story-specific content under existing headings.
+Requirements:
+- List the source requirements this story satisfies.
+- State the behavior, constraints, and validation expectations.
+- Include relevant “must not” rules or invariants.
+- Do not include implementation tasks, subtasks, file lists, or commands.
 
-Populate these required headings in each story file:
+Objective:
+As a [user/system/workflow/runtime actor]
+I want [one capability outcome]
+so that [the value or enabled downstream behavior]
 
-- \`Scope\`
-- \`Scope Boundary\`
-- \`Requirements\`
-- \`Objective\`
-- \`Known Issues/ Risks/ Technical Debt\`
+Known Issues/ Risks/ Technical Debt
+Include items relevant to the story
 
-Avoid implementation tasks, subtasks, file lists, or commands in story requirements.
+Do not create story files manually- use the appropriate plan_story_artifacts -> generate_story_files process if new stories or story files are needed at any point.
 
-Do not manually create story files.
+Once every story file in ${draftsFolder} contains the required information, send an update to the user informing them that you've updated the epic's stories with initial story details. Ask the user to review and provide feedback. Continue refining the stories as needed based on user feedback.
 
-Use the \`plan_story_artifacts\` to \`generate_story_files\` process if new stories or story files are needed at any point.
-
-Send an update to the user after every story file in \`${draftsFolder}\` contains the required information.
-
-Ask the user to review and provide feedback.
-
-Continue refining stories as needed based on user feedback.
-
-Use \`attempt_completion\` only after the user is fully aligned with the story set and story content.
-
-In the final recap, remind the user to run \`create_story\` for each generated story to generate story tasks before implementation.`,
+Once the user is fully aligned with the story set and each story's content, use attempt_completion to provide a final workflow recap to the user, and remind them to run create_story for each generated story to generate story tasks before implementation.`,
 	}
 }
 
@@ -522,15 +705,12 @@ async function deriveSelectedEpicValuesFromForm(session: ActiveWorkflowSession):
 	const targetEpic = `Epic ${selectedEpic.identity}: ${selectedEpic.title}`
 	if (selectedEpic["story-index-generated"]) {
 		const projectRoot = dirname(dirname(epicsIndex))
+		const storiesIndexPath = join(projectRoot, "implementation", `epic-${selectedEpic.identity}-stories.index.json`)
 		return {
 			kind: "succeeded",
 			workflowValueWrites: {
 				[PiPlanningWorkflowValueKey.TargetEpic]: targetEpic,
-				[PiPlanningWorkflowValueKey.StoriesIndex]: join(
-					projectRoot,
-					"implementation",
-					`epic-${selectedEpic.identity}-stories.index.json`,
-				),
+				[PiPlanningWorkflowValueKey.StoriesIndex]: storiesIndexPath,
 				[PiPlanningWorkflowValueKey.StoriesIndexExistedAtWorkflowStart]: true,
 			},
 		}
@@ -545,6 +725,310 @@ async function deriveSelectedEpicValuesFromForm(session: ActiveWorkflowSession):
 	}
 }
 
+function findStoryIndexRecord(args: { stories: readonly unknown[]; storyIdentity: string }): Record<string, unknown> | undefined {
+	for (const storyValue of args.stories) {
+		if (isRecord(storyValue) === false) {
+			continue
+		}
+
+		if (storyValue.story_identity === args.storyIdentity) {
+			return storyValue
+		}
+	}
+
+	return undefined
+}
+
+async function deriveSelectedStoryValuesFromForm(session: ActiveWorkflowSession): Promise<WorkflowDeterministicProcedureResult> {
+	const selectedStoryIdentity = readWorkflowStringValue(
+		session.workflowValues,
+		PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+	)
+	if (selectedStoryIdentity === undefined) {
+		return {
+			kind: "failed",
+			errorMessage: "PI Planning requires a selected story identity before resolving the target story.",
+		}
+	}
+
+	const storiesIndex = readWorkflowStringValue(session.workflowValues, PiPlanningWorkflowValueKey.StoriesIndex)
+	if (storiesIndex === undefined) {
+		return {
+			kind: "failed",
+			errorMessage: "PI Planning requires a resolved stories_index path before resolving the target story.",
+		}
+	}
+
+	let parsedStoryIndex: unknown
+	try {
+		const storyIndexText = await readFile(storiesIndex, "utf8")
+		parsedStoryIndex = JSON.parse(storyIndexText)
+	} catch {
+		return {
+			kind: "failed",
+			errorMessage: "I could not read or parse the selected story index before resolving the target story.",
+		}
+	}
+
+	if (
+		isRecord(parsedStoryIndex) === false ||
+		parsedStoryIndex.version !== 1 ||
+		Array.isArray(parsedStoryIndex.stories) === false
+	) {
+		return {
+			kind: "failed",
+			errorMessage: "I could not read or parse the selected story index before resolving the target story.",
+		}
+	}
+	const storyRecords: readonly unknown[] = parsedStoryIndex.stories
+
+	const selectedStory = findStoryIndexRecord({ stories: storyRecords, storyIdentity: selectedStoryIdentity })
+	if (selectedStory === undefined) {
+		return {
+			kind: "failed",
+			errorMessage: "The selected story was not found in the selected story index.",
+		}
+	}
+
+	const selectedStoryType = selectedStory.story_type
+	const selectedStoryStatus = selectedStory.status
+	if (selectedStoryType !== "primary" || (selectedStoryStatus !== "draft" && selectedStoryStatus !== "backlog")) {
+		return {
+			kind: "failed",
+			errorMessage: "The selected story has an unsupported story status.",
+		}
+	}
+
+	const selectedStoryFileName = selectedStory.story_file_name
+	if (typeof selectedStoryFileName !== "string") {
+		return {
+			kind: "failed",
+			errorMessage: "I could not read or parse the selected story index before resolving the target story.",
+		}
+	}
+
+	return {
+		kind: "succeeded",
+		workflowValueWrites: {
+			[PiPlanningWorkflowValueKey.SelectedStoryFileName]: selectedStoryFileName,
+			[PiPlanningWorkflowValueKey.SelectedStoryStatus]: selectedStoryStatus,
+		},
+	}
+}
+
+function buildGenerateMissingStoryFilesInstruction(): WorkflowToolBackedActionInstruction {
+	return {
+		toolName: ClineDefaultTool.GENERATE_STORY_FILES,
+		buildStatusDefinition: (): WorkflowStepResolutionStatusDefinition => ({
+			title: "Generate Missing Story Files",
+			pendingLabel: "Generating missing story files",
+			successLabel: "Generated missing story files",
+			failureLabel: "Failed to generate missing story files",
+		}),
+		buildToolExecutionRequest: ({ activeWorkflowSession }): WorkflowToolBackedOperationExecutionRequest => ({
+			toolName: ClineDefaultTool.GENERATE_STORY_FILES,
+			toolInput: {},
+			toolParams: {
+				epic_identity:
+					readWorkflowStringValue(activeWorkflowSession.workflowValues, PiPlanningWorkflowValueKey.EpicIdentity) ?? "",
+			},
+		}),
+		evaluateToolExecutionResult: (): WorkflowToolBackedOperationEvaluationResult => ({ succeeded: true }),
+	}
+}
+
+function buildValidateSelectedStoryIndexEntryAction(
+	status: Extract<WorkflowStoryStatus, "draft" | "backlog">,
+): WorkflowDecisionAction {
+	return {
+		kind: "validate_story_index_entry",
+		storyIndexWorkflowValueKey: PiPlanningWorkflowValueKey.StoriesIndex,
+		storyIdentityWorkflowValueKey: PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+		storyFilenameWorkflowValueKey: PiPlanningWorkflowValueKey.SelectedStoryFileName,
+		requiredStoryType: "primary",
+		requiredStatus: status,
+		missingOrMalformedIndexErrorMessage:
+			"I could not read or parse the selected story index before resolving the target story.",
+		missingEntryErrorMessage: "The selected story was not found in the selected story index.",
+		invalidEntryErrorMessage: "I could not read or parse the selected story index before resolving the target story.",
+	}
+}
+
+function buildResolveDraftTargetStoryAction(): WorkflowDecisionAction {
+	return {
+		kind: "resolve_existing_project_artifact",
+		artifactFamily: WorkflowArtifactFamily.Story,
+		artifactIdentityWorkflowValueKey: PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+		projectSubfolderSegments: ["implementation", "drafts"],
+		outputWorkflowValueKey: PiPlanningWorkflowValueKey.TargetStory,
+		missingArtifactErrorMessage: "The target story path does not exist.",
+	}
+}
+
+function buildResolveBacklogTargetStoryAction(): WorkflowDecisionAction {
+	return {
+		kind: "resolve_existing_project_artifact",
+		artifactFamily: WorkflowArtifactFamily.Story,
+		artifactIdentityWorkflowValueKey: PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+		projectSubfolderSegments: ["implementation", "stories-backlog"],
+		outputWorkflowValueKey: PiPlanningWorkflowValueKey.TargetStory,
+		missingArtifactErrorMessage: "The target story path does not exist.",
+	}
+}
+
+function buildStep1TargetEpicPanel(): WorkflowFormPanelDefinition {
+	return {
+		panelId: STEP_1_TARGET_EPIC_PANEL_ID,
+		title: "Target Epic",
+		promptMarkdown: "Which epic are we working on during this workflow?",
+		fields: [
+			{
+				key: PiPlanningWorkflowValueKey.EpicIdentity,
+				workflowValueKey: PiPlanningWorkflowValueKey.EpicIdentity,
+				kind: "dropdown",
+				label: "Target Epic",
+				required: true,
+				allowedValueType: "string",
+				resetValueKeysOnChange: [
+					PiPlanningWorkflowValueKey.TargetEpic,
+					PiPlanningWorkflowValueKey.StoriesIndex,
+					PiPlanningWorkflowValueKey.StoriesIndexExistedAtWorkflowStart,
+					PiPlanningWorkflowValueKey.EditIntent,
+					PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+					PiPlanningWorkflowValueKey.SelectedStoryFileName,
+					PiPlanningWorkflowValueKey.SelectedStoryStatus,
+					PiPlanningWorkflowValueKey.TargetStory,
+					PiPlanningWorkflowValueKey.AdditionalContext,
+				],
+				jsonOptionsSource: {
+					root: {
+						kind: "selected_project_root",
+					},
+					sourcePathSegments: ["planning", "Epics.index.json"],
+					itemsPath: "epics",
+					valueProperty: "identity",
+					labelTemplate: "Epic {identity}: {title}",
+					descriptionTemplate: "Story index generated: {story-index-generated}",
+				},
+			},
+		],
+		allowedActions: ["submit"],
+		actionLabels: { submit: "Continue" },
+		transition: buildRuntimeRoutedTransition(),
+	}
+}
+
+function buildStep1EditIntentPanel(): WorkflowFormPanelDefinition {
+	return {
+		panelId: STEP_1_EDIT_INTENT_PANEL_ID,
+		title: "Provide Edit Intent",
+		promptMarkdown:
+			"It looks like the selected epic already has a story index file with generated story files. Please select one of the following options:",
+		fields: [
+			{
+				key: PiPlanningWorkflowValueKey.EditIntent,
+				workflowValueKey: PiPlanningWorkflowValueKey.EditIntent,
+				kind: "dropdown",
+				label: "select one",
+				required: true,
+				allowedValueType: "string",
+				resetValueKeysOnChange: [
+					PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+					PiPlanningWorkflowValueKey.SelectedStoryFileName,
+					PiPlanningWorkflowValueKey.SelectedStoryStatus,
+					PiPlanningWorkflowValueKey.TargetStory,
+					PiPlanningWorkflowValueKey.AdditionalContext,
+				],
+				options: [
+					buildOption(PiPlanningEditIntent.CompleteInitialStoryBuildout),
+					buildOption(PiPlanningEditIntent.EditExistingStoryFile),
+				],
+			},
+		],
+		allowedActions: ["submit", "back"],
+		actionLabels: { submit: "Continue", back: "Back" },
+		backDestinationPanelId: STEP_1_TARGET_EPIC_PANEL_ID,
+		backStaleValueKeysToClear: [
+			PiPlanningWorkflowValueKey.EditIntent,
+			PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+			PiPlanningWorkflowValueKey.SelectedStoryFileName,
+			PiPlanningWorkflowValueKey.SelectedStoryStatus,
+			PiPlanningWorkflowValueKey.TargetStory,
+			PiPlanningWorkflowValueKey.AdditionalContext,
+		],
+		transition: buildRuntimeRoutedTransition(),
+	}
+}
+
+function buildStep1SelectStoryPanel(): WorkflowFormPanelDefinition {
+	return {
+		panelId: STEP_1_SELECT_STORY_PANEL_ID,
+		title: "Select Story",
+		promptMarkdown: "Which story would you like to edit?",
+		fields: [
+			{
+				key: PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+				workflowValueKey: PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+				kind: "dropdown",
+				label: "Select Story",
+				required: true,
+				allowedValueType: "string",
+				resetValueKeysOnChange: [
+					PiPlanningWorkflowValueKey.SelectedStoryFileName,
+					PiPlanningWorkflowValueKey.SelectedStoryStatus,
+					PiPlanningWorkflowValueKey.TargetStory,
+					PiPlanningWorkflowValueKey.AdditionalContext,
+				],
+				jsonOptionsSource: {
+					root: {
+						kind: "selected_project_root",
+					},
+					sourcePathSegments: ["implementation", "epic-{workflow.epic_identity}-stories.index.json"],
+					itemsPath: "stories",
+					valueProperty: "story_identity",
+					labelTemplate: "Story {story_identity}: {story_file_name}",
+				},
+			},
+		],
+		allowedActions: ["submit", "back"],
+		actionLabels: { submit: "Continue", back: "Back" },
+		backDestinationPanelId: STEP_1_EDIT_INTENT_PANEL_ID,
+		backStaleValueKeysToClear: [
+			PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+			PiPlanningWorkflowValueKey.SelectedStoryFileName,
+			PiPlanningWorkflowValueKey.SelectedStoryStatus,
+			PiPlanningWorkflowValueKey.TargetStory,
+			PiPlanningWorkflowValueKey.AdditionalContext,
+		],
+		transition: buildRuntimeRoutedTransition(),
+	}
+}
+
+function buildStep1AdditionalContextPanel(): WorkflowFormPanelDefinition {
+	return {
+		panelId: STEP_1_ADDITIONAL_CONTEXT_PANEL_ID,
+		title: "Additional Context",
+		promptMarkdown:
+			"If you'd like to include any other files as workflow context please provide their full file paths below.",
+		fields: [
+			{
+				key: PiPlanningWorkflowValueKey.AdditionalContext,
+				workflowValueKey: PiPlanningWorkflowValueKey.AdditionalContext,
+				kind: "large_text",
+				label: "Additional context file paths",
+				required: false,
+				allowedValueType: "string",
+				presentation: {
+					textareaSize: "large",
+				},
+			},
+		],
+		allowedActions: ["submit"],
+		actionLabels: { submit: "Continue" },
+		transition: buildTerminalTransition(),
+	}
+}
+
 function buildStep1InputWorkflowForm(): WorkflowFormDefinitionPayload {
 	return {
 		definitionVersion: 2,
@@ -553,84 +1037,16 @@ function buildStep1InputWorkflowForm(): WorkflowFormDefinitionPayload {
 		toolDictionaryMarkdown: "Provide PI Planning target epic and context confirmation inputs.",
 		firstPanelId: STEP_1_TARGET_EPIC_PANEL_ID,
 		panels: {
-			[STEP_1_TARGET_EPIC_PANEL_ID]: {
-				panelId: STEP_1_TARGET_EPIC_PANEL_ID,
-				title: "Target Epic",
-				promptMarkdown: "Which epic are we working on during this workflow?",
-				fields: [
-					{
-						key: PiPlanningWorkflowValueKey.EpicIdentity,
-						workflowValueKey: PiPlanningWorkflowValueKey.EpicIdentity,
-						kind: "dropdown",
-						label: "Target Epic",
-						required: true,
-						allowedValueType: "string",
-						jsonOptionsSource: {
-							root: {
-								kind: "selected_project_root",
-							},
-							sourcePathSegments: ["planning", "Epics.index.json"],
-							itemsPath: "epics",
-							valueProperty: "identity",
-							labelTemplate: "Epic {identity}: {title}",
-							descriptionTemplate: "Story index generated: {story-index-generated}",
-						},
-					},
-				],
-				allowedActions: ["submit"],
-				actionLabels: {
-					submit: "Continue",
-				},
-				transition: {
-					type: "sequential",
-					nextPanelId: STEP_1_REQUIRED_CONTEXT_PANEL_ID,
-				},
-			},
-			[STEP_1_REQUIRED_CONTEXT_PANEL_ID]: {
-				panelId: STEP_1_REQUIRED_CONTEXT_PANEL_ID,
-				title: "Required Context",
-				promptMarkdown: `Confirm the required context files for this PI Planning workflow:
-
-- [Epics.index.json](<{workflow.epics_index}>)
-- [Epics.md](<{workflow.epics_document}>)
-- [architecture.md](<{workflow.architecture_document}>)`,
-				fields: [],
-				allowedActions: ["submit"],
-				actionLabels: {
-					submit: "Continue",
-				},
-				transition: {
-					type: "sequential",
-					nextPanelId: STEP_1_ADDITIONAL_CONTEXT_PANEL_ID,
-				},
-			},
-			[STEP_1_ADDITIONAL_CONTEXT_PANEL_ID]: {
-				panelId: STEP_1_ADDITIONAL_CONTEXT_PANEL_ID,
-				title: "Additional Context",
-				promptMarkdown:
-					"If you'd like to include any other files as workflow context please provide their full file paths below.",
-				fields: [
-					{
-						key: PiPlanningWorkflowValueKey.AdditionalContext,
-						workflowValueKey: PiPlanningWorkflowValueKey.AdditionalContext,
-						kind: "large_text",
-						label: "Additional context file paths",
-						required: false,
-						allowedValueType: "string",
-						presentation: {
-							textareaSize: "large",
-						},
-					},
-				],
-				allowedActions: ["submit", "back"],
-				actionLabels: {
-					submit: "Continue",
-					back: "Back",
-				},
-				transition: buildTerminalTransition(),
-			},
+			[STEP_1_TARGET_EPIC_PANEL_ID]: buildStep1TargetEpicPanel(),
+			[STEP_1_EDIT_INTENT_PANEL_ID]: buildStep1EditIntentPanel(),
+			[STEP_1_SELECT_STORY_PANEL_ID]: buildStep1SelectStoryPanel(),
+			[STEP_1_ADDITIONAL_CONTEXT_PANEL_ID]: buildStep1AdditionalContextPanel(),
 		},
 	}
+}
+
+function buildStep1ContinuationReplacement(panel: WorkflowFormPanelDefinition): WorkflowFormContinuationReplacement {
+	return { panel, data: {} }
 }
 
 function buildStep1DecisionTree(): WorkflowDecisionTree {
@@ -683,38 +1099,233 @@ function buildStep1DecisionTree(): WorkflowDecisionTree {
 							workflowFormId: STEP_1_INPUT_FORM_ID,
 							buildSessionData: validateEpicsIndexBeforeStep1InputForm,
 						},
-						followingBranchId: "step-1-await-input-form",
+						followingBranchId: "step-1-await-target-epic-panel",
 					},
 				],
 			},
-			"step-1-await-input-form": {
-				id: "step-1-await-input-form",
+			"step-1-await-target-epic-panel": {
+				id: "step-1-await-target-epic-panel",
 				routes: [
 					{
 						id: "step-1-derive-selected-epic-values",
-						trigger: workflowFormCompleted(STEP_1_INPUT_FORM_ID),
+						trigger: workflowFormPanelSubmitted(STEP_1_TARGET_EPIC_PANEL_ID, "submit"),
 						action: {
 							kind: "run_deterministic_procedure",
 							instruction: {
 								run: deriveSelectedEpicValuesFromForm,
 							},
 						},
-						followingBranchId: "step-1-await-selected-epic-values",
+						followingBranchId: "step-1-route-after-target-epic-panel",
 					},
 				],
 			},
-			"step-1-await-selected-epic-values": {
-				id: "step-1-await-selected-epic-values",
+			"step-1-route-after-target-epic-panel": {
+				id: "step-1-route-after-target-epic-panel",
 				routes: [
 					{
-						id: "step-1-transition-to-step-2",
-						trigger: workflowValuesPersisted(PiPlanningWorkflowValueKey.TargetEpic),
+						id: "step-1-continue-to-edit-intent-panel",
+						trigger: selectedEpicHasStoriesIndex(),
+						action: {
+							kind: "continue_workflow_form",
+							workflowFormId: STEP_1_INPUT_FORM_ID,
+							panelId: STEP_1_EDIT_INTENT_PANEL_ID,
+							buildReplacement: (): WorkflowFormContinuationReplacement =>
+								buildStep1ContinuationReplacement(buildStep1EditIntentPanel()),
+						},
+						followingBranchId: "step-1-await-edit-intent-panel",
+					},
+					{
+						id: "step-1-continue-to-additional-context-after-new-index-epic",
+						trigger: selectedEpicDoesNotHaveStoriesIndex(),
+						action: {
+							kind: "continue_workflow_form",
+							workflowFormId: STEP_1_INPUT_FORM_ID,
+							panelId: STEP_1_ADDITIONAL_CONTEXT_PANEL_ID,
+							buildReplacement: (): WorkflowFormContinuationReplacement =>
+								buildStep1ContinuationReplacement(buildStep1AdditionalContextPanel()),
+						},
+						followingBranchId: "step-1-await-final-form-submit",
+					},
+				],
+			},
+			"step-1-await-edit-intent-panel": {
+				id: "step-1-await-edit-intent-panel",
+				routes: [
+					{
+						id: "step-1-route-after-edit-intent",
+						trigger: workflowFormPanelSubmitted(STEP_1_EDIT_INTENT_PANEL_ID, "submit"),
+						action: { kind: "no_op" },
+						followingBranchId: "step-1-route-after-edit-intent-panel",
+					},
+				],
+			},
+			"step-1-route-after-edit-intent-panel": {
+				id: "step-1-route-after-edit-intent-panel",
+				routes: [
+					{
+						id: "step-1-continue-to-additional-context-after-complete-initial-buildout",
+						trigger: editIntentMatches(PiPlanningEditIntent.CompleteInitialStoryBuildout),
+						action: {
+							kind: "continue_workflow_form",
+							workflowFormId: STEP_1_INPUT_FORM_ID,
+							panelId: STEP_1_ADDITIONAL_CONTEXT_PANEL_ID,
+							buildReplacement: (): WorkflowFormContinuationReplacement =>
+								buildStep1ContinuationReplacement(buildStep1AdditionalContextPanel()),
+						},
+						followingBranchId: "step-1-await-final-form-submit",
+					},
+					{
+						id: "step-1-continue-to-select-story-panel",
+						trigger: editIntentMatches(PiPlanningEditIntent.EditExistingStoryFile),
+						action: {
+							kind: "continue_workflow_form",
+							workflowFormId: STEP_1_INPUT_FORM_ID,
+							panelId: STEP_1_SELECT_STORY_PANEL_ID,
+							buildReplacement: (): WorkflowFormContinuationReplacement =>
+								buildStep1ContinuationReplacement(buildStep1SelectStoryPanel()),
+						},
+						followingBranchId: "step-1-await-select-story-panel",
+					},
+				],
+			},
+			"step-1-await-select-story-panel": {
+				id: "step-1-await-select-story-panel",
+				routes: [
+					{
+						id: "step-1-derive-selected-story-values",
+						trigger: workflowFormPanelSubmitted(STEP_1_SELECT_STORY_PANEL_ID, "submit"),
+						action: {
+							kind: "run_deterministic_procedure",
+							instruction: {
+								run: deriveSelectedStoryValuesFromForm,
+							},
+						},
+						followingBranchId: "step-1-continue-to-additional-context-after-story-selection",
+					},
+				],
+			},
+			"step-1-continue-to-additional-context-after-story-selection": {
+				id: "step-1-continue-to-additional-context-after-story-selection",
+				routes: [
+					{
+						id: "step-1-continue-to-additional-context-after-story-selection",
+						trigger: { kind: "always" },
+						action: {
+							kind: "continue_workflow_form",
+							workflowFormId: STEP_1_INPUT_FORM_ID,
+							panelId: STEP_1_ADDITIONAL_CONTEXT_PANEL_ID,
+							buildReplacement: (): WorkflowFormContinuationReplacement =>
+								buildStep1ContinuationReplacement(buildStep1AdditionalContextPanel()),
+						},
+						followingBranchId: "step-1-await-final-form-submit",
+					},
+				],
+			},
+			"step-1-await-final-form-submit": {
+				id: "step-1-await-final-form-submit",
+				routes: [
+					{
+						id: "step-1-transition-to-step-2-after-new-index-epic",
+						trigger: workflowFormCompletedWithStoriesIndexExistedAtWorkflowStart(false),
 						action: {
 							kind: "transition_step",
-							target: {
-								kind: "entry_branch",
-								stepNumber: 2,
-							},
+							target: { kind: "entry_branch", stepNumber: 2 },
+						},
+					},
+					{
+						id: "step-1-transition-to-step-2-after-complete-initial-buildout",
+						trigger: workflowFormCompletedWithEditIntent(PiPlanningEditIntent.CompleteInitialStoryBuildout),
+						action: {
+							kind: "transition_step",
+							target: { kind: "entry_branch", stepNumber: 2 },
+						},
+					},
+					{
+						id: "step-1-generate-missing-story-files-before-edit",
+						trigger: workflowFormCompletedWithEditIntent(PiPlanningEditIntent.EditExistingStoryFile),
+						action: {
+							kind: "execute_tool_backed_operation",
+							instruction: buildGenerateMissingStoryFilesInstruction(),
+						},
+						followingBranchId: "step-1-await-missing-story-generation",
+					},
+				],
+			},
+			"step-1-await-missing-story-generation": {
+				id: "step-1-await-missing-story-generation",
+				routes: [
+					{
+						id: "step-1-route-target-story-status-after-missing-story-generation",
+						trigger: toolBackedOperationSucceeded(
+							"step-1-await-final-form-submit",
+							"step-1-generate-missing-story-files-before-edit",
+						),
+						action: { kind: "no_op" },
+						followingBranchId: "step-1-route-target-story-status",
+					},
+					{
+						id: "step-1-fail-after-missing-story-generation",
+						trigger: toolBackedOperationFailed(
+							"step-1-await-final-form-submit",
+							"step-1-generate-missing-story-files-before-edit",
+						),
+						action: { kind: "terminal_error", errorMessage: "Failed to generate missing story files" },
+					},
+				],
+			},
+			"step-1-route-target-story-status": {
+				id: "step-1-route-target-story-status",
+				routes: [
+					{
+						id: "step-1-validate-draft-story-index-entry",
+						trigger: selectedStoryStatusMatches("draft"),
+						action: buildValidateSelectedStoryIndexEntryAction("draft"),
+						followingBranchId: "step-1-resolve-draft-target-story",
+					},
+					{
+						id: "step-1-validate-backlog-story-index-entry",
+						trigger: selectedStoryStatusMatches("backlog"),
+						action: buildValidateSelectedStoryIndexEntryAction("backlog"),
+						followingBranchId: "step-1-resolve-backlog-target-story",
+					},
+					{
+						id: "step-1-fail-unsupported-selected-story-status",
+						trigger: selectedStoryStatusUnsupported(),
+						action: { kind: "terminal_error", errorMessage: "The selected story has an unsupported story status." },
+					},
+				],
+			},
+			"step-1-resolve-draft-target-story": {
+				id: "step-1-resolve-draft-target-story",
+				routes: [
+					{
+						id: "step-1-resolve-draft-target-story",
+						trigger: { kind: "always" },
+						action: buildResolveDraftTargetStoryAction(),
+						followingBranchId: "step-1-await-target-story-resolution",
+					},
+				],
+			},
+			"step-1-resolve-backlog-target-story": {
+				id: "step-1-resolve-backlog-target-story",
+				routes: [
+					{
+						id: "step-1-resolve-backlog-target-story",
+						trigger: { kind: "always" },
+						action: buildResolveBacklogTargetStoryAction(),
+						followingBranchId: "step-1-await-target-story-resolution",
+					},
+				],
+			},
+			"step-1-await-target-story-resolution": {
+				id: "step-1-await-target-story-resolution",
+				routes: [
+					{
+						id: "step-1-transition-to-step-6-after-target-story-resolution",
+						trigger: workflowValuesPersisted(PiPlanningWorkflowValueKey.TargetStory),
+						action: {
+							kind: "transition_step",
+							target: { kind: "entry_branch", stepNumber: 6 },
 						},
 					},
 				],

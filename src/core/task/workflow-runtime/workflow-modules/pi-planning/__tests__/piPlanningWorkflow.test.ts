@@ -8,6 +8,7 @@ import type {
 } from "@shared/ExtensionMessage"
 import { expect } from "chai"
 import { describe, it } from "mocha"
+import type { WorkflowStepResolutionSessionState } from "@/core/task/workflow-step-resolution/types"
 import { ClineDefaultTool } from "@/shared/tools"
 import type {
 	ActiveWorkflowSession,
@@ -24,6 +25,8 @@ import { PiPlanningWorkflowValueKey, piPlanningWorkflowDefinition } from "../piP
 const PROJECT_ROOT = "/tmp/pi-planning-project"
 const EPICS_INDEX_PATH = `${PROJECT_ROOT}/planning/Epics.index.json`
 const SAMPLE_WORKFLOW_VALUES: WorkflowValues = {
+	[PiPlanningWorkflowValueKey.ProjectTitle]: "PI Planning Project",
+	[PiPlanningWorkflowValueKey.ProjectFolderName]: "pi-planning-project",
 	[PiPlanningWorkflowValueKey.ArchitectureDocument]: `${PROJECT_ROOT}/planning/architecture.md`,
 	[PiPlanningWorkflowValueKey.EpicsDocument]: `${PROJECT_ROOT}/planning/Epics.md`,
 	[PiPlanningWorkflowValueKey.EpicsIndex]: EPICS_INDEX_PATH,
@@ -35,6 +38,11 @@ const SAMPLE_WORKFLOW_VALUES: WorkflowValues = {
 	[PiPlanningWorkflowValueKey.DraftsFolder]: `${PROJECT_ROOT}/implementation/drafts`,
 	[PiPlanningWorkflowValueKey.StoriesIndex]: `${PROJECT_ROOT}/implementation/epic-1-stories.index.json`,
 	[PiPlanningWorkflowValueKey.StoriesIndexExistedAtWorkflowStart]: true,
+	[PiPlanningWorkflowValueKey.EditIntent]: "Complete initial story buildout",
+	[PiPlanningWorkflowValueKey.SelectedStoryIdentity]: "1.1",
+	[PiPlanningWorkflowValueKey.SelectedStoryFileName]: "Story-1-1.md",
+	[PiPlanningWorkflowValueKey.SelectedStoryStatus]: "draft",
+	[PiPlanningWorkflowValueKey.TargetStory]: "/tmp/pi-planning-project/implementation/drafts/Story-1-1.md",
 }
 const FORBIDDEN_BACKEND_ONLY_TOOL_NAMES: readonly string[] = [
 	"build_workflow_document",
@@ -97,6 +105,25 @@ function buildWorkflowValuesPersistedEvent(changedKeys: readonly string[]): Work
 	}
 }
 
+function buildWorkflowFormPanelSubmittedEvent(panelId: string, action: "submit" | "back"): WorkflowBranchTriggerEvent {
+	return {
+		kind: "workflow_form_panel_submitted",
+		workflowFormId: "step-1-input-form",
+		panelId,
+		action,
+		submittedValueKeys: [],
+		clearedValueKeys: [],
+	}
+}
+
+function buildToolBackedOperationSucceededEvent(sourceRoute: { branchId: string; routeId: string }): WorkflowBranchTriggerEvent {
+	return { kind: "tool_backed_operation_succeeded", sourceRoute }
+}
+
+function buildToolBackedOperationFailedEvent(sourceRoute: { branchId: string; routeId: string }): WorkflowBranchTriggerEvent {
+	return { kind: "tool_backed_operation_failed", sourceRoute }
+}
+
 function buildModelToolSucceededEvent(toolName: ClineDefaultTool): WorkflowBranchTriggerEvent {
 	return {
 		kind: "model_tool_succeeded",
@@ -148,6 +175,55 @@ function expectTransitionStepAction(action: WorkflowDecisionAction, stepNumber: 
 		kind: "entry_branch",
 		stepNumber,
 	})
+}
+
+async function expectContinueWorkflowFormAction(
+	action: WorkflowDecisionAction,
+	panelId: string,
+): Promise<Extract<WorkflowDecisionAction, { kind: "continue_workflow_form" }>> {
+	expect(action.kind).to.equal("continue_workflow_form")
+	if (action.kind !== "continue_workflow_form") {
+		throw new Error(`Expected continue_workflow_form, received ${action.kind}.`)
+	}
+
+	expect(action.workflowFormId).to.equal("step-1-input-form")
+	expect(action.panelId).to.equal(panelId)
+	const replacement = await action.buildReplacement(createSession(SAMPLE_WORKFLOW_VALUES))
+	expect(replacement).to.deep.equal({ panel: getPanel(getStep1InputForm(), panelId), data: {} })
+	return action
+}
+
+function expectExecuteToolBackedOperationAction(
+	action: WorkflowDecisionAction,
+): Extract<WorkflowDecisionAction, { kind: "execute_tool_backed_operation" }> {
+	expect(action.kind).to.equal("execute_tool_backed_operation")
+	if (action.kind !== "execute_tool_backed_operation") {
+		throw new Error(`Expected execute_tool_backed_operation, received ${action.kind}.`)
+	}
+
+	return action
+}
+
+function expectValidateStoryIndexEntryAction(
+	action: WorkflowDecisionAction,
+): Extract<WorkflowDecisionAction, { kind: "validate_story_index_entry" }> {
+	expect(action.kind).to.equal("validate_story_index_entry")
+	if (action.kind !== "validate_story_index_entry") {
+		throw new Error(`Expected validate_story_index_entry, received ${action.kind}.`)
+	}
+
+	return action
+}
+
+function expectResolveExistingProjectArtifactAction(
+	action: WorkflowDecisionAction,
+): Extract<WorkflowDecisionAction, { kind: "resolve_existing_project_artifact" }> {
+	expect(action.kind).to.equal("resolve_existing_project_artifact")
+	if (action.kind !== "resolve_existing_project_artifact") {
+		throw new Error(`Expected resolve_existing_project_artifact, received ${action.kind}.`)
+	}
+
+	return action
 }
 
 function expectEventPredicateMatches(args: {
@@ -277,6 +353,11 @@ describe("piPlanningWorkflowDefinition", () => {
 			PiPlanningWorkflowValueKey.EpicIdentity,
 			PiPlanningWorkflowValueKey.StoriesIndex,
 			PiPlanningWorkflowValueKey.StoriesIndexExistedAtWorkflowStart,
+			PiPlanningWorkflowValueKey.EditIntent,
+			PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+			PiPlanningWorkflowValueKey.SelectedStoryFileName,
+			PiPlanningWorkflowValueKey.SelectedStoryStatus,
+			PiPlanningWorkflowValueKey.TargetStory,
 		]
 
 		expect(piPlanningWorkflowDefinition.workflowValueKeys).to.deep.equal(expectedWorkflowValueKeys)
@@ -342,54 +423,163 @@ describe("piPlanningWorkflowDefinition", () => {
 		const panelA = getPanel(form, "step-1-target-epic-panel")
 		const field = getSingleField(panelA)
 
-		expect(field).to.deep.include({
+		expect(panelA.panelId).to.equal("step-1-target-epic-panel")
+		expect(panelA.title).to.equal("Target Epic")
+		expect(panelA.promptMarkdown).to.equal("Which epic are we working on during this workflow?")
+		expect(panelA.allowedActions).to.deep.equal(["submit"])
+		expect(panelA.actionLabels).to.deep.equal({ submit: "Continue" })
+		expect(field).to.deep.equal({
 			key: PiPlanningWorkflowValueKey.EpicIdentity,
 			workflowValueKey: PiPlanningWorkflowValueKey.EpicIdentity,
 			kind: "dropdown",
+			label: "Target Epic",
 			required: true,
 			allowedValueType: "string",
-		})
-		expect(field.jsonOptionsSource).to.deep.equal({
-			root: {
-				kind: "selected_project_root",
+			resetValueKeysOnChange: [
+				PiPlanningWorkflowValueKey.TargetEpic,
+				PiPlanningWorkflowValueKey.StoriesIndex,
+				PiPlanningWorkflowValueKey.StoriesIndexExistedAtWorkflowStart,
+				PiPlanningWorkflowValueKey.EditIntent,
+				PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+				PiPlanningWorkflowValueKey.SelectedStoryFileName,
+				PiPlanningWorkflowValueKey.SelectedStoryStatus,
+				PiPlanningWorkflowValueKey.TargetStory,
+				PiPlanningWorkflowValueKey.AdditionalContext,
+			],
+			jsonOptionsSource: {
+				root: {
+					kind: "selected_project_root",
+				},
+				sourcePathSegments: ["planning", "Epics.index.json"],
+				itemsPath: "epics",
+				valueProperty: "identity",
+				labelTemplate: "Epic {identity}: {title}",
+				descriptionTemplate: "Story index generated: {story-index-generated}",
 			},
-			sourcePathSegments: ["planning", "Epics.index.json"],
-			itemsPath: "epics",
-			valueProperty: "identity",
-			labelTemplate: "Epic {identity}: {title}",
-			descriptionTemplate: "Story index generated: {story-index-generated}",
 		})
+		expect(panelA.transition).to.deep.equal({ type: "runtime_routed" })
 	})
 
-	it("defines Step 1 Panel B as informational prerequisite confirmation", () => {
-		const panelB = getPanel(getStep1InputForm(), "step-1-required-context-panel")
-
-		expect(panelB.fields).to.deep.equal([])
-		expect(panelB.promptMarkdown).to.include("[Epics.index.json](<{workflow.epics_index}>)")
-		expect(panelB.promptMarkdown).to.include("[Epics.md](<{workflow.epics_document}>)")
-		expect(panelB.promptMarkdown).to.include("[architecture.md](<{workflow.architecture_document}>)")
-		expect(panelB.allowedActions).to.deep.equal(["submit"])
-		expect(panelB.actionLabels).to.deep.equal({ submit: "Continue" })
-		expect(panelB.transition).to.deep.equal({
-			type: "sequential",
-			nextPanelId: "step-1-additional-context-panel",
-		})
+	it("does not retain the removed Required Context panel", () => {
+		expect(getStep1InputForm().panels["step-1-required-context-panel"]).to.equal(undefined)
 	})
 
-	it("defines Step 1 Panel C as optional additional context persisted to additional_context", () => {
-		const panelC = getPanel(getStep1InputForm(), "step-1-additional-context-panel")
+	it("defines Step 1 Panel B as the edit-intent panel", () => {
+		const panelB = getPanel(getStep1InputForm(), "step-1-edit-intent-panel")
+		const field = getSingleField(panelB)
+
+		expect(panelB.panelId).to.equal("step-1-edit-intent-panel")
+		expect(panelB.title).to.equal("Provide Edit Intent")
+		expect(panelB.promptMarkdown).to.equal(
+			"It looks like the selected epic already has a story index file with generated story files. Please select one of the following options:",
+		)
+		expect(field).to.deep.equal({
+			key: PiPlanningWorkflowValueKey.EditIntent,
+			workflowValueKey: PiPlanningWorkflowValueKey.EditIntent,
+			kind: "dropdown",
+			label: "select one",
+			required: true,
+			allowedValueType: "string",
+			resetValueKeysOnChange: [
+				PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+				PiPlanningWorkflowValueKey.SelectedStoryFileName,
+				PiPlanningWorkflowValueKey.SelectedStoryStatus,
+				PiPlanningWorkflowValueKey.TargetStory,
+				PiPlanningWorkflowValueKey.AdditionalContext,
+			],
+			options: [
+				{ value: "Complete initial story buildout", label: "Complete initial story buildout" },
+				{ value: "edit existing story file", label: "edit existing story file" },
+			],
+		})
+		expect(panelB.allowedActions).to.deep.equal(["submit", "back"])
+		expect(panelB.actionLabels).to.deep.equal({ submit: "Continue", back: "Back" })
+		expect(panelB.backDestinationPanelId).to.equal("step-1-target-epic-panel")
+		expect(panelB.backStaleValueKeysToClear).to.deep.equal([
+			PiPlanningWorkflowValueKey.EditIntent,
+			PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+			PiPlanningWorkflowValueKey.SelectedStoryFileName,
+			PiPlanningWorkflowValueKey.SelectedStoryStatus,
+			PiPlanningWorkflowValueKey.TargetStory,
+			PiPlanningWorkflowValueKey.AdditionalContext,
+		])
+		expect(panelB.transition).to.deep.equal({ type: "runtime_routed" })
+	})
+
+	it("defines Step 1 Panel C as the story-selection panel", () => {
+		const panelC = getPanel(getStep1InputForm(), "step-1-select-story-panel")
 		const field = getSingleField(panelC)
 
-		expect(field).to.deep.include({
+		expect(panelC.panelId).to.equal("step-1-select-story-panel")
+		expect(panelC.title).to.equal("Select Story")
+		expect(panelC.promptMarkdown).to.equal("Which story would you like to edit?")
+		expect(field).to.deep.equal({
+			key: PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+			workflowValueKey: PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+			kind: "dropdown",
+			label: "Select Story",
+			required: true,
+			allowedValueType: "string",
+			resetValueKeysOnChange: [
+				PiPlanningWorkflowValueKey.SelectedStoryFileName,
+				PiPlanningWorkflowValueKey.SelectedStoryStatus,
+				PiPlanningWorkflowValueKey.TargetStory,
+				PiPlanningWorkflowValueKey.AdditionalContext,
+			],
+			jsonOptionsSource: {
+				root: { kind: "selected_project_root" },
+				sourcePathSegments: ["implementation", "epic-{workflow.epic_identity}-stories.index.json"],
+				itemsPath: "stories",
+				valueProperty: "story_identity",
+				labelTemplate: "Story {story_identity}: {story_file_name}",
+			},
+		})
+		expect(field.kind).to.equal("dropdown")
+		if (field.kind !== "dropdown") {
+			throw new Error(`Expected dropdown field, received ${field.kind}.`)
+		}
+		const jsonOptionsSource = field.jsonOptionsSource
+		expect(jsonOptionsSource).not.to.equal(undefined)
+		if (jsonOptionsSource === undefined) {
+			throw new Error("Expected story-selection field to define jsonOptionsSource.")
+		}
+		expect(jsonOptionsSource.descriptionTemplate).to.equal(undefined)
+		expect(panelC.allowedActions).to.deep.equal(["submit", "back"])
+		expect(panelC.actionLabels).to.deep.equal({ submit: "Continue", back: "Back" })
+		expect(panelC.backDestinationPanelId).to.equal("step-1-edit-intent-panel")
+		expect(panelC.backStaleValueKeysToClear).to.deep.equal([
+			PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+			PiPlanningWorkflowValueKey.SelectedStoryFileName,
+			PiPlanningWorkflowValueKey.SelectedStoryStatus,
+			PiPlanningWorkflowValueKey.TargetStory,
+			PiPlanningWorkflowValueKey.AdditionalContext,
+		])
+		expect(panelC.transition).to.deep.equal({ type: "runtime_routed" })
+	})
+
+	it("defines Step 1 Panel D as optional additional context persisted to additional_context", () => {
+		const panelD = getPanel(getStep1InputForm(), "step-1-additional-context-panel")
+		const field = getSingleField(panelD)
+
+		expect(panelD.panelId).to.equal("step-1-additional-context-panel")
+		expect(panelD.title).to.equal("Additional Context")
+		expect(panelD.promptMarkdown).to.equal(
+			"If you'd like to include any other files as workflow context please provide their full file paths below.",
+		)
+		expect(field).to.deep.equal({
 			key: PiPlanningWorkflowValueKey.AdditionalContext,
 			workflowValueKey: PiPlanningWorkflowValueKey.AdditionalContext,
 			kind: "large_text",
+			label: "Additional context file paths",
 			required: false,
 			allowedValueType: "string",
+			presentation: { textareaSize: "large" },
 		})
-		expect(field.presentation).to.deep.equal({ textareaSize: "large" })
-		expect(panelC.allowedActions).to.deep.equal(["submit", "back"])
-		expect(panelC.transition).to.deep.equal({
+		expect(panelD.allowedActions).to.deep.equal(["submit"])
+		expect(panelD.actionLabels).to.deep.equal({ submit: "Continue" })
+		expect(panelD.backDestinationPanelId).to.equal(undefined)
+		expect(panelD.backStaleValueKeysToClear).to.equal(undefined)
+		expect(panelD.transition).to.deep.equal({
 			type: "conditional",
 			conditionSourceKey: "__terminal__",
 			branches: [],
@@ -397,7 +587,7 @@ describe("piPlanningWorkflowDefinition", () => {
 		})
 	})
 
-	it("routes Step 1 through prerequisites, folder persistence, input form, selected epic derivation, and Step 2", async () => {
+	it("routes Step 1 through runtime-routed edit-intent and target-story paths", async () => {
 		const step1 = getStep("step-1")
 		expect(step1.decisionTree.entryBranchId).to.equal("step-1-resolve-prerequisites")
 
@@ -443,33 +633,424 @@ describe("piPlanningWorkflowDefinition", () => {
 		}
 		expect(renderFormRoute.action.workflowFormId).to.equal("step-1-input-form")
 		expect("buildSessionData" in renderFormRoute.action).to.equal(true)
-		expect(renderFormRoute.followingBranchId).to.equal("step-1-await-input-form")
+		if (!("buildSessionData" in renderFormRoute.action)) {
+			throw new Error("Expected render_workflow_form route to define buildSessionData.")
+		}
+		expect(typeof renderFormRoute.action.buildSessionData).to.equal("function")
+		expect(renderFormRoute.followingBranchId).to.equal("step-1-await-target-epic-panel")
 
-		const derivationRoute = findRoute("step-1", "step-1-await-input-form", "step-1-derive-selected-epic-values")
+		const derivationRoute = findRoute("step-1", "step-1-await-target-epic-panel", "step-1-derive-selected-epic-values")
 		expectEventPredicateMatches({
 			route: derivationRoute,
-			activeBranchId: "step-1-await-input-form",
-			workflowValues: {},
+			activeBranchId: "step-1-await-target-epic-panel",
+			workflowValues: SAMPLE_WORKFLOW_VALUES,
+			step: step1,
+			triggerEvent: buildWorkflowFormPanelSubmittedEvent("step-1-target-epic-panel", "submit"),
+		})
+		expect(derivationRoute.action.kind).to.equal("run_deterministic_procedure")
+		expect(derivationRoute.followingBranchId).to.equal("step-1-route-after-target-epic-panel")
+
+		const existingIndexRoute = findRoute(
+			"step-1",
+			"step-1-route-after-target-epic-panel",
+			"step-1-continue-to-edit-intent-panel",
+		)
+		expect(existingIndexRoute.trigger.kind).to.equal("session_predicate")
+		if (existingIndexRoute.trigger.kind !== "session_predicate") {
+			throw new Error(`Expected session_predicate trigger, received ${existingIndexRoute.trigger.kind}.`)
+		}
+		expect(
+			existingIndexRoute.trigger.matches({
+				activeBranchId: "step-1-route-after-target-epic-panel",
+				workflowValues: {
+					...SAMPLE_WORKFLOW_VALUES,
+					[PiPlanningWorkflowValueKey.StoriesIndex]:
+						"/tmp/pi-planning-project/implementation/epic-1-stories.index.json",
+				},
+				step: step1,
+			}),
+		).to.equal(true)
+		await expectContinueWorkflowFormAction(existingIndexRoute.action, "step-1-edit-intent-panel")
+		expect(existingIndexRoute.followingBranchId).to.equal("step-1-await-edit-intent-panel")
+
+		const missingIndexRoute = findRoute(
+			"step-1",
+			"step-1-route-after-target-epic-panel",
+			"step-1-continue-to-additional-context-after-new-index-epic",
+		)
+		expect(missingIndexRoute.trigger.kind).to.equal("session_predicate")
+		if (missingIndexRoute.trigger.kind !== "session_predicate") {
+			throw new Error(`Expected session_predicate trigger, received ${missingIndexRoute.trigger.kind}.`)
+		}
+		const workflowValues: WorkflowValues = { ...SAMPLE_WORKFLOW_VALUES }
+		delete workflowValues[PiPlanningWorkflowValueKey.StoriesIndex]
+		expect(
+			missingIndexRoute.trigger.matches({
+				activeBranchId: "step-1-route-after-target-epic-panel",
+				workflowValues,
+				step: step1,
+			}),
+		).to.equal(true)
+		await expectContinueWorkflowFormAction(missingIndexRoute.action, "step-1-additional-context-panel")
+		expect(missingIndexRoute.followingBranchId).to.equal("step-1-await-final-form-submit")
+
+		const editIntentSubmitRoute = findRoute("step-1", "step-1-await-edit-intent-panel", "step-1-route-after-edit-intent")
+		expectEventPredicateMatches({
+			route: editIntentSubmitRoute,
+			activeBranchId: "step-1-await-edit-intent-panel",
+			workflowValues: SAMPLE_WORKFLOW_VALUES,
+			step: step1,
+			triggerEvent: buildWorkflowFormPanelSubmittedEvent("step-1-edit-intent-panel", "submit"),
+		})
+		expect(editIntentSubmitRoute.action).to.deep.equal({ kind: "no_op" })
+		expect(editIntentSubmitRoute.followingBranchId).to.equal("step-1-route-after-edit-intent-panel")
+
+		const initialBuildoutRoute = findRoute(
+			"step-1",
+			"step-1-route-after-edit-intent-panel",
+			"step-1-continue-to-additional-context-after-complete-initial-buildout",
+		)
+		expect(initialBuildoutRoute.trigger.kind).to.equal("session_predicate")
+		if (initialBuildoutRoute.trigger.kind !== "session_predicate") {
+			throw new Error(`Expected session_predicate trigger, received ${initialBuildoutRoute.trigger.kind}.`)
+		}
+		expect(
+			initialBuildoutRoute.trigger.matches({
+				activeBranchId: "step-1-route-after-edit-intent-panel",
+				workflowValues: {
+					...SAMPLE_WORKFLOW_VALUES,
+					[PiPlanningWorkflowValueKey.EditIntent]: "Complete initial story buildout",
+				},
+				step: step1,
+			}),
+		).to.equal(true)
+		await expectContinueWorkflowFormAction(initialBuildoutRoute.action, "step-1-additional-context-panel")
+		expect(initialBuildoutRoute.followingBranchId).to.equal("step-1-await-final-form-submit")
+
+		const editExistingStoryRoute = findRoute(
+			"step-1",
+			"step-1-route-after-edit-intent-panel",
+			"step-1-continue-to-select-story-panel",
+		)
+		expect(editExistingStoryRoute.trigger.kind).to.equal("session_predicate")
+		if (editExistingStoryRoute.trigger.kind !== "session_predicate") {
+			throw new Error(`Expected session_predicate trigger, received ${editExistingStoryRoute.trigger.kind}.`)
+		}
+		expect(
+			editExistingStoryRoute.trigger.matches({
+				activeBranchId: "step-1-route-after-edit-intent-panel",
+				workflowValues: {
+					...SAMPLE_WORKFLOW_VALUES,
+					[PiPlanningWorkflowValueKey.EditIntent]: "edit existing story file",
+				},
+				step: step1,
+			}),
+		).to.equal(true)
+		await expectContinueWorkflowFormAction(editExistingStoryRoute.action, "step-1-select-story-panel")
+		expect(editExistingStoryRoute.followingBranchId).to.equal("step-1-await-select-story-panel")
+
+		const selectedStoryRoute = findRoute("step-1", "step-1-await-select-story-panel", "step-1-derive-selected-story-values")
+		expectEventPredicateMatches({
+			route: selectedStoryRoute,
+			activeBranchId: "step-1-await-select-story-panel",
+			workflowValues: SAMPLE_WORKFLOW_VALUES,
+			step: step1,
+			triggerEvent: buildWorkflowFormPanelSubmittedEvent("step-1-select-story-panel", "submit"),
+		})
+		expect(selectedStoryRoute.action.kind).to.equal("run_deterministic_procedure")
+		expect(selectedStoryRoute.followingBranchId).to.equal("step-1-continue-to-additional-context-after-story-selection")
+
+		const storySelectionAdditionalContextRoute = findRoute(
+			"step-1",
+			"step-1-continue-to-additional-context-after-story-selection",
+			"step-1-continue-to-additional-context-after-story-selection",
+		)
+		expect(storySelectionAdditionalContextRoute.trigger).to.deep.equal({ kind: "always" })
+		await expectContinueWorkflowFormAction(storySelectionAdditionalContextRoute.action, "step-1-additional-context-panel")
+		expect(storySelectionAdditionalContextRoute.followingBranchId).to.equal("step-1-await-final-form-submit")
+
+		const newIndexFinalRoute = findRoute(
+			"step-1",
+			"step-1-await-final-form-submit",
+			"step-1-transition-to-step-2-after-new-index-epic",
+		)
+		expectEventPredicateMatches({
+			route: newIndexFinalRoute,
+			activeBranchId: "step-1-await-final-form-submit",
+			workflowValues: { ...SAMPLE_WORKFLOW_VALUES, [PiPlanningWorkflowValueKey.StoriesIndexExistedAtWorkflowStart]: false },
 			step: step1,
 			triggerEvent: buildWorkflowFormCompletedEvent("step-1-input-form"),
 		})
-		expect(derivationRoute.action.kind).to.equal("run_deterministic_procedure")
-		expect(derivationRoute.followingBranchId).to.equal("step-1-await-selected-epic-values")
-
-		const transitionRoute = findRoute("step-1", "step-1-await-selected-epic-values", "step-1-transition-to-step-2")
-		expectEventPredicateMatches({
-			route: transitionRoute,
-			activeBranchId: "step-1-await-selected-epic-values",
-			workflowValues: {},
+		expectEventPredicateDoesNotMatch({
+			route: newIndexFinalRoute,
+			activeBranchId: "step-1-await-final-form-submit",
+			workflowValues: { ...SAMPLE_WORKFLOW_VALUES, [PiPlanningWorkflowValueKey.StoriesIndexExistedAtWorkflowStart]: true },
 			step: step1,
-			triggerEvent: buildWorkflowValuesPersistedEvent([PiPlanningWorkflowValueKey.TargetEpic]),
+			triggerEvent: buildWorkflowFormCompletedEvent("step-1-input-form"),
 		})
-		expect(transitionRoute.action).to.deep.equal({
+		expect(newIndexFinalRoute.action).to.deep.equal({
 			kind: "transition_step",
-			target: {
-				kind: "entry_branch",
-				stepNumber: 2,
+			target: { kind: "entry_branch", stepNumber: 2 },
+		})
+
+		const completeInitialBuildoutFinalRoute = findRoute(
+			"step-1",
+			"step-1-await-final-form-submit",
+			"step-1-transition-to-step-2-after-complete-initial-buildout",
+		)
+		expectEventPredicateMatches({
+			route: completeInitialBuildoutFinalRoute,
+			activeBranchId: "step-1-await-final-form-submit",
+			workflowValues: {
+				...SAMPLE_WORKFLOW_VALUES,
+				[PiPlanningWorkflowValueKey.EditIntent]: "Complete initial story buildout",
 			},
+			step: step1,
+			triggerEvent: buildWorkflowFormCompletedEvent("step-1-input-form"),
+		})
+		expectEventPredicateDoesNotMatch({
+			route: completeInitialBuildoutFinalRoute,
+			activeBranchId: "step-1-await-final-form-submit",
+			workflowValues: {
+				...SAMPLE_WORKFLOW_VALUES,
+				[PiPlanningWorkflowValueKey.EditIntent]: "edit existing story file",
+			},
+			step: step1,
+			triggerEvent: buildWorkflowFormCompletedEvent("step-1-input-form"),
+		})
+		expect(completeInitialBuildoutFinalRoute.action).to.deep.equal({
+			kind: "transition_step",
+			target: { kind: "entry_branch", stepNumber: 2 },
+		})
+
+		const generateMissingStoriesRoute = findRoute(
+			"step-1",
+			"step-1-await-final-form-submit",
+			"step-1-generate-missing-story-files-before-edit",
+		)
+		expectEventPredicateMatches({
+			route: generateMissingStoriesRoute,
+			activeBranchId: "step-1-await-final-form-submit",
+			workflowValues: {
+				...SAMPLE_WORKFLOW_VALUES,
+				[PiPlanningWorkflowValueKey.EditIntent]: "edit existing story file",
+			},
+			step: step1,
+			triggerEvent: buildWorkflowFormCompletedEvent("step-1-input-form"),
+		})
+		expectEventPredicateDoesNotMatch({
+			route: generateMissingStoriesRoute,
+			activeBranchId: "step-1-await-final-form-submit",
+			workflowValues: {
+				...SAMPLE_WORKFLOW_VALUES,
+				[PiPlanningWorkflowValueKey.EditIntent]: "Complete initial story buildout",
+			},
+			step: step1,
+			triggerEvent: buildWorkflowFormCompletedEvent("step-1-input-form"),
+		})
+		const generateMissingStoriesAction = expectExecuteToolBackedOperationAction(generateMissingStoriesRoute.action)
+		const instruction = generateMissingStoriesAction.instruction
+		expect(instruction.toolName).to.equal(ClineDefaultTool.GENERATE_STORY_FILES)
+		const toolBackedOperationSession: WorkflowStepResolutionSessionState = {
+			sessionId: "pi-planning-generate-missing-story-files",
+			sourceRoute: {
+				branchId: "step-1-await-final-form-submit",
+				routeId: "step-1-generate-missing-story-files-before-edit",
+			},
+			triggerSource: "execute_tool_backed_operation",
+			owner: { kind: "workflow_step", workflowName: "pi-planning", stepNumber: 1 },
+			state: "pending",
+		}
+		const statusDefinition = instruction.buildStatusDefinition(toolBackedOperationSession)
+		const toolExecutionRequest = instruction.buildToolExecutionRequest({
+			toolBackedOperationSession,
+			activeWorkflowSession: createSession({
+				...SAMPLE_WORKFLOW_VALUES,
+				[PiPlanningWorkflowValueKey.EditIntent]: "edit existing story file",
+				[PiPlanningWorkflowValueKey.EpicIdentity]: "1",
+			}),
+		})
+		const evaluationResult = instruction.evaluateToolExecutionResult(toolBackedOperationSession, {})
+		expect(statusDefinition).to.deep.equal({
+			title: "Generate Missing Story Files",
+			pendingLabel: "Generating missing story files",
+			successLabel: "Generated missing story files",
+			failureLabel: "Failed to generate missing story files",
+		})
+		expect(toolExecutionRequest).to.deep.equal({
+			toolName: ClineDefaultTool.GENERATE_STORY_FILES,
+			toolInput: {},
+			toolParams: { epic_identity: "1" },
+		})
+		expect(evaluationResult).to.deep.equal({ succeeded: true })
+		expect(generateMissingStoriesRoute.followingBranchId).to.equal("step-1-await-missing-story-generation")
+
+		const generationSuccessRoute = findRoute(
+			"step-1",
+			"step-1-await-missing-story-generation",
+			"step-1-route-target-story-status-after-missing-story-generation",
+		)
+		expectEventPredicateMatches({
+			route: generationSuccessRoute,
+			activeBranchId: "step-1-await-missing-story-generation",
+			workflowValues: SAMPLE_WORKFLOW_VALUES,
+			step: step1,
+			triggerEvent: buildToolBackedOperationSucceededEvent({
+				branchId: "step-1-await-final-form-submit",
+				routeId: "step-1-generate-missing-story-files-before-edit",
+			}),
+		})
+		expect(generationSuccessRoute.action).to.deep.equal({ kind: "no_op" })
+		expect(generationSuccessRoute.followingBranchId).to.equal("step-1-route-target-story-status")
+
+		const generationFailureRoute = findRoute(
+			"step-1",
+			"step-1-await-missing-story-generation",
+			"step-1-fail-after-missing-story-generation",
+		)
+		expectEventPredicateMatches({
+			route: generationFailureRoute,
+			activeBranchId: "step-1-await-missing-story-generation",
+			workflowValues: SAMPLE_WORKFLOW_VALUES,
+			step: step1,
+			triggerEvent: buildToolBackedOperationFailedEvent({
+				branchId: "step-1-await-final-form-submit",
+				routeId: "step-1-generate-missing-story-files-before-edit",
+			}),
+		})
+		expect(generationFailureRoute.action).to.deep.equal({
+			kind: "terminal_error",
+			errorMessage: "Failed to generate missing story files",
+		})
+
+		const draftValidationRoute = findRoute(
+			"step-1",
+			"step-1-route-target-story-status",
+			"step-1-validate-draft-story-index-entry",
+		)
+		expect(draftValidationRoute.trigger.kind).to.equal("session_predicate")
+		if (draftValidationRoute.trigger.kind !== "session_predicate") {
+			throw new Error(`Expected session_predicate trigger, received ${draftValidationRoute.trigger.kind}.`)
+		}
+		expect(
+			draftValidationRoute.trigger.matches({
+				activeBranchId: "step-1-route-target-story-status",
+				workflowValues: { ...SAMPLE_WORKFLOW_VALUES, [PiPlanningWorkflowValueKey.SelectedStoryStatus]: "draft" },
+				step: step1,
+			}),
+		).to.equal(true)
+		expect(expectValidateStoryIndexEntryAction(draftValidationRoute.action)).to.deep.equal({
+			kind: "validate_story_index_entry",
+			storyIndexWorkflowValueKey: PiPlanningWorkflowValueKey.StoriesIndex,
+			storyIdentityWorkflowValueKey: PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+			storyFilenameWorkflowValueKey: PiPlanningWorkflowValueKey.SelectedStoryFileName,
+			requiredStoryType: "primary",
+			requiredStatus: "draft",
+			missingOrMalformedIndexErrorMessage:
+				"I could not read or parse the selected story index before resolving the target story.",
+			missingEntryErrorMessage: "The selected story was not found in the selected story index.",
+			invalidEntryErrorMessage: "I could not read or parse the selected story index before resolving the target story.",
+		})
+		expect(draftValidationRoute.followingBranchId).to.equal("step-1-resolve-draft-target-story")
+
+		const backlogValidationRoute = findRoute(
+			"step-1",
+			"step-1-route-target-story-status",
+			"step-1-validate-backlog-story-index-entry",
+		)
+		expect(backlogValidationRoute.trigger.kind).to.equal("session_predicate")
+		if (backlogValidationRoute.trigger.kind !== "session_predicate") {
+			throw new Error(`Expected session_predicate trigger, received ${backlogValidationRoute.trigger.kind}.`)
+		}
+		expect(
+			backlogValidationRoute.trigger.matches({
+				activeBranchId: "step-1-route-target-story-status",
+				workflowValues: { ...SAMPLE_WORKFLOW_VALUES, [PiPlanningWorkflowValueKey.SelectedStoryStatus]: "backlog" },
+				step: step1,
+			}),
+		).to.equal(true)
+		expect(expectValidateStoryIndexEntryAction(backlogValidationRoute.action)).to.deep.equal({
+			kind: "validate_story_index_entry",
+			storyIndexWorkflowValueKey: PiPlanningWorkflowValueKey.StoriesIndex,
+			storyIdentityWorkflowValueKey: PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+			storyFilenameWorkflowValueKey: PiPlanningWorkflowValueKey.SelectedStoryFileName,
+			requiredStoryType: "primary",
+			requiredStatus: "backlog",
+			missingOrMalformedIndexErrorMessage:
+				"I could not read or parse the selected story index before resolving the target story.",
+			missingEntryErrorMessage: "The selected story was not found in the selected story index.",
+			invalidEntryErrorMessage: "I could not read or parse the selected story index before resolving the target story.",
+		})
+		expect(backlogValidationRoute.followingBranchId).to.equal("step-1-resolve-backlog-target-story")
+
+		const unsupportedStatusRoute = findRoute(
+			"step-1",
+			"step-1-route-target-story-status",
+			"step-1-fail-unsupported-selected-story-status",
+		)
+		expect(unsupportedStatusRoute.trigger.kind).to.equal("session_predicate")
+		if (unsupportedStatusRoute.trigger.kind !== "session_predicate") {
+			throw new Error(`Expected session_predicate trigger, received ${unsupportedStatusRoute.trigger.kind}.`)
+		}
+		expect(
+			unsupportedStatusRoute.trigger.matches({
+				activeBranchId: "step-1-route-target-story-status",
+				workflowValues: { ...SAMPLE_WORKFLOW_VALUES, [PiPlanningWorkflowValueKey.SelectedStoryStatus]: "review" },
+				step: step1,
+			}),
+		).to.equal(true)
+		expect(unsupportedStatusRoute.action).to.deep.equal({
+			kind: "terminal_error",
+			errorMessage: "The selected story has an unsupported story status.",
+		})
+
+		const draftTargetStoryRoute = findRoute(
+			"step-1",
+			"step-1-resolve-draft-target-story",
+			"step-1-resolve-draft-target-story",
+		)
+		expect(draftTargetStoryRoute.trigger).to.deep.equal({ kind: "always" })
+		expect(expectResolveExistingProjectArtifactAction(draftTargetStoryRoute.action)).to.deep.equal({
+			kind: "resolve_existing_project_artifact",
+			artifactFamily: "story",
+			artifactIdentityWorkflowValueKey: PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+			projectSubfolderSegments: ["implementation", "drafts"],
+			outputWorkflowValueKey: PiPlanningWorkflowValueKey.TargetStory,
+			missingArtifactErrorMessage: "The target story path does not exist.",
+		})
+		expect(draftTargetStoryRoute.followingBranchId).to.equal("step-1-await-target-story-resolution")
+
+		const backlogTargetStoryRoute = findRoute(
+			"step-1",
+			"step-1-resolve-backlog-target-story",
+			"step-1-resolve-backlog-target-story",
+		)
+		expect(backlogTargetStoryRoute.trigger).to.deep.equal({ kind: "always" })
+		expect(expectResolveExistingProjectArtifactAction(backlogTargetStoryRoute.action)).to.deep.equal({
+			kind: "resolve_existing_project_artifact",
+			artifactFamily: "story",
+			artifactIdentityWorkflowValueKey: PiPlanningWorkflowValueKey.SelectedStoryIdentity,
+			projectSubfolderSegments: ["implementation", "stories-backlog"],
+			outputWorkflowValueKey: PiPlanningWorkflowValueKey.TargetStory,
+			missingArtifactErrorMessage: "The target story path does not exist.",
+		})
+		expect(backlogTargetStoryRoute.followingBranchId).to.equal("step-1-await-target-story-resolution")
+
+		const targetStoryPersistedRoute = findRoute(
+			"step-1",
+			"step-1-await-target-story-resolution",
+			"step-1-transition-to-step-6-after-target-story-resolution",
+		)
+		expectEventPredicateMatches({
+			route: targetStoryPersistedRoute,
+			activeBranchId: "step-1-await-target-story-resolution",
+			workflowValues: SAMPLE_WORKFLOW_VALUES,
+			step: step1,
+			triggerEvent: buildWorkflowValuesPersistedEvent([PiPlanningWorkflowValueKey.TargetStory]),
+		})
+		expect(targetStoryPersistedRoute.action).to.deep.equal({
+			kind: "transition_step",
+			target: { kind: "entry_branch", stepNumber: 6 },
 		})
 	})
 
@@ -490,7 +1071,7 @@ describe("piPlanningWorkflowDefinition", () => {
 				}),
 			)
 
-			const derivationRoute = findRoute("step-1", "step-1-await-input-form", "step-1-derive-selected-epic-values")
+			const derivationRoute = findRoute("step-1", "step-1-await-target-epic-panel", "step-1-derive-selected-epic-values")
 			expect(derivationRoute.action.kind).to.equal("run_deterministic_procedure")
 			if (derivationRoute.action.kind !== "run_deterministic_procedure") {
 				throw new Error(`Expected run_deterministic_procedure, received ${derivationRoute.action.kind}.`)
@@ -531,7 +1112,279 @@ describe("piPlanningWorkflowDefinition", () => {
 		}
 	})
 
-	it("renders Step 2 through Step 6 prompts with required workflow value references and no backend-only tools", () => {
+	it("derives selected story file metadata for draft and backlog primary stories", async () => {
+		const route = findRoute("step-1", "step-1-await-select-story-panel", "step-1-derive-selected-story-values")
+		expect(route.action.kind).to.equal("run_deterministic_procedure")
+		if (route.action.kind !== "run_deterministic_procedure") {
+			throw new Error(`Expected run_deterministic_procedure, received ${route.action.kind}.`)
+		}
+
+		const fixtureRoot = await mkdtemp(join(tmpdir(), "pi-planning-workflow-"))
+		try {
+			const implementationDir = join(fixtureRoot, "implementation")
+			await mkdir(implementationDir, { recursive: true })
+			const storiesIndexPath = join(implementationDir, "epic-1-stories.index.json")
+			await writeFile(
+				storiesIndexPath,
+				JSON.stringify({
+					version: 1,
+					stories: [
+						{
+							story_identity: "1.1",
+							story_file_name: "Story-1-1.md",
+							story_type: "primary",
+							parent_story_identity: null,
+							story_file_generated: true,
+							status: "draft",
+						},
+						{
+							story_identity: "1.2",
+							story_file_name: "Story-1-2.md",
+							story_type: "primary",
+							parent_story_identity: null,
+							story_file_generated: true,
+							status: "backlog",
+						},
+					],
+				}),
+				"utf8",
+			)
+			const draftResult = await route.action.instruction.run(
+				createSession({
+					...SAMPLE_WORKFLOW_VALUES,
+					[PiPlanningWorkflowValueKey.StoriesIndex]: storiesIndexPath,
+					[PiPlanningWorkflowValueKey.SelectedStoryIdentity]: "1.1",
+				}),
+			)
+			const backlogResult = await route.action.instruction.run(
+				createSession({
+					...SAMPLE_WORKFLOW_VALUES,
+					[PiPlanningWorkflowValueKey.StoriesIndex]: storiesIndexPath,
+					[PiPlanningWorkflowValueKey.SelectedStoryIdentity]: "1.2",
+				}),
+			)
+			expect(draftResult).to.deep.equal({
+				kind: "succeeded",
+				workflowValueWrites: {
+					[PiPlanningWorkflowValueKey.SelectedStoryFileName]: "Story-1-1.md",
+					[PiPlanningWorkflowValueKey.SelectedStoryStatus]: "draft",
+				},
+			})
+			expect(backlogResult).to.deep.equal({
+				kind: "succeeded",
+				workflowValueWrites: {
+					[PiPlanningWorkflowValueKey.SelectedStoryFileName]: "Story-1-2.md",
+					[PiPlanningWorkflowValueKey.SelectedStoryStatus]: "backlog",
+				},
+			})
+		} finally {
+			await rm(fixtureRoot, { recursive: true, force: true })
+		}
+	})
+
+	it("fails selected-story derivation when selected_story_identity is missing", async () => {
+		const route = findRoute("step-1", "step-1-await-select-story-panel", "step-1-derive-selected-story-values")
+		expect(route.action.kind).to.equal("run_deterministic_procedure")
+		if (route.action.kind !== "run_deterministic_procedure") {
+			throw new Error(`Expected run_deterministic_procedure, received ${route.action.kind}.`)
+		}
+		const workflowValues: WorkflowValues = {
+			...SAMPLE_WORKFLOW_VALUES,
+			[PiPlanningWorkflowValueKey.StoriesIndex]: "/tmp/pi-planning-project/implementation/epic-1-stories.index.json",
+		}
+		delete workflowValues[PiPlanningWorkflowValueKey.SelectedStoryIdentity]
+		const result = await route.action.instruction.run(createSession(workflowValues))
+		expect(result).to.deep.equal({
+			kind: "failed",
+			errorMessage: "PI Planning requires a selected story identity before resolving the target story.",
+		})
+	})
+
+	it("fails selected-story derivation when stories_index is missing", async () => {
+		const route = findRoute("step-1", "step-1-await-select-story-panel", "step-1-derive-selected-story-values")
+		expect(route.action.kind).to.equal("run_deterministic_procedure")
+		if (route.action.kind !== "run_deterministic_procedure") {
+			throw new Error(`Expected run_deterministic_procedure, received ${route.action.kind}.`)
+		}
+		const workflowValues: WorkflowValues = {
+			...SAMPLE_WORKFLOW_VALUES,
+			[PiPlanningWorkflowValueKey.SelectedStoryIdentity]: "1.1",
+		}
+		delete workflowValues[PiPlanningWorkflowValueKey.StoriesIndex]
+		const result = await route.action.instruction.run(createSession(workflowValues))
+		expect(result).to.deep.equal({
+			kind: "failed",
+			errorMessage: "PI Planning requires a resolved stories_index path before resolving the target story.",
+		})
+	})
+
+	it("fails selected-story derivation for unreadable or malformed story index JSON", async () => {
+		const route = findRoute("step-1", "step-1-await-select-story-panel", "step-1-derive-selected-story-values")
+		expect(route.action.kind).to.equal("run_deterministic_procedure")
+		if (route.action.kind !== "run_deterministic_procedure") {
+			throw new Error(`Expected run_deterministic_procedure, received ${route.action.kind}.`)
+		}
+		const fixtureRoot = await mkdtemp(join(tmpdir(), "pi-planning-workflow-"))
+		try {
+			const implementationDir = join(fixtureRoot, "implementation")
+			await mkdir(implementationDir, { recursive: true })
+			const storiesIndexPath = join(implementationDir, "epic-1-stories.index.json")
+			await writeFile(storiesIndexPath, "{ invalid json", "utf8")
+			const result = await route.action.instruction.run(
+				createSession({
+					...SAMPLE_WORKFLOW_VALUES,
+					[PiPlanningWorkflowValueKey.StoriesIndex]: storiesIndexPath,
+					[PiPlanningWorkflowValueKey.SelectedStoryIdentity]: "1.1",
+				}),
+			)
+			expect(result).to.deep.equal({
+				kind: "failed",
+				errorMessage: "I could not read or parse the selected story index before resolving the target story.",
+			})
+		} finally {
+			await rm(fixtureRoot, { recursive: true, force: true })
+		}
+	})
+
+	it("fails selected-story derivation when the selected story identity is absent from the index", async () => {
+		const route = findRoute("step-1", "step-1-await-select-story-panel", "step-1-derive-selected-story-values")
+		expect(route.action.kind).to.equal("run_deterministic_procedure")
+		if (route.action.kind !== "run_deterministic_procedure") {
+			throw new Error(`Expected run_deterministic_procedure, received ${route.action.kind}.`)
+		}
+		const fixtureRoot = await mkdtemp(join(tmpdir(), "pi-planning-workflow-"))
+		try {
+			const implementationDir = join(fixtureRoot, "implementation")
+			await mkdir(implementationDir, { recursive: true })
+			const storiesIndexPath = join(implementationDir, "epic-1-stories.index.json")
+			await writeFile(
+				storiesIndexPath,
+				JSON.stringify({
+					version: 1,
+					stories: [
+						{
+							story_identity: "1.9",
+							story_file_name: "Story-1-9.md",
+							story_type: "primary",
+							parent_story_identity: null,
+							story_file_generated: true,
+							status: "draft",
+						},
+					],
+				}),
+				"utf8",
+			)
+			const result = await route.action.instruction.run(
+				createSession({
+					...SAMPLE_WORKFLOW_VALUES,
+					[PiPlanningWorkflowValueKey.StoriesIndex]: storiesIndexPath,
+					[PiPlanningWorkflowValueKey.SelectedStoryIdentity]: "1.1",
+				}),
+			)
+			expect(result).to.deep.equal({
+				kind: "failed",
+				errorMessage: "The selected story was not found in the selected story index.",
+			})
+		} finally {
+			await rm(fixtureRoot, { recursive: true, force: true })
+		}
+	})
+
+	it("fails selected-story derivation for unsupported selected story entries", async () => {
+		const route = findRoute("step-1", "step-1-await-select-story-panel", "step-1-derive-selected-story-values")
+		expect(route.action.kind).to.equal("run_deterministic_procedure")
+		if (route.action.kind !== "run_deterministic_procedure") {
+			throw new Error(`Expected run_deterministic_procedure, received ${route.action.kind}.`)
+		}
+		const unsupportedCases = [
+			{ story_type: "primary", status: "review" },
+			{ story_type: "primary", status: "complete" },
+			{ story_type: "remediation", status: "draft" },
+		]
+		for (const caseValue of unsupportedCases) {
+			const fixtureRoot = await mkdtemp(join(tmpdir(), "pi-planning-workflow-"))
+			try {
+				const implementationDir = join(fixtureRoot, "implementation")
+				await mkdir(implementationDir, { recursive: true })
+				const storiesIndexPath = join(implementationDir, "epic-1-stories.index.json")
+				await writeFile(
+					storiesIndexPath,
+					JSON.stringify({
+						version: 1,
+						stories: [
+							{
+								story_identity: "1.1",
+								story_file_name: "Story-1-1.md",
+								story_type: caseValue.story_type,
+								parent_story_identity: null,
+								story_file_generated: true,
+								status: caseValue.status,
+							},
+						],
+					}),
+					"utf8",
+				)
+				const result = await route.action.instruction.run(
+					createSession({
+						...SAMPLE_WORKFLOW_VALUES,
+						[PiPlanningWorkflowValueKey.StoriesIndex]: storiesIndexPath,
+						[PiPlanningWorkflowValueKey.SelectedStoryIdentity]: "1.1",
+					}),
+				)
+				expect(result).to.deep.equal({
+					kind: "failed",
+					errorMessage: "The selected story has an unsupported story status.",
+				})
+			} finally {
+				await rm(fixtureRoot, { recursive: true, force: true })
+			}
+		}
+	})
+
+	it("fails selected-story derivation when story_file_name is missing", async () => {
+		const route = findRoute("step-1", "step-1-await-select-story-panel", "step-1-derive-selected-story-values")
+		expect(route.action.kind).to.equal("run_deterministic_procedure")
+		if (route.action.kind !== "run_deterministic_procedure") {
+			throw new Error(`Expected run_deterministic_procedure, received ${route.action.kind}.`)
+		}
+		const fixtureRoot = await mkdtemp(join(tmpdir(), "pi-planning-workflow-"))
+		try {
+			const implementationDir = join(fixtureRoot, "implementation")
+			await mkdir(implementationDir, { recursive: true })
+			const storiesIndexPath = join(implementationDir, "epic-1-stories.index.json")
+			await writeFile(
+				storiesIndexPath,
+				JSON.stringify({
+					version: 1,
+					stories: [
+						{
+							story_identity: "1.1",
+							story_type: "primary",
+							parent_story_identity: null,
+							story_file_generated: true,
+							status: "draft",
+						},
+					],
+				}),
+				"utf8",
+			)
+			const result = await route.action.instruction.run(
+				createSession({
+					...SAMPLE_WORKFLOW_VALUES,
+					[PiPlanningWorkflowValueKey.StoriesIndex]: storiesIndexPath,
+					[PiPlanningWorkflowValueKey.SelectedStoryIdentity]: "1.1",
+				}),
+			)
+			expect(result).to.deep.equal({
+				kind: "failed",
+				errorMessage: "I could not read or parse the selected story index before resolving the target story.",
+			})
+		} finally {
+			await rm(fixtureRoot, { recursive: true, force: true })
+		}
+	})
+
+	it("renders Step 2 through Step 5 prompts with required workflow value references and no backend-only tools", () => {
 		const promptExpectations: ReadonlyArray<{
 			stepId: WorkflowStepDefinition["id"]
 			requiredSnippets: readonly string[]
@@ -577,18 +1430,6 @@ describe("piPlanningWorkflowDefinition", () => {
 					"generate_story_files",
 				],
 			},
-			{
-				stepId: "step-6",
-				requiredSnippets: [
-					SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.DraftsFolder].toString(),
-					"Scope",
-					"Scope Boundary",
-					"Requirements",
-					"Objective",
-					"Known Issues/ Risks/ Technical Debt",
-					"attempt_completion",
-				],
-			},
 		]
 
 		for (const promptExpectation of promptExpectations) {
@@ -600,6 +1441,83 @@ describe("piPlanningWorkflowDefinition", () => {
 				expect(prompt).not.to.include(forbiddenToolName)
 			}
 		}
+	})
+
+	it("renders the exact Step 6 initial-buildout prompt", () => {
+		const approvedInitialBuildoutPrompt = `Populate the generated story files in drafts_folder to set implementation sequence and story-specific details.
+
+Sequence stories by dependency:
+1. Contracts, state shape, and invariants.
+2. Core runtime/backend behavior.
+3. User-facing forms or lifecycle flows.
+4. Prompt/tool/schema behavior.
+5. Workflow/module consumers.
+6. Cleanup, migration, and validation.
+
+Read each story file with read_file, then use apply_patch to add story-specific content under these existing headings:
+
+Scope:
+Define what is in-scope
+
+Scope Boundary:
+Define items which are out of scope. Should not be overly exhaustive- focus on the things that could be mistakenly interpreted as in-scope to establish a firm scope boundary.
+
+Requirements:
+- List the source requirements this story satisfies.
+- State the behavior, constraints, and validation expectations.
+- Include relevant “must not” rules or invariants.
+- Do not include implementation tasks, subtasks, file lists, or commands.
+
+Objective:
+As a [user/system/workflow/runtime actor]
+I want [one capability outcome]
+so that [the value or enabled downstream behavior]
+
+Known Issues/ Risks/ Technical Debt
+Include items relevant to the story
+
+Do not create story files manually- use the appropriate plan_story_artifacts -> generate_story_files process if new stories or story files are needed at any point.
+
+Once every story file in drafts_folder contains the required information, send an update to the user informing them that you've updated the epic's stories with initial story details. Ask the user to review and provide feedback. Continue refining the stories as needed based on user feedback.
+
+Once the user is fully aligned with the story set and each story's content, use attempt_completion to provide a final workflow recap to the user, and remind them to run create_story for each generated story to generate story tasks before implementation.`
+		const expectedPrompt = approvedInitialBuildoutPrompt.replaceAll(
+			"drafts_folder",
+			SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.DraftsFolder].toString(),
+		)
+		const prompt = buildPrompt("step-6", SAMPLE_WORKFLOW_VALUES)
+
+		expect(prompt).to.equal(expectedPrompt)
+		expect(prompt).not.to.include("drafts_folder")
+		expect(prompt).not.to.include("target_story")
+		expect(prompt).not.to.include("feedback gathered during story validation")
+	})
+
+	it("renders the Step 6 edit-existing-story prompt with target story values", () => {
+		const prompt = buildPrompt("step-6", {
+			...SAMPLE_WORKFLOW_VALUES,
+			[PiPlanningWorkflowValueKey.EditIntent]: "edit existing story file",
+		})
+
+		expect(prompt).to.include(SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.ProjectTitle].toString())
+		expect(prompt).to.include(SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.ProjectFolderName].toString())
+		expect(prompt).to.include(SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.ArchitectureDocument].toString())
+		expect(prompt).to.include(SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.EpicsDocument].toString())
+		expect(prompt).to.include(SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.TargetStory].toString())
+		expect(prompt).to.include("Scope")
+		expect(prompt).to.include("Scope Boundary")
+		expect(prompt).to.include("Requirements")
+		expect(prompt).to.include("Objective")
+		expect(prompt).to.include("Known Issues/ Risks/ Technical Debt")
+		expect(prompt).not.to.include("drafts_folder")
+		expect(prompt).not.to.include("plan_story_artifacts")
+		expect(prompt).not.to.include("generate_story_files")
+		expect(prompt).not.to.include("create_story")
+		expect(prompt).not.to.include("projectTitle")
+		expect(prompt).not.to.include("projectFolderName")
+		expect(prompt).not.to.include("architecture_document")
+		expect(prompt).not.to.include("epics_document")
+		expect(prompt).not.to.include("target_story")
 	})
 
 	it("uses stories_index_existed_at_workflow_start for Step 3 through Step 5 existing-index prompt branches", () => {

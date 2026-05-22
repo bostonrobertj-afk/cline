@@ -1,6 +1,7 @@
 import { expect } from "chai"
 import { describe, it } from "mocha"
 import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"
+import type { WorkflowPromptBuilderInput, WorkflowValues } from "../../../types"
 import {
 	buildPiPlanningStep1ToolSchemas,
 	buildPiPlanningStep2ToolSchemas,
@@ -9,6 +10,7 @@ import {
 	buildPiPlanningStep5ToolSchemas,
 	buildPiPlanningStep6ToolSchemas,
 } from "../piPlanningToolSchemas"
+import { PiPlanningEditIntent, PiPlanningWorkflowValueKey, piPlanningWorkflowDefinition } from "../piPlanningWorkflow"
 
 type ToolSchemaBuilder = () => readonly ClineToolSpec[]
 
@@ -61,17 +63,64 @@ const FORBIDDEN_MODEL_FACING_TOOL_NAMES: readonly string[] = [
 	"execute_command",
 ]
 
-const PI_PLANNING_STEP_BUILDERS: readonly ToolSchemaBuilder[] = [
+const PI_PLANNING_NON_STEP_6_BUILDERS: readonly ToolSchemaBuilder[] = [
 	buildPiPlanningStep1ToolSchemas,
 	buildPiPlanningStep2ToolSchemas,
 	buildPiPlanningStep3ToolSchemas,
 	buildPiPlanningStep4ToolSchemas,
 	buildPiPlanningStep5ToolSchemas,
-	buildPiPlanningStep6ToolSchemas,
 ]
 
 function schemaNames(schemas: readonly ClineToolSpec[]): readonly string[] {
 	return schemas.map((schema) => schema.name)
+}
+
+function createStep6ToolSchemaInput(editIntent: PiPlanningEditIntent | undefined): WorkflowPromptBuilderInput {
+	const workflowValues: WorkflowValues = {
+		[PiPlanningWorkflowValueKey.ProjectTitle]: "PI Planning Project",
+		[PiPlanningWorkflowValueKey.ProjectFolderName]: "pi-planning-project",
+		[PiPlanningWorkflowValueKey.ArchitectureDocument]: "/tmp/pi-planning-project/planning/architecture.md",
+		[PiPlanningWorkflowValueKey.EpicsDocument]: "/tmp/pi-planning-project/planning/Epics.md",
+		[PiPlanningWorkflowValueKey.EpicsIndex]: "/tmp/pi-planning-project/planning/Epics.index.json",
+		[PiPlanningWorkflowValueKey.BrainstormingDocument]: "/tmp/pi-planning-project/discovery/brainstorming.md",
+		[PiPlanningWorkflowValueKey.AdditionalContext]: "/tmp/pi-planning-project/research/context.md",
+		[PiPlanningWorkflowValueKey.TargetEpic]: "Epic 1: Improve workflow runtime",
+		[PiPlanningWorkflowValueKey.EpicIdentity]: "1",
+		[PiPlanningWorkflowValueKey.ImplementationFolder]: "/tmp/pi-planning-project/implementation",
+		[PiPlanningWorkflowValueKey.DraftsFolder]: "/tmp/pi-planning-project/implementation/drafts",
+		[PiPlanningWorkflowValueKey.StoriesIndex]: "/tmp/pi-planning-project/implementation/epic-1-stories.index.json",
+		[PiPlanningWorkflowValueKey.StoriesIndexExistedAtWorkflowStart]: true,
+		[PiPlanningWorkflowValueKey.SelectedStoryIdentity]: "1.1",
+		[PiPlanningWorkflowValueKey.SelectedStoryFileName]: "Story-1-1.md",
+		[PiPlanningWorkflowValueKey.SelectedStoryStatus]: "draft",
+		[PiPlanningWorkflowValueKey.TargetStory]: "/tmp/pi-planning-project/implementation/drafts/Story-1-1.md",
+	}
+	if (editIntent !== undefined) {
+		workflowValues[PiPlanningWorkflowValueKey.EditIntent] = editIntent
+	}
+
+	return {
+		session: {
+			activeStepNumber: 6,
+			workflowValues,
+			projectSelection: {
+				projectMode: "existing",
+				projectTitle: "PI Planning Project",
+				projectFolderName: "pi-planning-project",
+			},
+			lifecycle: { projectSelectionCompleted: true },
+			entryArtifactResolution: undefined,
+			ui: {
+				formSession: undefined,
+				stepResolutionSession: undefined,
+				suppressedWorkflowFormIds: [],
+				suppressedWorkflowStepResolutionRoutes: [],
+			},
+			branchContext: { activeBranchId: "step-6-project-prompt" },
+		},
+		step: piPlanningWorkflowDefinition.steps["step-6"],
+		renderWorkflowValue: (value): string => (typeof value === "string" ? value : JSON.stringify(value)),
+	}
 }
 
 describe("piPlanningToolSchemas", () => {
@@ -84,14 +133,19 @@ describe("piPlanningToolSchemas", () => {
 		expect(schemaNames(buildPiPlanningStep3ToolSchemas())).to.deep.equal(STEP_3_TOOL_NAMES)
 		expect(schemaNames(buildPiPlanningStep4ToolSchemas())).to.deep.equal(STEP_4_TOOL_NAMES)
 		expect(schemaNames(buildPiPlanningStep5ToolSchemas())).to.deep.equal(STEP_5_TOOL_NAMES)
-		expect(schemaNames(buildPiPlanningStep6ToolSchemas())).to.deep.equal(STEP_6_TOOL_NAMES)
+		expect(schemaNames(buildPiPlanningStep6ToolSchemas(createStep6ToolSchemaInput(undefined)))).to.deep.equal(
+			STEP_6_TOOL_NAMES,
+		)
+		expect(
+			schemaNames(buildPiPlanningStep6ToolSchemas(createStep6ToolSchemaInput(PiPlanningEditIntent.EditExistingStoryFile))),
+		).to.deep.equal(["read_file", "apply_patch", "send_user_message", "ask_followup_question", "attempt_completion"])
 	})
 
 	it("exposes set_workflow_values only in Step 4", () => {
 		const step4ToolNames = schemaNames(buildPiPlanningStep4ToolSchemas())
 		expect(step4ToolNames).to.include("set_workflow_values")
 
-		const nonStep4Builders: readonly ToolSchemaBuilder[] = PI_PLANNING_STEP_BUILDERS.filter(
+		const nonStep4Builders: readonly ToolSchemaBuilder[] = PI_PLANNING_NON_STEP_6_BUILDERS.filter(
 			(buildToolSchemas) => buildToolSchemas !== buildPiPlanningStep4ToolSchemas,
 		)
 
@@ -126,12 +180,21 @@ describe("piPlanningToolSchemas", () => {
 	})
 
 	it("does not expose forbidden model-facing tools in any PI Planning step schema", () => {
-		for (const buildToolSchemas of PI_PLANNING_STEP_BUILDERS) {
+		for (const buildToolSchemas of PI_PLANNING_NON_STEP_6_BUILDERS) {
 			const toolNames = schemaNames(buildToolSchemas())
 
 			for (const forbiddenToolName of FORBIDDEN_MODEL_FACING_TOOL_NAMES) {
 				expect(toolNames).not.to.include(forbiddenToolName)
 			}
+		}
+
+		const initialBuildoutStep6ToolNames = schemaNames(buildPiPlanningStep6ToolSchemas(createStep6ToolSchemaInput(undefined)))
+		const editExistingStoryStep6ToolNames = schemaNames(
+			buildPiPlanningStep6ToolSchemas(createStep6ToolSchemaInput(PiPlanningEditIntent.EditExistingStoryFile)),
+		)
+		for (const forbiddenToolName of FORBIDDEN_MODEL_FACING_TOOL_NAMES) {
+			expect(initialBuildoutStep6ToolNames).not.to.include(forbiddenToolName)
+			expect(editExistingStoryStep6ToolNames).not.to.include(forbiddenToolName)
 		}
 	})
 })

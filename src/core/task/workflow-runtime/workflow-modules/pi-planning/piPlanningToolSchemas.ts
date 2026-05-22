@@ -2,6 +2,7 @@ import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"
 import { AGENT_FEEDBACK_PARAMETER } from "@/core/prompts/system-prompt/types"
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
+import type { WorkflowPromptBuilderInput } from "../../types"
 
 const PI_PLANNING_TOOL_SCHEMA_VARIANT = ModelFamily.NATIVE_GPT_5
 
@@ -339,7 +340,17 @@ export function buildPiPlanningStep5ToolSchemas(): readonly ClineToolSpec[] {
 	]
 }
 
-export function buildPiPlanningStep6ToolSchemas(): readonly ClineToolSpec[] {
+export function buildPiPlanningStep6ToolSchemas(input: WorkflowPromptBuilderInput): readonly ClineToolSpec[] {
+	if (input.session.workflowValues.edit_intent === "edit existing story file") {
+		return [
+			buildPiPlanningReadFileToolSchema(),
+			buildPiPlanningApplyPatchToolSchema(),
+			buildPiPlanningSendUserMessageToolSchema(),
+			buildPiPlanningAskFollowupQuestionToolSchema(),
+			buildPiPlanningAttemptCompletionToolSchema(),
+		]
+	}
+
 	return [
 		buildPiPlanningListFilesToolSchema(),
 		buildPiPlanningReadFileToolSchema(),

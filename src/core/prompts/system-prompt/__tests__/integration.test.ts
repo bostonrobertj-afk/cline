@@ -75,7 +75,11 @@ import {
 	EdgeCaseHunterReviewWorkflowValueKey,
 	edgeCaseHunterReviewWorkflowDefinition,
 } from "@/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review"
-import { piPlanningWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/pi-planning"
+import {
+	PiPlanningEditIntent,
+	PiPlanningWorkflowValueKey,
+	piPlanningWorkflowDefinition,
+} from "@/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow"
 import {
 	buildWriteRemediationStoryStep3ToolSchemas,
 	WriteRemediationStoryWorkflowValueKey,
@@ -1571,6 +1575,7 @@ const PI_PLANNING_EPIC_IDENTITY = "7"
 const PI_PLANNING_IMPLEMENTATION_FOLDER = "/test/project/implementation"
 const PI_PLANNING_DRAFTS_FOLDER = "/test/project/implementation/drafts"
 const PI_PLANNING_STORIES_INDEX = "/test/project/implementation/epic-7-stories.index.json"
+const PI_PLANNING_TARGET_STORY = "/test/project/implementation/drafts/Story-7-1.md"
 
 const getPiPlanningEntryBranchId = (activeStepNumber: PiPlanningPromptStepNumber): string => {
 	switch (activeStepNumber) {
@@ -1590,41 +1595,60 @@ const getPiPlanningEntryBranchId = (activeStepNumber: PiPlanningPromptStepNumber
 	return unreachableActiveStepNumber
 }
 
-const createPiPlanningWorkflowSession = (activeStepNumber: PiPlanningPromptStepNumber): ActiveWorkflowSession => ({
-	activeStepNumber,
-	workflowValues: {
-		architecture_document: PI_PLANNING_ARCHITECTURE_DOCUMENT,
-		epics_document: PI_PLANNING_EPICS_DOCUMENT,
-		epics_index: PI_PLANNING_EPICS_INDEX,
-		brainstorming_document: PI_PLANNING_BRAINSTORMING_DOCUMENT,
-		additional_context: PI_PLANNING_ADDITIONAL_CONTEXT,
-		target_epic: PI_PLANNING_TARGET_EPIC,
-		epic_identity: PI_PLANNING_EPIC_IDENTITY,
-		implementation_folder: PI_PLANNING_IMPLEMENTATION_FOLDER,
-		drafts_folder: PI_PLANNING_DRAFTS_FOLDER,
-		stories_index: PI_PLANNING_STORIES_INDEX,
-		stories_index_existed_at_workflow_start: true,
-	},
-	projectSelection: {
-		projectMode: "new",
-		projectTitle: "PI Planning Session",
-		projectFolderName: "pi-planning-session",
-	},
-	lifecycle: {
-		projectSelectionCompleted: true,
-	},
-	entryArtifactResolution: undefined,
-	ui: {
-		suppressedWorkflowFormIds: [],
-		suppressedWorkflowStepResolutionRoutes: [],
-	},
-	branchContext: {
-		activeBranchId: getPiPlanningEntryBranchId(activeStepNumber),
-	},
-})
+const createPiPlanningWorkflowSession = (
+	activeStepNumber: PiPlanningPromptStepNumber,
+	options: { editIntent: PiPlanningEditIntent } | undefined = undefined,
+): ActiveWorkflowSession => {
+	const workflowValues: WorkflowValues = {
+		[PiPlanningWorkflowValueKey.ArchitectureDocument]: PI_PLANNING_ARCHITECTURE_DOCUMENT,
+		[PiPlanningWorkflowValueKey.EpicsDocument]: PI_PLANNING_EPICS_DOCUMENT,
+		[PiPlanningWorkflowValueKey.EpicsIndex]: PI_PLANNING_EPICS_INDEX,
+		[PiPlanningWorkflowValueKey.BrainstormingDocument]: PI_PLANNING_BRAINSTORMING_DOCUMENT,
+		[PiPlanningWorkflowValueKey.AdditionalContext]: PI_PLANNING_ADDITIONAL_CONTEXT,
+		[PiPlanningWorkflowValueKey.TargetEpic]: PI_PLANNING_TARGET_EPIC,
+		[PiPlanningWorkflowValueKey.EpicIdentity]: PI_PLANNING_EPIC_IDENTITY,
+		[PiPlanningWorkflowValueKey.ImplementationFolder]: PI_PLANNING_IMPLEMENTATION_FOLDER,
+		[PiPlanningWorkflowValueKey.DraftsFolder]: PI_PLANNING_DRAFTS_FOLDER,
+		[PiPlanningWorkflowValueKey.StoriesIndex]: PI_PLANNING_STORIES_INDEX,
+		[PiPlanningWorkflowValueKey.StoriesIndexExistedAtWorkflowStart]: true,
+		[PiPlanningWorkflowValueKey.ProjectTitle]: "PI Planning Session",
+		[PiPlanningWorkflowValueKey.ProjectFolderName]: "pi-planning-session",
+		[PiPlanningWorkflowValueKey.SelectedStoryIdentity]: "7.1",
+		[PiPlanningWorkflowValueKey.SelectedStoryFileName]: "Story-7-1.md",
+		[PiPlanningWorkflowValueKey.SelectedStoryStatus]: "draft",
+		[PiPlanningWorkflowValueKey.TargetStory]: PI_PLANNING_TARGET_STORY,
+	}
+	if (options !== undefined) {
+		workflowValues[PiPlanningWorkflowValueKey.EditIntent] = options.editIntent
+	}
+
+	return {
+		activeStepNumber,
+		workflowValues,
+		projectSelection: {
+			projectMode: "new",
+			projectTitle: "PI Planning Session",
+			projectFolderName: "pi-planning-session",
+		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
+		entryArtifactResolution: undefined,
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: {
+			activeBranchId: getPiPlanningEntryBranchId(activeStepNumber),
+		},
+	}
+}
 
 const buildPiPlanningPromptContext = async (
 	activeStepNumber: PiPlanningPromptStepNumber,
+	options: { editIntent: PiPlanningEditIntent } | undefined = undefined,
 ): Promise<SystemPromptContext & WorkflowPromptProjection> => {
 	const workspacePathPolicy: WorkflowWorkspacePathPolicy = {
 		validateAccess: () => true,
@@ -1632,7 +1656,7 @@ const buildPiPlanningPromptContext = async (
 	const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })
 	const taskState = new TaskState()
 	taskState.activeWorkflowName = "pi-planning"
-	taskState.activeWorkflowSession = createPiPlanningWorkflowSession(activeStepNumber)
+	taskState.activeWorkflowSession = createPiPlanningWorkflowSession(activeStepNumber, options)
 	taskState.apiRequestCount = 1
 	const workflowProjection = await runtime.buildTurnProjection({ taskState })
 
@@ -2518,8 +2542,8 @@ describe("Prompt System Integration Tests", () => {
 			])
 		})
 
-		it("projects active pi-planning Step 6 tools into native GPT-5 prompts", async function () {
-			await expectPiPlanningProjectedToolNames(this, 6, [
+		it("projects active pi-planning Step 6 initial-buildout tools into native GPT-5 prompts", async function () {
+			const expectedToolNames = [
 				"list_files",
 				"read_file",
 				"apply_patch",
@@ -2528,7 +2552,35 @@ describe("Prompt System Integration Tests", () => {
 				"send_user_message",
 				"ask_followup_question",
 				"attempt_completion",
-			])
+			]
+			const context = await buildPiPlanningPromptContext(6, {
+				editIntent: PiPlanningEditIntent.CompleteInitialStoryBuildout,
+			})
+			const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
+			expect(projectedToolNames).to.deep.equal(expectedToolNames)
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ tools }) => {
+				expect(getNativeToolNames(tools)).to.deep.equal(expectedToolNames)
+			})
+		})
+
+		it("projects active pi-planning Step 6 edit-existing-story tools into native GPT-5 prompts", async function () {
+			const expectedToolNames = [
+				"read_file",
+				"apply_patch",
+				"send_user_message",
+				"ask_followup_question",
+				"attempt_completion",
+			]
+			const context = await buildPiPlanningPromptContext(6, {
+				editIntent: PiPlanningEditIntent.EditExistingStoryFile,
+			})
+			const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
+			expect(projectedToolNames).to.deep.equal(expectedToolNames)
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ tools }) => {
+				expect(getNativeToolNames(tools)).to.deep.equal(expectedToolNames)
+			})
 		})
 
 		it("projects active create-story step tools from module-owned builders into native GPT-5 prompts", async function () {
@@ -3361,7 +3413,17 @@ describe("Prompt System Integration Tests", () => {
 		})
 
 		it("does not statically expose backend-only runtime tools in pi-planning prompt projection", async function () {
-			const activeStepNumbers: readonly PiPlanningPromptStepNumber[] = [2, 3, 4, 5, 6]
+			const activeStepCases: readonly {
+				activeStepNumber: PiPlanningPromptStepNumber
+				options?: { editIntent: PiPlanningEditIntent }
+			}[] = [
+				{ activeStepNumber: 2 },
+				{ activeStepNumber: 3 },
+				{ activeStepNumber: 4 },
+				{ activeStepNumber: 5 },
+				{ activeStepNumber: 6, options: { editIntent: PiPlanningEditIntent.CompleteInitialStoryBuildout } },
+				{ activeStepNumber: 6, options: { editIntent: PiPlanningEditIntent.EditExistingStoryFile } },
+			]
 			const forbiddenToolNames: readonly string[] = [
 				"build_workflow_document",
 				"create_workflow_artifact",
@@ -3370,11 +3432,15 @@ describe("Prompt System Integration Tests", () => {
 				"move_workflow_project_file",
 			]
 
-			for (const activeStepNumber of activeStepNumbers) {
-				const context = await buildPiPlanningPromptContext(activeStepNumber)
+			for (const activeStepCase of activeStepCases) {
+				const context = await buildPiPlanningPromptContext(activeStepCase.activeStepNumber, activeStepCase.options)
 				const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
 				for (const forbiddenToolName of forbiddenToolNames) {
 					expect(projectedToolNames).to.not.include(forbiddenToolName)
+				}
+				if (activeStepCase.options?.editIntent === PiPlanningEditIntent.EditExistingStoryFile) {
+					expect(projectedToolNames).to.not.include("plan_story_artifacts")
+					expect(projectedToolNames).to.not.include("generate_story_files")
 				}
 
 				await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt, tools }) => {
@@ -3382,6 +3448,10 @@ describe("Prompt System Integration Tests", () => {
 					for (const forbiddenToolName of forbiddenToolNames) {
 						expect(nativeToolNames).to.not.include(forbiddenToolName)
 						expect(systemPrompt).to.not.include(forbiddenToolName)
+					}
+					if (activeStepCase.options?.editIntent === PiPlanningEditIntent.EditExistingStoryFile) {
+						expect(nativeToolNames).to.not.include("plan_story_artifacts")
+						expect(nativeToolNames).to.not.include("generate_story_files")
 					}
 				})
 			}
