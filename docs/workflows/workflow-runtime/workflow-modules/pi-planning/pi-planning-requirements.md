@@ -195,7 +195,7 @@ When Panel C completes, module logic must derive `selected_story_file_name` and 
 
 After any required missing-story generation completes, runtime-owned `validate_story_index_entry` must validate the selected primary story entry using the derived `selected_story_file_name`, the selected `selected_story_identity`, the selected epic's `stories_index`, and the selected entry status. Runtime-owned `resolve_existing_project_artifact` must then resolve and persist `target_story` from `selected_story_identity` using `WorkflowArtifactFamily.Story` and status-specific selected-project subfolders: `["implementation", "drafts"]` for `draft` stories and `["implementation", "stories-backlog"]` for `backlog` stories.
 
-Target-story setup must fail closed before Step 6 model-driven work if `selected_story_identity` is missing, `stories_index` is missing, the story index cannot be read or parsed, the selected story identity is absent from the index, the selected story entry is not a supported draft or backlog primary story, the selected story entry has an invalid or missing `story_file_name`, or runtime-owned existing artifact resolution cannot resolve an existing selected-project story file.
+Target-story setup must fail closed before Step 6 model-driven work if `selected_story_identity` is missing, `stories_index` is missing, the story index cannot be read or parsed including malformed or noncanonical story-index entries, the selected story identity is absent from the index, the selected story entry is not a supported draft or backlog primary story, or runtime-owned existing artifact resolution cannot resolve an existing selected-project story file.
 
 The Step 1 deterministic `generate_story_files` route must use this exact workflow-step status definition:
 
@@ -211,7 +211,6 @@ The Step 1 deterministic `generate_story_files` route must use this exact workfl
 - Unreadable or malformed story index: `I could not read or parse the selected story index before resolving the target story.`
 - Selected story identity absent from index: `The selected story was not found in the selected story index.`
 - Unsupported status: `The selected story has an unsupported story status.`
-- Invalid or missing `story_file_name`: `The selected story has an invalid story_file_name.`
 - Existing artifact resolution failure: `The target story path does not exist.`
 
 Step 1 must transition according to the completed form state:
@@ -435,32 +434,47 @@ The edit-existing-story prompt variant must render:
 
 The edit-existing-story prompt variant must not include initial-buildout instructions, `drafts_folder`, `plan_story_artifacts`, `generate_story_files`, or the instruction to run `create_story` for each generated story.
 
-When `edit_intent` is `Complete initial story buildout` or `edit_intent` is absent, the Step 6 prompt must render only the initial-buildout prompt variant. The prompt must instruct the AI to:
+When `edit_intent` is `Complete initial story buildout` or `edit_intent` is absent, the Step 6 prompt must render only the initial-buildout prompt variant. The prompt must preserve this exact source prompt text, with both `drafts_folder` placeholder labels populated from workflow values:
 
-- populate generated story files in `drafts_folder`
-- set implementation sequence and story-specific details
-- sequence stories by dependency in this order:
-  - `Contracts, state shape, and invariants.`
-  - `Core runtime/backend behavior.`
-  - `User-facing forms or lifecycle flows.`
-  - `Prompt/tool/schema behavior.`
-  - `Workflow/module consumers.`
-  - `Cleanup, migration, and validation.`
-- read each story file with `read_file`
-- use `apply_patch` to add story-specific content under existing headings
-- populate `Scope`
-- populate `Scope Boundary`
-- populate `Requirements`
-- populate `Objective`
-- populate `Known Issues/ Risks/ Technical Debt`
-- avoid implementation tasks, subtasks, file lists, or commands in story requirements
-- avoid manually creating story files
-- use the `plan_story_artifacts` to `generate_story_files` process if new stories or story files are needed at any point
-- send an update to the user after every story file in `drafts_folder` contains the required information
-- ask the user to review and provide feedback
-- continue refining stories as needed based on user feedback
-- use `attempt_completion` only after the user is fully aligned with the story set and story content
-- remind the user in the final recap to run `create_story` for each generated story to generate story tasks before implementation
+```text
+Populate the generated story files in drafts_folder to set implementation sequence and story-specific details.
+
+Sequence stories by dependency:
+1. Contracts, state shape, and invariants.
+2. Core runtime/backend behavior.
+3. User-facing forms or lifecycle flows.
+4. Prompt/tool/schema behavior.
+5. Workflow/module consumers.
+6. Cleanup, migration, and validation.
+
+Read each story file with read_file, then use apply_patch to add story-specific content under these existing headings:
+
+Scope:
+Define what is in-scope
+
+Scope Boundary:
+Define items which are out of scope. Should not be overly exhaustive- focus on the things that could be mistakenly interpreted as in-scope to establish a firm scope boundary.
+
+Requirements:
+- List the source requirements this story satisfies.
+- State the behavior, constraints, and validation expectations.
+- Include relevant “must not” rules or invariants.
+- Do not include implementation tasks, subtasks, file lists, or commands.
+
+Objective:
+As a [user/system/workflow/runtime actor]
+I want [one capability outcome]
+so that [the value or enabled downstream behavior]
+
+Known Issues/ Risks/ Technical Debt
+Include items relevant to the story
+
+Do not create story files manually- use the appropriate plan_story_artifacts -> generate_story_files process if new stories or story files are needed at any point.
+
+Once every story file in drafts_folder contains the required information, send an update to the user informing them that you've updated the epic's stories with initial story details. Ask the user to review and provide feedback. Continue refining the stories as needed based on user feedback.
+
+Once the user is fully aligned with the story set and each story's content, use attempt_completion to provide a final workflow recap to the user, and remind them to run create_story for each generated story to generate story tasks before implementation.
+```
 
 The initial-buildout prompt variant must not include the edit-existing-story validation-feedback instructions or `target_story`.
 
@@ -531,7 +545,7 @@ The pi-planning module must include module tests for:
 - Step 1 transition to Step 2 when no story index existed at workflow start
 - Step 1 transition to Step 2 when `edit_intent` is `Complete initial story buildout`
 - Step 1 selected story metadata derivation, deterministic generation of missing story files, draft/backlog `target_story` resolution through runtime-owned story-index validation and existing-artifact resolution, and direct transition to Step 6 when `edit_intent` is `edit existing story file`
-- `target_story` setup fail-closed behavior for missing, malformed, invalid, unsupported-status, or unresolved selected story targets
+- `target_story` setup fail-closed behavior for missing, malformed or noncanonical, unsupported-status, or unresolved selected story targets
 - Step 2 prompt source output
 - Step 3 prompt source output, including the existing-story-index conditional prompt block
 - Step 4 prompt source output for existing and missing story-index branches
