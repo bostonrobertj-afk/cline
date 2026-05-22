@@ -82,6 +82,8 @@ The module must include workflow-value keys for:
 - `stories_index_existed_at_workflow_start`, a boolean indicating whether the selected epic already had a story index when Step 1 derived selected-epic values
 - optional `edit_intent`, the user's Panel B selection, with exact allowed values `Complete initial story buildout` and `edit existing story file`
 - optional `selected_story_identity`, the story identity selected in Panel C when `edit_intent` is `edit existing story file`
+- optional `selected_story_file_name`, the `story_file_name` read from the selected story index entry
+- optional `selected_story_status`, the `status` read from the selected story index entry
 - optional `target_story`, the full absolute path resolved from `selected_story_identity` and the selected epic's story index
 
 Any workflow form field whose submitted value must survive beyond form-local state must declare a durable workflow-value destination and persist through the runtime value seam, per `FR-39f` through `FR-39m`.
@@ -178,7 +180,7 @@ Step 1 must render one module-owned workflow form containing these panels:
 | --- | --- | --- |
 | Panel A | First panel | Ask `Which epic are we working on during this workflow?`; render a required dropdown populated from `epics_index`; option labels must identify the epic clearly; selected value must persist `target_epic` and `epic_identity`; runtime/module logic must determine whether the selected epic has an existing story index, set `stories_index_existed_at_workflow_start`, and set `stories_index` to the selected epic's `implementation/epic-{E}-stories.index.json` absolute path when the story index exists. |
 | Panel B | Only when the selected epic has an existing story index | Title `Provide Edit Intent`; promptMarkdown `It looks like the selected epic already has a story index file with generated story files. Please select one of the following options:`; render a required dropdown field with label `select one`; options must be exactly `Complete initial story buildout` and `edit existing story file`; persist the selected value to `edit_intent`. |
-| Panel C | Only after Panel B when `edit_intent` is `edit existing story file` | Title `Select Story`; promptMarkdown `Which story would you like to edit?`; render a required dropdown field with label `Select Story`; options must be JSON-derived from `stories_index`, use `itemsPath: "stories"`, use `valueProperty: "story_identity"`, and persist the selected story identity to `selected_story_identity`. |
+| Panel C | Only after Panel B when `edit_intent` is `edit existing story file` | Title `Select Story`; promptMarkdown `Which story would you like to edit?`; render a required dropdown field with label `Select Story`; options must be JSON-derived from the selected epic's story index file using `jsonOptionsSource` root `{ kind: "selected_project_root" }`, `sourcePathSegments` `["implementation", "epic-{workflow.epic_identity}-stories.index.json"]`, `itemsPath` `"stories"`, `valueProperty` `"story_identity"`, and `labelTemplate` `"Story {story_identity}: {story_file_name}"`; no `descriptionTemplate` may be defined; persist the selected story identity to `selected_story_identity`. |
 | Panel D | After Panel A when no story index exists, after Panel B when `edit_intent` is `Complete initial story buildout`, or after Panel C when `edit_intent` is `edit existing story file` | Ask `If you'd like to include any other files as workflow context please provide their full file paths below.`; collect optional large-text-area input into `additional_context`. |
 
 Panel A must derive its dropdown from `Epics.index.json`, not from markdown parsing of `Epics.md`.
@@ -189,9 +191,11 @@ The module must not allow the user to type arbitrary epic identities in Panel A.
 
 The existing Required Context panel that displays `Epics.index.json`, `Epics.md`, and `architecture.md` as friendly file-name hyperlinks must be removed because prerequisite file resolution already handles prerequisite-file confirmation and path persistence.
 
-When Panel C completes, runtime/module logic must resolve `selected_story_identity` through `stories_index`, derive the selected story's full absolute file path from the indexed `story_file_name` and the canonical story status folder mapping, validate the resolved path through selected-project containment and workspace path-policy checks, require the resolved path to exist as a file after any required missing-story generation has completed, and persist the full path to `target_story`.
+When Panel C completes, module logic must derive `selected_story_file_name` and `selected_story_status` from `selected_story_identity` and `stories_index`. The selected entry must be a primary story whose status is `draft` or `backlog`; `review`, `complete`, remediation, malformed, or otherwise unsupported entries must fail closed before Step 6 model-driven work.
 
-Target-story resolution must fail closed before Step 6 model-driven work if `selected_story_identity` is missing, `stories_index` is missing, the story index cannot be read or parsed, the selected story identity is absent from the index, the selected story entry has an unsupported status, the selected story entry has an invalid or missing `story_file_name`, the resolved path is outside the selected project, workspace path-policy validation fails, or the resolved path is not an existing file.
+After any required missing-story generation completes, runtime-owned `validate_story_index_entry` must validate the selected primary story entry using the derived `selected_story_file_name`, the selected `selected_story_identity`, the selected epic's `stories_index`, and the selected entry status. Runtime-owned `resolve_existing_project_artifact` must then resolve and persist `target_story` from `selected_story_identity` using `WorkflowArtifactFamily.Story` and status-specific selected-project subfolders: `["implementation", "drafts"]` for `draft` stories and `["implementation", "stories-backlog"]` for `backlog` stories.
+
+Target-story setup must fail closed before Step 6 model-driven work if `selected_story_identity` is missing, `stories_index` is missing, the story index cannot be read or parsed, the selected story identity is absent from the index, the selected story entry is not a supported draft or backlog primary story, the selected story entry has an invalid or missing `story_file_name`, or runtime-owned existing artifact resolution cannot resolve an existing selected-project story file.
 
 The Step 1 deterministic `generate_story_files` route must use this exact workflow-step status definition:
 
@@ -208,16 +212,13 @@ The Step 1 deterministic `generate_story_files` route must use this exact workfl
 - Selected story identity absent from index: `The selected story was not found in the selected story index.`
 - Unsupported status: `The selected story has an unsupported story status.`
 - Invalid or missing `story_file_name`: `The selected story has an invalid story_file_name.`
-- Resolved path outside selected project: `The target story path is outside the selected project.`
-- Workspace path-policy rejection: `The target story path is not allowed by workspace path policy.`
-- Resolved path missing: `The target story path does not exist.`
-- Resolved path not a file: `The target story path is not a file.`
+- Existing artifact resolution failure: `The target story path does not exist.`
 
 Step 1 must transition according to the completed form state:
 
 - If no story index existed at workflow start, Panel B and Panel C must not render, Panel D must render after Panel A, and the workflow must transition to Step 2 after Panel D completes.
 - If a story index existed at workflow start and `edit_intent` is `Complete initial story buildout`, Panel C must not render, Panel D must render after Panel B, and the workflow must transition to Step 2 after Panel D completes.
-- If a story index existed at workflow start and `edit_intent` is `edit existing story file`, Panel C must render after Panel B, Panel D must render after Panel C, runtime/module logic must generate any missing draft story files from the selected epic's story index by invoking the existing `generate_story_files` backend workflow tool through a workflow-owned deterministic route before Step 6, `target_story` must be resolved and persisted, and the workflow must transition directly to Step 6 without entering Steps 2 through 5.
+- If a story index existed at workflow start and `edit_intent` is `edit existing story file`, Panel C must render after Panel B, Panel D must render after Panel C, runtime/module logic must derive selected story metadata from the story index, generate any missing draft story files from the selected epic's story index by invoking the existing `generate_story_files` backend workflow tool through a workflow-owned deterministic route before Step 6, validate and resolve `target_story` through the existing runtime-owned story-index and artifact-resolution actions, and transition directly to Step 6 without entering Steps 2 through 5.
 
 Step 1 must be runtime-driven and must expose an empty tool schema through an exported builder from `piPlanningToolSchemas.ts`.
 
@@ -525,12 +526,12 @@ The pi-planning module must include module tests for:
 - persistence of `target_epic`, `epic_identity`, `stories_index`, and `stories_index_existed_at_workflow_start` after Panel A submission
 - absence of the removed Required Context panel from the Step 1 workflow form
 - Step 1 workflow form Panel B edit-intent dropdown behavior, including exact allowed values `Complete initial story buildout` and `edit existing story file`
-- Step 1 workflow form Panel C story-selection dropdown behavior, including JSON-derived options from `stories_index`
+- Step 1 workflow form Panel C story-selection dropdown behavior, including JSON-derived options from the selected epic's story index file using `jsonOptionsSource` root `{ kind: "selected_project_root" }`, `sourcePathSegments` `["implementation", "epic-{workflow.epic_identity}-stories.index.json"]`, `itemsPath` `"stories"`, `valueProperty` `"story_identity"`, `labelTemplate` `"Story {story_identity}: {story_file_name}"`, and no `descriptionTemplate`
 - Step 1 workflow form Panel D optional `additional_context` persistence
 - Step 1 transition to Step 2 when no story index existed at workflow start
 - Step 1 transition to Step 2 when `edit_intent` is `Complete initial story buildout`
-- Step 1 deterministic generation of missing story files, `target_story` resolution, and direct transition to Step 6 when `edit_intent` is `edit existing story file`
-- `target_story` resolution fail-closed behavior for missing, malformed, invalid, outside-project, path-policy-rejected, non-file, or missing-file targets
+- Step 1 selected story metadata derivation, deterministic generation of missing story files, draft/backlog `target_story` resolution through runtime-owned story-index validation and existing-artifact resolution, and direct transition to Step 6 when `edit_intent` is `edit existing story file`
+- `target_story` setup fail-closed behavior for missing, malformed, invalid, unsupported-status, or unresolved selected story targets
 - Step 2 prompt source output
 - Step 3 prompt source output, including the existing-story-index conditional prompt block
 - Step 4 prompt source output for existing and missing story-index branches
