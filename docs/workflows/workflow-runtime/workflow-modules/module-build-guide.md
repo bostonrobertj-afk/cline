@@ -270,13 +270,51 @@ Each `WorkflowStepDefinition.buildToolSchema(...)` must delegate directly to a n
 
 The returned `readonly ClineToolSpec[]` is the complete model-visible workflow tool surface for that turn. It is not additive with default workflow tools, and the legacy contextual tool matrix must not participate.
 
+For normal shared Cline tools, the module-owned tool-schema file owns selection and ordering, but it must reuse the registered shared/default tool specs. Do not hand-build or copy local `ClineToolSpec` objects for normal shared tools such as `read_file`, `read_file_range`, `list_files`, `search_files`, `list_code_definition_names`, `execute_command`, `send_user_message`, `attempt_completion`, `apply_patch`, `write_to_file`, `ask_followup_question`, or `use_subagents`.
+
+Use this pattern for shared/default tools:
+
+```ts
+import { ClineToolSet } from "@/core/prompts/system-prompt/registry/ClineToolSet"
+import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"
+import { registerClineToolSets } from "@/core/prompts/system-prompt/tools/init"
+import { ModelFamily } from "@/shared/prompts"
+import { ClineDefaultTool } from "@/shared/tools"
+
+const EXAMPLE_TOOL_SCHEMA_VARIANT = ModelFamily.NATIVE_GPT_5
+
+function resolveExampleSharedToolSpec(toolId: ClineDefaultTool): ClineToolSpec {
+	registerClineToolSets()
+	const tool = ClineToolSet.getToolByNameWithFallback(toolId, EXAMPLE_TOOL_SCHEMA_VARIANT)
+	if (tool === undefined) {
+		throw new Error(`Missing shared/default tool schema for ${toolId}.`)
+	}
+
+	return tool.config
+}
+
+const EXAMPLE_STEP_2_TOOL_IDS: readonly ClineDefaultTool[] = [
+	ClineDefaultTool.FILE_READ,
+	ClineDefaultTool.APPLY_PATCH,
+	ClineDefaultTool.SEND_USER_MESSAGE,
+	ClineDefaultTool.ASK,
+	ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
+]
+
+export function buildExampleStep2ToolSchemas(): readonly ClineToolSpec[] {
+	return EXAMPLE_STEP_2_TOOL_IDS.map((toolId) => resolveExampleSharedToolSpec(toolId))
+}
+```
+
+Define local `ClineToolSpec` objects only for workflow-specific or domain-specific backend tools that do not have registered shared/default specs and are explicitly authorized by the workflow requirements.
+
 Do not include `archive_workflow_artifact`, `delete_workflow_artifact`, or `move_workflow_project_file` in module tool schemas. Those are backend-only runtime-owned tools. `move_workflow_project_file` must not be model-facing unless a future requirement explicitly approves projection.
 
 Use this translation process for each model-driven step:
 
 1. Read the current workflow source prompt for the step.
 2. Identify the actual actions the AI must perform in the runtime workflow step.
-3. Translate those actions into exact `ClineDefaultTool` schema builders in `{workflowId}ToolSchemas.ts`. Select tools to surface for that turn using the following guidelines:
+3. Translate those actions into exact ordered `ClineDefaultTool` ids in `{workflowId}ToolSchemas.ts`, then resolve normal shared tools through the registered shared/default specs. Select tools to surface for that turn using the following guidelines:
     - write/ update files: apply_patch, write_to_file, read_file, read_file_range (the AI agent needs to be able to read files before/after writing to ensure their write action is executed correctly)
     - read existing files: list_files, search_files, list_code_definition_names, read_file, read_file_range
     - activate subagents: use_subagents
@@ -420,16 +458,20 @@ export function buildExampleStep1ToolSchemas(): readonly ClineToolSpec[] {
 For model-driven steps:
 
 ```ts
+const EXAMPLE_STEP_2_TOOL_IDS: readonly ClineDefaultTool[] = [
+  ClineDefaultTool.FILE_READ,
+  ClineDefaultTool.APPLY_PATCH,
+  ClineDefaultTool.SEND_USER_MESSAGE,
+  ClineDefaultTool.ASK,
+  ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
+]
+
 export function buildExampleStep2ToolSchemas(): readonly ClineToolSpec[] {
-  return [
-    buildExampleReadFileToolSchema(),
-    buildExampleApplyPatchToolSchema(),
-    buildExampleSendUserMessageToolSchema(),
-    buildExampleAskFollowupQuestionToolSchema(),
-    buildExampleWorkflowProgressRequestToolSchema(),
-  ]
+  return EXAMPLE_STEP_2_TOOL_IDS.map((toolId) => resolveExampleSharedToolSpec(toolId))
 }
 ```
+
+When a model-driven step needs a workflow-specific backend tool that has no shared/default spec, define a local builder for that tool only and include it directly in the returned array alongside resolved shared/default specs.
 
 Keep the tool list exact. If a step prompt says the AI can switch methods, inspect documents, edit an artifact, ask the user a question, and request progression, the schema must include exactly the tools needed for those actions.
 

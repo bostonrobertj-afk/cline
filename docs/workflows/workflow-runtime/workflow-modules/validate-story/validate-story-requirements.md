@@ -250,7 +250,7 @@ Step 1 must expose exactly these existing shared/default tool schemas, in this o
 7. `send_user_message`
 8. `attempt_completion`
 
-The Step 1 tool-schema builder must use existing shared/default `ClineDefaultTool` schema builders and must not define custom validate-story descriptions for those tools.
+The Step 1 tool-schema builder must follow `FR-15g` and the module build guide shared/default tool-schema resolver pattern. It must declare the exact ordered `readonly ClineDefaultTool[]` for the Step 1 tool ids and resolve each shared/default tool through `ClineToolSet.getToolByNameWithFallback(..., ModelFamily.NATIVE_GPT_5)` after calling `registerClineToolSets()`. It must not hand-build or copy local `ClineToolSpec` objects, and it must not define custom validate-story descriptions for shared/default tools.
 
 The validate-story tool schema must not include:
 
