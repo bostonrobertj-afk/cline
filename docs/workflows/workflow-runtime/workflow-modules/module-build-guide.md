@@ -26,7 +26,7 @@ Build a workflow module in this order:
 6. Add shared backend tools only when module behavior truly requires them.
 7. Register the workflow.
 8. Add tests at the module, runtime, handler, and prompt-projection levels.
-9. Run unit validation, typecheck, lint, package, and a real workflow smoke test.
+9. Run unit validation, typecheck, lint, package.
 
 Do not start from code. The requirements must own the final behavior, especially prompt text, step progression, artifact behavior, and model-visible tool schemas.
 

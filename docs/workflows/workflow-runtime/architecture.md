@@ -40,7 +40,7 @@ The architecture is constrained by the following discovery decisions and existin
 - The system will not continue supporting user-authored workflows as part of this architecture direction.
 - Workflows will ship with the product and will be registered in product-owned runtime code.
 - Managed workflows are being retired.
-- Workflow placeholders are being retired as a concept.
+- Legacy workflow placeholders are being retired as a concept. Runtime-owned workflow prompt value references are allowed only as code-owned prompt-template syntax rendered by the shared workflow runtime.
 - Workflow-owned values discovered during execution still require one canonical runtime-owned persistence surface after placeholder workflows are retired.
 - Focus chain becomes a workflow-only downstream surface and no longer owns active-step state.
 - `task_progress` is retired.
@@ -228,6 +228,7 @@ Responsibilities:
 - orchestrate workflow lifecycle across turns
 - orchestrate multiple concurrent workflow sessions across parent and child execution contexts
 - validate and apply workflow-value mutations from backend-owned logic and AI-callable tool paths
+- validate and render workflow prompt value references through one shared runtime-owned prompt-template renderer before prompt projection
 - validate allowed transitions and progression mechanisms
 - coordinate completion and teardown
 - persist and restore workflow session state
@@ -251,7 +252,7 @@ Responsibilities:
 - branch only on documented `WorkflowBranchTriggerEvent` variants and payloads; modules must not define custom trigger-event variants or depend on runtime-internal event fields
 - Model-called workflow-projected tool success and failure are emitted as model-tool lifecycle events carrying the canonical tool name. These events allow workflow modules to route success, retry, recovery, user notification, step transition, or completion behavior after AI-invoked tools without treating those tools as runtime-selected source-route operations. `tool_backed_operation_succeeded` and `tool_backed_operation_failed` remain reserved for runtime-selected deterministic tool-backed actions with `{ branchId, routeId }` source-route correlation.
 - declare selector discovery only through documented roots, target path segments, filters, labels, and sort rules; modules must not provide arbitrary filesystem paths or path traversal conventions
-- declare per-step prompt content
+- declare per-step prompt templates using runtime-owned workflow value reference syntax; modules must not hand-render workflow-value references
 - declare workflow-level and per-step native tool schema
 - declare workflow-entry informational panel content and workflow-form configuration
 - declare deterministic step-resolution rules
@@ -368,7 +369,7 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 4. Workflow runtime writes the values into the active session's canonical workflow value map while preserving each value's JSON-safe type and shape.
 5. Workflow runtime compares workflow values with deterministic equality for JSON-safe values, not by string-only comparison.
 6. Downstream prompt, artifact-path, form, and focus-chain projections consume those values from workflow session state.
-7. Prompt builders that insert workflow values into instruction text render those values deterministically: strings as-is, numbers and booleans through `String(value)`, and arrays and objects as stable JSON.
+7. Prompt template projection consumes workflow values through the shared runtime-owned prompt-template renderer, which validates `{workflow.<workflowValueKey>}` references against the active workflow definition and renders values deterministically.
 8. Tool payload builders consume the typed workflow values directly when the target tool supports that shape; any runtime or tool code that requires a string workflow value must validate a non-empty string before use and fail clearly otherwise.
 9. When workflow-value persistence returns a next action, the tool or backend path carries that action to the shared next-action consumer after its normal result is recorded.
 
@@ -493,7 +494,7 @@ This removes the need for placeholder substitution as a first-class runtime conc
 
 Workflow-owned values remain a first-class concept, but they are session-owned runtime state rather than placeholder-system state.
 
-Workflow-owned values are typed JSON-safe session data, not a string-only placeholder map. Prompt-builder functions may render those values into final workflow instructions, but that rendering is local to prompt construction and must not reintroduce a generic placeholder subsystem or leave unresolved placeholder markers in the workflow prompt contract.
+Workflow-owned values are typed JSON-safe session data, not a string-only placeholder map. Workflow prompt templates may reference workflow values only through runtime-owned workflow value reference syntax, and the shared workflow runtime renders those references before prompt projection. Workflow modules must not perform local ad hoc workflow-value substitution or leave unresolved workflow value reference markers in the prompt contract.
 
 ### 8.4 Workflow-Owned Tool Exposure
 

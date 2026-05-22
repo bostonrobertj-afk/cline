@@ -11887,3 +11887,353 @@ Allowed files:
 
     Allowed files:
     - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+## Phase 72 - Runtime-Owned Workflow Prompt Template Rendering
+
+Pause for QA review after completing Phase 72.
+
+### Phase 72 Scope
+
+This phase adds the shared workflow-runtime prompt-template capability required by `FR-14a` through `FR-14e2` and `FR-63c`. The runtime must support `{workflow.<workflowValueKey>}` references in code-owned prompt templates, validate those references against the active workflow definition's declared `workflowValueKeys`, render referenced workflow values through the existing deterministic workflow-value prompt renderer, treat rendered workflow values as terminal text, and preserve existing `currentStepInstructions` compatibility until workflow modules are migrated separately.
+
+### Phase 72 Scope Boundary
+
+- Do not migrate any workflow module prompt text or replace any workflow-module-local prompt rendering in this phase.
+- Do not remove `WorkflowPromptBuilderInput.renderWorkflowValue(...)` in this phase; existing workflow modules still compile through the legacy compatibility path.
+- Do not add `{data.*}` or workflow-form data references to workflow prompt templates.
+- Do not add expression evaluation, file reads, dynamic imports, `eval`, `Function`, recursive/nested prompt-template rendering, or module-authored executable interpolation.
+- Do not change workflow-form interpolation behavior; `{workflow.*}` and `{data.*}` workflow-form interpolation remains owned by the existing workflow-form pipeline.
+- Do not add model-facing tools, workflow-tool schemas, artifact families, registry entries, or workflow-module routing in this phase.
+
+### Phase 72 Known Issues / Risks / Technical Debt
+
+- Existing workflow modules still use `currentStepInstructions` and module-local prompt rendering. Phase 72 must keep that compatibility path working and add the runtime-owned template path as an additive shared capability for future module migrations.
+- At the time this phase was authored, `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md` and `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/architecture.md` were already dirty from the approved runtime-owned prompt-template requirements and architecture updates. Phase 72 implementation and QA must not treat those pre-existing diffs as Phase 72 scope unless Phase 72 changes them.
+
+### Phase 72 Tasks / Subtasks
+
+[ ] Task 267. Add the shared workflow prompt-template renderer.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowPromptTemplates.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 267.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowPromptTemplates.ts`, create the file with exactly these imports: type `WorkflowValidationResult`, type `WorkflowValues`, and type `WorkflowValue` from `./types`; and `stringifyWorkflowValueForPrompt` from `./workflowValues`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowPromptTemplates.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 267.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowPromptTemplates.ts`, add exported interface `WorkflowPromptTemplateValidationArgs` with fields `template: string`, `workflowValueKeys: readonly string[]`, and `context: string`; and exported interface `WorkflowPromptTemplateRenderArgs` with fields `template: string`, `workflowValueKeys: readonly string[]`, `workflowValues: WorkflowValues`, and `context: string`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowPromptTemplates.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 267.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowPromptTemplates.ts`, add internal constants `WORKFLOW_PROMPT_TEMPLATE_REFERENCE_PATTERN = /\{([^{}]*)\}/g`, `WORKFLOW_PROMPT_TEMPLATE_WORKFLOW_PREFIX = "workflow."`, and `WORKFLOW_PROMPT_TEMPLATE_KEY_PATTERN = /^[A-Za-z0-9_-]+$/`; then add internal interface `WorkflowPromptTemplateReference` with readonly fields `placeholder: string` and `reference: string`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowPromptTemplates.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 267.4. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowPromptTemplates.ts`, add `function readWorkflowPromptTemplateReferences(template: string): WorkflowPromptTemplateReference[]` that initializes `const references: WorkflowPromptTemplateReference[] = []`, loops `for (const match of template.matchAll(WORKFLOW_PROMPT_TEMPLATE_REFERENCE_PATTERN))`, assigns `const placeholder = match[0]` and `const reference = match[1]`, continues when `reference === undefined`, pushes `{ placeholder, reference }` otherwise, and returns `references`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowPromptTemplates.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 267.5. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowPromptTemplates.ts`, add exported `function validateWorkflowPromptTemplate(args: WorkflowPromptTemplateValidationArgs): WorkflowValidationResult`; it must create `const workflowValueKeys = new Set(args.workflowValueKeys)`, loop over `readWorkflowPromptTemplateReferences(args.template)`, return `{ valid: false, errorMessage: \`Workflow prompt template ${args.context} contains unsupported reference ${reference.placeholder}.\` }` when `reference.reference.startsWith(WORKFLOW_PROMPT_TEMPLATE_WORKFLOW_PREFIX) === false`, assign `const workflowValueKey = reference.reference.slice(WORKFLOW_PROMPT_TEMPLATE_WORKFLOW_PREFIX.length)`, return `{ valid: false, errorMessage: \`Workflow prompt template ${args.context} contains blank workflow value reference.\` }` when `workflowValueKey.trim() === ""`, return `{ valid: false, errorMessage: \`Workflow prompt template ${args.context} contains malformed workflow value reference ${reference.placeholder}.\` }` when `workflowValueKey.trim() !== workflowValueKey || WORKFLOW_PROMPT_TEMPLATE_KEY_PATTERN.test(workflowValueKey) === false`, return `{ valid: false, errorMessage: \`Workflow prompt template ${args.context} references undeclared workflow value ${workflowValueKey}.\` }` when `workflowValueKeys.has(workflowValueKey) === false`, and return `{ valid: true }` after all references pass.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowPromptTemplates.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 267.6. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowPromptTemplates.ts`, add `function renderWorkflowPromptTemplateValue(value: WorkflowValue | undefined): string` that returns `""` when `value === undefined` and otherwise returns `stringifyWorkflowValueForPrompt(value)`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowPromptTemplates.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 267.7. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowPromptTemplates.ts`, add exported `function renderWorkflowPromptTemplate(args: WorkflowPromptTemplateRenderArgs): string` with this exact implementation:
+
+    ```ts
+    export function renderWorkflowPromptTemplate(args: WorkflowPromptTemplateRenderArgs): string {
+        const validationResult = validateWorkflowPromptTemplate({
+            template: args.template,
+            workflowValueKeys: args.workflowValueKeys,
+            context: args.context,
+        })
+        if (validationResult.valid === false) {
+            throw new Error(validationResult.errorMessage)
+        }
+
+        const workflowValueKeys = new Set(args.workflowValueKeys)
+        return args.template.replace(
+            WORKFLOW_PROMPT_TEMPLATE_REFERENCE_PATTERN,
+            (placeholder: string, reference: string | undefined): string => {
+                if (reference === undefined) {
+                    return placeholder
+                }
+                if (reference.startsWith(WORKFLOW_PROMPT_TEMPLATE_WORKFLOW_PREFIX) === false) {
+                    return placeholder
+                }
+
+                const workflowValueKey = reference.slice(WORKFLOW_PROMPT_TEMPLATE_WORKFLOW_PREFIX.length)
+                if (workflowValueKey.trim() === "") {
+                    return placeholder
+                }
+                if (workflowValueKey.trim() !== workflowValueKey || WORKFLOW_PROMPT_TEMPLATE_KEY_PATTERN.test(workflowValueKey) === false) {
+                    return placeholder
+                }
+                if (workflowValueKeys.has(workflowValueKey) === false) {
+                    return placeholder
+                }
+
+                return renderWorkflowPromptTemplateValue(args.workflowValues[workflowValueKey])
+            },
+        )
+    }
+    ```
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowPromptTemplates.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Task 268. Extend workflow prompt source and step definition types for runtime-owned prompt templates.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 268.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`, update `WorkflowStepPromptSource` by adding `currentStepInstructionTemplate?: string` before the existing `currentStepInstructions?: string` field.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 268.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`, update `WorkflowStepDefinition` by adding `promptTemplates?: readonly string[]` immediately before `buildPromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Task 269. Wire runtime-owned prompt-template validation and rendering into `WorkflowRuntime`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 269.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, add `WorkflowStepPromptSource` to the existing type import from `./types`, and add a new import from `./workflowPromptTemplates` importing exactly `renderWorkflowPromptTemplate` and `validateWorkflowPromptTemplate`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 269.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, add private method `validateWorkflowStepPromptTemplates(args: { workflow: WorkflowDefinition; step: WorkflowStepDefinition }): WorkflowValidationResult` immediately before `validateWorkflowDefinition(...)`; the method must loop over `args.step.promptTemplates ?? []`, return `{ valid: false, errorMessage: \`Workflow step ${args.step.id} promptTemplates entry must not be empty.\` }` when `promptTemplate.trim() === ""`, call `validateWorkflowPromptTemplate({ template: promptTemplate, workflowValueKeys: args.workflow.workflowValueKeys, context: \`workflow ${args.workflow.name} step ${args.step.id} promptTemplates entry\` })`, return that validation result when `validationResult.valid === false`, and return `{ valid: true }` after all templates pass.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 269.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, inside the existing `for (const step of steps)` loop in `validateWorkflowDefinition(...)`, immediately after the `step.checklistLabel.trim() === ""` guard and before the `seenStepNumbers.has(step.stepNumber)` guard, add `const promptTemplateValidation = this.validateWorkflowStepPromptTemplates({ workflow, step })`; if `promptTemplateValidation.valid === false`, return `promptTemplateValidation`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 269.4. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, add private method `resolveWorkflowCurrentStepInstructions(args: { workflow: WorkflowDefinition; step: WorkflowStepDefinition; session: ActiveWorkflowSession; promptSource: WorkflowStepPromptSource }): string | undefined` immediately before `buildWorkflowCurrentStepInputPayloadBlock(...)`; the method must assign `const hasCurrentStepInstructions = args.promptSource.currentStepInstructions !== undefined` and `const hasCurrentStepInstructionTemplate = args.promptSource.currentStepInstructionTemplate !== undefined`, throw `new Error(\`Workflow step ${args.step.id} prompt source must not define both currentStepInstructions and currentStepInstructionTemplate.\`)` when both booleans are true, return `args.promptSource.currentStepInstructions` when `hasCurrentStepInstructionTemplate === false`, assign `const currentStepInstructionTemplate = args.promptSource.currentStepInstructionTemplate`, return `args.promptSource.currentStepInstructions` when `currentStepInstructionTemplate === undefined`, throw `new Error(\`Workflow step ${args.step.id} currentStepInstructionTemplate requires promptTemplates.\`)` when `args.step.promptTemplates === undefined`, throw `new Error(\`Workflow step ${args.step.id} currentStepInstructionTemplate must be declared in promptTemplates.\`)` when `args.step.promptTemplates.includes(currentStepInstructionTemplate) === false`, and otherwise return `renderWorkflowPromptTemplate({ template: currentStepInstructionTemplate, workflowValueKeys: args.workflow.workflowValueKeys, workflowValues: args.session.workflowValues, context: \`workflow ${args.workflow.name} step ${args.step.id} currentStepInstructionTemplate\` })`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 269.5. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, in `buildTurnProjection(...)`, immediately after `const promptSource = activeStep.buildPromptSource(promptBuilderInput)`, add `const currentStepInstructions = this.resolveWorkflowCurrentStepInstructions({ workflow: definition, step: activeStep, session, promptSource })`; then replace both `promptSource.currentStepInstructions` arguments passed to `this.buildWorkflowCurrentStepInputPayloadBlock(...)` with `currentStepInstructions`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Task 270. Add pure unit coverage for the shared prompt-template renderer.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 270.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts`, create the file with exactly these imports: `expect` from `chai`, `describe` and `it` from `mocha`, type `WorkflowValues` from `../types`, and `renderWorkflowPromptTemplate` plus `validateWorkflowPromptTemplate` from `../workflowPromptTemplates`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 270.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts`, add top-level `describe("workflow prompt templates", () => {})`; inside that describe block, add test `renders declared workflow references with deterministic workflow values` that defines `const workflowValues: WorkflowValues = { project_title: "Project Alpha", target_story: "/tmp/story.md", details: { ready: true, priority: 2 } }`, calls `renderWorkflowPromptTemplate({ template: "Project {workflow.project_title}\\nStory {workflow.target_story}\\nDetails {workflow.details}\\nMissing {workflow.missing_value}", workflowValueKeys: ["project_title", "target_story", "details", "missing_value"], workflowValues, context: "unit test prompt" })`, and asserts the result exactly equals `"Project Project Alpha\nStory /tmp/story.md\nDetails {\"priority\":2,\"ready\":true}\nMissing "`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 270.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts`, inside the `describe("workflow prompt templates", () => {})` block added by Subtask 270.2, add test `allows repeated references to the same declared workflow value` that calls `validateWorkflowPromptTemplate({ template: "{workflow.target_story} then {workflow.target_story}", workflowValueKeys: ["target_story"], context: "duplicate reference prompt" })` and asserts the result deep-equals `{ valid: true }`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 270.4. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts`, inside the `describe("workflow prompt templates", () => {})` block added by Subtask 270.2, add test `rejects unsupported non-workflow references` that calls `validateWorkflowPromptTemplate({ template: "Use {data.target_story}", workflowValueKeys: ["target_story"], context: "unsupported reference prompt" })` and asserts the result deep-equals `{ valid: false, errorMessage: "Workflow prompt template unsupported reference prompt contains unsupported reference {data.target_story}." }`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 270.5. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts`, inside the `describe("workflow prompt templates", () => {})` block added by Subtask 270.2, add test `rejects blank workflow value references` that calls `validateWorkflowPromptTemplate({ template: "Use {workflow.}", workflowValueKeys: ["target_story"], context: "blank reference prompt" })` and asserts the result deep-equals `{ valid: false, errorMessage: "Workflow prompt template blank reference prompt contains blank workflow value reference." }`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 270.6. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts`, inside the `describe("workflow prompt templates", () => {})` block added by Subtask 270.2, add test `rejects malformed workflow value references` that calls `validateWorkflowPromptTemplate({ template: "Use {workflow.target.story}", workflowValueKeys: ["target_story"], context: "malformed reference prompt" })` and asserts the result deep-equals `{ valid: false, errorMessage: "Workflow prompt template malformed reference prompt contains malformed workflow value reference {workflow.target.story}." }`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 270.7. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts`, inside the `describe("workflow prompt templates", () => {})` block added by Subtask 270.2, add test `rejects undeclared workflow value references` that calls `validateWorkflowPromptTemplate({ template: "Use {workflow.target_story}", workflowValueKeys: ["architecture_document"], context: "undeclared reference prompt" })` and asserts the result deep-equals `{ valid: false, errorMessage: "Workflow prompt template undeclared reference prompt references undeclared workflow value target_story." }`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 270.8. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts`, inside the `describe("workflow prompt templates", () => {})` block added by Subtask 270.2, add test `throws the validation error before rendering invalid templates` that declares `let thrownError: Error | undefined`, calls `renderWorkflowPromptTemplate({ template: "Use {workflow.target_story}", workflowValueKeys: ["architecture_document"], workflowValues: { target_story: "/tmp/story.md" }, context: "invalid render prompt" })` inside a try/catch, assigns `thrownError = error` only when `error instanceof Error`, throws `new Error("Expected invalid render prompt to throw.")` when `thrownError === undefined`, and asserts `thrownError.message` exactly equals `"Workflow prompt template invalid render prompt references undeclared workflow value target_story."`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 270.9. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts`, inside the `describe("workflow prompt templates", () => {})` block added by Subtask 270.2, add test `treats rendered workflow values as terminal text` that defines `const workflowValues: WorkflowValues = { first_value: "{workflow.second_value}", second_value: "must not render" }`, calls `renderWorkflowPromptTemplate({ template: "Value {workflow.first_value}", workflowValueKeys: ["first_value", "second_value"], workflowValues, context: "terminal value prompt" })`, asserts the result exactly equals `"Value {workflow.second_value}"`, and asserts the result does not contain `"must not render"`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Task 271. Add runtime projection and validation coverage for prompt-template integration.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 271.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update helper `createStepDefinition(args: ...)` so the `args` type includes `promptTemplates?: WorkflowStepDefinition["promptTemplates"]` and `buildPromptSource?: WorkflowStepDefinition["buildPromptSource"]`; inside the helper, create `const stepId: WorkflowStepDefinition["id"] = \`step-${args.stepNumber}\`` before constructing the returned object; create `const stepDefinition: WorkflowStepDefinition = { id: stepId, stepNumber: args.stepNumber, checklistLabel: args.checklistLabel ?? \`Step ${args.stepNumber}\`, buildPromptSource: args.buildPromptSource ?? (() => createPromptSource()), buildToolSchema: () => args.toolSchema ?? [], decisionTree: args.decisionTree ?? createProjectPromptDecisionTree(), completionRules: args.completionRules }`; when `args.promptTemplates !== undefined`, return `{ id: stepDefinition.id, stepNumber: stepDefinition.stepNumber, checklistLabel: stepDefinition.checklistLabel, buildPromptSource: stepDefinition.buildPromptSource, buildToolSchema: stepDefinition.buildToolSchema, decisionTree: stepDefinition.decisionTree, completionRules: stepDefinition.completionRules, promptTemplates: args.promptTemplates }`; otherwise return `stepDefinition`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 271.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `rejects promptTemplates references to undeclared workflow values before activation` near the existing invalid workflow definition activation tests; create `const invalidState = new TaskState()`, create `const workflow = createWorkflowDefinition({ workflowValueKeys: ["declared_value"], steps: { "step-1": createStepDefinition({ stepNumber: 1, promptTemplates: ["Review {workflow.undeclared_value}."] }) } })`, call `const result = await activateWorkflow(invalidState, workflow)`, assert `result` deep-equals `{ kind: "no_op" }`, assert `invalidState.activeWorkflowName === undefined`, and assert `invalidState.activeWorkflowSession === undefined`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 271.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `renders currentStepInstructionTemplate through runtime-owned prompt template projection` near the existing `projects workflow prompt blocks and tool schema override for the active step` test; define `const promptTemplate = "Review {workflow.target_story} with {workflow.review_context} and {workflow.missing_context}."`, create `const workflow = createWorkflowDefinition({ workflowValueKeys: ["target_story", "review_context", "missing_context"], steps: { "step-1": createStepDefinition({ stepNumber: 1, promptTemplates: [promptTemplate], buildPromptSource: () => ({ currentStepInstructionTemplate: promptTemplate }) }) } })`, activate the workflow, set `taskState.apiRequestCount = 1`, submit new project selection `"Template Projection Project"`, read `const session = taskState.activeWorkflowSession` and throw `new Error("Expected active workflow session after project selection.")` when `session === undefined`, assign `session.workflowValues.target_story = "/tmp/story.md"` and `session.workflowValues.review_context = { ready: true, priority: 2 }`, call `const projection = await runtime.buildTurnProjection({ taskState })`, assign `const workflowInputPayloadBlock = projection.workflowInputPayloadBlock`, throw `new Error("Expected workflow input payload block.")` when `workflowInputPayloadBlock === undefined`, assert `workflowInputPayloadBlock` contains `"Review /tmp/story.md with {\"priority\":2,\"ready\":true} and ."`, and assert `workflowInputPayloadBlock` does not contain `{workflow.target_story}`, `{workflow.review_context}`, or `{workflow.missing_context}`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 271.4. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `rejects prompt sources that define template and rendered instructions together` near the test added by Subtask 271.3; create `const promptTemplate = "Review {workflow.target_story}."`, create a workflow with `workflowValueKeys: ["target_story"]`, `promptTemplates: [promptTemplate]`, and `buildPromptSource: () => ({ currentStepInstructionTemplate: promptTemplate, currentStepInstructions: "Already rendered instructions" })`; activate it, set `taskState.apiRequestCount = 1`, submit new project selection `"Invalid Prompt Source Project"`, declare `let thrownError: Error | undefined`, call `await runtime.buildTurnProjection({ taskState })` inside a try/catch, assign `thrownError = error` only when `error instanceof Error`, throw `new Error("Expected invalid prompt source to throw.")` when `thrownError === undefined`, and assert `thrownError.message` exactly equals `"Workflow step step-1 prompt source must not define both currentStepInstructions and currentStepInstructionTemplate."`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 271.5. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add test `rejects returned prompt templates that were not declared on the step` near the test added by Subtask 271.4; create `const declaredPromptTemplate = "Review {workflow.target_story}."`, create `const returnedPromptTemplate = "Review {workflow.other_story}."`, create a workflow with `workflowValueKeys: ["target_story", "other_story"]`, `promptTemplates: [declaredPromptTemplate]`, and `buildPromptSource: () => ({ currentStepInstructionTemplate: returnedPromptTemplate })`; activate it, set `taskState.apiRequestCount = 1`, submit new project selection `"Undeclared Runtime Template Project"`, declare `let thrownError: Error | undefined`, call `await runtime.buildTurnProjection({ taskState })` inside a try/catch, assign `thrownError = error` only when `error instanceof Error`, throw `new Error("Expected undeclared runtime template to throw.")` when `thrownError === undefined`, and assert `thrownError.message` exactly equals `"Workflow step step-1 currentStepInstructionTemplate must be declared in promptTemplates."`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Task 272. Update module-build guidance for runtime-owned workflow prompt templates.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 272.1. In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`, replace the sentence `Current step instructions belong in `buildPromptSource(...).currentStepInstructions`, not workflow system instructions. Do not put current step details into persona fields or workflow-level system instructions.` with `Current step prompt templates belong in `buildPromptSource(...).currentStepInstructionTemplate`, not workflow system instructions. Do not put current step details into persona fields or workflow-level system instructions. Existing modules that have not yet migrated may continue returning `currentStepInstructions` until their module-specific migration phase replaces local prompt rendering.`
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 272.2. In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`, replace the sentence `Prompt builders may interpolate workflow values only through the runtime prompt builder input, such as `input.renderWorkflowValue(...)`. For paths like `output_file`, render the persisted value rather than reconstructing it.` with `Prompt templates may reference workflow values only with `{workflow.<workflowValueKey>}` tokens matching declared `workflowValueKeys`. The shared `WorkflowRuntime` prompt-template renderer validates and renders those tokens before prompt projection. Workflow modules must not use local `replace`, `replaceAll`, regex, or hand-built substitution for workflow-value references after migration to the prompt-template contract.`
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 272.3. In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`, replace the paragraph beginning `When the user-authored source document provides step prompt wording, `buildPromptSource(...)` must preserve that wording exactly` with `When the user-authored source document provides step prompt wording, `buildPromptSource(...)` must preserve that wording exactly except for converting workflow-value references into `{workflow.<workflowValueKey>}` prompt-template tokens and applying explicitly approved runtime-only substitutions. Tests must not assert exact editable prompt prose. Protect prompt behavior with shape and invariant assertions: prompt output exists when required, required workflow values are rendered non-empty, prompt-template tokens required by the requirements are materialized, forbidden legacy text is absent, current step details are projected in the correct payload location, and the projected tool schema matches the prompt's tool references.`
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Task 273. Update action-plan guidance for prompt-template coverage.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/action-plan-guide.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 273.1. In `/Users/robertboston/Documents/Cline Extension/cline/docs/action-plan-guide.md`, replace the exactness-check bullet `Prompt placeholder coverage: prompt tests must include raw-placeholder negative assertions for every placeholder required by the requirements, including conditional placeholders.` with `Prompt template coverage: prompt tests must include materialization assertions for every `{workflow.<workflowValueKey>}` prompt-template token required by the requirements, including conditional prompt templates, and must assert those source-template tokens do not remain in rendered prompt output.`
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/action-plan-guide.md`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 273.2. In `/Users/robertboston/Documents/Cline Extension/cline/docs/action-plan-guide.md`, replace the test-calibration bullet `For tests focused on prompt behavior, ensure that coverage exists ensuring that required prompts are non-empty, conditional prompting is included when required, and that each placeholder is materialized in the prompt rather than the prompt including the raw placeholder text.` with `For tests focused on prompt behavior, ensure that coverage exists ensuring that required prompts are non-empty, conditional prompting is included when required, and each required `{workflow.<workflowValueKey>}` prompt-template token is materialized in rendered prompt output rather than remaining as source-template text.`
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/action-plan-guide.md`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+### Phase 72 Validation
+
+[ ] Task 274. Run Phase 72 focused unit validation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 274.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Task 275. Run Phase 72 static and package validation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 275.1. Run `npm run check-types`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 275.2. Run `npm run lint`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 275.3. Run `npm run package`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Task 276. Run Phase 72 scope-diff validation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 276.1. Run `git diff --name-only`; confirm Phase 72 implementation changed only `/Users/robertboston/Documents/Cline Extension/cline/docs/action-plan-guide.md`, `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`, `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`, `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`, `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowPromptTemplates.ts`, `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts`, and `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`; if `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/requirements.md` or `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/architecture.md` appear in the diff, treat them as pre-existing dirty files unless their Phase 72 diff changed during this phase.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 276.2. Run `git ls-files --others --exclude-standard`; confirm Phase 72 introduced only `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowPromptTemplates.ts` and `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts` as untracked files.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
