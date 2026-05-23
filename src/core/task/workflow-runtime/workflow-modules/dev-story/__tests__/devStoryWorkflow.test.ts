@@ -18,7 +18,6 @@ import type {
 	WorkflowDecisionBranchRoute,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
-	WorkflowValue,
 	WorkflowValues,
 	WorkflowWorkspacePathPolicy,
 } from "../../../types"
@@ -28,6 +27,7 @@ import {
 	resolveWorkflowDefinition,
 } from "../../../WorkflowRegistry"
 import { WorkflowRuntime } from "../../../WorkflowRuntime"
+import { renderWorkflowPromptTemplate } from "../../../workflowPromptTemplates"
 import {
 	buildDevStoryGitFinalizeInstruction,
 	DEV_STORY_ENTRY_PROJECT_VALUE_KEYS,
@@ -52,11 +52,11 @@ const TEST_PROJECT_ROOT = "/tmp/dev-story-project"
 const TEST_TARGET_STORY = `${TEST_PROJECT_ROOT}/implementation/stories-backlog/Story-1-2.md`
 const TEST_STORIES_INDEX = `${TEST_PROJECT_ROOT}/implementation/epic-1-stories.index.json`
 
-function buildAllowedFilesValue(): WorkflowValue {
+function buildAllowedFilesValue(): WorkflowValues[string] {
 	return []
 }
 
-function buildSubtaskInventoryValue(args: { id: string; rawLine: string; completed: boolean }): WorkflowValue {
+function buildSubtaskInventoryValue(args: { id: string; rawLine: string; completed: boolean }): WorkflowValues[string] {
 	return {
 		id: args.id,
 		lineIndex: 10,
@@ -70,8 +70,8 @@ function buildTaskInventoryValue(args: {
 	id: string
 	rawLine: string
 	completed: boolean
-	subtasks: readonly WorkflowValue[]
-}): WorkflowValue {
+	subtasks: readonly WorkflowValues[string][]
+}): WorkflowValues[string] {
 	return {
 		id: args.id,
 		lineIndex: 5,
@@ -86,7 +86,7 @@ function buildStoryTaskInventoryValue(args: {
 	firstTaskComplete: boolean
 	secondTaskComplete: boolean
 	thirdTaskComplete: boolean
-}): WorkflowValue {
+}): WorkflowValues[string] {
 	return {
 		tasks: [
 			buildTaskInventoryValue({
@@ -259,14 +259,6 @@ function getSingleField(panel: WorkflowFormPanelDefinition): WorkflowFormFieldDe
 	return field
 }
 
-function renderWorkflowValue(value: WorkflowValue): string {
-	if (typeof value === "string") {
-		return value
-	}
-
-	return JSON.stringify(value)
-}
-
 function createPromptInput(args: {
 	stepId: WorkflowStepDefinition["id"]
 	activeBranchId: string
@@ -280,7 +272,6 @@ function createPromptInput(args: {
 			workflowValues: args.workflowValues,
 		}),
 		step,
-		renderWorkflowValue,
 	}
 }
 
@@ -290,11 +281,31 @@ function getPromptInstructions(args: {
 	workflowValues: WorkflowValues
 }): string {
 	const promptSource = getStep(args.stepId).buildPromptSource(createPromptInput(args))
-	if (promptSource.currentStepInstructions === undefined) {
-		throw new Error(`Missing prompt instructions for ${args.stepId}.`)
+	if (promptSource.kind !== "current_step_instruction_template") {
+		throw new Error(`Missing current step instruction template for ${args.stepId}.`)
 	}
 
-	return promptSource.currentStepInstructions
+	const template = promptSource.currentStepInstructionTemplate
+	return renderWorkflowPromptTemplate({
+		template,
+		workflowValueKeys: devStoryWorkflowDefinition.workflowValueKeys,
+		workflowValues: args.workflowValues,
+		context: `dev-story ${args.stepId} test prompt`,
+	})
+}
+
+function expectNoDevStoryWorkflowPromptTokens(prompt: string): void {
+	const promptTokens: readonly string[] = [
+		"{workflow.story_general_instructions}",
+		"{workflow.story_objective}",
+		"{workflow.story_scope_boundary}",
+		"{workflow.story_scope}",
+		"{workflow.story_requirements}",
+		"{workflow.story_issues}",
+	]
+	for (const promptToken of promptTokens) {
+		expect(prompt).not.to.include(promptToken)
+	}
 }
 
 function buildModelToolSucceededEvent(toolName: ClineDefaultTool): WorkflowBranchTriggerEvent {
@@ -655,12 +666,19 @@ describe("devStoryWorkflowDefinition Step 2", () => {
 			}),
 		})
 
+		expect(prompt).to.include("General guidance")
+		expect(prompt).to.include("Objective detail")
+		expect(prompt).to.include("Scope detail")
+		expect(prompt).to.include("Boundary detail")
+		expect(prompt).to.include("Requirement detail")
+		expect(prompt).to.include("Issue detail")
 		expect(prompt).to.be.a("string").and.not.empty
 		expect(prompt).to.include("General guidance")
 		expect(prompt).to.include("Objective detail")
 		expect(prompt).to.include("- [ ] Task 1: Update runtime")
 		expect(prompt).to.include("  - [ ] Subtask 1.1: Update runtime contract")
 		expect(prompt).to.not.include("- [ ] Task 2: Update prompt projection")
+		expectNoDevStoryWorkflowPromptTokens(prompt)
 	})
 
 	it("does not define an automatic task-loop prompt route for ordinary subtask completions without a queued workflow event", () => {
@@ -709,6 +727,7 @@ describe("devStoryWorkflowDefinition Step 2", () => {
 		expect(prompt).to.include("  - [ ] Subtask 2.1: Project task detail")
 		expect(prompt).to.not.include("General guidance")
 		expect(prompt).to.not.include("- [ ] Task 1: Update runtime")
+		expectNoDevStoryWorkflowPromptTokens(prompt)
 	})
 
 	it("continues task-loop prompt detail while incomplete tasks remain", () => {
@@ -744,6 +763,7 @@ describe("devStoryWorkflowDefinition Step 2", () => {
 		expect(prompt).to.include("  - [ ] Subtask 3.1: Run validation")
 		expect(prompt).to.not.include("Objective detail")
 		expect(prompt).to.not.include("- [ ] Task 2: Update prompt projection")
+		expectNoDevStoryWorkflowPromptTokens(prompt)
 	})
 
 	it("transitions to Step 3 when story task inventory is complete", () => {
@@ -801,6 +821,7 @@ describe("devStoryWorkflowDefinition Step 3 and Step 4", () => {
 			}),
 		})
 		expect(prompt).to.be.a("string").and.not.empty
+		expectNoDevStoryWorkflowPromptTokens(prompt)
 
 		const projectPromptRoute = findStepRoute("step-3", "step-3-project-prompt", "step-3-project-prompt")
 		expect(projectPromptRoute.action).to.deep.equal({

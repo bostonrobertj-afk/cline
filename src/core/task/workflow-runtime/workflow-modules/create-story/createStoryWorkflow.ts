@@ -149,7 +149,7 @@ function buildRuntimeRoutedTransition(): WorkflowFormDefinitionPayload["panels"]
 }
 
 function createEmptyPromptSource(): WorkflowStepPromptSource {
-	return {}
+	return { kind: "none" }
 }
 
 function createStepDefinition(args: {
@@ -157,9 +157,10 @@ function createStepDefinition(args: {
 	checklistLabel: string
 	decisionTree: WorkflowDecisionTree
 	buildPromptSource?: WorkflowStepDefinition["buildPromptSource"]
+	promptTemplates?: WorkflowStepDefinition["promptTemplates"]
 	buildToolSchema: WorkflowStepDefinition["buildToolSchema"]
 }): WorkflowStepDefinition {
-	return {
+	const stepDefinition: WorkflowStepDefinition = {
 		id: `step-${args.stepNumber}`,
 		stepNumber: args.stepNumber,
 		checklistLabel: args.checklistLabel,
@@ -167,20 +168,54 @@ function createStepDefinition(args: {
 		buildToolSchema: args.buildToolSchema,
 		decisionTree: args.decisionTree,
 	}
+
+	if (args.promptTemplates !== undefined) {
+		return { ...stepDefinition, promptTemplates: args.promptTemplates }
+	}
+
+	return stepDefinition
 }
 
-function renderWorkflowValueByKey(input: WorkflowPromptBuilderInput, key: CreateStoryWorkflowValueKey): string {
-	return input.renderWorkflowValue(input.session.workflowValues[key] ?? key)
-}
+const CREATE_STORY_STEP_2_REVISE_BACKLOG_PROMPT_TEMPLATE = `In this workflow you will be assisting the user in revising an existing story file.
 
-function renderCreateStoryPromptTemplate(input: WorkflowPromptBuilderInput, template: string): string {
-	return template
-		.replaceAll("target_story", renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.TargetStory))
-		.replaceAll("architecture_document", renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.ArchitectureDocument))
-		.replaceAll("epics_document", renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.EpicsDocument))
-		.replaceAll("parent_story", renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.ParentStory))
-		.replaceAll("findings_document", renderWorkflowValueByKey(input, CreateStoryWorkflowValueKey.FindingsDocument))
-}
+The target story for this workflow is: {workflow.target_story}
+
+Before doing anything else, ensure that the existing content within the target story file fully aligns with the project's foundational documents, including:
+- Project Architecture: {workflow.architecture_document}
+- Epics Document: {workflow.epics_document}
+If you detect any conflict or misalignment, notify the user and work with them to identify the appropriate resolution. Only proceed once the story file's objective, scope, scope boundary, requirements, and Known Issues/ Risks/ Technical Debt sections fully align with the project's foundational documents.
+
+Then, ask the user to explain the revisions they require. If they ask you for suggestions regarding task/subtask revisions, ground your response in the provided context and existing runtime code/tests.
+
+Once you've reviewed context and ensured that the target story's existing non-task content aligns with the provided project documentation, call workflow_progress_request to unlock the next step's instructions.`
+
+const CREATE_STORY_STEP_2_DRAFT_PRIMARY_PROMPT_TEMPLATE = `In this workflow, you'll be preparing a story file for implementation by adding tasks and subtasks.
+
+The target story for this workflow is: {workflow.target_story}
+
+Before beginning work on the story's tasks & subtasks, ensure that the existing content within the target story file fully aligns with the project's foundational documents, including:
+- Project Architecture: {workflow.architecture_document}
+- Epics Document: {workflow.epics_document}
+
+If you detect any conflict or misalignment, notify the user and work with them to identify the appropriate resolution. Only proceed once the story file's objective, scope, scope boundary, requirements, and Known Issues/ Risks/ Technical Debt sections fully align with the project's foundational documents.
+
+Once you've reviewed context and ensured that the target story's existing non-task content aligns with the provided project documentation, call workflow_progress_request to unlock the next step's instructions.`
+
+const CREATE_STORY_STEP_2_DRAFT_REMEDIATION_PROMPT_TEMPLATE = `In this workflow, you'll be preparing a remediation story file for implementation by adding tasks and subtasks.
+
+The target story for this workflow is: {workflow.target_story}
+
+This story was generated due to QA findings after the following story was completed and reviewed:
+Originating story: {workflow.parent_story}
+The QA findings were documented in this file: {workflow.findings_document}
+
+Before doing anything else, review the originating story and QA findings and ensure that the existing content in the target story document aligns with the QA findings. Then, assess the target story document vs the project's foundational documents, including:
+- Project Architecture: {workflow.architecture_document}
+- Epics Document: {workflow.epics_document}
+
+If you detect any conflict or misalignment, notify the user and work with them to identify the appropriate resolution. Only proceed once the story file's objective, scope, scope boundary, requirements, and Known Issues/ Risks/ Technical Debt sections fully align with the project's foundational documents.
+
+Once you've reviewed context and ensured that the target story's existing non-task content aligns with the provided project documentation, call workflow_progress_request to unlock the next step's instructions.`
 
 function buildStep2PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
 	const selectedStoryStatus = readWorkflowStringValue(
@@ -195,63 +230,22 @@ function buildStep2PromptSource(input: WorkflowPromptBuilderInput): WorkflowStep
 
 	if (selectedStoryStatus === "backlog" && reviseBacklogStory === true) {
 		return {
-			currentStepInstructions: renderCreateStoryPromptTemplate(
-				input,
-				`In this workflow you will be assisting the user in revising an existing story file.
-
-The target story for this workflow is: target_story
-
-Before doing anything else, ensure that the existing content within the target story file fully aligns with the project's foundational documents, including:
-- Project Architecture: architecture_document
-- Epics Document: epics_document
-If you detect any conflict or misalignment, notify the user and work with them to identify the appropriate resolution. Only proceed once the story file's objective, scope, scope boundary, requirements, and Known Issues/ Risks/ Technical Debt sections fully align with the project's foundational documents.
-
-Then, ask the user to explain the revisions they require. If they ask you for suggestions regarding task/subtask revisions, ground your response in the provided context and existing runtime code/tests.
-
-Once you've reviewed context and ensured that the target story's existing non-task content aligns with the provided project documentation, call workflow_progress_request to unlock the next step's instructions.`,
-			),
+			kind: "current_step_instruction_template",
+			currentStepInstructionTemplate: CREATE_STORY_STEP_2_REVISE_BACKLOG_PROMPT_TEMPLATE,
 		}
 	}
 
 	if (selectedStoryStatus === "draft" && selectedStoryType === "primary") {
 		return {
-			currentStepInstructions: renderCreateStoryPromptTemplate(
-				input,
-				`In this workflow, you'll be preparing a story file for implementation by adding tasks and subtasks.
-
-The target story for this workflow is: target_story
-
-Before beginning work on the story's tasks & subtasks, ensure that the existing content within the target story file fully aligns with the project's foundational documents, including:
-- Project Architecture: architecture_document
-- Epics Document: epics_document
-
-If you detect any conflict or misalignment, notify the user and work with them to identify the appropriate resolution. Only proceed once the story file's objective, scope, scope boundary, requirements, and Known Issues/ Risks/ Technical Debt sections fully align with the project's foundational documents.
-
-Once you've reviewed context and ensured that the target story's existing non-task content aligns with the provided project documentation, call workflow_progress_request to unlock the next step's instructions.`,
-			),
+			kind: "current_step_instruction_template",
+			currentStepInstructionTemplate: CREATE_STORY_STEP_2_DRAFT_PRIMARY_PROMPT_TEMPLATE,
 		}
 	}
 
 	if (selectedStoryStatus === "draft" && selectedStoryType === "remediation") {
 		return {
-			currentStepInstructions: renderCreateStoryPromptTemplate(
-				input,
-				`In this workflow, you'll be preparing a remediation story file for implementation by adding tasks and subtasks.
-
-The target story for this workflow is: target_story
-
-This story was generated due to QA findings after the following story was completed and reviewed:
-Originating story: parent_story
-The QA findings were documented in this file: findings_document
-
-Before doing anything else, review the originating story and QA findings and ensure that the existing content in the target story document aligns with the QA findings. Then, assess the target story document vs the project's foundational documents, including:
-- Project Architecture: architecture_document
-- Epics Document: epics_document
-
-If you detect any conflict or misalignment, notify the user and work with them to identify the appropriate resolution. Only proceed once the story file's objective, scope, scope boundary, requirements, and Known Issues/ Risks/ Technical Debt sections fully align with the project's foundational documents.
-
-Once you've reviewed context and ensured that the target story's existing non-task content aligns with the provided project documentation, call workflow_progress_request to unlock the next step's instructions.`,
-			),
+			kind: "current_step_instruction_template",
+			currentStepInstructionTemplate: CREATE_STORY_STEP_2_DRAFT_REMEDIATION_PROMPT_TEMPLATE,
 		}
 	}
 
@@ -268,53 +262,15 @@ function buildStep3PromptSource(input: WorkflowPromptBuilderInput): WorkflowStep
 
 	if (selectedStoryStatus === "backlog") {
 		return {
-			currentStepInstructions: renderCreateStoryPromptTemplate(
-				input,
-				`Review the existing tasks and subtasks in target_story and determine whether they meet the following criteria:
-- They fully satisfy the story's requirements
-- They respect the story's scope and scope boundary
-- They support achievement of the story's objective
-- They prescribe changes in a manner which complies with the story's general instructions
-- Subtasks are scoped to a single revision in a single target file
-- Each subtask includes specific allowed files
-- Tasks & subtasks provide specific prescriptive revisions without deferring decision space to the implementing agent.
-- Requirements do not ask for delivery of imports, helpers, placeholder scaffolding, future-step code, or partially-wired definitions unless the story will also wire them into legitimate runtime use.
-- Prescribed tests provide adequate coverage of both happy paths and failure paths for all code revisions
-- Tests are prescribed only for behavior, contracts, regression, and material risks required by the story document and project documentation
-- Any tests built via the story's tasks use exact assertions for canonical machine-consumed outputs and stable contracts, including tool names/ schema shape, artifact file formats, and persisted metadata.
-- Any tests built via the story's tasks use shape and invariant assertions for editable content: required fields exist, strings are non-empty, mappings are correct, and forbidden legacy values are absent.
-- Any tests built via the story's tasks do not add static guards unless they protect an approved boundary, forbidden legacy dependency, or known regression risk.
-
-Notify the user that you've reviwed the existing tasks & subtasks for coverage, consistency, and quality, surface any issues you've identified to them, and ask them what additional issues or concerns they'd like you to address.
-
-${STEP_3_SHARED_PROMPT_TEMPLATE}`,
-			),
+			kind: "current_step_instruction_template",
+			currentStepInstructionTemplate: CREATE_STORY_STEP_3_BACKLOG_PROMPT_TEMPLATE,
 		}
 	}
 
 	if (selectedStoryStatus === "draft") {
 		return {
-			currentStepInstructions: renderCreateStoryPromptTemplate(
-				input,
-				`Review runtime code & tests and identify the full set of in-scope revisions needed to deliver the story's requirements and objective.
-If the story requires touching existing artifacts or placeholders, trace the exact runtime resolution path end to end:
-    config/source of truth
-    resolver/helper
-    handler/runtime consumer
-    tests/docs that assert the convention
-    For any plan that introduces a new artifact, tool, or schema entry, perform a sibling-pattern audit:
-    registration
-    executor wiring
-    prompt/tool exposure
-    approval/path policy
-    tests
-    snapshots/generated surfaces
-    docs/reference surfaces if treated as canonical in-repo
-Provide the user with the identified revision set and tell them your next step is to translate these revisions into implementation-ready tasks and subtasks.
-Next, build the story's tasks & subtasks using the identified revision set.
-
-${STEP_3_SHARED_PROMPT_TEMPLATE}`,
-			),
+			kind: "current_step_instruction_template",
+			currentStepInstructionTemplate: CREATE_STORY_STEP_3_DRAFT_PROMPT_TEMPLATE,
 		}
 	}
 
@@ -387,13 +343,47 @@ If at any point you cannot satisfy one or more of these rules (for example, due 
 After authoring the tasks & subtasks, reach each line of the story and seek out any inconsistencies or conflicts. During this review, assess each task and subtask for internal dependencies, and ensure that no task or subtask is dependent upon a task or subtask which is sequenced after it in the story. Resolve them appropriately, asking the user for input if necessary, before indicating that the tasks & subtasks are complete.
 
 *** User Review & Feedback ***
-Provide the user with the full path for target_story and ask them to review the tasks / subtasks section and provide feedback. Refine based on the user's feedback as needed. Once the user is satisfied with the tasks / subtasks section, unlock the next step's instructions by calling workflow_progress_request.`
+Provide the user with the full path for {workflow.target_story} and ask them to review the tasks / subtasks section and provide feedback. Refine based on the user's feedback as needed. Once the user is satisfied with the tasks / subtasks section, unlock the next step's instructions by calling workflow_progress_request.`
 
-function buildStep4PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
-	return {
-		currentStepInstructions: renderCreateStoryPromptTemplate(
-			input,
-			`Verify that target_story is complete, correctly formatted, internally consistent, and safe to hand off for implementation.
+const CREATE_STORY_STEP_3_BACKLOG_PROMPT_TEMPLATE = `Review the existing tasks and subtasks in {workflow.target_story} and determine whether they meet the following criteria:
+- They fully satisfy the story's requirements
+- They respect the story's scope and scope boundary
+- They support achievement of the story's objective
+- They prescribe changes in a manner which complies with the story's general instructions
+- Subtasks are scoped to a single revision in a single target file
+- Each subtask includes specific allowed files
+- Tasks & subtasks provide specific prescriptive revisions without deferring decision space to the implementing agent.
+- Requirements do not ask for delivery of imports, helpers, placeholder scaffolding, future-step code, or partially-wired definitions unless the story will also wire them into legitimate runtime use.
+- Prescribed tests provide adequate coverage of both happy paths and failure paths for all code revisions
+- Tests are prescribed only for behavior, contracts, regression, and material risks required by the story document and project documentation
+- Any tests built via the story's tasks use exact assertions for canonical machine-consumed outputs and stable contracts, including tool names/ schema shape, artifact file formats, and persisted metadata.
+- Any tests built via the story's tasks use shape and invariant assertions for editable content: required fields exist, strings are non-empty, mappings are correct, and forbidden legacy values are absent.
+- Any tests built via the story's tasks do not add static guards unless they protect an approved boundary, forbidden legacy dependency, or known regression risk.
+
+Notify the user that you've reviwed the existing tasks & subtasks for coverage, consistency, and quality, surface any issues you've identified to them, and ask them what additional issues or concerns they'd like you to address.
+
+${STEP_3_SHARED_PROMPT_TEMPLATE}`
+
+const CREATE_STORY_STEP_3_DRAFT_PROMPT_TEMPLATE = `Review runtime code & tests and identify the full set of in-scope revisions needed to deliver the story's requirements and objective.
+If the story requires touching existing artifacts or placeholders, trace the exact runtime resolution path end to end:
+    config/source of truth
+    resolver/helper
+    handler/runtime consumer
+    tests/docs that assert the convention
+    For any plan that introduces a new artifact, tool, or schema entry, perform a sibling-pattern audit:
+    registration
+    executor wiring
+    prompt/tool exposure
+    approval/path policy
+    tests
+    snapshots/generated surfaces
+    docs/reference surfaces if treated as canonical in-repo
+Provide the user with the identified revision set and tell them your next step is to translate these revisions into implementation-ready tasks and subtasks.
+Next, build the story's tasks & subtasks using the identified revision set.
+
+${STEP_3_SHARED_PROMPT_TEMPLATE}`
+
+const CREATE_STORY_STEP_4_PROMPT_TEMPLATE = `Verify that {workflow.target_story} is complete, correctly formatted, internally consistent, and safe to hand off for implementation.
 
 Validate the story as a complete implementation handoff:
 - every acceptance criterion is covered by one or more tasks
@@ -405,8 +395,12 @@ Validate the story as a complete implementation handoff:
 
 If you detect ambiguity, contradiction, or missing coverage, correct it. If correction requires a new decision, stop and ask the user.
 
-When validation passes, use attempt_completion to notify the user that the story is complete and ready for implementation.`,
-		),
+When validation passes, use attempt_completion to notify the user that the story is complete and ready for implementation.`
+
+function buildStep4PromptSource(): WorkflowStepPromptSource {
+	return {
+		kind: "current_step_instruction_template",
+		currentStepInstructionTemplate: CREATE_STORY_STEP_4_PROMPT_TEMPLATE,
 	}
 }
 
@@ -1590,6 +1584,11 @@ export const createStoryWorkflowDefinition: WorkflowDefinition = {
 			checklistLabel: "Review Context & Ensure Project Alignment",
 			decisionTree: buildStep2DecisionTree(),
 			buildPromptSource: buildStep2PromptSource,
+			promptTemplates: [
+				CREATE_STORY_STEP_2_REVISE_BACKLOG_PROMPT_TEMPLATE,
+				CREATE_STORY_STEP_2_DRAFT_PRIMARY_PROMPT_TEMPLATE,
+				CREATE_STORY_STEP_2_DRAFT_REMEDIATION_PROMPT_TEMPLATE,
+			],
 			buildToolSchema: buildCreateStoryStep2ToolSchemas,
 		}),
 		"step-3": createStepDefinition({
@@ -1597,6 +1596,7 @@ export const createStoryWorkflowDefinition: WorkflowDefinition = {
 			checklistLabel: "Author Tasks & Subtasks",
 			decisionTree: buildStep3DecisionTree(),
 			buildPromptSource: buildStep3PromptSource,
+			promptTemplates: [CREATE_STORY_STEP_3_BACKLOG_PROMPT_TEMPLATE, CREATE_STORY_STEP_3_DRAFT_PROMPT_TEMPLATE],
 			buildToolSchema: buildCreateStoryStep3ToolSchemas,
 		}),
 		"step-4": createStepDefinition({
@@ -1604,6 +1604,7 @@ export const createStoryWorkflowDefinition: WorkflowDefinition = {
 			checklistLabel: "Finalize & Validate Story Document",
 			decisionTree: buildStep4DecisionTree(),
 			buildPromptSource: buildStep4PromptSource,
+			promptTemplates: [CREATE_STORY_STEP_4_PROMPT_TEMPLATE],
 			buildToolSchema: buildCreateStoryStep4ToolSchemas,
 		}),
 	},

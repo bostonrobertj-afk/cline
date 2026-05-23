@@ -11,7 +11,6 @@ import type {
 	WorkflowDeterministicProcedureResult,
 	WorkflowFormContinuationReplacementBuilder,
 	WorkflowPersonaDefinition,
-	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
 	WorkflowStepPromptSource,
 	WorkflowValues,
@@ -228,10 +227,6 @@ function readWorkflowStringValue(workflowValues: WorkflowValues, key: EdgeCaseHu
 	return trimmedValue.length > 0 ? trimmedValue : undefined
 }
 
-function renderWorkflowValueByKey(input: WorkflowPromptBuilderInput, key: EdgeCaseHunterReviewWorkflowValueKey): string {
-	return input.renderWorkflowValue(input.session.workflowValues[key] ?? key)
-}
-
 function readFormStringValue(session: ActiveWorkflowSession, key: string): string | undefined {
 	const formValue = session.ui.formSession?.values[key]
 	if (formValue === undefined || formValue.valueType !== "string") {
@@ -245,37 +240,6 @@ function readFormStringValue(session: ActiveWorkflowSession, key: string): strin
 
 	const trimmedValue = rawValue.trim()
 	return trimmedValue.length > 0 ? trimmedValue : undefined
-}
-
-function renderEdgeCaseHunterReviewPromptTemplate(input: WorkflowPromptBuilderInput, template: string): string {
-	const replacements: readonly { placeholder: string; key: EdgeCaseHunterReviewWorkflowValueKey }[] = [
-		{
-			placeholder: "edge_case_review_output",
-			key: EdgeCaseHunterReviewWorkflowValueKey.EdgeCaseReviewOutput,
-		},
-		{
-			placeholder: "review_scope_manifest",
-			key: EdgeCaseHunterReviewWorkflowValueKey.ReviewScopeManifest,
-		},
-		{
-			placeholder: "review_commit_parent",
-			key: EdgeCaseHunterReviewWorkflowValueKey.ReviewCommitParent,
-		},
-		{
-			placeholder: "review_commit_hash",
-			key: EdgeCaseHunterReviewWorkflowValueKey.ReviewCommitHash,
-		},
-		{
-			placeholder: "target_story",
-			key: EdgeCaseHunterReviewWorkflowValueKey.TargetStory,
-		},
-	]
-	let renderedTemplate = template
-	for (const replacement of replacements) {
-		renderedTemplate = renderedTemplate.replaceAll(replacement.placeholder, renderWorkflowValueByKey(input, replacement.key))
-	}
-
-	return renderedTemplate
 }
 
 function resolveEdgeCaseHunterReviewStoryProjectRoot(
@@ -622,7 +586,7 @@ export function failEdgeCaseHunterReviewOutputArtifactAllocation(
 }
 
 function createEmptyPromptSource(): WorkflowStepPromptSource {
-	return {}
+	return { kind: "none" }
 }
 
 function createStepDefinition(args: {
@@ -630,9 +594,10 @@ function createStepDefinition(args: {
 	checklistLabel: string
 	decisionTree: WorkflowDecisionTree
 	buildPromptSource?: WorkflowStepDefinition["buildPromptSource"]
+	promptTemplates?: WorkflowStepDefinition["promptTemplates"]
 	buildToolSchema: WorkflowStepDefinition["buildToolSchema"]
 }): WorkflowStepDefinition {
-	return {
+	const stepDefinition: WorkflowStepDefinition = {
 		id: `step-${args.stepNumber}`,
 		stepNumber: args.stepNumber,
 		checklistLabel: args.checklistLabel,
@@ -640,6 +605,12 @@ function createStepDefinition(args: {
 		buildToolSchema: args.buildToolSchema,
 		decisionTree: args.decisionTree,
 	}
+
+	if (args.promptTemplates !== undefined) {
+		return { ...stepDefinition, promptTemplates: args.promptTemplates }
+	}
+
+	return stepDefinition
 }
 
 function sourceRouteMatches(sourceRoute: { branchId: string; routeId: string }, branchId: string, routeId: string): boolean {
@@ -1001,12 +972,12 @@ const EDGE_CASE_HUNTER_REVIEW_STEP_2_PROMPT = `Your task is to conduct an edge c
 Your review is not a general implementation review. Your job is to find overlooked boundary, lifecycle, integration, configuration, and adjacent-file cases that may have been missed during implementation.
 
 Review the following:
-- Review Scope: review_scope_manifest
-- Target Story: target_story
-- Commit hash for the implemented code: review_commit_hash
-- Parent commit hash before implementation: review_commit_parent
+- Review Scope: {workflow.review_scope_manifest}
+- Target Story: {workflow.target_story}
+- Commit hash for the implemented code: {workflow.review_commit_hash}
+- Parent commit hash before implementation: {workflow.review_commit_parent}
 
-Use \`review_scope_manifest\` as the starting map for the review. Use the commit hash and parent hash to inspect the implementation diff when you need to verify exact changed code.
+Use \`{workflow.review_scope_manifest}\` as the starting map for the review. Use the commit hash and parent hash to inspect the implementation diff when you need to verify exact changed code.
 
 1. Identify every changed file, changed symbol, changed workflow value, changed tool/schema contract, changed route/action, changed persisted artifact, changed test fixture, changed validation path, changed prompt surface, or changed configuration surface described by the review scope.
 
@@ -1039,7 +1010,7 @@ Use \`review_scope_manifest\` as the starting map for the review. Use the commit
 
 7. Re-run the review once from the opposite direction: start from tests, schemas, routes, artifact outputs, and persisted workflow values, then trace back to the implementation code. Add any newly discovered unhandled paths to findings.
 
-8. Document your findings in edge_case_review_output. For each finding, include:
+8. Document your findings in {workflow.edge_case_review_output}. For each finding, include:
    - finding: a short title
    - description: a detailed explanation including:
      - what is wrong
@@ -1049,16 +1020,17 @@ Use \`review_scope_manifest\` as the starting map for the review. Use the commit
      - if the finding depends on multiple non-contiguous locations, include each cited location
      - what the cited code proves
 
-If no findings were identified, add a note to edge_case_review_output stating that no findings were found after thorough edge case review.
+If no findings were identified, add a note to {workflow.edge_case_review_output} stating that no findings were found after thorough edge case review.
 
 9. Use attempt_completion to provide a final report including:
    - number of findings, or a clear statement that no findings were identified
-   - the full file path for your recorded findings: edge_case_review_output
+   - the full file path for your recorded findings: {workflow.edge_case_review_output}
    - an overview of the findings you documented, if any`
 
-function buildStep2PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
+function buildStep2PromptSource(): WorkflowStepPromptSource {
 	return {
-		currentStepInstructions: renderEdgeCaseHunterReviewPromptTemplate(input, EDGE_CASE_HUNTER_REVIEW_STEP_2_PROMPT),
+		kind: "current_step_instruction_template",
+		currentStepInstructionTemplate: EDGE_CASE_HUNTER_REVIEW_STEP_2_PROMPT,
 	}
 }
 
@@ -1143,6 +1115,7 @@ export const edgeCaseHunterReviewWorkflowDefinition: WorkflowDefinition = {
 			checklistLabel: "Conduct Exhaustive Path Analysis",
 			decisionTree: buildStep2DecisionTree(),
 			buildPromptSource: buildStep2PromptSource,
+			promptTemplates: [EDGE_CASE_HUNTER_REVIEW_STEP_2_PROMPT],
 			buildToolSchema: buildEdgeCaseHunterReviewStep2ToolSchemas,
 		}),
 	},

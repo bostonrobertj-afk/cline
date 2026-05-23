@@ -18,6 +18,7 @@ import type {
 	WorkflowStepDefinition,
 	WorkflowValues,
 } from "../../../types"
+import { renderWorkflowPromptTemplate } from "../../../workflowPromptTemplates"
 import {
 	buildCorrectCourseStep1ToolSchemas,
 	buildCorrectCourseStep1WorkflowForm,
@@ -248,18 +249,24 @@ function createPromptInput(stepId: WorkflowStepDefinition["id"], workflowValues:
 	return {
 		session: createSession(workflowValues),
 		step: getStep(stepId),
-		renderWorkflowValue: (value) => (typeof value === "string" ? value : (JSON.stringify(value) ?? String(value))),
 	}
 }
 
 function buildPrompt(stepId: WorkflowStepDefinition["id"], workflowValues: WorkflowValues): string {
 	const promptSource = getStep(stepId).buildPromptSource(createPromptInput(stepId, workflowValues))
-	expect(promptSource.currentStepInstructions).to.be.a("string").and.not.empty
-	if (typeof promptSource.currentStepInstructions !== "string" || promptSource.currentStepInstructions.length === 0) {
-		throw new Error(`Step ${stepId} did not produce currentStepInstructions.`)
+	expect(promptSource.kind).to.equal("current_step_instruction_template")
+	if (promptSource.kind !== "current_step_instruction_template") {
+		throw new Error(`Missing current step instruction template for ${stepId}.`)
 	}
 
-	return promptSource.currentStepInstructions
+	const template = promptSource.currentStepInstructionTemplate
+	expect(template).to.be.a("string").and.not.empty
+	return renderWorkflowPromptTemplate({
+		template,
+		workflowValueKeys: correctCourseWorkflowDefinition.workflowValueKeys,
+		workflowValues,
+		context: `correct-course ${stepId} test prompt`,
+	})
 }
 
 function createMissingSourceChoiceSession(fieldKey: string, choice: string, currentPanelId: string): ActiveWorkflowSession {
@@ -995,15 +1002,15 @@ describe("correctCourseWorkflow", () => {
 			expect(prompt).to.include(expectedText)
 		}
 		for (const rawPlaceholder of [
-			"projectTitle",
-			"projectFolderName",
-			"architecture_document",
-			"output_document",
-			"epic_source_indicator",
-			"epic_source_identifier",
-			"epics_document",
-			"story_source_indicator",
-			"story_source_identifier",
+			"{workflow.projectTitle}",
+			"{workflow.projectFolderName}",
+			"{workflow.architecture_document}",
+			"{workflow.output_document}",
+			"{workflow.epic_source_indicator}",
+			"{workflow.epic_source_identifier}",
+			"{workflow.epics_document}",
+			"{workflow.story_source_indicator}",
+			"{workflow.story_source_identifier}",
 		]) {
 			expect(prompt).not.to.include(rawPlaceholder)
 		}
@@ -1011,6 +1018,13 @@ describe("correctCourseWorkflow", () => {
 
 	it("includes Step 3 conditional blocks only when source indicators are yes", () => {
 		const fullPrompt = buildPrompt("step-3", SAMPLE_WORKFLOW_VALUES)
+		expect(fullPrompt).to.include("Correct Course Session")
+		expect(fullPrompt).to.include("correct-course-project")
+		expect(fullPrompt).to.include(ARCHITECTURE_DOCUMENT_PATH)
+		expect(fullPrompt).to.include(OUTPUT_DOCUMENT_PATH)
+		expect(fullPrompt).to.include("1")
+		expect(fullPrompt).to.include(EPICS_DOCUMENT_PATH)
+		expect(fullPrompt).to.include("1.1")
 		expect(fullPrompt).to.include("Discovered while authoring a specific epic:")
 		expect(fullPrompt).to.include("Discovered while authoring, implementing, or reviewing a specific story:")
 

@@ -229,8 +229,10 @@ function createWorkflowStepDefinition(): WorkflowStepDefinition {
 		id: "step-1",
 		stepNumber: 1,
 		checklistLabel: "Step 1",
+		promptTemplates: ["input"],
 		buildPromptSource: () => ({
-			currentStepInstructions: "input",
+			kind: "current_step_instruction_template",
+			currentStepInstructionTemplate: "input",
 		}),
 		buildToolSchema: () => [],
 		decisionTree: {

@@ -24,9 +24,9 @@ import type {
 	WorkflowDeterministicProcedureResult,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
-	WorkflowValue,
 	WorkflowValues,
 } from "../../../types"
+import { renderWorkflowPromptTemplate } from "../../../workflowPromptTemplates"
 import {
 	buildAndPersistReviewScopeManifest,
 	buildCodeReviewStep1WorkflowForm,
@@ -151,30 +151,44 @@ function getSingleField(panel: WorkflowFormPanelDefinition): WorkflowFormFieldDe
 	return field
 }
 
-function renderWorkflowValue(value: WorkflowValue): string {
-	if (typeof value === "string") {
-		return value
-	}
-
-	return JSON.stringify(value)
-}
-
 function createPromptInput(stepId: WorkflowStepDefinition["id"], workflowValues: WorkflowValues): WorkflowPromptBuilderInput {
 	const step = getStep(stepId)
 	return {
 		session: createSession(workflowValues),
 		step,
-		renderWorkflowValue,
 	}
 }
 
 function buildPrompt(stepId: WorkflowStepDefinition["id"], workflowValues: WorkflowValues): string {
-	const prompt = getStep(stepId).buildPromptSource(createPromptInput(stepId, workflowValues)).currentStepInstructions
-	if (prompt === undefined) {
-		throw new Error(`Missing prompt instructions for ${stepId}.`)
+	const promptSource = getStep(stepId).buildPromptSource(createPromptInput(stepId, workflowValues))
+	if (promptSource.kind !== "current_step_instruction_template") {
+		throw new Error(`Missing current step instruction template for ${stepId}.`)
 	}
 
-	return prompt
+	const template = promptSource.currentStepInstructionTemplate
+	return renderWorkflowPromptTemplate({
+		template,
+		workflowValueKeys: codeReviewWorkflowDefinition.workflowValueKeys,
+		workflowValues,
+		context: `code-review ${stepId} test prompt`,
+	})
+}
+
+function expectNoCodeReviewWorkflowPromptTokens(prompt: string): void {
+	const promptTokens: readonly string[] = [
+		"{workflow.blind_review_output}",
+		"{workflow.acceptance_audit_output}",
+		"{workflow.edge_case_review_output}",
+		"{workflow.code_review_output}",
+		"{workflow.target_story}",
+		"{workflow.review_scope_manifest}",
+		"{workflow.epics_document}",
+		"{workflow.architecture_document}",
+		"{workflow.remediation_story}",
+	]
+	for (const promptToken of promptTokens) {
+		expect(prompt).not.to.include(promptToken)
+	}
 }
 
 function getToolNamesForStep(stepId: WorkflowStepDefinition["id"]): readonly string[] {
@@ -748,6 +762,7 @@ describe("codeReviewWorkflowDefinition", () => {
 		})
 		expect(missingPrompt.trim().length).to.be.greaterThan(0)
 		expect(missingPrompt).to.include("blind-review-1-1.md")
+		expectNoCodeReviewWorkflowPromptTokens(missingPrompt)
 	})
 
 	it("builds non-empty Step 2 and Step 3 prompts with materialized review output paths", () => {
@@ -757,13 +772,17 @@ describe("codeReviewWorkflowDefinition", () => {
 		expect(step2Prompt).to.include("Skill: use_skill('edge-case-hunter-review')")
 		expect(step2Prompt).to.include("Skill: use_skill('acceptance-audit-review')")
 		expect(step2Prompt).not.to.include("Skill: use_skill('review-edge-case-hunter')")
+		expectNoCodeReviewWorkflowPromptTokens(step2Prompt)
 
 		const step3Prompt = buildPrompt("step-3", SAMPLE_WORKFLOW_VALUES)
+		expect(step3Prompt).to.include(SAMPLE_WORKFLOW_VALUES[CodeReviewWorkflowValueKey.BlindReviewOutput].toString())
+		expect(step3Prompt).to.include(SAMPLE_WORKFLOW_VALUES[CodeReviewWorkflowValueKey.AcceptanceAuditOutput].toString())
+		expect(step3Prompt).to.include(SAMPLE_WORKFLOW_VALUES[CodeReviewWorkflowValueKey.EdgeCaseReviewOutput].toString())
 		expect(step3Prompt).to.include(SAMPLE_WORKFLOW_VALUES[CodeReviewWorkflowValueKey.BlindReviewOutput])
 		expect(step3Prompt).to.include(SAMPLE_WORKFLOW_VALUES[CodeReviewWorkflowValueKey.AcceptanceAuditOutput])
-		expect(step3Prompt).not.to.include("acceptance_audit_output")
 		expect(step3Prompt).to.include(SAMPLE_WORKFLOW_VALUES[CodeReviewWorkflowValueKey.EdgeCaseReviewOutput])
 		expect(step3Prompt.trim().length).to.be.greaterThan(0)
+		expectNoCodeReviewWorkflowPromptTokens(step3Prompt)
 	})
 
 	it("routes Step 3 workflow_progress_request confirmation to Step 4", () => {
@@ -1003,6 +1022,7 @@ describe("codeReviewWorkflowDefinition", () => {
 			[CodeReviewWorkflowValueKey.UpstreamFindingsPresent]: false,
 			[CodeReviewWorkflowValueKey.RemediationStory]: "",
 		})
+		expect(basePrompt).to.include(SAMPLE_WORKFLOW_VALUES[CodeReviewWorkflowValueKey.CodeReviewOutput].toString())
 		expect(basePrompt.trim().length).to.be.greaterThan(0)
 		expect(basePrompt).not.to.include(remediationStory)
 
@@ -1011,18 +1031,21 @@ describe("codeReviewWorkflowDefinition", () => {
 			[CodeReviewWorkflowValueKey.UpstreamFindingsPresent]: true,
 			[CodeReviewWorkflowValueKey.RemediationStory]: "",
 		})
+		expect(upstreamPrompt).to.include(SAMPLE_WORKFLOW_VALUES[CodeReviewWorkflowValueKey.CodeReviewOutput].toString())
 		expect(upstreamPrompt.trim().length).to.be.greaterThan(0)
 		expect(upstreamPrompt).not.to.include(remediationStory)
 		expect(upstreamPrompt).not.to.equal(basePrompt)
 
 		const remediationPrompt = buildPrompt("step-4", SAMPLE_WORKFLOW_VALUES)
+		expect(remediationPrompt).to.include(SAMPLE_WORKFLOW_VALUES[CodeReviewWorkflowValueKey.CodeReviewOutput].toString())
+		expect(remediationPrompt).to.include(SAMPLE_WORKFLOW_VALUES[CodeReviewWorkflowValueKey.RemediationStory].toString())
 		expect(remediationPrompt.trim().length).to.be.greaterThan(0)
 		expect(remediationPrompt).to.include(remediationStory)
 		expect(remediationPrompt.trim().length).to.be.greaterThan(upstreamPrompt.trim().length)
 
 		for (const prompt of [basePrompt, upstreamPrompt, remediationPrompt]) {
 			expect(prompt).to.include(codeReviewOutput)
-			expect(prompt).not.to.include("code_review_output")
+			expectNoCodeReviewWorkflowPromptTokens(prompt)
 		}
 	})
 

@@ -17,9 +17,9 @@ import type {
 	WorkflowDecisionBranchRoute,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
-	WorkflowValue,
 	WorkflowValues,
 } from "../../../types"
+import { renderWorkflowPromptTemplate } from "../../../workflowPromptTemplates"
 import { PiPlanningWorkflowValueKey, piPlanningWorkflowDefinition } from "../piPlanningWorkflow"
 
 const PROJECT_ROOT = "/tmp/pi-planning-project"
@@ -138,31 +138,49 @@ function buildModelToolFailedEvent(toolName: ClineDefaultTool): WorkflowBranchTr
 	}
 }
 
-function renderWorkflowValue(value: WorkflowValue): string {
-	if (typeof value === "string") {
-		return value
-	}
-
-	return JSON.stringify(value)
-}
-
 function createPromptInput(step: WorkflowStepDefinition, workflowValues: WorkflowValues): WorkflowPromptBuilderInput {
 	return {
 		session: createSession(workflowValues),
 		step,
-		renderWorkflowValue,
 	}
 }
 
 function buildPrompt(stepId: WorkflowStepDefinition["id"], workflowValues: WorkflowValues): string {
 	const step = getStep(stepId)
 	const promptSource = step.buildPromptSource(createPromptInput(step, workflowValues))
-	const prompt = promptSource.currentStepInstructions
-	if (prompt === undefined) {
-		throw new Error(`Missing prompt source for ${stepId}.`)
+	if (promptSource.kind !== "current_step_instruction_template") {
+		throw new Error(`Missing current step instruction template for ${stepId}.`)
 	}
 
-	return prompt
+	const template = promptSource.currentStepInstructionTemplate
+	return renderWorkflowPromptTemplate({
+		template,
+		workflowValueKeys: piPlanningWorkflowDefinition.workflowValueKeys,
+		workflowValues,
+		context: `pi-planning ${stepId} test prompt`,
+	})
+}
+
+function expectNoPiPlanningWorkflowPromptTokens(prompt: string): void {
+	const forbiddenTokens: readonly string[] = [
+		"{workflow.target_epic}",
+		"{workflow.epics_index}",
+		"{workflow.epics_document}",
+		"{workflow.architecture_document}",
+		"{workflow.brainstorming_document}",
+		"{workflow.additional_context}",
+		"{workflow.drafts_folder}",
+		"{workflow.stories_index}",
+		"{workflow.epic_identity}",
+		"{workflow.implementation_folder}",
+		"{workflow.projectTitle}",
+		"{workflow.projectFolderName}",
+		"{workflow.target_story}",
+	]
+
+	for (const forbiddenToken of forbiddenTokens) {
+		expect(prompt).not.to.include(forbiddenToken)
+	}
 }
 
 function expectTransitionStepAction(action: WorkflowDecisionAction, stepNumber: number): void {
@@ -1440,6 +1458,7 @@ describe("piPlanningWorkflowDefinition", () => {
 			for (const forbiddenToolName of FORBIDDEN_BACKEND_ONLY_TOOL_NAMES) {
 				expect(prompt).not.to.include(forbiddenToolName)
 			}
+			expectNoPiPlanningWorkflowPromptTokens(prompt)
 		}
 	})
 
@@ -1488,6 +1507,8 @@ Once the user is fully aligned with the story set and each story's content, use 
 		const prompt = buildPrompt("step-6", SAMPLE_WORKFLOW_VALUES)
 
 		expect(prompt).to.equal(expectedPrompt)
+		expect(prompt).to.include(SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.DraftsFolder].toString())
+		expectNoPiPlanningWorkflowPromptTokens(prompt)
 		expect(prompt).not.to.include("drafts_folder")
 		expect(prompt).not.to.include("target_story")
 		expect(prompt).not.to.include("feedback gathered during story validation")
@@ -1504,6 +1525,7 @@ Once the user is fully aligned with the story set and each story's content, use 
 		expect(prompt).to.include(SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.ArchitectureDocument].toString())
 		expect(prompt).to.include(SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.EpicsDocument].toString())
 		expect(prompt).to.include(SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.TargetStory].toString())
+		expectNoPiPlanningWorkflowPromptTokens(prompt)
 		expect(prompt).to.include("Scope")
 		expect(prompt).to.include("Scope Boundary")
 		expect(prompt).to.include("Requirements")

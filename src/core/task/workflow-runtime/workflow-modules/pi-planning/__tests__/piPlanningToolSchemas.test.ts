@@ -119,7 +119,6 @@ function createStep6ToolSchemaInput(editIntent: PiPlanningEditIntent | undefined
 			branchContext: { activeBranchId: "step-6-project-prompt" },
 		},
 		step: piPlanningWorkflowDefinition.steps["step-6"],
-		renderWorkflowValue: (value): string => (typeof value === "string" ? value : JSON.stringify(value)),
 	}
 }
 

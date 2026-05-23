@@ -103,7 +103,7 @@ Tips for the session:
 - Ask how ideas connect to earlier ideas
 - Offer challenges to to the user's ideas or assumptions
 - Offer new ideas and angles
-Be sure to record the session's progress in \`{output_file}\`, including noting any new techniques which are adopted and ideas that are generated.
+Be sure to record the session's progress in \`{workflow.output_file}\`, including noting any new techniques which are adopted and ideas that are generated.
 
 Once the user indicates they're ready to move on from idea generation, use \`workflow_progress_request\` to confirm and unlock the next workflow step.`
 
@@ -112,8 +112,24 @@ const STEP_4_PROMPT = `- Review the captured ideas, cluster them into themes, an
 - Do not extend into solutioning during this workflow. If the user attempts to steer the conversation toward solutioning or planning actions, STOP and tell them that this workflow is scoped to idea-generation, and that they should use one of these workflows for solutioning:
   - create architecture (if the solution(s) will likely require a large body of work consisting of one or more epics)
   - quick spec (if the solution(s) will likely require small patches that can be implemented quickly)
-- Append the themes, priorities, and summary to \`{output_file}\`.
-- Send the user a final message indicating that the brainstorming session is complete using \`attempt_completion\`. Include the full file path of \`{output_file}\` in this message.`
+- Append the themes, priorities, and summary to \`{workflow.output_file}\`.
+- Send the user a final message indicating that the brainstorming session is complete using \`attempt_completion\`. Include the full file path of \`{workflow.output_file}\` in this message.`
+
+const BRAINSTORMING_STEP_3_SUGGEST_PROMPT_TEMPLATE = `Read \`{workflow.output_file}\`.
+
+The user has requested that you propose an appropriate brainstorming technique based on the information they've provided in \`{workflow.output_file}\`. Call \`get_brainstorming_methods\` to retrieve the list of supported brainstorming methods. Select a brainstorming technique that seems appropriate, then propose that technique to the user.
+
+After the user accepts the proposed technique, call \`append_brainstorming_selected_technique\` with the accepted technique name, description, and category/id when available. Do not call \`set_workflow_values\` for \`selected_techniques\`.
+
+Then record the selected technique under the \`selected techniques\` heading in \`{workflow.output_file}\` with the accepted technique name and description.
+
+After the accepted technique has been appended and written to \`{workflow.output_file}\`, continue with the shared brainstorming facilitation instructions below.
+
+${STEP_3_SHARED_FACILITATION_PROMPT}`
+
+const BRAINSTORMING_STEP_3_STANDARD_PROMPT_TEMPLATE = `Read \`{workflow.output_file}\`.
+
+${STEP_3_SHARED_FACILITATION_PROMPT}`
 
 const BRAINSTORMING_WORKFLOW_VALUE_KEYS = [
 	BrainstormingWorkflowValueKey.ProjectMode,
@@ -733,42 +749,20 @@ function buildBrainstormingDocumentWithSuggestionPlaceholder(session: ActiveWork
 	})
 }
 
-function replaceOutputFilePlaceholder(input: WorkflowPromptBuilderInput, source: string): string {
-	const outputFileValue = input.session.workflowValues[BrainstormingWorkflowValueKey.OutputFile]
-	if (outputFileValue === undefined) {
-		return source
-	}
-
-	return source.replace(/\{output_file\}/g, input.renderWorkflowValue(outputFileValue))
-}
-
 function buildStep3PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
 	const selectedApproach = readSelectedApproach(input.session.workflowValues)
-	const openingPrompt =
-		selectedApproach === BrainstormingSelectedApproach.Suggest
-			? `Read \`{output_file}\`.
-
-The user has requested that you propose an appropriate brainstorming technique based on the information they've provided in \`{output_file}\`. Call \`get_brainstorming_methods\` to retrieve the list of supported brainstorming methods. Select a brainstorming technique that seems appropriate, then propose that technique to the user.
-
-After the user accepts the proposed technique, call \`append_brainstorming_selected_technique\` with the accepted technique name, description, and category/id when available. Do not call \`set_workflow_values\` for \`selected_techniques\`.
-
-Then record the selected technique under the \`selected techniques\` heading in \`{output_file}\` with the accepted technique name and description.
-
-After the accepted technique has been appended and written to \`{output_file}\`, continue with the shared brainstorming facilitation instructions below.`
-			: `Read \`{output_file}\`.`
 
 	return {
-		currentStepInstructions: replaceOutputFilePlaceholder(
-			input,
-			`${openingPrompt}
-
-${STEP_3_SHARED_FACILITATION_PROMPT}`,
-		),
+		kind: "current_step_instruction_template",
+		currentStepInstructionTemplate:
+			selectedApproach === BrainstormingSelectedApproach.Suggest
+				? BRAINSTORMING_STEP_3_SUGGEST_PROMPT_TEMPLATE
+				: BRAINSTORMING_STEP_3_STANDARD_PROMPT_TEMPLATE,
 	}
 }
 
 function createEmptyPromptSource(): WorkflowStepPromptSource {
-	return {}
+	return { kind: "none" }
 }
 
 function createStepDefinition(args: {
@@ -777,8 +771,9 @@ function createStepDefinition(args: {
 	decisionTree: WorkflowDecisionTree
 	buildPromptSource?: WorkflowStepDefinition["buildPromptSource"]
 	buildToolSchema: WorkflowStepDefinition["buildToolSchema"]
+	promptTemplates?: WorkflowStepDefinition["promptTemplates"]
 }): WorkflowStepDefinition {
-	return {
+	const stepDefinition: WorkflowStepDefinition = {
 		id: `step-${args.stepNumber}`,
 		stepNumber: args.stepNumber,
 		checklistLabel: args.checklistLabel,
@@ -786,6 +781,10 @@ function createStepDefinition(args: {
 		buildToolSchema: args.buildToolSchema,
 		decisionTree: args.decisionTree,
 	}
+	if (args.promptTemplates !== undefined) {
+		return { ...stepDefinition, promptTemplates: args.promptTemplates }
+	}
+	return stepDefinition
 }
 
 function buildStep1DecisionTree(): WorkflowDecisionTree {
@@ -1341,15 +1340,18 @@ export const brainstormingWorkflowDefinition: WorkflowDefinition = {
 			decisionTree: buildStep3DecisionTree(),
 			buildPromptSource: buildStep3PromptSource,
 			buildToolSchema: buildBrainstormingStep3ToolSchemas,
+			promptTemplates: [BRAINSTORMING_STEP_3_SUGGEST_PROMPT_TEMPLATE, BRAINSTORMING_STEP_3_STANDARD_PROMPT_TEMPLATE],
 		}),
 		"step-4": createStepDefinition({
 			stepNumber: 4,
 			checklistLabel: "Organize Ideas & Plan Next Actions",
 			decisionTree: buildStep4DecisionTree(),
-			buildPromptSource: (input) => ({
-				currentStepInstructions: replaceOutputFilePlaceholder(input, STEP_4_PROMPT),
+			buildPromptSource: () => ({
+				kind: "current_step_instruction_template",
+				currentStepInstructionTemplate: STEP_4_PROMPT,
 			}),
 			buildToolSchema: buildBrainstormingStep4ToolSchemas,
+			promptTemplates: [STEP_4_PROMPT],
 		}),
 	},
 }

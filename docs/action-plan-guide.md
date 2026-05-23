@@ -106,6 +106,7 @@ For every deletion, replacement, de-parameterization, signature change, type cha
 - Stale validation guards.
 - Scope-diff allowlists.
 - Prompt placeholder coverage.
+- Runtime workflow prompt tests must not assert exact editable prompt prose. Protect runtime workflow prompt behavior with shape and invariant assertions: prompt output exists when required, required workflow values are rendered non-empty, prompt-template tokens required by the requirements are materialized, forbidden legacy text is absent, current step details are projected in the correct payload location, and the projected tool schema matches the prompt's tool references.
 - Downstream call sites.
 
 Validation commands do not replace this pass. It is a guide violation to rely on typecheck, lint, or implementation-time discovery to find fallout.

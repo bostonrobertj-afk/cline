@@ -11,7 +11,6 @@ import type {
 	WorkflowDeterministicProcedureResult,
 	WorkflowFormContinuationReplacementBuilder,
 	WorkflowPersonaDefinition,
-	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
 	WorkflowStepPromptSource,
 	WorkflowValues,
@@ -227,10 +226,6 @@ function readWorkflowStringValue(workflowValues: WorkflowValues, key: Acceptance
 	return trimmedValue.length > 0 ? trimmedValue : undefined
 }
 
-function renderWorkflowValueByKey(input: WorkflowPromptBuilderInput, key: AcceptanceAuditReviewWorkflowValueKey): string {
-	return input.renderWorkflowValue(input.session.workflowValues[key] ?? key)
-}
-
 function readFormStringValue(session: ActiveWorkflowSession, key: string): string | undefined {
 	const formValue = session.ui.formSession?.values[key]
 	if (formValue === undefined || formValue.valueType !== "string") {
@@ -244,45 +239,6 @@ function readFormStringValue(session: ActiveWorkflowSession, key: string): strin
 
 	const trimmedValue = rawValue.trim()
 	return trimmedValue.length > 0 ? trimmedValue : undefined
-}
-
-function renderAcceptanceAuditReviewPromptTemplate(input: WorkflowPromptBuilderInput, template: string): string {
-	const replacements: readonly { placeholder: string; key: AcceptanceAuditReviewWorkflowValueKey }[] = [
-		{
-			placeholder: "acceptance_audit_output",
-			key: AcceptanceAuditReviewWorkflowValueKey.AcceptanceAuditOutput,
-		},
-		{
-			placeholder: "architecture_document",
-			key: AcceptanceAuditReviewWorkflowValueKey.ArchitectureDocument,
-		},
-		{
-			placeholder: "review_scope_manifest",
-			key: AcceptanceAuditReviewWorkflowValueKey.ReviewScopeManifest,
-		},
-		{
-			placeholder: "review_commit_parent",
-			key: AcceptanceAuditReviewWorkflowValueKey.ReviewCommitParent,
-		},
-		{
-			placeholder: "review_commit_hash",
-			key: AcceptanceAuditReviewWorkflowValueKey.ReviewCommitHash,
-		},
-		{
-			placeholder: "epics_document",
-			key: AcceptanceAuditReviewWorkflowValueKey.EpicsDocument,
-		},
-		{
-			placeholder: "target_story",
-			key: AcceptanceAuditReviewWorkflowValueKey.TargetStory,
-		},
-	]
-	let renderedTemplate = template
-	for (const replacement of replacements) {
-		renderedTemplate = renderedTemplate.replaceAll(replacement.placeholder, renderWorkflowValueByKey(input, replacement.key))
-	}
-
-	return renderedTemplate
 }
 
 function resolveAcceptanceAuditReviewStoryProjectRoot(
@@ -688,7 +644,7 @@ export function failAcceptanceAuditReviewOutputArtifactAllocation(
 }
 
 function createEmptyPromptSource(): WorkflowStepPromptSource {
-	return {}
+	return { kind: "none" }
 }
 
 function createStepDefinition(args: {
@@ -697,8 +653,9 @@ function createStepDefinition(args: {
 	decisionTree: WorkflowDecisionTree
 	buildPromptSource?: WorkflowStepDefinition["buildPromptSource"]
 	buildToolSchema: WorkflowStepDefinition["buildToolSchema"]
+	promptTemplates?: WorkflowStepDefinition["promptTemplates"]
 }): WorkflowStepDefinition {
-	return {
+	const stepDefinition: WorkflowStepDefinition = {
 		id: `step-${args.stepNumber}`,
 		stepNumber: args.stepNumber,
 		checklistLabel: args.checklistLabel,
@@ -706,6 +663,10 @@ function createStepDefinition(args: {
 		buildToolSchema: args.buildToolSchema,
 		decisionTree: args.decisionTree,
 	}
+	if (args.promptTemplates !== undefined) {
+		return { ...stepDefinition, promptTemplates: args.promptTemplates }
+	}
+	return stepDefinition
 }
 
 function sourceRouteMatches(sourceRoute: { branchId: string; routeId: string }, branchId: string, routeId: string): boolean {
@@ -1067,11 +1028,12 @@ function buildStep1DecisionTree(): WorkflowDecisionTree {
 	}
 }
 
-const ACCEPTANCE_AUDIT_REVIEW_STEP_2_PROMPT = `You have been tasked with conducting an acceptance audit of preproduction code against backing project documentation. \n\n1: Before starting your audit, read the following:\n    - target story: target_story\n    - epics document: epics_document\n    - architecture document: architecture_document\n    - review scope manifest: review_scope_manifest\n\n    If needed, you may use the following commit hashes to identify specific code revisions for detailed analysis:\n    - Commit from the implementation cycle: review_commit_hash\n    - Latest commit immediately before the implementation cycle: review_commit_parent\n\n2: Audit all code revisions (adds/edits/deletes). Your goal is to ensure that the work done during implementation satisfies the following:\n    - includes all of the exact changes prescribed by the provided story document, and no other revisions\n    - does not invent solutions and/or architecture not clearly authorized by the provided project documentation\n    - fully satisfies the story's requirements and objective\n\n3: After conducting your audit, document your findings in this document: acceptance_audit_output. \n    - For each finding, you must include:\n        - finding: a short title for the finding\n        - description: a detailed explanation of the finding, including:\n        - the task(s)/ subtask(s) from the target story which are associated with the finding\n        - an explanation of the identified issue\n        - the trigger condition for the finding\n        - the potential consequence if the finding is not addressed\n        - exact supporting code location with file path, start line, and end line for the smallest line range that supports the finding. If a finding depends on more than one non-contiguous location, include each one in the finding description.\n        - an explanation of what in the cited code locations supports the finding\n    - If no findings were identified, add a note to acceptance_audit_output indicating that no findings were found after thorough review.\n\n4: Use attempt_completion to provide a final report to the user including:\n    - number of findings, or clear statement that no findings were identified\n    - The full file path for your recorded findings: acceptance_audit_output\n    - an overview of the findings you documented, if any.`
+const ACCEPTANCE_AUDIT_REVIEW_STEP_2_PROMPT = `You have been tasked with conducting an acceptance audit of preproduction code against backing project documentation. \n\n1: Before starting your audit, read the following:\n    - target story: {workflow.target_story}\n    - epics document: {workflow.epics_document}\n    - architecture document: {workflow.architecture_document}\n    - review scope manifest: {workflow.review_scope_manifest}\n\n    If needed, you may use the following commit hashes to identify specific code revisions for detailed analysis:\n    - Commit from the implementation cycle: {workflow.review_commit_hash}\n    - Latest commit immediately before the implementation cycle: {workflow.review_commit_parent}\n\n2: Audit all code revisions (adds/edits/deletes). Your goal is to ensure that the work done during implementation satisfies the following:\n    - includes all of the exact changes prescribed by the provided story document, and no other revisions\n    - does not invent solutions and/or architecture not clearly authorized by the provided project documentation\n    - fully satisfies the story's requirements and objective\n\n3: After conducting your audit, document your findings in this document: {workflow.acceptance_audit_output}. \n    - For each finding, you must include:\n        - finding: a short title for the finding\n        - description: a detailed explanation of the finding, including:\n        - the task(s)/ subtask(s) from the target story which are associated with the finding\n        - an explanation of the identified issue\n        - the trigger condition for the finding\n        - the potential consequence if the finding is not addressed\n        - exact supporting code location with file path, start line, and end line for the smallest line range that supports the finding. If a finding depends on more than one non-contiguous location, include each one in the finding description.\n        - an explanation of what in the cited code locations supports the finding\n    - If no findings were identified, add a note to {workflow.acceptance_audit_output} indicating that no findings were found after thorough review.\n\n4: Use attempt_completion to provide a final report to the user including:\n    - number of findings, or clear statement that no findings were identified\n    - The full file path for your recorded findings: {workflow.acceptance_audit_output}\n    - an overview of the findings you documented, if any.`
 
-function buildStep2PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
+function buildStep2PromptSource(): WorkflowStepPromptSource {
 	return {
-		currentStepInstructions: renderAcceptanceAuditReviewPromptTemplate(input, ACCEPTANCE_AUDIT_REVIEW_STEP_2_PROMPT),
+		kind: "current_step_instruction_template",
+		currentStepInstructionTemplate: ACCEPTANCE_AUDIT_REVIEW_STEP_2_PROMPT,
 	}
 }
 
@@ -1165,6 +1127,7 @@ export const acceptanceAuditReviewWorkflowDefinition: WorkflowDefinition = {
 			decisionTree: buildStep2DecisionTree(),
 			buildPromptSource: buildStep2PromptSource,
 			buildToolSchema: buildAcceptanceAuditReviewStep2ToolSchemas,
+			promptTemplates: [ACCEPTANCE_AUDIT_REVIEW_STEP_2_PROMPT],
 		}),
 	},
 }

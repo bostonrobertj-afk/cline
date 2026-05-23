@@ -43,7 +43,7 @@ function createWorkflowDefinition(): WorkflowDefinition {
 				id: "step-1",
 				stepNumber: 1,
 				checklistLabel: "Step 1",
-				buildPromptSource: () => ({}),
+				buildPromptSource: () => ({ kind: "none" }),
 				buildToolSchema: () => [],
 				decisionTree: {
 					entryBranchId: "project-prompt",

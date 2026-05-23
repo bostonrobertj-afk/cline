@@ -239,15 +239,15 @@ Workflow prompt data has two places:
 - workflow-level identity, description, persona, and checklist context
 - current step details in the input payload
 
-Current step instructions belong in `buildPromptSource(...).currentStepInstructions`, not workflow system instructions. Do not put current step details into persona fields or workflow-level system instructions.
+Each workflow module must define workflow-level and per-step prompt content.
 
-Prompt builders may interpolate workflow values only through the runtime prompt builder input, such as `input.renderWorkflowValue(...)`. For paths like `output_file`, render the persisted value rather than reconstructing it.
+Prompt templates may reference workflow values only with `{workflow.<workflowValueKey>}` tokens matching declared `workflowValueKeys`. The shared `WorkflowRuntime` prompt-template renderer validates and renders those tokens before prompt projection. Workflow modules must not use local `replace`, `replaceAll`, regex, or hand-built substitution for workflow-value references.
 
 The prompt and tool schema must match. If the prompt says the AI may call a tool, that tool must be in the current step schema. If the schema does not include the tool, the prompt must not instruct or imply that it is available.
 
 Shared prompt fragments are acceptable only when the final generated prompt for each variant is reviewable and tested. Do not split prompt construction in a way that hides the final ordering or makes requirements hard to compare against runtime output.
 
-When the user-authored source document provides step prompt wording, `buildPromptSource(...)` must preserve that wording exactly except for deterministic workflow-value interpolation and explicitly approved runtime-only substitutions. Tests must not assert exact editable prompt prose. Protect prompt behavior with shape and invariant assertions: prompt output exists when required, required workflow values are rendered non-empty, placeholders are not leaked, forbidden legacy text is absent, current step details are projected in the correct payload location, and the projected tool schema matches the prompt's tool references.
+When the user-authored source document provides step prompt wording, `buildPromptSource(...)` must preserve that wording exactly except for converting workflow-value references into `{workflow.<workflowValueKey>}` prompt-template tokens and applying explicitly approved runtime-only substitutions. Tests must not assert exact editable prompt prose. Protect prompt behavior with shape and invariant assertions: prompt output exists when required, required workflow values are rendered non-empty, prompt-template tokens required by the requirements are materialized, forbidden legacy text is absent, current step details are projected in the correct payload location, and the projected tool schema matches the prompt's tool references.
 
 ### Tool Schema Ownership
 

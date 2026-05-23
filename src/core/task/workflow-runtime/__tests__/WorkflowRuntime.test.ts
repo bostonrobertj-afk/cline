@@ -46,6 +46,7 @@ import type {
 	WorkflowPersonaDefinition,
 	WorkflowPrerequisiteFileDefinition,
 	WorkflowStepDefinition,
+	WorkflowStepPromptSource,
 	WorkflowStepTransitionTarget,
 	WorkflowValues,
 	WorkflowWorkspacePathPolicy,
@@ -159,9 +160,10 @@ describe("WorkflowRuntime", () => {
 		await rm(cwd, { recursive: true, force: true })
 	})
 
-	function createPromptSource() {
+	function createPromptSource(): WorkflowStepPromptSource {
 		return {
-			currentStepInstructions: "input",
+			kind: "current_step_instruction_template",
+			currentStepInstructionTemplate: "input",
 		}
 	}
 
@@ -978,16 +980,35 @@ describe("WorkflowRuntime", () => {
 		decisionTree?: WorkflowDecisionTree
 		completionRules?: WorkflowStepDefinition["completionRules"]
 		toolSchema?: readonly ClineToolSpec[]
+		promptTemplates?: WorkflowStepDefinition["promptTemplates"]
+		buildPromptSource?: WorkflowStepDefinition["buildPromptSource"]
 	}): WorkflowStepDefinition {
-		return {
-			id: `step-${args.stepNumber}` as WorkflowStepDefinition["id"],
+		const stepId: WorkflowStepDefinition["id"] = `step-${args.stepNumber}`
+		const buildPromptSource: WorkflowStepDefinition["buildPromptSource"] =
+			args.buildPromptSource ?? (() => createPromptSource())
+		const promptTemplates = args.promptTemplates ?? (args.buildPromptSource === undefined ? ["input"] : undefined)
+		const stepDefinition: WorkflowStepDefinition = {
+			id: stepId,
 			stepNumber: args.stepNumber,
 			checklistLabel: args.checklistLabel ?? `Step ${args.stepNumber}`,
-			buildPromptSource: () => createPromptSource(),
+			buildPromptSource,
 			buildToolSchema: () => args.toolSchema ?? [],
 			decisionTree: args.decisionTree ?? createProjectPromptDecisionTree(),
 			completionRules: args.completionRules,
 		}
+		if (promptTemplates !== undefined) {
+			return {
+				id: stepDefinition.id,
+				stepNumber: stepDefinition.stepNumber,
+				checklistLabel: stepDefinition.checklistLabel,
+				buildPromptSource: stepDefinition.buildPromptSource,
+				buildToolSchema: stepDefinition.buildToolSchema,
+				decisionTree: stepDefinition.decisionTree,
+				completionRules: stepDefinition.completionRules,
+				promptTemplates,
+			}
+		}
+		return stepDefinition
 	}
 
 	function createWorkflowDefinition(args?: {
@@ -2870,6 +2891,42 @@ describe("WorkflowRuntime", () => {
 			expect(invalidState.activeWorkflowName).to.be.undefined
 			expect(invalidState.activeWorkflowSession).to.be.undefined
 		}
+	})
+
+	it("rejects promptTemplates references to undeclared workflow values before activation", async () => {
+		const invalidState = new TaskState()
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["declared_value"],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					promptTemplates: ["Review {workflow.undeclared_value}."],
+				}),
+			},
+		})
+		const result = await activateWorkflow(invalidState, workflow)
+
+		expect(result).to.deep.equal({ kind: "no_op" })
+		expect(invalidState.activeWorkflowName).to.be.undefined
+		expect(invalidState.activeWorkflowSession).to.be.undefined
+	})
+
+	it("rejects malformed promptTemplates before activation", async () => {
+		const invalidState = new TaskState()
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["target_story"],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					promptTemplates: ["Review {workflow.target_story"],
+				}),
+			},
+		})
+		const result = await activateWorkflow(invalidState, workflow)
+
+		expect(result).to.deep.equal({ kind: "no_op" })
+		expect(invalidState.activeWorkflowName).to.be.undefined
+		expect(invalidState.activeWorkflowSession).to.be.undefined
 	})
 
 	it("rejects invalid entry project and workflow-form value destinations before activation", async () => {
@@ -5851,6 +5908,78 @@ describe("WorkflowRuntime", () => {
 			continuationWorkflowInputPayloadBlock: undefined,
 			workflowToolSchemaOverride: undefined,
 		})
+	})
+
+	it("renders currentStepInstructionTemplate through runtime-owned prompt template projection", async () => {
+		const promptTemplate = "Review {workflow.target_story} with {workflow.review_context} and {workflow.missing_context}."
+		const workflow = createWorkflowDefinition({
+			workflowValueKeys: ["target_story", "review_context", "missing_context"],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					promptTemplates: [promptTemplate],
+					buildPromptSource: () => ({
+						kind: "current_step_instruction_template",
+						currentStepInstructionTemplate: promptTemplate,
+					}),
+				}),
+			},
+		})
+		await activateWorkflow(taskState, workflow)
+		taskState.apiRequestCount = 1
+		await submitNewProjectSelection(taskState, "Template Projection Project")
+		const session = taskState.activeWorkflowSession
+		if (session === undefined) {
+			throw new Error("Expected active workflow session after project selection.")
+		}
+		session.workflowValues.target_story = "/tmp/story.md"
+		session.workflowValues.review_context = { ready: true, priority: 2 }
+		const projection = await runtime.buildTurnProjection({ taskState })
+		const workflowInputPayloadBlock = projection.workflowInputPayloadBlock
+		if (workflowInputPayloadBlock === undefined) {
+			throw new Error("Expected workflow input payload block.")
+		}
+
+		expect(workflowInputPayloadBlock).to.contain('Review /tmp/story.md with {"priority":2,"ready":true} and .')
+		expect(workflowInputPayloadBlock).to.not.contain("{workflow.target_story}")
+		expect(workflowInputPayloadBlock).to.not.contain("{workflow.review_context}")
+		expect(workflowInputPayloadBlock).to.not.contain("{workflow.missing_context}")
+	})
+
+	it("rejects runtime returned prompt templates that reference undeclared workflow values", async () => {
+		const returnedPromptTemplate = "Review {workflow.other_story}."
+		const workflow = createWorkflowDefinition({
+			name: "test-workflow",
+			workflowValueKeys: ["target_story"],
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					promptTemplates: ["Review {workflow.target_story}."],
+					buildPromptSource: () => ({
+						kind: "current_step_instruction_template",
+						currentStepInstructionTemplate: returnedPromptTemplate,
+					}),
+				}),
+			},
+		})
+		await activateWorkflow(taskState, workflow)
+		taskState.apiRequestCount = 1
+		let thrownError: Error | undefined
+		try {
+			await submitNewProjectSelection(taskState, "Runtime Invalid Template Project")
+			await runtime.buildTurnProjection({ taskState })
+		} catch (error) {
+			if (error instanceof Error) {
+				thrownError = error
+			}
+		}
+		if (thrownError === undefined) {
+			throw new Error("Expected invalid runtime template to throw.")
+		}
+
+		expect(thrownError.message).to.equal(
+			"Workflow prompt template workflow test-workflow step step-1 currentStepInstructionTemplate references undeclared workflow value other_story.",
+		)
 	})
 
 	it("creates workflow form sessions at a render action startPanelId", async () => {

@@ -20,7 +20,6 @@ import type {
 	WorkflowDeterministicProcedureResult,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
-	WorkflowValue,
 	WorkflowValues,
 	WorkflowWorkspacePathPolicy,
 } from "../../../types"
@@ -30,6 +29,7 @@ import {
 	resolveWorkflowDefinition,
 } from "../../../WorkflowRegistry"
 import { WorkflowRuntime } from "../../../WorkflowRuntime"
+import { renderWorkflowPromptTemplate } from "../../../workflowPromptTemplates"
 import {
 	BLIND_REVIEW_ARTIFACTS,
 	BLIND_REVIEW_COMMIT_HASH_FIELD_KEY,
@@ -195,35 +195,27 @@ function getSingleField(panel: WorkflowFormPanelDefinition): WorkflowFormFieldDe
 	return field
 }
 
-function renderWorkflowValue(value: WorkflowValue): string {
-	if (typeof value === "string") {
-		return value
-	}
-
-	const renderedValue = JSON.stringify(value)
-	if (renderedValue === undefined) {
-		throw new Error("Unable to render workflow value.")
-	}
-
-	return renderedValue
-}
-
 function createPromptInput(stepId: WorkflowStepDefinition["id"], workflowValues: WorkflowValues): WorkflowPromptBuilderInput {
 	const step = getStep(stepId)
 	return {
 		session: createSession(workflowValues),
 		step,
-		renderWorkflowValue,
 	}
 }
 
 function buildPrompt(stepId: WorkflowStepDefinition["id"], workflowValues: WorkflowValues): string {
-	const prompt = getStep(stepId).buildPromptSource(createPromptInput(stepId, workflowValues)).currentStepInstructions
-	if (prompt === undefined) {
-		throw new Error(`Missing prompt instructions for ${stepId}.`)
+	const promptSource = getStep(stepId).buildPromptSource(createPromptInput(stepId, workflowValues))
+	if (promptSource.kind !== "current_step_instruction_template") {
+		throw new Error(`Missing current step instruction template for ${stepId}.`)
 	}
 
-	return prompt
+	const template = promptSource.currentStepInstructionTemplate
+	return renderWorkflowPromptTemplate({
+		template,
+		workflowValueKeys: blindReviewWorkflowDefinition.workflowValueKeys,
+		workflowValues,
+		context: `blind-review ${stepId} test prompt`,
+	})
 }
 
 function getToolNamesForStep(stepId: WorkflowStepDefinition["id"]): readonly string[] {
@@ -835,6 +827,9 @@ describe("blindReviewWorkflowDefinition", () => {
 
 	it("projects Step 2 prompt instructions with materialized workflow values", () => {
 		const prompt = buildPrompt("step-2", SAMPLE_WORKFLOW_VALUES)
+		expect(prompt).to.include(SAMPLE_WORKFLOW_VALUES[BlindReviewWorkflowValueKey.ReviewCommitParent].toString())
+		expect(prompt).to.include(SAMPLE_WORKFLOW_VALUES[BlindReviewWorkflowValueKey.ReviewCommitHash].toString())
+		expect(prompt).to.include(SAMPLE_WORKFLOW_VALUES[BlindReviewWorkflowValueKey.BlindReviewOutput].toString())
 		const blindReviewOutput = SAMPLE_WORKFLOW_VALUES[BlindReviewWorkflowValueKey.BlindReviewOutput]
 		if (typeof blindReviewOutput !== "string" || blindReviewOutput.length === 0) {
 			throw new Error("Expected SAMPLE_WORKFLOW_VALUES to define a blind_review_output path.")
@@ -846,9 +841,9 @@ describe("blindReviewWorkflowDefinition", () => {
 		expect(prompt).to.include(blindReviewOutput)
 		expect(prompt).to.include("git diff --name-status def456 abc123")
 		expect(prompt).to.include("git diff def456 abc123 -- <path>")
-		expect(prompt).not.to.include("review_commit_hash")
-		expect(prompt).not.to.include("review_commit_parent")
-		expect(prompt).not.to.include("blind_review_output")
+		expect(prompt).not.to.include("{workflow.review_commit_parent}")
+		expect(prompt).not.to.include("{workflow.review_commit_hash}")
+		expect(prompt).not.to.include("{workflow.blind_review_output}")
 		expect(prompt).not.to.include(TARGET_STORY_PATH)
 	})
 

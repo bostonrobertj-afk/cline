@@ -37,8 +37,10 @@ function createResolvedWorkflow(
 				id: "step-1",
 				stepNumber: 1,
 				checklistLabel: "Step 1",
+				promptTemplates: ["Step 1"],
 				buildPromptSource: () => ({
-					currentStepInstructions: "Step 1",
+					kind: "current_step_instruction_template",
+					currentStepInstructionTemplate: "Step 1",
 				}),
 				buildToolSchema: () => [],
 				decisionTree: {

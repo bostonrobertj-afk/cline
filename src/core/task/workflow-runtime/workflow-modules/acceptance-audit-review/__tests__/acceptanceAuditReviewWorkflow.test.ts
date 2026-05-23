@@ -19,7 +19,6 @@ import type {
 	WorkflowDeterministicProcedureResult,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
-	WorkflowValue,
 	WorkflowValues,
 } from "../../../types"
 import {
@@ -27,6 +26,7 @@ import {
 	resolveWorkflowByUseSkillName,
 	resolveWorkflowDefinition,
 } from "../../../WorkflowRegistry"
+import { renderWorkflowPromptTemplate } from "../../../workflowPromptTemplates"
 import {
 	ACCEPTANCE_AUDIT_REVIEW_ARTIFACTS,
 	ACCEPTANCE_AUDIT_REVIEW_COMMIT_HASH_FIELD_KEY,
@@ -213,34 +213,26 @@ function getSingleField(panel: WorkflowFormPanelDefinition): WorkflowFormFieldDe
 	return field
 }
 
-function renderWorkflowValue(value: WorkflowValue): string {
-	if (typeof value === "string") {
-		return value
-	}
-
-	const renderedValue = JSON.stringify(value)
-	if (renderedValue === undefined) {
-		throw new Error("Unable to render workflow value.")
-	}
-
-	return renderedValue
-}
-
 function createPromptInput(stepId: WorkflowStepDefinition["id"], workflowValues: WorkflowValues): WorkflowPromptBuilderInput {
 	return {
 		session: createSession(workflowValues),
 		step: getStep(stepId),
-		renderWorkflowValue,
 	}
 }
 
 function buildPrompt(stepId: WorkflowStepDefinition["id"], workflowValues: WorkflowValues): string {
-	const prompt = getStep(stepId).buildPromptSource(createPromptInput(stepId, workflowValues)).currentStepInstructions
-	if (prompt === undefined) {
-		throw new Error(`Missing prompt instructions for ${stepId}.`)
+	const promptSource = getStep(stepId).buildPromptSource(createPromptInput(stepId, workflowValues))
+	if (promptSource.kind !== "current_step_instruction_template") {
+		throw new Error(`Missing current step instruction template for ${stepId}.`)
 	}
 
-	return prompt
+	const template = promptSource.currentStepInstructionTemplate
+	return renderWorkflowPromptTemplate({
+		template,
+		workflowValueKeys: acceptanceAuditReviewWorkflowDefinition.workflowValueKeys,
+		workflowValues,
+		context: `acceptance-audit-review ${stepId} test prompt`,
+	})
 }
 
 function getToolNamesForStep(stepId: WorkflowStepDefinition["id"]): readonly string[] {
@@ -1366,13 +1358,13 @@ describe("acceptanceAuditReviewWorkflowDefinition", () => {
 		expect(prompt).to.include(ACCEPTANCE_AUDIT_OUTPUT_PATH)
 
 		const rawPlaceholders: readonly string[] = [
-			"target_story",
-			"epics_document",
-			"architecture_document",
-			"review_scope_manifest",
-			"review_commit_hash",
-			"review_commit_parent",
-			"acceptance_audit_output",
+			"{workflow.target_story}",
+			"{workflow.epics_document}",
+			"{workflow.architecture_document}",
+			"{workflow.review_scope_manifest}",
+			"{workflow.review_commit_hash}",
+			"{workflow.review_commit_parent}",
+			"{workflow.acceptance_audit_output}",
 		]
 		for (const rawPlaceholder of rawPlaceholders) {
 			expect(prompt).not.to.include(rawPlaceholder)

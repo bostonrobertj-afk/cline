@@ -83,67 +83,67 @@ const CREATE_ARCHITECTURE_WORKFLOW_VALUE_KEYS = [
 	CreateArchitectureWorkflowValueKey.OutputArtifactRelativePath,
 ]
 
-const STEP_3_PROMPT = `Read \`{output_file}\`.
+const STEP_3_PROMPT = `Read \`{workflow.output_file}\`.
 
 Use any files listed in the Relevant Context section when they would help ground the architecture.
 
-Draft and propose content for Project Context Analysis. After the user approves it, save the approved content to \`{output_file}\`.
+Draft and propose content for Project Context Analysis. After the user approves it, save the approved content to \`{workflow.output_file}\`.
 
-Review Scope, Architectural goals, and Core architectural rules for sufficiency. If any section is vague, overly broad, or insufficient for the remaining architecture work, ask the user for clarification or improvement and save approved refinements to \`{output_file}\`.
+Review Scope, Architectural goals, and Core architectural rules for sufficiency. If any section is vague, overly broad, or insufficient for the remaining architecture work, ask the user for clarification or improvement and save approved refinements to \`{workflow.output_file}\`.
 
-Draft and propose content for Interpretation. After the user approves it, save the approved content to \`{output_file}\`.
+Draft and propose content for Interpretation. After the user approves it, save the approved content to \`{workflow.output_file}\`.
 
 After approved interpretation content has been saved, use \`workflow_progress_request\` to confirm and unlock the next workflow step.`
 
-const STEP_4_PROMPT = `Read \`{output_file}\`.
+const STEP_4_PROMPT = `Read \`{workflow.output_file}\`.
 
 Guide the user through documenting Responsibility Boundaries, Durable vs Transient Ownership, and Required Additional Baseline for Authority Enforcement.
 
 Refer to relevant context, runtime code, and tests frequently so the content stays grounded in the project reality.
 
-Draft, discuss, and refine the content with the user. Save approved content under the matching headings in \`{output_file}\`.
+Draft, discuss, and refine the content with the user. Save approved content under the matching headings in \`{workflow.output_file}\`.
 
 Once the user is aligned with the saved content, use \`workflow_progress_request\` to confirm and unlock the next workflow step.`
 
-const STEP_5_PROMPT = `Read \`{output_file}\`.
+const STEP_5_PROMPT = `Read \`{workflow.output_file}\`.
 
 Tell the user that you will assess the current runtime code and tests for alignment with the intended architecture.
 
-Perform a thorough repository assessment using code and test files. Write findings under Aligned, Partially aligned, and Not aligned / conflicts in \`{output_file}\`.
+Perform a thorough repository assessment using code and test files. Write findings under Aligned, Partially aligned, and Not aligned / conflicts in \`{workflow.output_file}\`.
 
-Brief the user on the findings. Answer questions, revise the assessment when needed, and save approved changes to \`{output_file}\`.
+Brief the user on the findings. Answer questions, revise the assessment when needed, and save approved changes to \`{workflow.output_file}\`.
 
 Once the user approves the assessment content, use \`workflow_progress_request\` to confirm and unlock the next workflow step.`
 
-const STEP_6_PROMPT = `Read \`{output_file}\` and identify key tradeoffs and risks from the current architecture content.
+const STEP_6_PROMPT = `Read \`{workflow.output_file}\` and identify key tradeoffs and risks from the current architecture content.
 
 Perform additional code assessment if needed to keep the tradeoffs and risks concrete.
 
-Propose draft content for Tradeoffs and Risks, refine it based on user feedback, and save approved final content under the matching headings in \`{output_file}\`.
+Propose draft content for Tradeoffs and Risks, refine it based on user feedback, and save approved final content under the matching headings in \`{workflow.output_file}\`.
 
 Once Tradeoffs and Risks are populated with approved content, use \`workflow_progress_request\` to confirm and unlock the next workflow step.`
 
-const STEP_7_PROMPT = `Read \`{output_file}\`.
+const STEP_7_PROMPT = `Read \`{workflow.output_file}\`.
 
 Draft a comprehensive project blast radius. Include files, modules, directories, shared components, and integration boundaries.
 
-Propose the blast radius to the user, adjust based on feedback, and save approved content under Project Blast Radius in \`{output_file}\`.
+Propose the blast radius to the user, adjust based on feedback, and save approved content under Project Blast Radius in \`{workflow.output_file}\`.
 
 Once Project Blast Radius is populated with approved content, use \`workflow_progress_request\` to confirm and unlock the next workflow step.`
 
-const STEP_8_PROMPT = `Read \`{output_file}\`.
+const STEP_8_PROMPT = `Read \`{workflow.output_file}\`.
 
-Identify key dependencies that will matter during project implementation. Present those dependencies to the user, adjust based on feedback, and save approved dependencies under Dependencies in \`{output_file}\`.
+Identify key dependencies that will matter during project implementation. Present those dependencies to the user, adjust based on feedback, and save approved dependencies under Dependencies in \`{workflow.output_file}\`.
 
-Build an implementation roadmap establishing high-level project implementation sequencing based on dependencies and blast radius. Present the roadmap to the user, adjust based on feedback, and save approved roadmap content under Project Roadmap in \`{output_file}\`.
+Build an implementation roadmap establishing high-level project implementation sequencing based on dependencies and blast radius. Present the roadmap to the user, adjust based on feedback, and save approved roadmap content under Project Roadmap in \`{workflow.output_file}\`.
 
 Once Dependencies and Project Roadmap are populated with approved content, use \`workflow_progress_request\` to confirm and unlock the final workflow step.`
 
 const STEP_9_EXISTING_DOCUMENT_HEADER_PROMPT =
-	"You have been called inside a workflow focused on revising an existing architecture document within the following project:\n- Project: {projectTitle}\n- Project Folder: {projectFolderName}\n- Architecture Document: {output_file}"
-const STEP_9_CHANGE_PLAN_PROMPT_LINE = "- Change Management Plan: {change_plan}"
+	"You have been called inside a workflow focused on revising an existing architecture document within the following project:\n- Project: {workflow.projectTitle}\n- Project Folder: {workflow.projectFolderName}\n- Architecture Document: {workflow.output_file}"
+const STEP_9_CHANGE_PLAN_PROMPT_LINE = "- Change Management Plan: {workflow.change_plan}"
 const STEP_9_EXISTING_DOCUMENT_BODY_PROMPT =
-	'Steps 1-8 were automatically completed by the system.\nReview the architecture document and any files listed in the "Relevant Context" section.\nAfter reviewing, confirm the scope of revisions that the user wishes to make in the architecture document, then work with them to identify the correct revisions to the existing document and update {output_file} appropriately.'
+	'Steps 1-8 were automatically completed by the system.\nReview the architecture document and any files listed in the "Relevant Context" section.\nAfter reviewing, confirm the scope of revisions that the user wishes to make in the architecture document, then work with them to identify the correct revisions to the existing document and update {workflow.output_file} appropriately.'
 const STEP_9_NEW_DOCUMENT_REVIEW_PROMPT =
 	"Review the full architecture for coherence and pattern and structure alignment.\nClassify any issues as critical, important, or minor.\nIf there are critical issues, present them and ask how the user wants to resolve them before implementation. If there are important or minor issues, present them as refinements and ask whether to address them now."
 const STEP_9_FINAL_PROMPT =
@@ -236,24 +236,6 @@ function workflowProgressRequestDenied(): WorkflowDecisionBranchTrigger {
 	}
 }
 
-function replaceOutputFilePlaceholder(input: WorkflowPromptBuilderInput, prompt: string): string {
-	const outputFileValue = input.session.workflowValues[CreateArchitectureWorkflowValueKey.OutputFile]
-	if (outputFileValue === undefined) {
-		return prompt.replace(/\{output_file\}/g, input.renderWorkflowValue(CreateArchitectureWorkflowValueKey.OutputFile))
-	}
-
-	return prompt.replace(/\{output_file\}/g, input.renderWorkflowValue(outputFileValue))
-}
-
-function renderWorkflowValueByKey(input: WorkflowPromptBuilderInput, key: CreateArchitectureWorkflowValueKey): string {
-	const value = input.session.workflowValues[key]
-	if (value === undefined) {
-		return input.renderWorkflowValue(key)
-	}
-
-	return input.renderWorkflowValue(value)
-}
-
 function readBooleanWorkflowValue(
 	input: WorkflowPromptBuilderInput,
 	key: CreateArchitectureWorkflowValueKey,
@@ -284,7 +266,7 @@ function readNonEmptyStringWorkflowValue(
 }
 
 function createEmptyPromptSource(): WorkflowStepPromptSource {
-	return {}
+	return { kind: "none" }
 }
 
 function createStepDefinition(args: {
@@ -292,9 +274,10 @@ function createStepDefinition(args: {
 	checklistLabel: string
 	decisionTree: WorkflowDecisionTree
 	buildPromptSource?: WorkflowStepDefinition["buildPromptSource"]
+	promptTemplates?: WorkflowStepDefinition["promptTemplates"]
 	buildToolSchema: WorkflowStepDefinition["buildToolSchema"]
 }): WorkflowStepDefinition {
-	return {
+	const stepDefinition: WorkflowStepDefinition = {
 		id: `step-${args.stepNumber}`,
 		stepNumber: args.stepNumber,
 		checklistLabel: args.checklistLabel,
@@ -302,6 +285,12 @@ function createStepDefinition(args: {
 		buildToolSchema: args.buildToolSchema,
 		decisionTree: args.decisionTree,
 	}
+
+	if (args.promptTemplates !== undefined) {
+		return { ...stepDefinition, promptTemplates: args.promptTemplates }
+	}
+
+	return stepDefinition
 }
 
 function buildStep2InputWorkflowForm(): WorkflowFormDefinitionPayload {
@@ -926,40 +915,28 @@ function buildStep9DecisionTree(): WorkflowDecisionTree {
 	}
 }
 
-function buildStep3PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
-	return {
-		currentStepInstructions: replaceOutputFilePlaceholder(input, STEP_3_PROMPT),
-	}
+function buildStep3PromptSource(): WorkflowStepPromptSource {
+	return { kind: "current_step_instruction_template", currentStepInstructionTemplate: STEP_3_PROMPT }
 }
 
-function buildStep4PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
-	return {
-		currentStepInstructions: replaceOutputFilePlaceholder(input, STEP_4_PROMPT),
-	}
+function buildStep4PromptSource(): WorkflowStepPromptSource {
+	return { kind: "current_step_instruction_template", currentStepInstructionTemplate: STEP_4_PROMPT }
 }
 
-function buildStep5PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
-	return {
-		currentStepInstructions: replaceOutputFilePlaceholder(input, STEP_5_PROMPT),
-	}
+function buildStep5PromptSource(): WorkflowStepPromptSource {
+	return { kind: "current_step_instruction_template", currentStepInstructionTemplate: STEP_5_PROMPT }
 }
 
-function buildStep6PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
-	return {
-		currentStepInstructions: replaceOutputFilePlaceholder(input, STEP_6_PROMPT),
-	}
+function buildStep6PromptSource(): WorkflowStepPromptSource {
+	return { kind: "current_step_instruction_template", currentStepInstructionTemplate: STEP_6_PROMPT }
 }
 
-function buildStep7PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
-	return {
-		currentStepInstructions: replaceOutputFilePlaceholder(input, STEP_7_PROMPT),
-	}
+function buildStep7PromptSource(): WorkflowStepPromptSource {
+	return { kind: "current_step_instruction_template", currentStepInstructionTemplate: STEP_7_PROMPT }
 }
 
-function buildStep8PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
-	return {
-		currentStepInstructions: replaceOutputFilePlaceholder(input, STEP_8_PROMPT),
-	}
+function buildStep8PromptSource(): WorkflowStepPromptSource {
+	return { kind: "current_step_instruction_template", currentStepInstructionTemplate: STEP_8_PROMPT }
 }
 
 function buildStep9PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
@@ -967,32 +944,23 @@ function buildStep9PromptSource(input: WorkflowPromptBuilderInput): WorkflowStep
 	const creationRequired = readBooleanWorkflowValue(input, CreateArchitectureWorkflowValueKey.CreationRequired)
 
 	if (creationRequired === false) {
-		const existingDocumentHeader = replaceOutputFilePlaceholder(input, STEP_9_EXISTING_DOCUMENT_HEADER_PROMPT)
-			.replace(/\{projectTitle\}/g, renderWorkflowValueByKey(input, CreateArchitectureWorkflowValueKey.ProjectTitle))
-			.replace(
-				/\{projectFolderName\}/g,
-				renderWorkflowValueByKey(input, CreateArchitectureWorkflowValueKey.ProjectFolderName),
-			)
-
-		sections.push(existingDocumentHeader)
+		sections.push(STEP_9_EXISTING_DOCUMENT_HEADER_PROMPT)
 
 		const changePlan = readNonEmptyStringWorkflowValue(input, CreateArchitectureWorkflowValueKey.ChangePlan)
 		if (changePlan !== undefined) {
-			sections.push(STEP_9_CHANGE_PLAN_PROMPT_LINE.replace(/\{change_plan\}/g, input.renderWorkflowValue(changePlan)))
+			sections.push(STEP_9_CHANGE_PLAN_PROMPT_LINE)
 		}
 
-		sections.push(replaceOutputFilePlaceholder(input, STEP_9_EXISTING_DOCUMENT_BODY_PROMPT))
+		sections.push(STEP_9_EXISTING_DOCUMENT_BODY_PROMPT)
 	}
 
 	if (creationRequired === true) {
-		sections.push(replaceOutputFilePlaceholder(input, STEP_9_NEW_DOCUMENT_REVIEW_PROMPT))
+		sections.push(STEP_9_NEW_DOCUMENT_REVIEW_PROMPT)
 	}
 
 	sections.push(STEP_9_FINAL_PROMPT)
 
-	return {
-		currentStepInstructions: sections.join("\n\n"),
-	}
+	return { kind: "current_step_instruction_template", currentStepInstructionTemplate: sections.join("\n\n") }
 }
 
 export const createArchitectureWorkflowDefinition: WorkflowDefinition = {
@@ -1053,6 +1021,7 @@ export const createArchitectureWorkflowDefinition: WorkflowDefinition = {
 			checklistLabel: "Establish Architecture Foundational Elements",
 			decisionTree: buildProgressionDecisionTree(3, 4),
 			buildPromptSource: buildStep3PromptSource,
+			promptTemplates: [STEP_3_PROMPT],
 			buildToolSchema: buildCreateArchitectureStep3ToolSchemas,
 		}),
 		"step-4": createStepDefinition({
@@ -1060,6 +1029,7 @@ export const createArchitectureWorkflowDefinition: WorkflowDefinition = {
 			checklistLabel: "Revolve Responsibility & Ownership",
 			decisionTree: buildProgressionDecisionTree(4, 5),
 			buildPromptSource: buildStep4PromptSource,
+			promptTemplates: [STEP_4_PROMPT],
 			buildToolSchema: buildCreateArchitectureStep4ToolSchemas,
 		}),
 		"step-5": createStepDefinition({
@@ -1067,6 +1037,7 @@ export const createArchitectureWorkflowDefinition: WorkflowDefinition = {
 			checklistLabel: "Code Alignment Assessment",
 			decisionTree: buildProgressionDecisionTree(5, 6),
 			buildPromptSource: buildStep5PromptSource,
+			promptTemplates: [STEP_5_PROMPT],
 			buildToolSchema: buildCreateArchitectureStep5ToolSchemas,
 		}),
 		"step-6": createStepDefinition({
@@ -1074,6 +1045,7 @@ export const createArchitectureWorkflowDefinition: WorkflowDefinition = {
 			checklistLabel: "Identify Key Tradeoffs & Risks",
 			decisionTree: buildProgressionDecisionTree(6, 7),
 			buildPromptSource: buildStep6PromptSource,
+			promptTemplates: [STEP_6_PROMPT],
 			buildToolSchema: buildCreateArchitectureStep6ToolSchemas,
 		}),
 		"step-7": createStepDefinition({
@@ -1081,6 +1053,7 @@ export const createArchitectureWorkflowDefinition: WorkflowDefinition = {
 			checklistLabel: "Map out Blast Radius",
 			decisionTree: buildProgressionDecisionTree(7, 8),
 			buildPromptSource: buildStep7PromptSource,
+			promptTemplates: [STEP_7_PROMPT],
 			buildToolSchema: buildCreateArchitectureStep7ToolSchemas,
 		}),
 		"step-8": createStepDefinition({
@@ -1088,6 +1061,7 @@ export const createArchitectureWorkflowDefinition: WorkflowDefinition = {
 			checklistLabel: "Build Project Roadmap",
 			decisionTree: buildProgressionDecisionTree(8, 9),
 			buildPromptSource: buildStep8PromptSource,
+			promptTemplates: [STEP_8_PROMPT],
 			buildToolSchema: buildCreateArchitectureStep8ToolSchemas,
 		}),
 		"step-9": createStepDefinition({
@@ -1095,6 +1069,13 @@ export const createArchitectureWorkflowDefinition: WorkflowDefinition = {
 			checklistLabel: "Finalize Architecture Document",
 			decisionTree: buildStep9DecisionTree(),
 			buildPromptSource: buildStep9PromptSource,
+			promptTemplates: [
+				STEP_9_EXISTING_DOCUMENT_HEADER_PROMPT,
+				STEP_9_CHANGE_PLAN_PROMPT_LINE,
+				STEP_9_EXISTING_DOCUMENT_BODY_PROMPT,
+				STEP_9_NEW_DOCUMENT_REVIEW_PROMPT,
+				STEP_9_FINAL_PROMPT,
+			],
 			buildToolSchema: buildCreateArchitectureStep9ToolSchemas,
 		}),
 	},

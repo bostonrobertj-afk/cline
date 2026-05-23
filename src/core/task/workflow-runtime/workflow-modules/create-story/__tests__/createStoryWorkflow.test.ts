@@ -17,7 +17,6 @@ import type {
 	WorkflowDeterministicProcedureResult,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
-	WorkflowValue,
 	WorkflowValues,
 } from "../../../types"
 import {
@@ -25,6 +24,7 @@ import {
 	resolveWorkflowByUseSkillName,
 	resolveWorkflowDefinition,
 } from "../../../WorkflowRegistry"
+import { renderWorkflowPromptTemplate } from "../../../workflowPromptTemplates"
 import {
 	CREATE_STORY_ARCHITECTURE_PREREQUISITE_ID,
 	CREATE_STORY_BRAINSTORMING_PREREQUISITE_ID,
@@ -136,20 +136,11 @@ function getSingleField(panel: WorkflowFormPanelDefinition): WorkflowFormFieldDe
 	return field
 }
 
-function renderWorkflowValue(value: WorkflowValue): string {
-	if (typeof value === "string") {
-		return value
-	}
-
-	return JSON.stringify(value)
-}
-
 function createPromptInput(): WorkflowPromptBuilderInput {
 	const step = getStep("step-1")
 	return {
 		session: createSession({}),
 		step,
-		renderWorkflowValue,
 	}
 }
 
@@ -161,17 +152,35 @@ function createPromptInputForStep(
 	return {
 		session: createSession(workflowValues),
 		step,
-		renderWorkflowValue,
 	}
 }
 
 function getPromptInstructions(stepId: WorkflowStepDefinition["id"], workflowValues: WorkflowValues): string {
 	const promptSource = getStep(stepId).buildPromptSource(createPromptInputForStep(stepId, workflowValues))
-	if (promptSource.currentStepInstructions === undefined) {
-		throw new Error(`Missing prompt instructions for ${stepId}.`)
+	if (promptSource.kind !== "current_step_instruction_template") {
+		throw new Error(`Missing current step instruction template for ${stepId}.`)
 	}
 
-	return promptSource.currentStepInstructions
+	const template = promptSource.currentStepInstructionTemplate
+	return renderWorkflowPromptTemplate({
+		template,
+		workflowValueKeys: createStoryWorkflowDefinition.workflowValueKeys,
+		workflowValues,
+		context: `create-story ${stepId} test prompt`,
+	})
+}
+
+function expectNoCreateStoryWorkflowPromptTokens(prompt: string): void {
+	const promptTokens: readonly string[] = [
+		"{workflow.target_story}",
+		"{workflow.architecture_document}",
+		"{workflow.epics_document}",
+		"{workflow.parent_story}",
+		"{workflow.findings_document}",
+	]
+	for (const promptToken of promptTokens) {
+		expect(prompt).not.to.include(promptToken)
+	}
 }
 
 function getToolNamesForStep(stepId: WorkflowStepDefinition["id"]): string[] {
@@ -961,7 +970,7 @@ describe("createStoryWorkflowDefinition Step 1", () => {
 		})
 		try {
 			const parentStory = join(project.root, "implementation", "stories-complete", "Story-1-1.md")
-			const findingsDocument = join(project.root, "review", "Adversarial-review-1-1.md")
+			const findingsDocument = join(project.root, "review", "code-review-1-1.md")
 			await mkdir(join(project.root, "implementation", "stories-complete"), { recursive: true })
 			await mkdir(join(project.root, "review"), { recursive: true })
 			await writeFile(parentStory, "# Parent story\n")
@@ -1069,6 +1078,10 @@ describe("createStoryWorkflowDefinition Step 2", () => {
 		})
 
 		expect(prompt).to.be.a("string").and.not.empty
+		expect(prompt).to.include("/tmp/create-story-project/implementation/drafts/Story-1-1.md")
+		expect(prompt).to.include("/tmp/create-story-project/planning/architecture.md")
+		expect(prompt).to.include("/tmp/create-story-project/planning/Epics.md")
+		expectNoCreateStoryWorkflowPromptTokens(prompt)
 	})
 
 	it("builds a non-empty remediation draft context-review prompt", () => {
@@ -1080,10 +1093,16 @@ describe("createStoryWorkflowDefinition Step 2", () => {
 			[CreateStoryWorkflowValueKey.SelectedStoryStatus]: "draft",
 			[CreateStoryWorkflowValueKey.SelectedStoryType]: "remediation",
 			[CreateStoryWorkflowValueKey.ParentStory]: "/tmp/create-story-project/implementation/stories-complete/Story-1-1.md",
-			[CreateStoryWorkflowValueKey.FindingsDocument]: "/tmp/create-story-project/review/Adversarial-review-1-1.md",
+			[CreateStoryWorkflowValueKey.FindingsDocument]: "/tmp/create-story-project/review/code-review-1-1.md",
 		})
 
 		expect(prompt).to.be.a("string").and.not.empty
+		expect(prompt).to.include("/tmp/create-story-project/implementation/drafts/Remediation-story-1-1-1.md")
+		expect(prompt).to.include("/tmp/create-story-project/planning/architecture.md")
+		expect(prompt).to.include("/tmp/create-story-project/planning/Epics.md")
+		expect(prompt).to.include("/tmp/create-story-project/implementation/stories-complete/Story-1-1.md")
+		expect(prompt).to.include("/tmp/create-story-project/review/code-review-1-1.md")
+		expectNoCreateStoryWorkflowPromptTokens(prompt)
 	})
 
 	it("builds a non-empty backlog revision context-review prompt", () => {
@@ -1097,6 +1116,10 @@ describe("createStoryWorkflowDefinition Step 2", () => {
 		})
 
 		expect(prompt).to.be.a("string").and.not.empty
+		expect(prompt).to.include("/tmp/create-story-project/implementation/stories-backlog/Story-1-2.md")
+		expect(prompt).to.include("/tmp/create-story-project/planning/architecture.md")
+		expect(prompt).to.include("/tmp/create-story-project/planning/Epics.md")
+		expectNoCreateStoryWorkflowPromptTokens(prompt)
 	})
 
 	it("fails clearly for unsupported Step 2 prompt state", () => {
@@ -1118,6 +1141,7 @@ describe("createStoryWorkflowDefinition Step 3", () => {
 		})
 
 		expect(prompt).to.be.a("string").and.not.empty
+		expectNoCreateStoryWorkflowPromptTokens(prompt)
 	})
 
 	it("builds a non-empty backlog revision task/subtask authoring prompt", () => {
@@ -1127,6 +1151,7 @@ describe("createStoryWorkflowDefinition Step 3", () => {
 		})
 
 		expect(prompt).to.be.a("string").and.not.empty
+		expectNoCreateStoryWorkflowPromptTokens(prompt)
 	})
 
 	it("fails clearly for unsupported Step 3 prompt state", () => {
@@ -1214,6 +1239,7 @@ describe("createStoryWorkflowDefinition Step 4", () => {
 		})
 
 		expect(prompt).to.be.a("string").and.not.empty
+		expectNoCreateStoryWorkflowPromptTokens(prompt)
 	})
 
 	it("exposes attempt_completion only in Step 4", () => {

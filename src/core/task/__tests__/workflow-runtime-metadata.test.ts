@@ -155,8 +155,10 @@ function createMetadataRestoreWorkflow(): WorkflowDefinition {
 				id: "step-1",
 				stepNumber: 1,
 				checklistLabel: "Restore metadata",
+				promptTemplates: ["Restore metadata."],
 				buildPromptSource: () => ({
-					currentStepInstructions: "Restore metadata.",
+					kind: "current_step_instruction_template",
+					currentStepInstructionTemplate: "Restore metadata.",
 				}),
 				buildToolSchema: () => [],
 				decisionTree: {

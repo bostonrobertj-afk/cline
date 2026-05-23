@@ -219,12 +219,11 @@ export type WorkflowNextAction =
 export interface WorkflowPromptBuilderInput {
 	session: ActiveWorkflowSession
 	step: WorkflowStepDefinition
-	renderWorkflowValue(value: WorkflowValue): string
 }
 
-export interface WorkflowStepPromptSource {
-	currentStepInstructions?: string
-}
+export type WorkflowStepPromptSource =
+	| { kind: "none" }
+	| { kind: "current_step_instruction_template"; currentStepInstructionTemplate: string }
 
 export interface WorkflowDecisionBranchEvaluationInput {
 	activeBranchId: WorkflowDecisionBranchId
@@ -499,6 +498,7 @@ export interface WorkflowStepDefinition {
 	id: `step-${number}`
 	stepNumber: number
 	checklistLabel: string
+	promptTemplates?: readonly string[]
 	buildPromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource
 	buildToolSchema(input: WorkflowPromptBuilderInput): readonly ClineToolSpec[]
 	decisionTree: WorkflowDecisionTree

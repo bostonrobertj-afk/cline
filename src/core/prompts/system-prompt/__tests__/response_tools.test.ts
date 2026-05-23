@@ -1,6 +1,6 @@
 import { expect } from "chai"
 import { describe, it } from "mocha"
-import type { ActiveWorkflowSession, WorkflowPromptBuilderInput, WorkflowValue } from "@/core/task/workflow-runtime/types"
+import type { ActiveWorkflowSession, WorkflowPromptBuilderInput } from "@/core/task/workflow-runtime/types"
 import { createArchitectureWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-architecture"
 import { createEpicsWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-epics"
 import { ModelFamily } from "@/shared/prompts"
@@ -66,18 +66,6 @@ interface CreateArchitectureResponseToolCase {
 	absentSectionNames: readonly string[]
 }
 
-function renderWorkflowValue(value: WorkflowValue): string {
-	if (typeof value === "string") {
-		return value
-	}
-
-	if (typeof value === "number" || typeof value === "boolean") {
-		return String(value)
-	}
-
-	return JSON.stringify(value)
-}
-
 function createCreateArchitecturePromptBuilderInput(args: {
 	stepId: CreateArchitectureResponseToolStepId
 	activeStepNumber: 3 | 4 | 9
@@ -109,7 +97,6 @@ function createCreateArchitecturePromptBuilderInput(args: {
 	return {
 		session,
 		step,
-		renderWorkflowValue,
 	}
 }
 
@@ -152,7 +139,6 @@ function createCreateEpicsPromptBuilderInput(): WorkflowPromptBuilderInput {
 	return {
 		session,
 		step,
-		renderWorkflowValue,
 	}
 }
 

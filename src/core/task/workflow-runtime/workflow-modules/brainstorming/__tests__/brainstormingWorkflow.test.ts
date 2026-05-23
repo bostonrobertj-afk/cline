@@ -9,9 +9,9 @@ import type {
 	WorkflowDecisionBranchRoute,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
-	WorkflowValue,
 	WorkflowValues,
 } from "../../../types"
+import { renderWorkflowPromptTemplate } from "../../../workflowPromptTemplates"
 import { buildBrainstormingDocumentFromSession } from "../brainstormingDocument"
 import { BRAINSTORMING_TECHNIQUES } from "../brainstormingTechniqueRegistry"
 import {
@@ -49,19 +49,10 @@ function createSession(workflowValues: WorkflowValues): ActiveWorkflowSession {
 	}
 }
 
-function renderWorkflowValue(value: WorkflowValue): string {
-	if (typeof value === "string") {
-		return value
-	}
-
-	return JSON.stringify(value)
-}
-
 function createPromptInput(step: WorkflowStepDefinition, workflowValues: WorkflowValues): WorkflowPromptBuilderInput {
 	return {
 		session: createSession(workflowValues),
 		step,
-		renderWorkflowValue,
 	}
 }
 
@@ -683,30 +674,48 @@ describe("brainstormingWorkflowDefinition", () => {
 	it("builds Step 3 prompt and tool variants and routes workflow progress decisions", () => {
 		const step3 = brainstormingWorkflowDefinition.steps["step-3"]
 		expect(step3.buildToolSchema).to.equal(buildBrainstormingStep3ToolSchemas)
-		const suggestPromptSource = step3.buildPromptSource(
-			createPromptInput(step3, {
-				selected_approach: "I want you to suggest a technique",
-				output_file: OUTPUT_FILE,
-			}),
-		)
+		const suggestWorkflowValues: WorkflowValues = {
+			selected_approach: "I want you to suggest a technique",
+			output_file: OUTPUT_FILE,
+		}
+		const suggestPromptSource = step3.buildPromptSource(createPromptInput(step3, suggestWorkflowValues))
 		expect(suggestPromptSource).to.not.have.property("workflowSystemInstructions")
-		const suggestPrompt = suggestPromptSource.currentStepInstructions
+		if (suggestPromptSource.kind !== "current_step_instruction_template") {
+			throw new Error("Missing current step instruction template for step-3 suggest.")
+		}
+		const suggestPrompt = renderWorkflowPromptTemplate({
+			template: suggestPromptSource.currentStepInstructionTemplate,
+			workflowValueKeys: brainstormingWorkflowDefinition.workflowValueKeys,
+			workflowValues: suggestWorkflowValues,
+			context: "brainstorming step-3 suggest test prompt",
+		})
+		expect(suggestPrompt).to.include(OUTPUT_FILE)
 		expect(suggestPrompt).to.include(`Read \`${OUTPUT_FILE}\`.`)
 		expect(suggestPrompt).to.include("Call `get_brainstorming_methods`")
 		expect(suggestPrompt).to.include("Do not call `set_workflow_values` for `selected_techniques`.")
 		expect(suggestPrompt).to.include("Once the user indicates they're ready")
+		expect(suggestPrompt).not.to.include("{workflow.output_file}")
 
-		const choosePromptSource = step3.buildPromptSource(
-			createPromptInput(step3, {
-				selected_approach: "I want to choose",
-				output_file: OUTPUT_FILE,
-			}),
-		)
+		const chooseWorkflowValues: WorkflowValues = {
+			selected_approach: "I want to choose",
+			output_file: OUTPUT_FILE,
+		}
+		const choosePromptSource = step3.buildPromptSource(createPromptInput(step3, chooseWorkflowValues))
 		expect(choosePromptSource).to.not.have.property("workflowSystemInstructions")
-		const choosePrompt = choosePromptSource.currentStepInstructions
+		if (choosePromptSource.kind !== "current_step_instruction_template") {
+			throw new Error("Missing current step instruction template for step-3 choose.")
+		}
+		const choosePrompt = renderWorkflowPromptTemplate({
+			template: choosePromptSource.currentStepInstructionTemplate,
+			workflowValueKeys: brainstormingWorkflowDefinition.workflowValueKeys,
+			workflowValues: chooseWorkflowValues,
+			context: "brainstorming step-3 choose test prompt",
+		})
+		expect(choosePrompt).to.include(OUTPUT_FILE)
 		expect(choosePrompt).to.include(`Read \`${OUTPUT_FILE}\`.`)
 		expect(choosePrompt).to.include("If at any point the user asks to switch to a new brainstorming technique")
 		expect(choosePrompt).to.include("get_brainstorming_methods")
+		expect(choosePrompt).not.to.include("{workflow.output_file}")
 
 		const approvedStep3ToolNames = [
 			"get_brainstorming_methods",
@@ -757,19 +766,28 @@ describe("brainstormingWorkflowDefinition", () => {
 	it("builds Step 4 prompt and exposes only governed file-edit plus final delivery tools", () => {
 		const step4 = brainstormingWorkflowDefinition.steps["step-4"]
 		expect(step4.buildToolSchema).to.equal(buildBrainstormingStep4ToolSchemas)
-		const promptSource = step4.buildPromptSource(
-			createPromptInput(step4, {
-				output_file: OUTPUT_FILE,
-			}),
-		)
+		const workflowValues: WorkflowValues = {
+			output_file: OUTPUT_FILE,
+		}
+		const promptSource = step4.buildPromptSource(createPromptInput(step4, workflowValues))
 		expect(promptSource).to.not.have.property("workflowSystemInstructions")
-		const prompt = promptSource.currentStepInstructions
+		if (promptSource.kind !== "current_step_instruction_template") {
+			throw new Error("Missing current step instruction template for step-4.")
+		}
+		const prompt = renderWorkflowPromptTemplate({
+			template: promptSource.currentStepInstructionTemplate,
+			workflowValueKeys: brainstormingWorkflowDefinition.workflowValueKeys,
+			workflowValues,
+			context: "brainstorming step-4 test prompt",
+		})
+		expect(prompt).to.include(OUTPUT_FILE)
 		expect(prompt).to.include("Review the captured ideas, cluster them into themes")
 		expect(prompt).to.include("Do not extend into solutioning during this workflow.")
 		expect(prompt).to.include("create architecture")
 		expect(prompt).to.include("quick spec")
 		expect(prompt).to.include(`Append the themes, priorities, and summary to \`${OUTPUT_FILE}\`.`)
 		expect(prompt).to.include("using `attempt_completion`")
+		expect(prompt).not.to.include("{workflow.output_file}")
 		const step4ToolNames = step4.buildToolSchema(createPromptInput(step4, {})).map((schema) => schema.name)
 		expectToolNames(step4ToolNames, [
 			"read_file",

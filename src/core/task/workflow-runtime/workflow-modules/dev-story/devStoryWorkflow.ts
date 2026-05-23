@@ -156,22 +156,22 @@ You will use the following tools to manage your progress while implementing this
 
 *** Story Frontmatter ***
 General Instructions:
-general_instructions
+{workflow.story_general_instructions}
 
 Objective:
-story_objective
+{workflow.story_objective}
 
 Scope:
-story_scope
+{workflow.story_scope}
 
 Scope Boundary:
-story_scope_boundary
+{workflow.story_scope_boundary}
 
 Requirements:
-story_requirements
+{workflow.story_requirements}
 
 Known Issues/ Risks/ Technical Debt:
-story_issues
+{workflow.story_issues}
 
 **Continue task impelentation until instructed otherwise- when the final task is complete the next workflow step will unlock and further instructions will be provided.**
 
@@ -185,7 +185,7 @@ const DEV_STORY_STEP_3_PROMPT =
 	"Use attempt_completion to provide a final recap to the user summarizing the changes that you implemented during this workflow, and remind them to run the code-review workflow before committing the changed files."
 
 function createEmptyPromptSource(): WorkflowStepPromptSource {
-	return {}
+	return { kind: "none" }
 }
 
 function createStepDefinition(args: {
@@ -193,9 +193,10 @@ function createStepDefinition(args: {
 	checklistLabel: string
 	decisionTree: WorkflowDecisionTree
 	buildPromptSource?: WorkflowStepDefinition["buildPromptSource"]
+	promptTemplates?: WorkflowStepDefinition["promptTemplates"]
 	buildToolSchema: WorkflowStepDefinition["buildToolSchema"]
 }): WorkflowStepDefinition {
-	return {
+	const stepDefinition: WorkflowStepDefinition = {
 		id: `step-${args.stepNumber}`,
 		stepNumber: args.stepNumber,
 		checklistLabel: args.checklistLabel,
@@ -203,6 +204,12 @@ function createStepDefinition(args: {
 		buildToolSchema: args.buildToolSchema,
 		decisionTree: args.decisionTree,
 	}
+
+	if (args.promptTemplates !== undefined) {
+		return { ...stepDefinition, promptTemplates: args.promptTemplates }
+	}
+
+	return stepDefinition
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -456,10 +463,6 @@ export function renderCurrentDevStoryTaskDetail(workflowValues: WorkflowValues):
 	return formatStoryTaskDetail(buildStoryTaskDetailFromInventory(currentTask))
 }
 
-function renderWorkflowValueByKey(input: WorkflowPromptBuilderInput, key: DevStoryWorkflowValueKey): string {
-	return input.renderWorkflowValue(input.session.workflowValues[key] ?? key)
-}
-
 function buildStep2PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
 	const currentTaskDetail = renderCurrentDevStoryTaskDetail(input.session.workflowValues)
 	if (currentTaskDetail === undefined) {
@@ -468,28 +471,19 @@ function buildStep2PromptSource(input: WorkflowPromptBuilderInput): WorkflowStep
 
 	if (input.session.branchContext.activeBranchId === DEV_STORY_STEP_2_TASK_LOOP_BRANCH_ID) {
 		return {
-			currentStepInstructions: currentTaskDetail,
+			kind: "current_step_instruction_template",
+			currentStepInstructionTemplate: currentTaskDetail,
 		}
 	}
 
 	return {
-		currentStepInstructions: DEV_STORY_STEP_2_PROMPT_TEMPLATE.replaceAll(
-			"general_instructions",
-			renderWorkflowValueByKey(input, DevStoryWorkflowValueKey.StoryGeneralInstructions),
-		)
-			.replaceAll("story_objective", renderWorkflowValueByKey(input, DevStoryWorkflowValueKey.StoryObjective))
-			.replaceAll("story_scope_boundary", renderWorkflowValueByKey(input, DevStoryWorkflowValueKey.StoryScopeBoundary))
-			.replaceAll("story_scope", renderWorkflowValueByKey(input, DevStoryWorkflowValueKey.StoryScope))
-			.replaceAll("story_requirements", renderWorkflowValueByKey(input, DevStoryWorkflowValueKey.StoryRequirements))
-			.replaceAll("story_issues", renderWorkflowValueByKey(input, DevStoryWorkflowValueKey.StoryIssues))
-			.replaceAll("current_story_task", currentTaskDetail),
+		kind: "current_step_instruction_template",
+		currentStepInstructionTemplate: DEV_STORY_STEP_2_PROMPT_TEMPLATE.replaceAll("current_story_task", currentTaskDetail),
 	}
 }
 
 function buildStep3PromptSource(): WorkflowStepPromptSource {
-	return {
-		currentStepInstructions: DEV_STORY_STEP_3_PROMPT,
-	}
+	return { kind: "current_step_instruction_template", currentStepInstructionTemplate: DEV_STORY_STEP_3_PROMPT }
 }
 
 export async function setupDevStoryFromTargetStory(
@@ -1190,6 +1184,7 @@ export const devStoryWorkflowDefinition: WorkflowDefinition = {
 			checklistLabel: "Execute Story Tasks",
 			decisionTree: buildStep2DecisionTree(),
 			buildPromptSource: buildStep2PromptSource,
+			promptTemplates: [DEV_STORY_STEP_2_PROMPT_TEMPLATE],
 			buildToolSchema: buildDevStoryStep2ToolSchemas,
 		}),
 		"step-3": createStepDefinition({
@@ -1197,6 +1192,7 @@ export const devStoryWorkflowDefinition: WorkflowDefinition = {
 			checklistLabel: "Final User Recap",
 			decisionTree: buildStep3DecisionTree(),
 			buildPromptSource: buildStep3PromptSource,
+			promptTemplates: [DEV_STORY_STEP_3_PROMPT],
 			buildToolSchema: buildDevStoryStep3ToolSchemas,
 		}),
 		"step-4": createStepDefinition({

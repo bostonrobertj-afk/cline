@@ -20,9 +20,9 @@ import type {
 	WorkflowDeterministicProcedureResult,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
-	WorkflowValue,
 	WorkflowValues,
 } from "../../../types"
+import { renderWorkflowPromptTemplate } from "../../../workflowPromptTemplates"
 import {
 	buildWriteRemediationStoryStep1ToolSchemas,
 	buildWriteRemediationStoryStep1WorkflowForm,
@@ -191,35 +191,26 @@ function getSingleField(panel: WorkflowFormPanelDefinition): WorkflowFormFieldDe
 	return field
 }
 
-function renderWorkflowValue(value: WorkflowValue): string {
-	if (typeof value === "string") {
-		return value
-	}
-
-	const rendered = JSON.stringify(value)
-	if (rendered === undefined) {
-		throw new Error("Workflow value could not be rendered.")
-	}
-
-	return rendered
-}
-
 function createPromptInput(stepId: WorkflowStepDefinition["id"], workflowValues: WorkflowValues): WorkflowPromptBuilderInput {
 	return {
 		step: getStep(stepId),
 		session: createSession(workflowValues),
-		renderWorkflowValue,
 	}
 }
 
 function buildPrompt(stepId: WorkflowStepDefinition["id"], workflowValues: WorkflowValues): string {
 	const promptSource = getStep(stepId).buildPromptSource(createPromptInput(stepId, workflowValues))
-	const currentStepInstructions = promptSource.currentStepInstructions
-	if (currentStepInstructions === undefined) {
-		throw new Error(`Step ${stepId} did not produce currentStepInstructions.`)
+	if (promptSource.kind !== "current_step_instruction_template") {
+		throw new Error(`Missing current step instruction template for ${stepId}.`)
 	}
 
-	return currentStepInstructions
+	const template = promptSource.currentStepInstructionTemplate
+	return renderWorkflowPromptTemplate({
+		template,
+		workflowValueKeys: writeRemediationStoryWorkflowDefinition.workflowValueKeys,
+		workflowValues,
+		context: `write-remediation-story ${stepId} test prompt`,
+	})
 }
 
 function getToolNamesForStep(stepId: WorkflowStepDefinition["id"]): readonly string[] {
@@ -721,9 +712,9 @@ describe("writeRemediationStoryWorkflow", () => {
 		expect(prompt).to.include(ORIGINATING_STORY_PATH)
 		expect(prompt).to.include(CODE_REVIEW_OUTPUT_PATH)
 		expect(prompt).to.include(TARGET_STORY_PATH)
-		expect(prompt).not.to.include("- The originating story: originating_story")
-		expect(prompt).not.to.include("- QA findings for the originating story: code_review_output")
-		expect(prompt).not.to.include("- Drafted remediation story: target_story")
+		expect(prompt).not.to.include("{workflow.originating_story}")
+		expect(prompt).not.to.include("{workflow.code_review_output}")
+		expect(prompt).not.to.include("{workflow.target_story}")
 	})
 
 	it("declares expected tool schemas by step", () => {

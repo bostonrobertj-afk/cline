@@ -12,7 +12,6 @@ import type {
 	WorkflowFormContinuationReplacement,
 	WorkflowFormContinuationReplacementBuilder,
 	WorkflowPersonaDefinition,
-	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
 	WorkflowStepPromptSource,
 	WorkflowValues,
@@ -498,23 +497,12 @@ export function validateAndPersistWriteRemediationStoryInputValues(
 	}
 }
 
-function renderWorkflowValueByKey(input: WorkflowPromptBuilderInput, key: WriteRemediationStoryWorkflowValueKey): string {
-	return input.renderWorkflowValue(input.session.workflowValues[key] ?? key)
-}
-
-function renderWriteRemediationStoryPromptTemplate(input: WorkflowPromptBuilderInput, template: string): string {
-	return template
-		.replaceAll("originating_story", renderWorkflowValueByKey(input, WriteRemediationStoryWorkflowValueKey.OriginatingStory))
-		.replaceAll("code_review_output", renderWorkflowValueByKey(input, WriteRemediationStoryWorkflowValueKey.CodeReviewOutput))
-		.replaceAll("target_story", renderWorkflowValueByKey(input, WriteRemediationStoryWorkflowValueKey.TargetStory))
-}
-
 const WRITE_REMEDIATION_STORY_STEP_3_PROMPT_TEMPLATE = `You have been invoked inside a workflow focused on completing a drafted remediation story in response to QA findings after an upstream story in the same project was completed.
 
 Read these files first:
-- The originating story: originating_story
-- QA findings for the originating story: code_review_output
-- Drafted remediation story: target_story
+- The originating story: {workflow.originating_story}
+- QA findings for the originating story: {workflow.code_review_output}
+- Drafted remediation story: {workflow.target_story}
 
 The remediation story's frontmatter has already been populated. Your task is to complete the story document by adding the tasks and subtasks necessary to ensure the documented findings are fully addressed.
 
@@ -530,7 +518,7 @@ A finding may belong to one or more of the selected categories. You must handle 
 
 When authoring the tasks and subtasks for the remediation story, you must follow this process:
    
-1. Read the requirements in target_story and parse them into observable obligations:
+1. Read the requirements in {workflow.target_story} and parse them into observable obligations:
    runtime behavior, persisted values, artifacts, form UI, tool exposure, prompt projection, routing, validation, cleanup, and tests.
 
 2. Map each obligation to the owning layer:
@@ -610,11 +598,12 @@ When authoring the tasks and subtasks for the remediation story, you must follow
 
 9. Author the story's validation section by prescribing the most targeted set of unit tests and validations possible while ensuring that the intended revisions and behavior are in place.
 
-Once all tasks and subtasks are added to target_story and you've validated them per step 8 above, use attempt_completion to provide a final update to the user notifying them that the remediation story is ready for implementation.`
+Once all tasks and subtasks are added to {workflow.target_story} and you've validated them per step 8 above, use attempt_completion to provide a final update to the user notifying them that the remediation story is ready for implementation.`
 
-function buildStep3PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
+function buildStep3PromptSource(): WorkflowStepPromptSource {
 	return {
-		currentStepInstructions: renderWriteRemediationStoryPromptTemplate(input, WRITE_REMEDIATION_STORY_STEP_3_PROMPT_TEMPLATE),
+		kind: "current_step_instruction_template",
+		currentStepInstructionTemplate: WRITE_REMEDIATION_STORY_STEP_3_PROMPT_TEMPLATE,
 	}
 }
 
@@ -628,7 +617,7 @@ export function failWithToolBackedOperationReason(session: ActiveWorkflowSession
 }
 
 function createEmptyPromptSource(): WorkflowStepPromptSource {
-	return {}
+	return { kind: "none" }
 }
 
 function createStepDefinition(args: {
@@ -636,9 +625,10 @@ function createStepDefinition(args: {
 	checklistLabel: string
 	decisionTree: WorkflowDecisionTree
 	buildPromptSource?: WorkflowStepDefinition["buildPromptSource"]
+	promptTemplates?: WorkflowStepDefinition["promptTemplates"]
 	buildToolSchema: WorkflowStepDefinition["buildToolSchema"]
 }): WorkflowStepDefinition {
-	return {
+	const stepDefinition: WorkflowStepDefinition = {
 		id: `step-${args.stepNumber}`,
 		stepNumber: args.stepNumber,
 		checklistLabel: args.checklistLabel,
@@ -646,6 +636,12 @@ function createStepDefinition(args: {
 		buildToolSchema: args.buildToolSchema,
 		decisionTree: args.decisionTree,
 	}
+
+	if (args.promptTemplates !== undefined) {
+		return { ...stepDefinition, promptTemplates: args.promptTemplates }
+	}
+
+	return stepDefinition
 }
 
 function sourceRouteMatches(sourceRoute: { branchId: string; routeId: string }, branchId: string, routeId: string): boolean {
@@ -1112,6 +1108,7 @@ export const writeRemediationStoryWorkflowDefinition: WorkflowDefinition = {
 			checklistLabel: "Complete Remediation Story",
 			decisionTree: buildStep3DecisionTree(),
 			buildPromptSource: buildStep3PromptSource,
+			promptTemplates: [WRITE_REMEDIATION_STORY_STEP_3_PROMPT_TEMPLATE],
 			buildToolSchema: buildWriteRemediationStoryStep3ToolSchemas,
 		}),
 		"step-4": createStepDefinition({

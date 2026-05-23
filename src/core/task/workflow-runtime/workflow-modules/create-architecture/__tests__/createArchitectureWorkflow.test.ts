@@ -11,9 +11,9 @@ import type {
 	WorkflowDecisionBranchRoute,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
-	WorkflowValue,
 	WorkflowValues,
 } from "../../../types"
+import { renderWorkflowPromptTemplate } from "../../../workflowPromptTemplates"
 import { buildCreateArchitectureDocumentFromSession } from "../createArchitectureDocument"
 import {
 	buildCreateArchitectureStep1ToolSchemas,
@@ -187,19 +187,10 @@ function createSession(workflowValues: WorkflowValues): ActiveWorkflowSession {
 	}
 }
 
-function renderWorkflowValue(value: WorkflowValue): string {
-	if (typeof value === "string") {
-		return value
-	}
-
-	return JSON.stringify(value)
-}
-
 function createPromptInput(step: WorkflowStepDefinition, workflowValues: WorkflowValues): WorkflowPromptBuilderInput {
 	return {
 		session: createSession(workflowValues),
 		step,
-		renderWorkflowValue,
 	}
 }
 
@@ -209,12 +200,17 @@ function buildPrompt(
 ): string {
 	const step = createArchitectureWorkflowDefinition.steps[stepId]
 	const promptSource = step.buildPromptSource(createPromptInput(step, workflowValues))
-	const prompt = promptSource.currentStepInstructions
-	if (prompt === undefined) {
-		throw new Error(`Missing prompt for ${stepId}.`)
+	if (promptSource.kind !== "current_step_instruction_template") {
+		throw new Error(`Missing current step instruction template for ${stepId}.`)
 	}
 
-	return prompt
+	const template = promptSource.currentStepInstructionTemplate
+	return renderWorkflowPromptTemplate({
+		template,
+		workflowValueKeys: createArchitectureWorkflowDefinition.workflowValueKeys,
+		workflowValues,
+		context: `create-architecture ${stepId} test prompt`,
+	})
 }
 
 describe("createArchitectureWorkflowDefinition", () => {
@@ -929,6 +925,10 @@ describe("createArchitectureWorkflowDefinition", () => {
 
 		const forbiddenSnippets = [
 			"{output_file}",
+			"{workflow.output_file}",
+			"{workflow.projectTitle}",
+			"{workflow.projectFolderName}",
+			"{workflow.change_plan}",
 			"build_workflow_document",
 			"set_workflow_values",
 			"/Users/robertboston/Documents/Cline/Workflows/create-architecture.md",
@@ -971,6 +971,10 @@ describe("createArchitectureWorkflowDefinition", () => {
 			"{projectTitle}",
 			"{projectFolderName}",
 			"{change_plan}",
+			"{workflow.output_file}",
+			"{workflow.projectTitle}",
+			"{workflow.projectFolderName}",
+			"{workflow.change_plan}",
 			"output_document",
 		]) {
 			expect(prompt).not.to.include(forbiddenSnippet)
@@ -994,6 +998,10 @@ describe("createArchitectureWorkflowDefinition", () => {
 			"{projectTitle}",
 			"{projectFolderName}",
 			"{change_plan}",
+			"{workflow.output_file}",
+			"{workflow.projectTitle}",
+			"{workflow.projectFolderName}",
+			"{workflow.change_plan}",
 			"output_document",
 		]) {
 			expect(prompt).not.to.include(forbiddenSnippet)
@@ -1017,6 +1025,10 @@ describe("createArchitectureWorkflowDefinition", () => {
 			"{projectTitle}",
 			"{projectFolderName}",
 			"{change_plan}",
+			"{workflow.output_file}",
+			"{workflow.projectTitle}",
+			"{workflow.projectFolderName}",
+			"{workflow.change_plan}",
 			"output_document",
 		]) {
 			expect(prompt).not.to.include(forbiddenSnippet)

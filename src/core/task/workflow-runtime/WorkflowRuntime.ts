@@ -90,12 +90,14 @@ import type {
 	WorkflowPromptProjection,
 	WorkflowRuntimeLifecycleState,
 	WorkflowStepDefinition,
+	WorkflowStepPromptSource,
 	WorkflowStepTransitionTarget,
 	WorkflowValidationResult,
 	WorkflowValue,
 	WorkflowValues,
 	WorkflowWorkspacePathPolicy,
 } from "./types"
+import { renderWorkflowPromptTemplate, validateWorkflowPromptTemplate } from "./workflowPromptTemplates"
 import {
 	areWorkflowValuesEqual,
 	isWorkflowValue,
@@ -2033,9 +2035,14 @@ export class WorkflowRuntime {
 		const promptBuilderInput: WorkflowPromptBuilderInput = {
 			session,
 			step: activeStep,
-			renderWorkflowValue: stringifyWorkflowValueForPrompt,
 		}
 		const promptSource = activeStep.buildPromptSource(promptBuilderInput)
+		const currentStepInstructionText = this.renderWorkflowCurrentStepInstructionTemplate({
+			workflow: definition,
+			step: activeStep,
+			session,
+			promptSource,
+		})
 		const workflowStepList = this.buildWorkflowStepChecklist(definition, session)
 		const workflowToolSchemaOverride = activeStep.buildToolSchema(promptBuilderInput)
 		const includePersona = args.isFirstTaskRequest ?? taskState.apiRequestCount === 1
@@ -2044,11 +2051,11 @@ export class WorkflowRuntime {
 			workflowInputPayloadBlock: this.joinPromptSections([
 				includePersona ? this.buildWorkflowPersonaInputPayloadBlock(definition) : undefined,
 				this.buildWorkflowContextInputPayloadBlock(definition, workflowStepList),
-				this.buildWorkflowCurrentStepInputPayloadBlock(activeStep, promptSource.currentStepInstructions),
+				this.buildWorkflowCurrentStepInputPayloadBlock(activeStep, currentStepInstructionText),
 			]),
 			continuationWorkflowInputPayloadBlock: this.joinPromptSections([
 				this.buildWorkflowContextInputPayloadBlock(definition, workflowStepList),
-				this.buildWorkflowCurrentStepInputPayloadBlock(activeStep, promptSource.currentStepInstructions),
+				this.buildWorkflowCurrentStepInputPayloadBlock(activeStep, currentStepInstructionText),
 			]),
 			workflowToolSchemaOverride,
 		}
@@ -2075,14 +2082,42 @@ export class WorkflowRuntime {
 		])
 	}
 
+	private renderWorkflowCurrentStepInstructionTemplate(args: {
+		workflow: WorkflowDefinition
+		step: WorkflowStepDefinition
+		session: ActiveWorkflowSession
+		promptSource: WorkflowStepPromptSource
+	}): string | undefined {
+		if (args.promptSource.kind === "none") {
+			return undefined
+		}
+
+		const currentStepInstructionTemplate = args.promptSource.currentStepInstructionTemplate
+		const validationResult = validateWorkflowPromptTemplate({
+			template: currentStepInstructionTemplate,
+			workflowValueKeys: args.workflow.workflowValueKeys,
+			context: `workflow ${args.workflow.name} step ${args.step.id} currentStepInstructionTemplate`,
+		})
+		if (validationResult.valid === false) {
+			throw new Error(validationResult.errorMessage)
+		}
+
+		return renderWorkflowPromptTemplate({
+			template: currentStepInstructionTemplate,
+			workflowValueKeys: args.workflow.workflowValueKeys,
+			workflowValues: args.session.workflowValues,
+			context: `workflow ${args.workflow.name} step ${args.step.id} currentStepInstructionTemplate`,
+		})
+	}
+
 	private buildWorkflowCurrentStepInputPayloadBlock(
 		activeStep: WorkflowStepDefinition,
-		currentStepInstructions: string | undefined,
+		currentStepInstructionText: string | undefined,
 	): string | undefined {
 		return this.joinPromptSections([
 			"CURRENT STEP DETAILED INSTRUCTIONS",
 			`Step ${activeStep.stepNumber}: ${activeStep.checklistLabel}`,
-			currentStepInstructions,
+			currentStepInstructionText,
 		])
 	}
 
@@ -7411,7 +7446,6 @@ export class WorkflowRuntime {
 		const projectedToolSchema = args.step.buildToolSchema({
 			session: args.session,
 			step: args.step,
-			renderWorkflowValue: stringifyWorkflowValueForPrompt,
 		})
 
 		return projectedToolSchema.some((toolSpec) => toolSpec.id === args.toolName)
@@ -7507,6 +7541,27 @@ export class WorkflowRuntime {
 			terminalErrorMessage: normalizedErrorMessage,
 		}
 		return this.resolveNextAction({ taskState: args.taskState })
+	}
+
+	private validateWorkflowStepPromptTemplates(args: {
+		workflow: WorkflowDefinition
+		step: WorkflowStepDefinition
+	}): WorkflowValidationResult {
+		for (const promptTemplate of args.step.promptTemplates ?? []) {
+			if (promptTemplate.trim() === "") {
+				return { valid: false, errorMessage: `Workflow step ${args.step.id} promptTemplates entry must not be empty.` }
+			}
+
+			const validationResult = validateWorkflowPromptTemplate({
+				template: promptTemplate,
+				workflowValueKeys: args.workflow.workflowValueKeys,
+				context: `workflow ${args.workflow.name} step ${args.step.id} promptTemplates entry`,
+			})
+			if (validationResult.valid === false) {
+				return validationResult
+			}
+		}
+		return { valid: true }
 	}
 
 	private validateWorkflowDefinition(workflow: WorkflowDefinition): WorkflowValidationResult {
@@ -7833,6 +7888,11 @@ export class WorkflowRuntime {
 
 			if (step.checklistLabel.trim() === "") {
 				return { valid: false, errorMessage: `Workflow step ${step.id} checklistLabel must not be empty.` }
+			}
+
+			const promptTemplateValidation = this.validateWorkflowStepPromptTemplates({ workflow, step })
+			if (promptTemplateValidation.valid === false) {
+				return promptTemplateValidation
 			}
 
 			if (seenStepNumbers.has(step.stepNumber)) {

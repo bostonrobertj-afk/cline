@@ -399,7 +399,7 @@ function buildStep1ContinuationReplacementBuilder(panelId: string): WorkflowForm
 }
 
 function createEmptyPromptSource(): WorkflowStepPromptSource {
-	return {}
+	return { kind: "none" }
 }
 
 function createStepDefinition(args: {
@@ -408,8 +408,9 @@ function createStepDefinition(args: {
 	decisionTree: WorkflowDecisionTree
 	buildPromptSource?: WorkflowStepDefinition["buildPromptSource"]
 	buildToolSchema: WorkflowStepDefinition["buildToolSchema"]
+	promptTemplates?: WorkflowStepDefinition["promptTemplates"]
 }): WorkflowStepDefinition {
-	return {
+	const stepDefinition: WorkflowStepDefinition = {
 		id: `step-${args.stepNumber}`,
 		stepNumber: args.stepNumber,
 		checklistLabel: args.checklistLabel,
@@ -417,6 +418,10 @@ function createStepDefinition(args: {
 		buildToolSchema: args.buildToolSchema,
 		decisionTree: args.decisionTree,
 	}
+	if (args.promptTemplates !== undefined) {
+		return { ...stepDefinition, promptTemplates: args.promptTemplates }
+	}
+	return stepDefinition
 }
 
 function readWorkflowStringValue(workflowValues: WorkflowValues, key: CorrectCourseWorkflowValueKey): string | undefined {
@@ -702,16 +707,12 @@ export function failWithToolBackedOperationReason(session: ActiveWorkflowSession
 	}
 }
 
-function renderWorkflowValueByKey(input: WorkflowPromptBuilderInput, key: CorrectCourseWorkflowValueKey): string {
-	return input.renderWorkflowValue(input.session.workflowValues[key] ?? key)
-}
-
 const CORRECT_COURSE_STEP_3_PROMPT_TEMPLATE: string = String.raw`You are a Scrum Master navigating change management. Analyze the triggering issue, assess impact across project artifacts, and produce an actionable change management plan with clear handoff. You will document your plan in the provided change management plan. You should actively engage the user while carrying out the steps prescribed below to ensure that they are kept abreast of your progress and are able to provide input.
 
-- Project: projectTitle
-- Project Folder: projectFolderName
-- Architecture Document: architecture_document
-- Change Management Plan: output_document
+- Project: {workflow.projectTitle}
+- Project Folder: {workflow.projectFolderName}
+- Architecture Document: {workflow.architecture_document}
+- Change Management Plan: {workflow.output_document}
 
 The project folder contains all existing documentation for this project, which can include:
 - discovery documents
@@ -719,14 +720,14 @@ The project folder contains all existing documentation for this project, which c
 - implementation documents, including story files and story index files
 - review files including documented findings from implemented stories which have been assessed via the code review workflow
 
-*** conditional: only shown if epic_source_indicator = yes ***
-Discovered while authoring a specific epic: epic_source_indicator
-Epic: epic_source_identifier
-Epic Document: epics_document
+*** conditional: only shown if {workflow.epic_source_indicator} = yes ***
+Discovered while authoring a specific epic: {workflow.epic_source_indicator}
+Epic: {workflow.epic_source_identifier}
+Epic Document: {workflow.epics_document}
 *** end conditional ***
-*** conditional: only shown if story_source_indicator = yes ***
-Discovered while authoring, implementing, or reviewing a specific story: story_source_indicator
-Story: story_source_identifier
+*** conditional: only shown if {workflow.story_source_indicator} = yes ***
+Discovered while authoring, implementing, or reviewing a specific story: {workflow.story_source_indicator}
+Story: {workflow.story_source_identifier}
 *** end conditional ***
 
 Define the core problem and assign it to one of the following categories:
@@ -736,17 +737,17 @@ Define the core problem and assign it to one of the following categories:
 - strategic pivot desired
 - failed approach requires a solution
 
-- Assess initial impact and gather supporting evidence including concrete examples, error messages, user feedback, or technical constraints. Record your findings under the "Impact Assessment" heading in output_document and note the issue's source under the "Issue Source" heading.
+- Assess initial impact and gather supporting evidence including concrete examples, error messages, user feedback, or technical constraints. Record your findings under the "Impact Assessment" heading in {workflow.output_document} and note the issue's source under the "Issue Source" heading.
 
 Assess the project's stories:
 Keep analysis and modification constrained to stories belonging to a single epic whenever feasible. Consider the following:
 - Can the issue be addressed by modifying existing stories?
 - Should new stories be added within the current epic structure?
-- Would this approach maintain project timeline and scope as documented in architecture_document?
+- Would this approach maintain project timeline and scope as documented in {workflow.architecture_document}?
 - Would reverting work from recently-completed stories simplify addressing this issue?
 - If so, which stories' changes should be rolled back?
 
-Add content under the "Story Modifications" heading in output_document indicating what work is needed for each story that should be touched as part of this change management process.
+Add content under the "Story Modifications" heading in {workflow.output_document} indicating what work is needed for each story that should be touched as part of this change management process.
 
 Assess the project's epics:
 - Evaluate the story's parent epic and, if needed, other epics in the same project and consider:
@@ -760,13 +761,13 @@ Assess the project's epics:
     - add new epic
     - remove an existing epic
 
-Add content under the "Epic Modifications" heading in output_document indicating what work is needed for each epic that should be touched as part of this change management process.
+Add content under the "Epic Modifications" heading in {workflow.output_document} indicating what work is needed for each epic that should be touched as part of this change management process.
 
 Assess the project's architecture:
-- Evaluate architecture_document and consider:
+- Evaluate {workflow.architecture_document} and consider:
 -   Do the project's scope, architectural goals, core architectural rules, responsibility boundaries, or durable vs transient ownership, blast radius, dependencies, or roadmap need to be modified?
 
-Add content under the "Architecture Modifications" heading in output_document indicating what work is needed in the architecture document as part of this change management process. 
+Add content under the "Architecture Modifications" heading in {workflow.output_document} indicating what work is needed in the architecture document as part of this change management process. 
 
 Build a change management action plan using the following guidelines:
 Indicate workflows which should be run with intended sequencing. This is the standard sequential workflow structure:
@@ -780,19 +781,19 @@ Indicate workflows which should be run with intended sequencing. This is the sta
 
 For each prescribed workflow, include details regarding what should be done to resolve the identified issue which agents executing those workflows can follow.
 
-Add the action plan under the "Change Management Implementation" heading in output_document.
+Add the action plan under the "Change Management Implementation" heading in {workflow.output_document}.
 
-Provide an overview of what you've documented to the user including the full file path for output_document. Revise as needed based on their feedback. Once they are satisfied with your documentation, use attempt_completion to provide them with a closing set of instructions which include the following where relevant:
-    - if the user needs to run the create-architecture or create-epics workflows, they must provide the full file path to output_document when prompted for context files.
+Provide an overview of what you've documented to the user including the full file path for {workflow.output_document}. Revise as needed based on their feedback. Once they are satisfied with your documentation, use attempt_completion to provide them with a closing set of instructions which include the following where relevant:
+    - if the user needs to run the create-architecture or create-epics workflows, they must provide the full file path to {workflow.output_document} when prompted for context files.
     - if epics are to be deleted, added, or resequenced, or if stories are to be added, deleted, or resequenced, the user must run the following workflows in order:
         - create-epics (once)
         - pi-planning (once per modified/new epic)
         - create-story (once per modified/new story)
     - The user should not resume the normal dev-story - > code-review - > write-remediation-story cycle until all project documentation has been updated per the change management plan.`
 
-const CORRECT_COURSE_EPIC_CONDITIONAL_START = "*** conditional: only shown if epic_source_indicator = yes ***"
+const CORRECT_COURSE_EPIC_CONDITIONAL_START = "*** conditional: only shown if {workflow.epic_source_indicator} = yes ***"
 const CORRECT_COURSE_EPIC_CONDITIONAL_END = "*** end conditional ***"
-const CORRECT_COURSE_STORY_CONDITIONAL_START = "*** conditional: only shown if story_source_indicator = yes ***"
+const CORRECT_COURSE_STORY_CONDITIONAL_START = "*** conditional: only shown if {workflow.story_source_indicator} = yes ***"
 const CORRECT_COURSE_STORY_CONDITIONAL_END = "*** end conditional ***"
 
 function removeDelimitedBlock(template: string, startMarker: string, endMarker: string): string {
@@ -814,22 +815,6 @@ function removeConditionalMarkers(template: string): string {
 		.replace(/\n{3,}/g, "\n\n")
 }
 
-function renderCorrectCoursePromptTemplate(input: WorkflowPromptBuilderInput, template: string): string {
-	return template
-		.replaceAll("projectTitle", renderWorkflowValueByKey(input, CorrectCourseWorkflowValueKey.ProjectTitle))
-		.replaceAll("projectFolderName", renderWorkflowValueByKey(input, CorrectCourseWorkflowValueKey.ProjectFolderName))
-		.replaceAll("architecture_document", renderWorkflowValueByKey(input, CorrectCourseWorkflowValueKey.ArchitectureDocument))
-		.replaceAll("output_document", renderWorkflowValueByKey(input, CorrectCourseWorkflowValueKey.OutputDocument))
-		.replaceAll("epic_source_indicator", renderWorkflowValueByKey(input, CorrectCourseWorkflowValueKey.EpicSourceIndicator))
-		.replaceAll("epic_source_identifier", renderWorkflowValueByKey(input, CorrectCourseWorkflowValueKey.EpicSourceIdentifier))
-		.replaceAll("epics_document", renderWorkflowValueByKey(input, CorrectCourseWorkflowValueKey.EpicsDocument))
-		.replaceAll("story_source_indicator", renderWorkflowValueByKey(input, CorrectCourseWorkflowValueKey.StorySourceIndicator))
-		.replaceAll(
-			"story_source_identifier",
-			renderWorkflowValueByKey(input, CorrectCourseWorkflowValueKey.StorySourceIdentifier),
-		)
-}
-
 function buildStep3PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
 	let promptTemplate = CORRECT_COURSE_STEP_3_PROMPT_TEMPLATE
 	if (readWorkflowStringValue(input.session.workflowValues, CorrectCourseWorkflowValueKey.EpicSourceIndicator) !== "yes") {
@@ -848,8 +833,10 @@ function buildStep3PromptSource(input: WorkflowPromptBuilderInput): WorkflowStep
 		)
 	}
 
-	const renderedPrompt = renderCorrectCoursePromptTemplate(input, removeConditionalMarkers(promptTemplate))
-	return { currentStepInstructions: renderedPrompt }
+	return {
+		kind: "current_step_instruction_template",
+		currentStepInstructionTemplate: removeConditionalMarkers(promptTemplate),
+	}
 }
 
 function buildStep1DecisionTree(): WorkflowDecisionTree {
@@ -1210,6 +1197,7 @@ export const correctCourseWorkflowDefinition: WorkflowDefinition = {
 			decisionTree: buildStep3DecisionTree(),
 			buildPromptSource: buildStep3PromptSource,
 			buildToolSchema: buildCorrectCourseStep3ToolSchemas,
+			promptTemplates: [CORRECT_COURSE_STEP_3_PROMPT_TEMPLATE],
 		}),
 	},
 }

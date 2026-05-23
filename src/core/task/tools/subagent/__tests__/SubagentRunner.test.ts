@@ -378,7 +378,7 @@ function createResolvedWorkflow(args?: {
 	useSkillName?: string
 	stepOneChecklistLabel?: string
 	stepTwoChecklistLabel?: string
-	currentStepInstructions?: string
+	currentStepInstructionTemplate?: string
 	workflowToolSchemaOverride?: readonly ClineToolSpec[]
 	workflowValueKeys?: readonly string[]
 	childInheritance?: WorkflowDefinition["childInheritance"]
@@ -404,9 +404,13 @@ function createResolvedWorkflow(args?: {
 			id: "step-1",
 			stepNumber: 1,
 			checklistLabel: args?.stepOneChecklistLabel ?? "Step 1: Gather Context",
-			buildPromptSource: () => ({
-				currentStepInstructions: args?.currentStepInstructions,
-			}),
+			buildPromptSource: () =>
+				args?.currentStepInstructionTemplate === undefined
+					? { kind: "none" }
+					: {
+							kind: "current_step_instruction_template",
+							currentStepInstructionTemplate: args.currentStepInstructionTemplate,
+						},
 			buildToolSchema: () => args?.workflowToolSchemaOverride ?? [],
 			decisionTree: createProjectPromptDecisionTree(),
 		},
@@ -416,9 +420,13 @@ function createResolvedWorkflow(args?: {
 			id: "step-2",
 			stepNumber: 2,
 			checklistLabel: args.stepTwoChecklistLabel,
-			buildPromptSource: () => ({
-				currentStepInstructions: args?.currentStepInstructions,
-			}),
+			buildPromptSource: () =>
+				args?.currentStepInstructionTemplate === undefined
+					? { kind: "none" }
+					: {
+							kind: "current_step_instruction_template",
+							currentStepInstructionTemplate: args.currentStepInstructionTemplate,
+						},
 			buildToolSchema: () => args?.workflowToolSchemaOverride ?? [],
 			decisionTree: createProjectPromptDecisionTree(),
 		}
@@ -1807,7 +1815,7 @@ describe("SubagentRunner", () => {
 		const workflow = createResolvedWorkflow({
 			name: "review-workflow",
 			useSkillName: "review-workflow",
-			currentStepInstructions: "INPUT BLOCK",
+			currentStepInstructionTemplate: "INPUT BLOCK",
 			workflowToolSchemaOverride,
 		})
 		stubResolvedWorkflowByName(workflow)
@@ -1870,7 +1878,7 @@ describe("SubagentRunner", () => {
 		const workflow = createResolvedWorkflow({
 			name: "review-workflow",
 			useSkillName: "review-workflow",
-			currentStepInstructions: "INPUT BLOCK",
+			currentStepInstructionTemplate: "INPUT BLOCK",
 		})
 		stubResolvedWorkflowByName(workflow)
 
@@ -1928,7 +1936,7 @@ describe("SubagentRunner", () => {
 		const workflow = createResolvedWorkflow({
 			name: "review-workflow",
 			useSkillName: "review-workflow",
-			currentStepInstructions: "INPUT BLOCK",
+			currentStepInstructionTemplate: "INPUT BLOCK",
 		})
 		sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(workflow)
 		stubResolvedWorkflowByName(workflow)

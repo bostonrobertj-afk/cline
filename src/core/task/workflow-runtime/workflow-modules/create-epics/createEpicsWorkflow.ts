@@ -5,7 +5,6 @@ import type {
 	WorkflowDecisionTree,
 	WorkflowDefinition,
 	WorkflowPersonaDefinition,
-	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
 	WorkflowStepPromptSource,
 } from "../../types"
@@ -46,6 +45,35 @@ const STEP_1_CONTEXT_FORM_ID = "step-1-context-form"
 const STEP_1_BRAINSTORMING_CHECK_PANEL_ID = "step-1-brainstorming-check-panel"
 const STEP_1_BRAINSTORMING_PATH_PANEL_ID = "step-1-brainstorming-path-panel"
 const STEP_1_ADDITIONAL_CONTEXT_PANEL_ID = "step-1-additional-context-panel"
+const CREATE_EPICS_STEP_2_PROMPT_TEMPLATE = `Read \`{workflow.output_file}\`.
+Read \`{workflow.architecture_document}\`.
+Read \`{workflow.brainstorming_document}\` when present.
+Read any files listed in \`{workflow.additional_context_files}\` when present.
+Read any other files provided within \`{workflow.output_file}\` as additional context, including files listed under Additional Context when useful.
+
+Identify the work necessary to deliver the project based on the architecture document.
+
+Provide your understanding of the necessary work to the user and confirm alignment before drafting epics.
+
+Break the project into epics by coherent capability outcomes, not by files, layers, or implementation chores.
+
+Ensure each epic delivers one testable outcome, groups requirements that change together, has clear dependencies and completion criteria, and is small enough to implement through a focused set of downstream stories.
+
+Split epics that contain multiple independent outcomes or major lifecycle transitions.
+
+Sequence epics by dependency order with aid from the architecture document.
+
+Avoid epics that are only \`backend\`, \`frontend\`, or \`tests\` unless that is genuinely the user-facing capability boundary.
+
+Call \`upsert_epic\` for each user-aligned epic. Use \`upsert_epic\` to persist every accepted epic and every accepted revision. Do not use \`apply_patch\`, \`build_workflow_document\`, \`set_workflow_values\`, or raw markdown editing for epic creation or revision.
+
+Do not draft stories, tasks, subtasks, acceptance criteria, action plans, implementation checklists, delivery specs, or downstream implementation plans.
+
+Notify the user and ask them to review the drafted epics.
+
+Revise epics through \`upsert_epic\` as needed based on user feedback.
+
+After the user indicates alignment with the drafted epics, use \`attempt_completion\` to provide a final recap and remind the user to run the \`pi-planning\` workflow for each epic to define that epic's user stories.`
 const CREATE_EPICS_WORKFLOW_PERSONA: WorkflowPersonaDefinition = {
 	name: "John",
 	role: "Product Manager",
@@ -271,7 +299,7 @@ function attemptCompletionSucceededWithoutResolvedEpicsIndexFile(): WorkflowDeci
 }
 
 function createEmptyPromptSource(): WorkflowStepPromptSource {
-	return {}
+	return { kind: "none" }
 }
 
 function createStepDefinition(args: {
@@ -279,9 +307,10 @@ function createStepDefinition(args: {
 	checklistLabel: string
 	decisionTree: WorkflowDecisionTree
 	buildPromptSource?: WorkflowStepDefinition["buildPromptSource"]
+	promptTemplates?: WorkflowStepDefinition["promptTemplates"]
 	buildToolSchema: WorkflowStepDefinition["buildToolSchema"]
 }): WorkflowStepDefinition {
-	return {
+	const stepDefinition: WorkflowStepDefinition = {
 		id: `step-${args.stepNumber}`,
 		stepNumber: args.stepNumber,
 		checklistLabel: args.checklistLabel,
@@ -289,49 +318,16 @@ function createStepDefinition(args: {
 		buildToolSchema: args.buildToolSchema,
 		decisionTree: args.decisionTree,
 	}
-}
 
-function renderWorkflowValueByKey(input: WorkflowPromptBuilderInput, key: CreateEpicsWorkflowValueKey): string {
-	return input.renderWorkflowValue(input.session.workflowValues[key] ?? key)
-}
-
-function buildStep2PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
-	const outputFile = renderWorkflowValueByKey(input, CreateEpicsWorkflowValueKey.OutputFile)
-	const architectureDocument = renderWorkflowValueByKey(input, CreateEpicsWorkflowValueKey.ArchitectureDocument)
-	const brainstormingDocument = renderWorkflowValueByKey(input, CreateEpicsWorkflowValueKey.BrainstormingDocument)
-	const additionalContextFiles = renderWorkflowValueByKey(input, CreateEpicsWorkflowValueKey.AdditionalContextFiles)
-
-	return {
-		currentStepInstructions: `Read \`${outputFile}\`.
-Read \`${architectureDocument}\`.
-Read \`${brainstormingDocument}\` when present.
-Read any files listed in \`${additionalContextFiles}\` when present.
-Read any other files provided within \`${outputFile}\` as additional context, including files listed under Additional Context when useful.
-
-Identify the work necessary to deliver the project based on the architecture document.
-
-Provide your understanding of the necessary work to the user and confirm alignment before drafting epics.
-
-Break the project into epics by coherent capability outcomes, not by files, layers, or implementation chores.
-
-Ensure each epic delivers one testable outcome, groups requirements that change together, has clear dependencies and completion criteria, and is small enough to implement through a focused set of downstream stories.
-
-Split epics that contain multiple independent outcomes or major lifecycle transitions.
-
-Sequence epics by dependency order with aid from the architecture document.
-
-Avoid epics that are only \`backend\`, \`frontend\`, or \`tests\` unless that is genuinely the user-facing capability boundary.
-
-Call \`upsert_epic\` for each user-aligned epic. Use \`upsert_epic\` to persist every accepted epic and every accepted revision. Do not use \`apply_patch\`, \`build_workflow_document\`, \`set_workflow_values\`, or raw markdown editing for epic creation or revision.
-
-Do not draft stories, tasks, subtasks, acceptance criteria, action plans, implementation checklists, delivery specs, or downstream implementation plans.
-
-Notify the user and ask them to review the drafted epics.
-
-Revise epics through \`upsert_epic\` as needed based on user feedback.
-
-After the user indicates alignment with the drafted epics, use \`attempt_completion\` to provide a final recap and remind the user to run the \`pi-planning\` workflow for each epic to define that epic's user stories.`,
+	if (args.promptTemplates !== undefined) {
+		return { ...stepDefinition, promptTemplates: args.promptTemplates }
 	}
+
+	return stepDefinition
+}
+
+function buildStep2PromptSource(): WorkflowStepPromptSource {
+	return { kind: "current_step_instruction_template", currentStepInstructionTemplate: CREATE_EPICS_STEP_2_PROMPT_TEMPLATE }
 }
 
 function buildStep1DecisionTree(): WorkflowDecisionTree {
@@ -702,6 +698,7 @@ export const createEpicsWorkflowDefinition: WorkflowDefinition = {
 			checklistLabel: "Draft Epics",
 			decisionTree: buildStep2DecisionTree(),
 			buildPromptSource: buildStep2PromptSource,
+			promptTemplates: [CREATE_EPICS_STEP_2_PROMPT_TEMPLATE],
 			buildToolSchema: buildCreateEpicsStep2ToolSchemas,
 		}),
 	},

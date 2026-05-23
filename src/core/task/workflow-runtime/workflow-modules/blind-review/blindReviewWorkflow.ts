@@ -10,7 +10,6 @@ import type {
 	WorkflowDeterministicProcedureResult,
 	WorkflowFormContinuationReplacementBuilder,
 	WorkflowPersonaDefinition,
-	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
 	WorkflowStepPromptSource,
 	WorkflowValues,
@@ -184,23 +183,6 @@ function readWorkflowStringValue(workflowValues: WorkflowValues, key: BlindRevie
 
 	const trimmedValue = value.trim()
 	return trimmedValue.length > 0 ? trimmedValue : undefined
-}
-
-function renderWorkflowValueByKey(input: WorkflowPromptBuilderInput, key: BlindReviewWorkflowValueKey): string {
-	return input.renderWorkflowValue(input.session.workflowValues[key] ?? key)
-}
-
-function renderBlindReviewPromptTemplate(input: WorkflowPromptBuilderInput, template: string): string {
-	const reviewCommitParent = renderWorkflowValueByKey(input, BlindReviewWorkflowValueKey.ReviewCommitParent)
-	const reviewCommitHash = renderWorkflowValueByKey(input, BlindReviewWorkflowValueKey.ReviewCommitHash)
-	const blindReviewOutput = renderWorkflowValueByKey(input, BlindReviewWorkflowValueKey.BlindReviewOutput)
-
-	return template
-		.replaceAll("<review_commit_parent>", reviewCommitParent)
-		.replaceAll("<review_commit_hash>", reviewCommitHash)
-		.replaceAll("review_commit_parent", reviewCommitParent)
-		.replaceAll("review_commit_hash", reviewCommitHash)
-		.replaceAll("blind_review_output", blindReviewOutput)
 }
 
 function readFormStringValue(session: ActiveWorkflowSession, key: string): string | undefined {
@@ -393,15 +375,15 @@ export async function validateAndPersistBlindReviewCommit(
 const BLIND_REVIEW_STEP_2_PROMPT = [
 	"Your job is to perform a blind adversarial review using git-backed evidence to identify misconfigured or lazily-written code. You are not to read any project documentation during this review.",
 	"Use these commit hashes:",
-	"commit hash: review_commit_hash",
-	"parent hash: review_commit_parent",
+	"commit hash: {workflow.review_commit_hash}",
+	"parent hash: {workflow.review_commit_parent}",
 	"",
 	"Use only the provided commit hash and parent hash to inspect the implementation changes.",
 	"",
-	"1. Run `git diff --name-status <review_commit_parent> <review_commit_hash>` to identify every changed, added, deleted, renamed, or copied file.",
+	"1. Run `git diff --name-status {workflow.review_commit_parent} {workflow.review_commit_hash}` to identify every changed, added, deleted, renamed, or copied file.",
 	"",
 	"2. For each changed file from the name-status output, inspect the implementation diff with:",
-	"   `git diff <review_commit_parent> <review_commit_hash> -- <path>`",
+	"   `git diff {workflow.review_commit_parent} {workflow.review_commit_hash} -- <path>`",
 	"   - Ignore project documents which were included in the name-status output.",
 	"",
 	"3. Review every changed file that is not a project document. Do not skip files because they appear small, generated, deleted, renamed, copied, test-only, or configuration-only.",
@@ -453,7 +435,7 @@ const BLIND_REVIEW_STEP_2_PROMPT = [
 	"  - Look for new async operations without awaiting or error handling.",
 	"  - Look for boundary violations visible in the diff, such as trust moved from server to client, authorization checked only in UI, skipped sanitization, or path/command injection risk.",
 	"",
-	"7. Document your findings in blind_review_output including:",
+	"7. Document your findings in {workflow.blind_review_output} including:",
 	"   - any findings, ordered by severity.",
 	"   - for each finding, include:",
 	"    - a brief title for the finding",
@@ -463,12 +445,13 @@ const BLIND_REVIEW_STEP_2_PROMPT = [
 	"",
 	"Once you've completed your review and documented your findings, use attempt_completion to provide a review summary including:",
 	"- number of findings, or statement that no findings were identified",
-	"- full file path for your output: blind_review_output",
+	"- full file path for your output: {workflow.blind_review_output}",
 ].join("\n")
 
-function buildStep2PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
+function buildStep2PromptSource(): WorkflowStepPromptSource {
 	return {
-		currentStepInstructions: renderBlindReviewPromptTemplate(input, BLIND_REVIEW_STEP_2_PROMPT),
+		kind: "current_step_instruction_template",
+		currentStepInstructionTemplate: BLIND_REVIEW_STEP_2_PROMPT,
 	}
 }
 
@@ -484,7 +467,7 @@ export function failBlindReviewOutputArtifactAllocation(session: ActiveWorkflowS
 }
 
 function createEmptyPromptSource(): WorkflowStepPromptSource {
-	return {}
+	return { kind: "none" }
 }
 
 function createStepDefinition(args: {
@@ -493,8 +476,9 @@ function createStepDefinition(args: {
 	decisionTree: WorkflowDecisionTree
 	buildPromptSource?: WorkflowStepDefinition["buildPromptSource"]
 	buildToolSchema: WorkflowStepDefinition["buildToolSchema"]
+	promptTemplates?: WorkflowStepDefinition["promptTemplates"]
 }): WorkflowStepDefinition {
-	return {
+	const stepDefinition: WorkflowStepDefinition = {
 		id: `step-${args.stepNumber}`,
 		stepNumber: args.stepNumber,
 		checklistLabel: args.checklistLabel,
@@ -502,6 +486,10 @@ function createStepDefinition(args: {
 		buildToolSchema: args.buildToolSchema,
 		decisionTree: args.decisionTree,
 	}
+	if (args.promptTemplates !== undefined) {
+		return { ...stepDefinition, promptTemplates: args.promptTemplates }
+	}
+	return stepDefinition
 }
 
 function sourceRouteMatches(sourceRoute: { branchId: string; routeId: string }, branchId: string, routeId: string): boolean {
@@ -826,6 +814,7 @@ export const blindReviewWorkflowDefinition: WorkflowDefinition = {
 			decisionTree: buildStep2DecisionTree(),
 			buildPromptSource: buildStep2PromptSource,
 			buildToolSchema: buildBlindReviewStep2ToolSchemas,
+			promptTemplates: [BLIND_REVIEW_STEP_2_PROMPT],
 		}),
 	},
 }

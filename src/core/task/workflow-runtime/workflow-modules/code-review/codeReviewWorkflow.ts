@@ -165,17 +165,17 @@ Launch three subagents and assign their specialized code review workflows:
 Once all three subagents are done and shut down, call workflow_progress_request to unlock the next workflow step's instructions.`
 
 const CODE_REVIEW_STEP_3_PROMPT = `Subagent findings are available:
-Blind Review: blind_review_output
-Edge Case Hunter: edge_case_review_output
-Acceptance Audit: acceptance_audit_output
+Blind Review: {workflow.blind_review_output}
+Edge Case Hunter: {workflow.edge_case_review_output}
+Acceptance Audit: {workflow.acceptance_audit_output}
 
 You must read all three documents, assess them following the instructions below, then persist final findings using record_findings.
 
 You may leverage the following additional documents when validating the subagents' findings:
-- target_story
-- review_scope_manifest
-- epics_document
-- architecture_document
+- {workflow.target_story}
+- {workflow.review_scope_manifest}
+- {workflow.epics_document}
+- {workflow.architecture_document}
 
 *** You must build a combined findings record following the following guidelines: ***
 
@@ -199,12 +199,12 @@ Once you've persisted the final set of findings (if any), send the user a messag
 
 After presenting findings to the user, call workflow_progress_request to unlock the next workflow step's instructions.`
 
-const CODE_REVIEW_STEP_4_BASE_PROMPT = "Review the findings in code_review_output."
+const CODE_REVIEW_STEP_4_BASE_PROMPT = "Review the findings in {workflow.code_review_output}."
 
 const CODE_REVIEW_STEP_4_UPSTREAM_FAILURE_PROMPT = `*** Conditional prompting: Runtime must assess the findings in the code-review-output document. If any findings are present under "upstream failure", then the following prompt must be shown: ***
 For findings listed under "upstream failure", determine which project documents require revision before a remediation story can be generated. Project documents include:
-- architecture_document
-- epics_document
+- {workflow.architecture_document}
+- {workflow.epics_document}
 
 Determine the exact revisions necessary, then message the user providing the exact proposed revisions and justification. Upon user approval, update the project documents with the approved revisions only, then follow the additional instructions below.
 *** end conditional prompt block ***`
@@ -212,12 +212,12 @@ Determine the exact revisions necessary, then message the user providing the exa
 const CODE_REVIEW_STEP_4_REMEDIATION_STORY_PROMPT = `*** Conditional prompting: shown only if a remediation story was generated: ***
 You'll now prepare a remediation story based on the documented review findings.
 Read the following relevant files:
-- architecture_document
-- epics_document
-- target_story
+- {workflow.architecture_document}
+- {workflow.epics_document}
+- {workflow.target_story}
 
 The story file has been generated from a template for you here:
-- remediation_story
+- {workflow.remediation_story}
 
 Your task is to populate the following sections in the generated story document:
 - objective
@@ -230,13 +230,13 @@ Present proposed drafts for the content to be added to the user, and add it to t
 
 You must not populate the tasks section of the story document. 
 
-Once you've populated the assigned sections of the story document, use attempt_completion to send a final message to the user informing them that you have produced the remediation story. Include the full file path to the document in your message, which is remediation_story, and remind the user to run the write-remediation-story workflow to finalize the story by generating tasks and subtasks.
+Once you've populated the assigned sections of the story document, use attempt_completion to send a final message to the user informing them that you have produced the remediation story. Include the full file path to the document in your message, which is {workflow.remediation_story}, and remind the user to run the write-remediation-story workflow to finalize the story by generating tasks and subtasks.
 *** End conditional prompt block ***`
 
 const CODE_REVIEW_FINDINGS_HEADINGS = ["## Task Failures", "## Dev Agent Failures", "## Upstream Failures"] as const
 
 function createEmptyPromptSource(): WorkflowStepPromptSource {
-	return {}
+	return { kind: "none" }
 }
 
 function createStepDefinition(args: {
@@ -245,8 +245,9 @@ function createStepDefinition(args: {
 	decisionTree: WorkflowDecisionTree
 	buildPromptSource?: WorkflowStepDefinition["buildPromptSource"]
 	buildToolSchema: WorkflowStepDefinition["buildToolSchema"]
+	promptTemplates?: WorkflowStepDefinition["promptTemplates"]
 }): WorkflowStepDefinition {
-	return {
+	const stepDefinition: WorkflowStepDefinition = {
 		id: `step-${args.stepNumber}`,
 		stepNumber: args.stepNumber,
 		checklistLabel: args.checklistLabel,
@@ -254,6 +255,10 @@ function createStepDefinition(args: {
 		buildToolSchema: args.buildToolSchema,
 		decisionTree: args.decisionTree,
 	}
+	if (args.promptTemplates !== undefined) {
+		return { ...stepDefinition, promptTemplates: args.promptTemplates }
+	}
+	return stepDefinition
 }
 
 export const CODE_REVIEW_OUTPUT_ARTIFACT_ID = CodeReviewWorkflowValueKey.CodeReviewOutput
@@ -436,23 +441,6 @@ function readWorkflowStringArrayValue(workflowValues: WorkflowValues, key: CodeR
 function readWorkflowBooleanValue(workflowValues: WorkflowValues, key: CodeReviewWorkflowValueKey): boolean | undefined {
 	const value = workflowValues[key]
 	return typeof value === "boolean" ? value : undefined
-}
-
-function renderWorkflowValueByKey(input: WorkflowPromptBuilderInput, key: CodeReviewWorkflowValueKey): string {
-	return input.renderWorkflowValue(input.session.workflowValues[key] ?? key)
-}
-
-function renderCodeReviewPromptTemplate(input: WorkflowPromptBuilderInput, template: string): string {
-	return template
-		.replaceAll("blind_review_output", renderWorkflowValueByKey(input, CodeReviewWorkflowValueKey.BlindReviewOutput))
-		.replaceAll("acceptance_audit_output", renderWorkflowValueByKey(input, CodeReviewWorkflowValueKey.AcceptanceAuditOutput))
-		.replaceAll("edge_case_review_output", renderWorkflowValueByKey(input, CodeReviewWorkflowValueKey.EdgeCaseReviewOutput))
-		.replaceAll("code_review_output", renderWorkflowValueByKey(input, CodeReviewWorkflowValueKey.CodeReviewOutput))
-		.replaceAll("target_story", renderWorkflowValueByKey(input, CodeReviewWorkflowValueKey.TargetStory))
-		.replaceAll("review_scope_manifest", renderWorkflowValueByKey(input, CodeReviewWorkflowValueKey.ReviewScopeManifest))
-		.replaceAll("epics_document", renderWorkflowValueByKey(input, CodeReviewWorkflowValueKey.EpicsDocument))
-		.replaceAll("architecture_document", renderWorkflowValueByKey(input, CodeReviewWorkflowValueKey.ArchitectureDocument))
-		.replaceAll("remediation_story", renderWorkflowValueByKey(input, CodeReviewWorkflowValueKey.RemediationStory))
 }
 
 function readFormStringValue(session: ActiveWorkflowSession, key: string): string | undefined {
@@ -1287,12 +1275,14 @@ function buildStep2PromptSource(input: WorkflowPromptBuilderInput): WorkflowStep
 	)
 	if (missingSubagentOutputFiles.length === 0) {
 		return {
-			currentStepInstructions: CODE_REVIEW_STEP_2_INITIAL_PROMPT,
+			kind: "current_step_instruction_template",
+			currentStepInstructionTemplate: CODE_REVIEW_STEP_2_INITIAL_PROMPT,
 		}
 	}
 
 	return {
-		currentStepInstructions: `These subagent output files were not found in the project's review folder:
+		kind: "current_step_instruction_template",
+		currentStepInstructionTemplate: `These subagent output files were not found in the project's review folder:
 ${missingSubagentOutputFiles.join("\n")}
 Please launch a new subagent and assign them to the workflow associated with the missing file.`,
 	}
@@ -1366,9 +1356,10 @@ function buildStep2DecisionTree(): WorkflowDecisionTree {
 	}
 }
 
-function buildStep3PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
+function buildStep3PromptSource(): WorkflowStepPromptSource {
 	return {
-		currentStepInstructions: renderCodeReviewPromptTemplate(input, CODE_REVIEW_STEP_3_PROMPT),
+		kind: "current_step_instruction_template",
+		currentStepInstructionTemplate: CODE_REVIEW_STEP_3_PROMPT,
 	}
 }
 
@@ -1427,7 +1418,8 @@ function buildStep4PromptSource(input: WorkflowPromptBuilderInput): WorkflowStep
 
 	const joinedPrompt = promptSections.join("\n\n")
 	return {
-		currentStepInstructions: renderCodeReviewPromptTemplate(input, joinedPrompt),
+		kind: "current_step_instruction_template",
+		currentStepInstructionTemplate: joinedPrompt,
 	}
 }
 
@@ -1830,6 +1822,7 @@ export const codeReviewWorkflowDefinition: WorkflowDefinition = {
 			decisionTree: buildStep2DecisionTree(),
 			buildPromptSource: buildStep2PromptSource,
 			buildToolSchema: buildCodeReviewStep2ToolSchemas,
+			promptTemplates: [CODE_REVIEW_STEP_2_INITIAL_PROMPT],
 		}),
 		"step-3": createStepDefinition({
 			stepNumber: 3,
@@ -1837,6 +1830,7 @@ export const codeReviewWorkflowDefinition: WorkflowDefinition = {
 			decisionTree: buildStep3DecisionTree(),
 			buildPromptSource: buildStep3PromptSource,
 			buildToolSchema: buildCodeReviewStep3ToolSchemas,
+			promptTemplates: [CODE_REVIEW_STEP_3_PROMPT],
 		}),
 		"step-4": createStepDefinition({
 			stepNumber: 4,
@@ -1844,6 +1838,11 @@ export const codeReviewWorkflowDefinition: WorkflowDefinition = {
 			decisionTree: buildStep4DecisionTree(),
 			buildPromptSource: buildStep4PromptSource,
 			buildToolSchema: buildCodeReviewStep4ToolSchemas,
+			promptTemplates: [
+				CODE_REVIEW_STEP_4_BASE_PROMPT,
+				CODE_REVIEW_STEP_4_UPSTREAM_FAILURE_PROMPT,
+				CODE_REVIEW_STEP_4_REMEDIATION_STORY_PROMPT,
+			],
 		}),
 	},
 }

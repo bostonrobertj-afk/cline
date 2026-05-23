@@ -8,9 +8,9 @@ import type {
 	WorkflowDecisionBranchRoute,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
-	WorkflowValue,
 	WorkflowValues,
 } from "../../../types"
+import { renderWorkflowPromptTemplate } from "../../../workflowPromptTemplates"
 import { createEpicsWorkflowDefinition } from "../createEpicsWorkflow"
 
 const OUTPUT_FILE = "/tmp/create-epics-project/planning/Epics.md"
@@ -219,19 +219,10 @@ function createSession(workflowValues: WorkflowValues): ActiveWorkflowSession {
 	}
 }
 
-function renderWorkflowValue(value: WorkflowValue): string {
-	if (typeof value === "string") {
-		return value
-	}
-
-	return JSON.stringify(value)
-}
-
 function createPromptInput(step: WorkflowStepDefinition, workflowValues: WorkflowValues): WorkflowPromptBuilderInput {
 	return {
 		session: createSession(workflowValues),
 		step,
-		renderWorkflowValue,
 	}
 }
 
@@ -609,18 +600,26 @@ describe("createEpicsWorkflowDefinition", () => {
 
 	it("builds the Step 2 prompt and exposes only the approved model-facing tools", () => {
 		const step2 = createEpicsWorkflowDefinition.steps["step-2"]
-		const promptSource = step2.buildPromptSource(
-			createPromptInput(step2, {
-				output_file: OUTPUT_FILE,
-				architecture_document: "/tmp/create-epics-project/planning/architecture.md",
-				brainstorming_document: "/tmp/create-epics-project/discovery/brainstorming.md",
-				additional_context_files: "/tmp/create-epics-project/research.md",
-			}),
-		)
-		const prompt = promptSource.currentStepInstructions
-		if (prompt === undefined) {
-			throw new Error("Missing Step 2 prompt source.")
+		const workflowValues: WorkflowValues = {
+			output_file: OUTPUT_FILE,
+			architecture_document: "/tmp/create-epics-project/planning/architecture.md",
+			brainstorming_document: "/tmp/create-epics-project/discovery/brainstorming.md",
+			additional_context_files: "/tmp/create-epics-project/research.md",
 		}
+		const promptSource = step2.buildPromptSource(createPromptInput(step2, workflowValues))
+		if (promptSource.kind !== "current_step_instruction_template") {
+			throw new Error("Missing current step instruction template for step-2.")
+		}
+		const prompt = renderWorkflowPromptTemplate({
+			template: promptSource.currentStepInstructionTemplate,
+			workflowValueKeys: createEpicsWorkflowDefinition.workflowValueKeys,
+			workflowValues,
+			context: "create-epics step-2 test prompt",
+		})
+		expect(prompt).to.include(OUTPUT_FILE)
+		expect(prompt).to.include("/tmp/create-epics-project/planning/architecture.md")
+		expect(prompt).to.include("/tmp/create-epics-project/discovery/brainstorming.md")
+		expect(prompt).to.include("/tmp/create-epics-project/research.md")
 
 		expect(prompt).to.include(`Read \`${OUTPUT_FILE}\`.`)
 		expect(prompt).to.include("Read `/tmp/create-epics-project/planning/architecture.md`.")
@@ -628,6 +627,10 @@ describe("createEpicsWorkflowDefinition", () => {
 		expect(prompt).to.include("Read any files listed in `/tmp/create-epics-project/research.md` when present.")
 		expect(prompt).to.include("Call `upsert_epic` for each user-aligned epic.")
 		expect(prompt).to.include("Do not use `apply_patch`, `build_workflow_document`, `set_workflow_values`")
+		expect(prompt).not.to.include("{workflow.output_file}")
+		expect(prompt).not.to.include("{workflow.architecture_document}")
+		expect(prompt).not.to.include("{workflow.brainstorming_document}")
+		expect(prompt).not.to.include("{workflow.additional_context_files}")
 
 		const step2ToolNames = step2.buildToolSchema(createPromptInput(step2, {})).map((schema) => schema.name)
 		expect(step2ToolNames).to.deep.equal([

@@ -21,7 +21,6 @@ import type {
 	WorkflowDeterministicProcedureResult,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
-	WorkflowValue,
 	WorkflowValues,
 	WorkflowWorkspacePathPolicy,
 } from "../../../types"
@@ -31,6 +30,7 @@ import {
 	resolveWorkflowDefinition,
 } from "../../../WorkflowRegistry"
 import { WorkflowRuntime } from "../../../WorkflowRuntime"
+import { renderWorkflowPromptTemplate } from "../../../workflowPromptTemplates"
 import {
 	buildAndPersistEdgeCaseHunterReviewScopeManifest,
 	buildEdgeCaseHunterReviewStep1WorkflowForm,
@@ -212,35 +212,27 @@ function getSingleField(panel: WorkflowFormPanelDefinition): WorkflowFormFieldDe
 	return field
 }
 
-function renderWorkflowValue(value: WorkflowValue): string {
-	if (typeof value === "string") {
-		return value
-	}
-
-	const renderedValue = JSON.stringify(value)
-	if (renderedValue === undefined) {
-		throw new Error("Unable to render workflow value.")
-	}
-
-	return renderedValue
-}
-
 function createPromptInput(stepId: WorkflowStepDefinition["id"], workflowValues: WorkflowValues): WorkflowPromptBuilderInput {
 	const step = getStep(stepId)
 	return {
 		session: createSession(workflowValues),
 		step,
-		renderWorkflowValue,
 	}
 }
 
 function buildPrompt(stepId: WorkflowStepDefinition["id"], workflowValues: WorkflowValues): string {
-	const prompt = getStep(stepId).buildPromptSource(createPromptInput(stepId, workflowValues)).currentStepInstructions
-	if (prompt === undefined) {
-		throw new Error(`Missing prompt instructions for ${stepId}.`)
+	const promptSource = getStep(stepId).buildPromptSource(createPromptInput(stepId, workflowValues))
+	if (promptSource.kind !== "current_step_instruction_template") {
+		throw new Error(`Missing current step instruction template for ${stepId}.`)
 	}
 
-	return prompt
+	const template = promptSource.currentStepInstructionTemplate
+	return renderWorkflowPromptTemplate({
+		template,
+		workflowValueKeys: edgeCaseHunterReviewWorkflowDefinition.workflowValueKeys,
+		workflowValues,
+		context: `edge-case-hunter-review ${stepId} test prompt`,
+	})
 }
 
 function getToolNamesForStep(stepId: WorkflowStepDefinition["id"]): readonly string[] {
@@ -1333,6 +1325,10 @@ describe("edgeCaseHunterReviewWorkflowDefinition", () => {
 
 	it("projects Step 2 prompt instructions with materialized workflow values", () => {
 		const prompt = buildPrompt("step-2", SAMPLE_WORKFLOW_VALUES)
+		expect(prompt).to.include(SAMPLE_WORKFLOW_VALUES[EdgeCaseHunterReviewWorkflowValueKey.ReviewCommitParent].toString())
+		expect(prompt).to.include(SAMPLE_WORKFLOW_VALUES[EdgeCaseHunterReviewWorkflowValueKey.ReviewCommitHash].toString())
+		expect(prompt).to.include(SAMPLE_WORKFLOW_VALUES[EdgeCaseHunterReviewWorkflowValueKey.TargetStory].toString())
+		expect(prompt).to.include(SAMPLE_WORKFLOW_VALUES[EdgeCaseHunterReviewWorkflowValueKey.ReviewScopeManifest].toString())
 
 		expect(prompt.trim().length).to.be.greaterThan(0)
 		expect(prompt).to.include(REVIEW_SCOPE_MANIFEST_PATH)
@@ -1340,10 +1336,11 @@ describe("edgeCaseHunterReviewWorkflowDefinition", () => {
 		expect(prompt).to.include("abc123")
 		expect(prompt).to.include("def456")
 		expect(prompt).to.include(EDGE_CASE_REVIEW_OUTPUT_PATH)
-		expect(prompt).not.to.include("review_scope_manifest")
-		expect(prompt).not.to.include("target_story")
-		expect(prompt).not.to.include("review_commit_hash")
-		expect(prompt).not.to.include("review_commit_parent")
+		expect(prompt).not.to.include("{workflow.edge_case_review_output}")
+		expect(prompt).not.to.include("{workflow.review_commit_parent}")
+		expect(prompt).not.to.include("{workflow.review_commit_hash}")
+		expect(prompt).not.to.include("{workflow.target_story}")
+		expect(prompt).not.to.include("{workflow.review_scope_manifest}")
 		expect(prompt).not.to.include("edge_case_review_output")
 	})
 
