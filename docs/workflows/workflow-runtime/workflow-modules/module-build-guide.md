@@ -241,7 +241,46 @@ Workflow prompt data has two places:
 
 Each workflow module must define workflow-level and per-step prompt content.
 
+AI-agent step prompt templates must be authored as readable multiline template literal constants, following the `codeReviewWorkflow.ts` pattern. Keep prompt text flush-left inside the template literal unless leading whitespace is part of the intended prompt. Do not encode full prompt bodies as one-line strings with `\n` escape sequences. Do not use `String.raw` for workflow prompt templates unless the requirements explicitly call for literal backslash escape sequences to be preserved in the final prompt.
+
 Prompt templates may reference workflow values only with `{workflow.<workflowValueKey>}` tokens matching declared `workflowValueKeys`. The shared `WorkflowRuntime` prompt-template renderer validates and renders those tokens before prompt projection. Workflow modules must not use local `replace`, `replaceAll`, regex, or hand-built substitution for workflow-value references.
+
+Conditional AI-agent prompt content must use section assembly as the canonical implementation pattern.
+
+Do not copy source-document authoring guidance such as `*** conditional ***`, `only shown if...`, `end conditional`, or equivalent planning notes into prompt template constants. Those lines are instructions to the module builder, not AI-facing prompt prose.
+
+For conditional prompt content:
+
+- define named prompt constants for AI-facing text only
+- define separate constants for base, conditional, and final prompt sections when applicable
+- assemble the rendered prompt in `buildPromptSource(...)` by pushing sections in final output order
+- join sections with `"\n\n"` unless the requirements prescribe tighter spacing
+- keep workflow-value references as `{workflow.<workflowValueKey>}` tokens and allow the shared runtime renderer to materialize them
+
+Example pattern:
+
+```ts
+function buildStepNPromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
+	const sections: string[] = [STEP_N_BASE_PROMPT]
+
+	if (conditionIsSatisfied(input.session.workflowValues)) {
+		sections.push(STEP_N_CONDITIONAL_PROMPT)
+	}
+
+	sections.push(STEP_N_FINAL_PROMPT)
+
+	return {
+		kind: "current_step_instruction_template",
+		currentStepInstructionTemplate: sections.join("\n\n"),
+	}
+}
+```
+
+For mutually exclusive full-step prompts, selecting one complete prompt constant is acceptable when each variant is named, reviewable, included in `promptTemplates`, and covered by prompt tests.
+
+For runtime-generated prompt content, keep source-document prose and generated content separate. Define source-authored header/instruction constants, generate the runtime value deterministically, and insert the generated value as its own section or line. Do not treat generated runtime content as source-document prompt text.
+
+Prompt tests for conditional prompts must verify that the rendered prompt includes the expected conditional content when its condition is met, excludes it when the condition is not met, materializes required workflow tokens, and never leaks source-document authoring markers into the AI-facing prompt.
 
 The prompt and tool schema must match. If the prompt says the AI may call a tool, that tool must be in the current step schema. If the schema does not include the tool, the prompt must not instruct or imply that it is available.
 

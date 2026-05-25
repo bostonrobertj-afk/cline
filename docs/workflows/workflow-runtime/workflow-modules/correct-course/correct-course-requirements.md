@@ -420,7 +420,7 @@ Step 2 must not project model-driven work and must not expose `create_workflow_a
 
 Step 3 is model-driven and must enter model-driven work through a `project_prompt` decision action.
 
-Step 3 `buildPromptSource` must construct the Step 3 prompt from module-owned code. The Step 3 prompt must preserve this exact source prompt text, with workflow values rendered by runtime prompt rendering:
+Step 3 `buildPromptSource` must construct the Step 3 prompt from module-owned code. The Step 3 prompt must preserve the AI-facing source prompt text below, with workflow values rendered by runtime prompt rendering. Source-document marker lines such as `*** conditional: only shown if ... ***` and `*** end conditional ***` are authoring guidance for prompt construction and must not appear in prompt constants, `promptTemplates`, or rendered AI-facing Step 3 prompt output.
 
 ```text
 You are a Scrum Master navigating change management. Analyze the triggering issue, assess impact across project artifacts, and produce an actionable change management plan with clear handoff. You will document your plan in the provided change management plan. You should actively engage the user while carrying out the steps prescribed below to ensure that they are kept abreast of your progress and are able to provide input.
@@ -436,15 +436,11 @@ The project folder contains all existing documentation for this project, which c
 - implementation documents, including story files and story index files
 - review files including documented findings from implemented stories which have been assessed via the code review workflow
 
-*** conditional: only shown if epic_source_indicator = yes ***
 Discovered while authoring a specific epic: epic_source_indicator
 Epic: epic_source_identifier
 Epic Document: epics_document
-*** end conditional ***
-*** conditional: only shown if story_source_indicator = yes ***
 Discovered while authoring, implementing, or reviewing a specific story: story_source_indicator
 Story: story_source_identifier
-*** end conditional ***
 
 Define the core problem and assign it to one of the following categories:
 - technical limitation discovered during implementation
@@ -644,7 +640,8 @@ The module build must include focused unit tests covering:
 - Step 2 failure routing for artifact allocation and document build failures with the concrete backend/runtime failure reason
 - Step 3 exported tool-schema builder returning exactly the approved model-visible tool names and using existing shared/default specs
 - Step 3 prompt projection preserving source wording while rendering required workflow values without leaking placeholders
-- Step 3 conditional prompt blocks: epic block included only when `epic_source_indicator` is `yes`, story block included only when `story_source_indicator` is `yes`
+- Step 3 conditional prompt sections: epic-source section included only when `epic_source_indicator` is `yes`, story-source section included only when `story_source_indicator` is `yes`
+- Step 3 rendered prompt exclusion of source-document authoring markers, including `*** conditional` and `*** end conditional ***`
 - prompt integration proving Step 3 projected tools are present in active workflow native/non-native prompt surfaces and forbidden tools are absent
 - Step 3 `attempt_completion_succeeded` routing to workflow completion without story index updates, story file moves, remediation story generation, subagent dispatch, parent workflow mutation, additional artifact allocation, or output document rebuild
 - absence of runtime dependency on the correct-course source markdown, placeholder workflow state, managed-workflow state, `.md` workflow identity aliases, workflow-specific document-generation handlers, and the legacy tool matrix

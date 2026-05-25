@@ -230,7 +230,7 @@ Step 1 must expose an empty model-facing tool schema.
 
 Step 2 must enter model-driven work through a `project_prompt` decision action.
 
-Step 2 `buildPromptSource` must construct the Step 2 prompt from module-owned code. The Step 2 prompt must preserve this exact source prompt text, with the listed placeholder labels populated from workflow values:
+Step 2 `buildPromptSource` must construct the Step 2 prompt from module-owned code. The Step 2 prompt must preserve the static AI-facing source prompt text below, with the listed placeholder labels populated from workflow values. Current-task detail is generated runtime content derived from the parsed target story task inventory and must be assembled separately from the static prompt prose.
 
 ```text
 You are tasked with implementing a story with a prescribed set of tasks and subtasks. You will be provided with the story's instructions and frontmatter, then will be provided with the assigned tasks one at a time. Once you've completed all subtasks for the provided task you will be provided with the next task.
@@ -261,10 +261,9 @@ story_issues
 **Continue task impelentation until instructed otherwise- when the final task is complete the next workflow step will unlock and further instructions will be provided.**
 
 *** Current Story Task: ***
-*** Conditional Prompting: ***
-Runtime must provide the first task and it's subtasks exactly as they are written in the target story document. When all subtasks for the provided task are complete, Runtime must provide the next task from the story document in the same manner. Existing tool story_task_reminder can likely be updated to serve this purpose.
-*** end conditional prompting block ***
 ```
+
+Source-document marker lines such as `*** Conditional Prompting: ***` and `*** end conditional prompting block ***` are authoring guidance for prompt construction and must not appear in prompt constants, `promptTemplates`, or rendered AI-facing Step 2 prompt output.
 
 The generated prompt must replace the placeholder labels with the corresponding workflow values:
 
@@ -662,7 +661,7 @@ The dev-story module build must add focused tests for:
 - rejection of legacy `## Tasks / Subtasks`-only documents
 - rejection of task/subtask rows whose IDs cannot be parsed from the story document
 - frontmatter section extraction into workflow values
-- Step 2 prompt source shape, including non-empty story frontmatter rendering and non-empty current task rendering
+- Step 2 prompt source shape, including non-empty story frontmatter rendering, non-empty generated current task rendering, and exclusion of source-document authoring markers such as `Conditional Prompting` and `end conditional prompting block`
 - Step 2 tool schema names and forbidden tool absence
 - `story_task_reminder`, `story_task_complete`, `request_task_detail`, and `show_incomplete_tasks` handler behavior
 - `story_task_complete` completing subtasks by `storyItemId`, completing eligible parent tasks by `storyItemId`, auto-completing parent tasks, rejecting parent task completion while subtasks remain incomplete, reporting parent/all-complete status, and not returning task-detail content

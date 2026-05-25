@@ -278,11 +278,12 @@ The resulting epic sections must be ordered by numeric identity.
 
 Step 2 must enter model-driven work through a `project_prompt` decision action.
 
-Step 2 `buildPromptSource` must construct the Step 2 prompt from module-owned code. The prompt must instruct the AI to:
+Step 2 `buildPromptSource` must construct the Step 2 prompt from module-owned code by assembling named prompt sections. The prompt must instruct the AI to:
 
 - read `{output_file}`
 - read `{architecture_document}`
-- read `{brainstorming_document}` when present
+- read `{brainstorming_document}` only when present
+- read `additional_context_files` only when present and non-empty
 - read any other files provided within `{output_file}` as additional context, including files listed under `Additional Context` when useful
 - identify the work necessary to deliver the project based on the architecture document
 - provide its understanding of the necessary work to the user and confirm alignment before drafting epics
@@ -297,6 +298,8 @@ Step 2 `buildPromptSource` must construct the Step 2 prompt from module-owned co
 - after the user indicates alignment with the drafted epics, use `attempt_completion` to provide a final recap and remind the user to run the `pi-planning` workflow for each epic to define that epic's user stories
 
 Step 2 prompt construction must not instruct the AI to draft stories, tasks, subtasks, acceptance criteria, action plans, or implementation checklists.
+
+Absent optional context values must not render raw workflow placeholders, empty read instructions, or invented fallback text.
 
 Step 2 tool schema must expose exactly:
 
@@ -382,7 +385,8 @@ The create-epics module must include module tests for:
 - Step 1 failure behavior when `architecture.md` is not discoverable
 - initial document shell heading order
 - initial document shell rendering of required prerequisite and user-provided context paths
-- Step 2 prompt source output
+- Step 2 prompt source output for optional-context states: brainstorming only, additional context only, both present, and neither present
+- absence of optional-context read instructions when the backing optional workflow value is absent
 - exact Step 1 and Step 2 tool-schema outputs
 - absence of `build_workflow_document`, `apply_patch`, `set_workflow_values`, archive/delete/move artifact tools, and `workflow_progress_request` from Step 2 model-facing schema
 

@@ -326,7 +326,7 @@ Step 1 must be runtime-driven and must expose an empty tool schema through an ex
 
 Step 2 must enter model-driven work through a `project_prompt` decision action.
 
-Step 2 `buildPromptSource` must construct the Step 2 prompt from module-owned code. The Step 2 prompt must preserve the exact conditional prompt text from `/Users/robertboston/Documents/Cline/Workflows/create-story.md`, with workflow value placeholders rendered through deterministic workflow value rendering.
+Step 2 `buildPromptSource` must construct the Step 2 prompt from module-owned code. The Step 2 prompt must preserve the AI-facing text for the selected condition from `/Users/robertboston/Documents/Cline/Workflows/create-story.md`, with workflow value placeholders rendered through deterministic workflow value rendering. Source-document marker lines such as `*** Shown only if... ***` and `*** end conditional prompt block ***` are authoring guidance for prompt construction and must not appear in prompt constants, `promptTemplates`, or rendered AI-facing Step 2 prompt output.
 
 When the selected story has `status: "backlog"` and `revise_backlog_story: true`, Step 2 must use this exact prompt variant:
 
@@ -414,7 +414,7 @@ Step 2 must transition to Step 3 only on `workflow_progress_request_confirmed`. 
 
 Step 3 must enter model-driven work through a `project_prompt` decision action.
 
-Step 3 `buildPromptSource` must construct the Step 3 prompt from module-owned code. The Step 3 prompt must preserve the exact conditional prompt text from `/Users/robertboston/Documents/Cline/Workflows/create-story.md`, with workflow value placeholders rendered through deterministic workflow value rendering.
+Step 3 `buildPromptSource` must construct the Step 3 prompt from module-owned code. The Step 3 prompt must preserve the AI-facing text for the selected condition from `/Users/robertboston/Documents/Cline/Workflows/create-story.md`, with workflow value placeholders rendered through deterministic workflow value rendering. Source-document marker lines such as `*** Shown only if... ***` and `*** end conditional prompt block ***` are authoring guidance for prompt construction and must not appear in prompt constants, `promptTemplates`, or rendered AI-facing Step 3 prompt output.
 
 When the selected story has `status: "backlog"`, Step 3 must begin with this exact prompt variant:
 
@@ -700,9 +700,9 @@ The create-story module must include module tests for:
 - remediation story parent-story and findings-document derivation
 - invalid remediation project-state failure for missing parent entry, missing parent file, or missing findings document
 - Step 1 transition to Step 2 only for actionable draft stories or user-approved backlog revisions
-- Step 2 prompt variant selection for backlog revision, primary draft story, and remediation draft story conditions, including deterministic rendering of required workflow-value placeholders and absence of known unauthorized legacy or invented prompt fragments
+- Step 2 prompt variant selection for backlog revision, primary draft story, and remediation draft story conditions, including deterministic rendering of required workflow-value placeholders, absence of known unauthorized legacy or invented prompt fragments, and exclusion of source-document authoring markers such as `*** Shown only if` and `*** end conditional prompt block ***`
 - Step 2 unsupported prompt conditions fail clearly instead of falling back to a generic prompt
-- Step 3 prompt variant selection for backlog revision and draft story conditions, including deterministic rendering of required workflow-value placeholders and absence of known unauthorized legacy or invented prompt fragments
+- Step 3 prompt variant selection for backlog revision and draft story conditions, including deterministic rendering of required workflow-value placeholders, absence of known unauthorized legacy or invented prompt fragments, and exclusion of source-document authoring markers such as `*** Shown only if` and `*** end conditional prompt block ***`
 - Step 3 unsupported prompt conditions fail clearly instead of falling back to a generic prompt
 - Step 4 prompt construction, including deterministic rendering of required workflow-value placeholders and absence of known unauthorized legacy or invented prompt fragments
 - Step 2 through Step 4 decision-tree route structure

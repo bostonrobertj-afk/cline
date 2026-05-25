@@ -373,7 +373,7 @@ When `workflow_progress_request` is confirmed, runtime/module logic must locate 
 
 Runtime/module logic must persist their full paths as `blind_review_output`, `acceptance_audit_output`, and `edge_case_review_output` before prompting Step 3.
 
-If any expected child output file is missing or empty, runtime/module logic must persist the missing or empty expected filenames as `missing_subagent_output_files`, remain in Step 2, and prompt the AI with exactly:
+If any expected child output file is missing or empty, runtime/module logic must persist the missing or empty expected filenames as `missing_subagent_output_files`, remain in Step 2, and prompt the AI with source-authored header and instruction text plus a generated runtime missing-file list:
 
 ```text
 These subagent output files were not found in the project's review folder:
@@ -381,7 +381,7 @@ These subagent output files were not found in the project's review folder:
 Please launch a new subagent and assign them to the workflow associated with the missing file.
 ```
 
-`<missing files>` must be replaced with the missing or empty expected filename list.
+`<missing files>` is generated runtime content and must be replaced with the missing or empty expected filename list. The generated missing-file list must not be included in `promptTemplates` as static source prompt text.
 
 Step 2 progression to Step 3 requires both:
 
@@ -545,22 +545,19 @@ Step 4 prompt construction must include this source prompt text:
 Review the findings in code_review_output.
 ```
 
-If any findings are present under `## Upstream Failures`, the Step 4 prompt must include this exact conditional prompt block:
+If any findings are present under `## Upstream Failures`, the Step 4 prompt must include this AI-facing conditional prompt section:
 
 ```text
-*** Conditional prompting: Runtime must assess the findings in the code-review-output document. If any findings are present under "upstream failure", then the following prompt must be shown: ***
 For findings listed under "upstream failure", determine which project documents require revision before a remediation story can be generated. Project documents include:
 - architecture_document
 - epics_document
 
 Determine the exact revisions necessary, then message the user providing the exact proposed revisions and justification. Upon user approval, update the project documents with the approved revisions only, then follow the additional instructions below.
-*** end conditional prompt block ***
 ```
 
-When a remediation story was generated, the Step 4 prompt must include this exact conditional prompt block:
+When a remediation story was generated, the Step 4 prompt must include this AI-facing conditional prompt section:
 
 ```text
-*** Conditional prompting: shown only if a remediation story was generated: ***
 You'll now prepare a remediation story based on the documented review findings.
 Read the following relevant files:
 - architecture_document
@@ -582,8 +579,9 @@ Present proposed drafts for the content to be added to the user, and add it to t
 You must not populate the tasks section of the story document. 
 
 Once you've populated the assigned sections of the story document, use attempt_completion to send a final message to the user informing them that you have produced the remediation story. Include the full file path to the document in your message, which is remediation_story, and remind the user to run the write-remediation-story workflow to finalize the story by generating tasks and subtasks.
-*** End conditional prompt block ***
 ```
+
+Source-document marker lines such as `*** Conditional prompting... ***`, `*** end conditional prompt block ***`, and `*** End conditional prompt block ***` are authoring guidance for prompt construction. They must not appear in prompt constants, `promptTemplates`, or rendered AI-facing Step 4 prompt output.
 
 Step 4 must expose the file-read and governed file-edit tools needed to read project/story/review documents and edit only the approved remediation story sections and any user-approved upstream project document revisions. Step 4 must expose `attempt_completion`.
 
@@ -709,6 +707,8 @@ The code-review module build must add focused tests for:
 - Step 4 findings route through remediation story artifact planning, artifact creation, initial document build, story index update, and prompt projection
 - Step 4 upstream-failure conditional prompt inclusion
 - Step 4 remediation-story conditional prompt inclusion when a remediation story is generated
+- Step 4 rendered prompt exclusion of source-document authoring markers, including `Conditional prompting`, `end conditional prompt block`, and `End conditional prompt block`
+- Step 2 missing-subagent-output prompt output containing the static header, generated missing-file list, static instruction text, and no source-document authoring markers
 - Step 4 exact tool schema names and forbidden backend-only tool absence
 - Step 4 `attempt_completion_succeeded` route through target-story status update to `complete`, target-story file move from `implementation/stories-review` to `implementation/stories-complete`, and `complete_workflow`
 - workflow completion only after Step 4 procedures finish

@@ -256,7 +256,7 @@ Then include these shared brainstorming facilitation instructions for both promp
 Goal: Guide an interactive brainstorming session from setup through technique selection, idea capture, and final organization, pausing whenever user input or confirmation is needed.
 
 - Engage the user in interactive brainstorming using the selected approach.
-- Keep the user in control at each decision point. Pause for clarification, a technique switch, or continuation whenever needed. Record `ideas_generated` through `set_workflow_values` where exposed and in `{output_file}` through governed file-edit tools as needed.
+- Keep the user in control at each decision point. Pause for clarification, a technique switch, or continuation whenever needed. Record `techniques_used` and `ideas_generated` in `{output_file}` as needed.
 - The goal is to generate as many ideas as possible without exhausting the user.
 - Techniques for keeping brainstorming going: ask probing questions, ask users how the current idea connects to an earlier idea, offer challenges to the user's idea or assumptions, offer new ideas or angles to keep the conversation going.
 
@@ -309,6 +309,15 @@ The implementation must add an AI-callable `get_brainstorming_methods` tool back
 `get_brainstorming_methods` must be read-only. It must return the supported brainstorming inventory with category, name, and description, and must not mutate workflow values, allocate artifacts, or write to `brainstorming.md`.
 
 Every Step 3 variant must expose `get_brainstorming_methods` and `append_brainstorming_selected_technique` so technique switching is available in every Step 3 path.
+
+## Testing Requirements
+
+Prompt tests must verify:
+
+- the Step 3 suggestion variant includes the technique-suggestion instructions and the standard variant excludes them
+- both Step 3 variants include the source-prescribed goal sentence, user-control instruction, `techniques_used` and `ideas_generated` recording instruction, and idea-generation-without-exhaustion instruction
+- both Step 3 variants exclude invented topic/goal refinement prose that is not present in `/Users/robertboston/Documents/Cline/Workflows/brainstorming.md`
+- rendered Step 3 and Step 4 prompts materialize required workflow-value tokens and do not leak raw `{workflow.` references
 
 ## Completion
 

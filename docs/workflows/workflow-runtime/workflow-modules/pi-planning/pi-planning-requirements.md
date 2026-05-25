@@ -225,13 +225,13 @@ Step 1 must be runtime-driven and must expose an empty tool schema through an ex
 
 Step 2 must enter model-driven work through a `project_prompt` decision action.
 
-Step 2 `buildPromptSource` must construct the Step 2 prompt from module-owned code. The prompt must instruct the AI to:
+Step 2 `buildPromptSource` must construct the Step 2 prompt from module-owned code by assembling named prompt sections. The prompt must instruct the AI to:
 
 - prepare to break a single epic down into deliverable user stories
 - focus on `target_epic`
 - read `epics_index`, `epics_document`, and `architecture_document`
-- read `brainstorming_document` when present and approved
-- read `additional_context` files when provided and relevant
+- read `brainstorming_document` only when present and approved
+- read `additional_context` files only when provided and relevant
 - assess context for issues, guidance, scope, risks, or requirements relevant to `target_epic`
 - identify conflicts between the target epic and architecture decisions, constraints, components, data models, integrations, or deployment assumptions
 - identify ambiguity in the epic objective, requirements, scope, or scope boundary
@@ -244,6 +244,8 @@ Step 2 `buildPromptSource` must construct the Step 2 prompt from module-owned co
 - summarize material conflicts, ambiguities, or missing information to the user as questions or decisions needed before story drafting can begin
 - briefly note non-blocking issues and explain how they will be accounted for during story decomposition
 - call `workflow_progress_request` only after the user clarifies blocking issues or confirms the current context is sufficient
+
+Absent optional context values must not render raw workflow placeholders, empty read instructions, or invented fallback text. The Step 2 prompt must not render `not provided` unless a later source document or requirements revision explicitly prescribes that exact AI-facing text.
 
 Step 2 tool schema must expose exactly:
 
@@ -546,8 +548,9 @@ The pi-planning module must include module tests for:
 - Step 1 transition to Step 2 when `edit_intent` is `Complete initial story buildout`
 - Step 1 selected story metadata derivation, deterministic generation of missing story files, draft/backlog `target_story` resolution through runtime-owned story-index validation and existing-artifact resolution, and direct transition to Step 6 when `edit_intent` is `edit existing story file`
 - `target_story` setup fail-closed behavior for missing, malformed or noncanonical, unsupported-status, or unresolved selected story targets
-- Step 2 prompt source output
-- Step 3 prompt source output, including the existing-story-index conditional prompt block
+- Step 2 prompt source output for optional-context states: brainstorming only, additional context only, both present, and neither present
+- Step 2 prompt output excluding absent optional context lines and excluding the invented fallback text `not provided`
+- Step 3 prompt source output, including the existing-story-index conditional prompt section
 - Step 4 prompt source output for existing and missing story-index branches
 - Step 5 prompt source output for existing and missing story-index branches
 - Step 6 prompt source output for the initial-buildout variant
