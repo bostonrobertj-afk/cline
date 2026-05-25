@@ -278,26 +278,59 @@ The resulting epic sections must be ordered by numeric identity.
 
 Step 2 must enter model-driven work through a `project_prompt` decision action.
 
-Step 2 `buildPromptSource` must construct the Step 2 prompt from module-owned code by assembling named prompt sections. The prompt must instruct the AI to:
+Step 2 `buildPromptSource` must construct the Step 2 prompt from module-owned code by assembling named prompt sections. The prompt must preserve the source prompt verbiage and structure below, with `output_file`, `architecture_document`, `brainstorming_document`, and `additional_context_files` rendered from their corresponding workflow value keys.
 
-- read `{output_file}`
-- read `{architecture_document}`
-- read `{brainstorming_document}` only when present
-- read `additional_context_files` only when present and non-empty
-- read any other files provided within `{output_file}` as additional context, including files listed under `Additional Context` when useful
-- identify the work necessary to deliver the project based on the architecture document
-- provide its understanding of the necessary work to the user and confirm alignment before drafting epics
-- break the project into epics by coherent capability outcomes, not by files, layers, or implementation chores
-- ensure each epic delivers one testable outcome, groups requirements that change together, has clear dependencies and completion criteria, and is small enough to implement through a focused set of downstream stories
-- split epics that contain multiple independent outcomes or major lifecycle transitions
-- sequence epics by dependency order with aid from the architecture document
-- avoid epics that are only `backend`, `frontend`, or `tests` unless that is genuinely the user-facing capability boundary
-- call `upsert_epic` for each user-aligned epic
-- notify the user and ask them to review the drafted epics
-- revise epics through `upsert_epic` as needed based on user feedback
-- after the user indicates alignment with the drafted epics, use `attempt_completion` to provide a final recap and remind the user to run the `pi-planning` workflow for each epic to define that epic's user stories
+The required context section must render this source prompt structure:
 
-Step 2 prompt construction must not instruct the AI to draft stories, tasks, subtasks, acceptance criteria, action plans, or implementation checklists.
+```text
+Read the following:
+- `{output_file}`
+- `{architecture_document}`
+```
+
+The required context list must include this optional item only when `brainstorming_document` is set to a non-empty value:
+
+```text
+- `{brainstorming_document}`
+```
+
+The required context list must include this optional item only when `additional_context_files` is set to a non-empty value:
+
+```text
+- `{additional_context_files}`
+```
+
+The Step 2 body prompt must render this source prompt text:
+
+```text
+Identify the work necessary to deliver the project based on the provided architecture document. Provide your understanding of the necessary work to the user, confirm their alignment, then break the work down into a logical set of epics to guide project delivery.
+
+Break the project into epics by coherent capability outcomes, not by files, layers, or implementation chores.
+
+Each epic must:
+- Deliver one testable outcome.
+- Group requirements that change together.
+- Have clear dependencies and completion criteria.
+- Be small enough to implement through a focused set of stories; split epics that contain multiple independent outcomes or major lifecycle transitions.
+
+Sequence epics by dependency order with aid from the provided architecture document:
+1. Shared contracts/invariants.
+2. Core runtime/backend behavior.
+3. User-facing flows.
+4. Prompt/tool/schema behavior.
+5. Workflow/module consumers.
+6. Cleanup, migration, and validation.
+
+Do not create epics that are only “backend,” “frontend,” or “tests” unless that is genuinely the user-facing capability boundary.
+
+Call `upsert_epic` for each user-aligned epic. Use `upsert_epic` to persist every accepted epic and every accepted revision.
+
+Once you've drafted the epics, notify the user and ask them to review the drafted epics. Adjust as needed using `apply_patch` based on their feedback.
+
+Once the user has indicated alignment with the drafted epics, use attempt_completion to provide a final recap and remind the user to run the pi-planning workflow for each epic to define the epics' user stories.
+```
+
+Step 2 prompt construction must not instruct the AI to draft stories, tasks, subtasks, acceptance criteria, action plans, implementation checklists, delivery specs, or downstream implementation plans.
 
 Absent optional context values must not render raw workflow placeholders, empty read instructions, or invented fallback text.
 
@@ -305,6 +338,7 @@ Step 2 tool schema must expose exactly:
 
 - `read_file`
 - `upsert_epic`
+- `apply_patch`
 - `send_user_message`
 - `ask_followup_question`
 - `attempt_completion`
@@ -312,7 +346,6 @@ Step 2 tool schema must expose exactly:
 Step 2 must not expose:
 
 - `build_workflow_document`
-- `apply_patch`
 - `set_workflow_values`
 - `workflow_progress_request`
 - `create_workflow_artifact`
@@ -388,7 +421,7 @@ The create-epics module must include module tests for:
 - Step 2 prompt source output for optional-context states: brainstorming only, additional context only, both present, and neither present
 - absence of optional-context read instructions when the backing optional workflow value is absent
 - exact Step 1 and Step 2 tool-schema outputs
-- absence of `build_workflow_document`, `apply_patch`, `set_workflow_values`, archive/delete/move artifact tools, and `workflow_progress_request` from Step 2 model-facing schema
+- absence of `build_workflow_document`, `set_workflow_values`, archive/delete/move artifact tools, and `workflow_progress_request` from Step 2 model-facing schema
 
 The `upsert_epic` backend tool must include handler tests for:
 
@@ -420,6 +453,7 @@ Prompt integration tests must prove:
 - runtime-projected workflow schema is the exact native tool surface for Step 2
 - response-tool guidance matches the projected Step 2 schema
 - `upsert_epic` appears only when Step 2 is active
+- `apply_patch` appears only when Step 2 is active
 - backend-only runtime tools such as `build_workflow_document` are not statically exposed
 
 Validation must include:
@@ -432,4 +466,4 @@ npm run check-types
 npm run lint
 ```
 
-Add focused `rg` checks proving `build_workflow_document`, `apply_patch`, `set_workflow_values`, `archive_workflow_artifact`, `delete_workflow_artifact`, and `move_workflow_project_file` are not present in the create-epics Step 2 model-facing tool schema.
+Add focused `rg` checks proving `build_workflow_document`, `set_workflow_values`, `archive_workflow_artifact`, `delete_workflow_artifact`, and `move_workflow_project_file` are not present in the create-epics Step 2 model-facing tool schema.

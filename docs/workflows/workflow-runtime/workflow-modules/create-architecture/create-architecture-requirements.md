@@ -255,15 +255,19 @@ Step 2 must be runtime-driven and must expose an empty tool schema through an ex
 
 Step 3 must enter model-driven work through a `project_prompt` decision action.
 
-Step 3 `buildPromptSource` must construct the Step 3 prompt from the source workflow prompt, normalized to use `{output_file}` consistently. The prompt must instruct the AI to:
+Step 3 `buildPromptSource` must construct the Step 3 prompt from the source workflow prompt. Source references to `output_document` must render from the workflow value key `output_file`. The Step 3 prompt must render this source prompt text:
 
-- read `{output_file}`
-- read any additional files listed in the `Relevant Context` section when useful
-- if files were provided, draft and propose content for `Project Context Analysis`, then save approved content to `{output_file}`
-- ensure that `Scope`, `Architectural goals`, and `Core architectural rules` are sufficient to support the remaining architecture sections
-- ask the user for clarification or improvement when those sections are vague, overly broad, or insufficient
-- draft and propose content for `Interpretation`, then save approved content to `{output_file}`
-- use `workflow_progress_request` to confirm and unlock the next workflow step after user-approved interpretation content has been saved
+```text
+Review {output_file} and any additional files listed within it as relevant context.
+
+If files were provided in the relevant context section, draft and propose content for the project context analysis section, then save it to {output_file} once the user approves.
+
+Ensure that the scope, architectural goals, and core architectural rules are sufficient to enable completion of the remaining document sections. If the existing is vague, overly broad, or lacks sufficient detail, engage the user and guide them through improving the content of these sections until it is appropriate for a project architecture document and sufficient to act as a basis for the remaining document sections.
+
+Once the scope, architectural goals, and core architectural rules sections are sufficient, draft and propose content for the interpretation section of the document to the user, and save it to {output_file} once the user approves.
+
+Once you've saved user-approved content to the document's interpretation section, use workflow_progress_request to confirm and unlock the next workflow step.
+```
 
 Step 3 tool schema must expose exactly:
 
@@ -279,12 +283,18 @@ When Step 3 receives a `workflow_progress_request_confirmed` event, the Step 3 d
 
 Step 4 must enter model-driven work through a `project_prompt` decision action.
 
-Step 4 `buildPromptSource` must construct the Step 4 prompt from the source workflow prompt, normalized to use `{output_file}` consistently. The prompt must instruct the AI to:
+Step 4 `buildPromptSource` must construct the Step 4 prompt from the source workflow prompt. Source references to `output_document` must render from the workflow value key `output_file`. The Step 4 prompt must render this source prompt text:
 
-- guide the user through documenting `Responsibility Boundaries`, `Durable vs Transient Ownership`, and `Required Additional Baseline for Authority Enforcement`
-- refer to relevant context, runtime code, and tests frequently to keep the section grounded in reality
-- save user-approved content under the matching headings in `{output_file}`
-- use `workflow_progress_request` to confirm and unlock the next workflow step once the user is aligned with the content
+```text
+Guide the user through documenting the following sections of {output_file}:
+- Responsibility Boundaries
+- Durable vs Transient Ownership
+- Required Additional Baseline for Authority Enforcement
+
+Refer to relevant context, runtime code, and tests frequently to help keep things grounded in reality and ensure that the section's final content is comprehensive.
+
+Once the user is aligned with this content, use workflow_progress_request to confirm and unlock the next workflow step.
+```
 
 Step 4 tool schema must expose exactly:
 
@@ -304,14 +314,13 @@ When Step 4 receives a `workflow_progress_request_confirmed` event, the Step 4 d
 
 Step 5 must enter model-driven work through a `project_prompt` decision action.
 
-Step 5 `buildPromptSource` must construct the Step 5 prompt from the source workflow prompt, normalized to use `{output_file}` consistently. The prompt must instruct the AI to:
+Step 5 `buildPromptSource` must construct the Step 5 prompt from the source workflow prompt. Source references to `output_document` must render from the workflow value key `output_file`. The Step 5 prompt must render this source prompt text:
 
-- tell the user that it will assess current runtime code and tests for alignment with the intended architecture
-- perform a thorough repository assessment
-- record findings under `Aligned`, `Partially aligned`, and `Not aligned / conflicts`
-- brief the user on findings
-- answer user questions and adjust the document when needed
-- use `workflow_progress_request` to unlock the next workflow step once the user approves the content
+```text
+Inform the user that you will now assess current runtime code & tests to identify what existing code is aligned, partially aligned, and not aligned with the intended architecture, then do a thorough assessment of the repository and record your findings in {output_file} under the appropriate section headings.
+
+Brief the user on your findings, answer any questions they have, make adjustments if needed, then use workflow_progress_request to unlock the next workflow step once the user approves the content you've added based on your code alignment assessment.
+```
 
 Step 5 tool schema must expose exactly:
 
@@ -333,14 +342,13 @@ When Step 5 receives a `workflow_progress_request_confirmed` event, the Step 5 d
 
 Step 6 must enter model-driven work through a `project_prompt` decision action.
 
-Step 6 `buildPromptSource` must construct the Step 6 prompt from the source workflow prompt, normalized to use `{output_file}` consistently. The prompt must instruct the AI to:
+Step 6 `buildPromptSource` must construct the Step 6 prompt from the source workflow prompt. Source references to `output_file` must render from the workflow value key `output_file`. The Step 6 prompt must render this source prompt text:
 
-- identify key tradeoffs and risks based on the existing contents of `{output_file}`
-- perform additional code assessment if needed
-- propose draft content for the `Tradeoffs` and `Risks` sections
-- refine based on user feedback
-- save user-approved final content under the matching headings in `{output_file}`
-- use `workflow_progress_request` to unlock the next workflow step once tradeoffs and risks are populated
+```text
+Identify the key tradeoffs and risks based on the existing contents of {output_file}, performing additional code assessment if needed. Provide a proposed draft for the key tradeoffs and risks section of the document to the user, refine as needed based on their feedback, and save the final version under the appropriate document headings once the user approves.
+
+Once the tradeoffs and risks sections are populated with user-approved content, use workflow_progress_request to unlock the next workflow step.
+```
 
 Step 6 tool schema must expose exactly:
 
@@ -360,14 +368,13 @@ When Step 6 receives a `workflow_progress_request_confirmed` event, the Step 6 d
 
 Step 7 must enter model-driven work through a `project_prompt` decision action.
 
-Step 7 `buildPromptSource` must construct the Step 7 prompt from the source workflow prompt, normalized to use `{output_file}` consistently. The prompt must instruct the AI to:
+Step 7 `buildPromptSource` must construct the Step 7 prompt from the source workflow prompt. Source references to `output_document` must render from the workflow value key `output_file`. The Step 7 prompt must render this source prompt text:
 
-- draft a comprehensive blast radius for the project
-- include files, modules, directories, shared components, and integration boundaries
-- propose the blast radius to the user
-- adjust based on user feedback
-- save approved content under `Project Blast Radius` in `{output_file}`
-- use `workflow_progress_request` to unlock the next workflow step once the section is populated
+```text
+Draft and propose a comprehensive blast radius for this project encompassing all files, modules, directories, shared components, and integration boundaries to the user, adjust based on their feedback, and save the approved content under the appropriate heading in {output_file}.
+
+Once the blast radius section of the architecture document is populated with user-approved content, use workflow_progress_request to unlock the next workflow step.
+```
 
 Step 7 tool schema must expose exactly:
 
@@ -387,15 +394,15 @@ When Step 7 receives a `workflow_progress_request_confirmed` event, the Step 7 d
 
 Step 8 must enter model-driven work through a `project_prompt` decision action.
 
-Step 8 `buildPromptSource` must construct the Step 8 prompt from the source workflow prompt, normalized to use `{output_file}` consistently. The prompt must instruct the AI to:
+Step 8 `buildPromptSource` must construct the Step 8 prompt from the source workflow prompt. Source references to `output_document` must render from the workflow value key `output_file`. The Step 8 prompt must render this source prompt text:
 
-- identify key dependencies that will matter during project implementation
-- present those dependencies to the user and adjust based on feedback
-- save approved dependencies under `Dependencies` in `{output_file}`
-- build an implementation roadmap establishing high-level project implementation sequencing based on dependencies and blast radius
-- present the roadmap to the user and adjust based on feedback
-- save approved roadmap content under `Project Roadmap` in `{output_file}`
-- use `workflow_progress_request` to unlock the final workflow step once both sections are populated
+```text
+Identify the key dependencies that will matter during project implementation, provide them to the user, adjust based on their feedback, then save them in the dependencies section of {output_file}.
+
+Next, build an implementation roadmap which establishes high-level project implementation sequencing based on the identified dependencies & blast radius. Provide the proposed draft to the user, adjust based on their feedback, then save it to the project roadmap section of {output_file}.
+
+Once you've populated the dependencies and implementation roadmap sections of {output_file} with user-approved content, use workflow_progress_request to unlock the final workflow step.
+```
 
 Step 8 tool schema must expose exactly:
 

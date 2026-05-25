@@ -225,25 +225,55 @@ Step 1 must be runtime-driven and must expose an empty tool schema through an ex
 
 Step 2 must enter model-driven work through a `project_prompt` decision action.
 
-Step 2 `buildPromptSource` must construct the Step 2 prompt from module-owned code by assembling named prompt sections. The prompt must instruct the AI to:
+Step 2 `buildPromptSource` must construct the Step 2 prompt from module-owned code by assembling named prompt sections. The prompt must preserve the source prompt verbiage and structure below, with source placeholders rendered from their corresponding workflow value keys.
 
-- prepare to break a single epic down into deliverable user stories
-- focus on `target_epic`
-- read `epics_index`, `epics_document`, and `architecture_document`
-- read `brainstorming_document` only when present and approved
-- read `additional_context` files only when provided and relevant
-- assess context for issues, guidance, scope, risks, or requirements relevant to `target_epic`
-- identify conflicts between the target epic and architecture decisions, constraints, components, data models, integrations, or deployment assumptions
-- identify ambiguity in the epic objective, requirements, scope, or scope boundary
-- identify missing architectural guidance needed to sequence or size stories
-- identify missing dependencies, prerequisite capabilities, shared contracts, or validation expectations
-- identify requirements in the epic that appear unsupported by the architecture document
-- identify architecture decisions that imply work not captured in the target epic
-- identify risks that would prevent coherent story breakdown
-- avoid silently resolving conflicts or filling gaps with assumptions
-- summarize material conflicts, ambiguities, or missing information to the user as questions or decisions needed before story drafting can begin
-- briefly note non-blocking issues and explain how they will be accounted for during story decomposition
-- call `workflow_progress_request` only after the user clarifies blocking issues or confirms the current context is sufficient
+The Step 2 base prompt must render this source prompt text:
+
+```text
+Your goal in this workflow is to break a single epic down into deliverable user stories. In this step, you will prepare by reading relevant context. Do not begin generating stories in this step.
+You will be focusing on {target_epic} during this workflow.
+*** Primary Context: ***
+  {epics_index}
+  {epics_document}
+  {architecture_document}
+```
+
+The Step 2 prompt must include this label only when either `brainstorming_document` or `additional_context` is set to a non-empty value:
+
+```text
+*** Secondary Context ***
+```
+
+Inside that single secondary context block, the Step 2 prompt must include this line only when `brainstorming_document` is set to a non-empty value:
+
+```text
+  {brainstorming_document}
+```
+
+Inside that single secondary context block, the Step 2 prompt must include this line only when `additional_context` is set to a non-empty value:
+
+```text
+  {additional_context}
+```
+
+The Step 2 assessment prompt must render this source prompt text after the context sections:
+
+```text
+Assess the provided context for issues, guidance, scope, risks, or requirements relevant to {target_epic}, including:
+- conflicts between the target epic and architecture decisions, constraints, components, data models, integrations, or deployment assumptions
+- ambiguity in the epic objective, requirements, scope, or scope boundary
+- missing architectural guidance needed to sequence or size stories
+- missing dependencies, prerequisite capabilities, shared contracts, or validation expectations
+- requirements in the epic that appear unsupported by the architecture document
+- architecture decisions that imply work not captured in the target epic
+- risks that would prevent coherent story breakdown, such as unclear ownership, incomplete external-system behavior, unresolved UX/data/API expectations, or contradictory constraints
+
+Do not silently resolve conflicts or fill gaps with assumptions. If you identify material conflicts, ambiguities, or missing information, summarize them for the user as questions or decisions needed before story drafting can begin.
+
+If issues are minor and do not block story drafting, note them briefly and explain to the user how you will account for them during story decomposition.
+
+Only proceed after the user has clarified blocking issues or confirmed that the current context is sufficient. At that point call workflow_progress_request to unlock the next workflow step's instructions.
+```
 
 Absent optional context values must not render raw workflow placeholders, empty read instructions, or invented fallback text. The Step 2 prompt must not render `not provided` unless a later source document or requirements revision explicitly prescribes that exact AI-facing text.
 
@@ -273,19 +303,34 @@ Step 2 must transition to Step 3 only on `workflow_progress_request_confirmed`. 
 
 Step 3 must enter model-driven work through a `project_prompt` decision action.
 
-Step 3 `buildPromptSource` must construct the Step 3 prompt from module-owned code.
+Step 3 `buildPromptSource` must construct the Step 3 prompt from module-owned code by assembling named prompt sections. The prompt must preserve the source prompt verbiage and structure below, with source placeholders rendered from their corresponding workflow value keys.
 
-When `stories_index` existed at workflow start, the Step 3 prompt must include the conditional instruction to review the existing story files for the epic in `drafts_folder`.
+When `stories_index` existed at workflow start, the Step 3 prompt must include this source prompt text before the shared Step 3 body:
 
-The prompt must instruct the AI to:
+```text
+Review the existing story files for this epic in {drafts_folder}.
+```
 
-- review provided context and existing runtime code/tests to determine the full set of stories needed to support delivery of `target_epic`
-- treat a story as one coherent, testable capability outcome
-- allow backend, UI, prompt/schema, state, docs, and tests in one story only when those pieces are required to deliver the same outcome
-- split a story when the objective contains multiple independent outcomes, one part can ship or be validated without the other, it crosses a major lifecycle boundary, it would need separate QA gates, or its requirements cannot be summarized clearly under one objective
-- avoid stories that are only file edits, test updates, cleanup chores, or technical layers unless that layer is itself the deliverable contract
-- provide an update to the user explaining how many stories are needed
-- call `workflow_progress_request` after explaining the story count
+The Step 3 shared body prompt must render this source prompt text:
+
+```text
+Review provided context and existing runtime code/ tests to determine the full set of stories needed to support delivery of {target_epic}.
+
+A story should represent one coherent, testable capability outcome. It may include backend, UI, prompt/schema, state, docs, and tests later, but only when those pieces are required to deliver the same outcome.
+
+Split a story if:
+- The objective contains multiple independent outcomes.
+- One part can ship or be validated without the other.
+- It crosses a major lifecycle boundary.
+- It would need separate QA gates.
+- Its requirements cannot be summarized clearly under one Objective.
+
+Stories should not be created that are only file edits, test updates, cleanup chores, or technical layers unless that layer is itself the deliverable contract.
+
+Once you've determined how many stories are needed, provide an update to the user explaining how many stories are needed, then call workflow_progress_request to unlock the next workflow step's instructions.
+```
+
+The Step 3 prompt must not render source-document conditional marker text such as `Shown only if` or `end conditional prompt block`.
 
 Step 3 tool schema must expose exactly:
 
@@ -317,25 +362,35 @@ Step 3 must transition to Step 4 only on `workflow_progress_request_confirmed`. 
 
 Step 4 must enter model-driven work through a `project_prompt` decision action.
 
-Step 4 `buildPromptSource` must construct the Step 4 prompt from module-owned code.
+Step 4 `buildPromptSource` must construct the Step 4 prompt from module-owned code by selecting the appropriate named branch prompt section and appending the shared story-index location section. The prompt must preserve the source prompt verbiage and structure below, with source placeholders rendered from their corresponding workflow value keys.
 
-When `stories_index` existed at workflow start, the Step 4 prompt must instruct the AI to:
+When `stories_index` existed at workflow start, the Step 4 prompt must include this source prompt text:
 
-- review the existing story index
-- call `plan_story_artifacts` only if additional stories are required beyond what the story index indicates
-- pass `epic_identity` to `plan_story_artifacts`
-- provide the total number of stories required for `target_epic` as `story_count`, not the number of newly added stories
-- understand that calling `plan_story_artifacts` with a `story_count` greater than the existing indexed count appends missing primary story entries up to that total
-- call `workflow_progress_request` when no additional stories are required
+```text
+This system uses a story index as the canonical indicator of which stories must exist for each epic.
+Target epic: {target_epic}
+Story Index: {stories_index}
 
-When `stories_index` did not exist at workflow start, the Step 4 prompt must instruct the AI to:
+Review the existing story index, then call plan_story_artifacts if additional stories are required beyond what the story index indicates. Use {epic_identity} when calling the tool. Indicate how many story files are needed to support delivery of {target_epic}. This tool will add additional stories to the existing story index when you indicate a number of stories greater than the index already contains. e.g. if a story index exists with three story files, and you call plan_story_artifacts and include story_count: 5, the tool will add 2 additional stories to the index so that it contains a total of 5 stories.
 
-- call `plan_story_artifacts`
-- pass `epic_identity`
-- provide the total number of stories required for `target_epic` as `story_count`
-- call `set_workflow_values` after successful story-index generation to persist the generated story index absolute path as `stories_index`
+If the existing story index does not need additional stories added, use workflow_progress_request to unlock the next workflow step's instructions.
+```
 
-The Step 4 prompt must tell the AI that the story index file is in `implementation_folder`.
+When `stories_index` did not exist at workflow start, the Step 4 prompt must include this source prompt text:
+
+```text
+This system uses a story index as the canonical indicator of which stories must exist for each epic. Generate the story index by calling plan_story_artifacts and including the total number of stories required in the story_count field. Use {epic_identity} when calling the tool.
+
+Once you generate the story index, call set_workflow_values to set the generated file's full file path as the stories_index workflow session key.
+```
+
+After the selected Step 4 branch text, the Step 4 prompt must render this source prompt text:
+
+```text
+The story index file can be found in {implementation_folder}.
+```
+
+The Step 4 prompt must not render source-document conditional marker text such as `Shown only if` or `end conditional prompt block`.
 
 Step 4 tool schema must expose exactly:
 
@@ -367,15 +422,27 @@ Step 4 must also transition to Step 5 after `workflow_progress_request_confirmed
 
 Step 5 must enter model-driven work through a `project_prompt` decision action.
 
-Step 5 `buildPromptSource` must construct the Step 5 prompt from module-owned code.
+Step 5 `buildPromptSource` must construct the Step 5 prompt from module-owned code by selecting the appropriate named branch prompt section and appending the shared generated-story-file location section. The prompt must preserve the source prompt verbiage and structure below, with source placeholders rendered from their corresponding workflow value keys.
 
-When `stories_index` existed at workflow start, the Step 5 prompt must instruct the AI to call `generate_story_files` to generate one templatized story for each indexed story that does not already have an existing story document.
+When `stories_index` existed at workflow start, the Step 5 prompt must include this source prompt text:
 
-When `stories_index` did not exist at workflow start, the Step 5 prompt must instruct the AI to call `generate_story_files` to generate one templatized story file for each story in `stories_index`.
+```text
+Call generate_story_files to generate one templatized story for each story in {stories_index} for which a story file does not already exist. The tool automatically identifies stories with index entries for which there is not an existing story document and generates the files for you. Use {epic_identity} when calling the tool.
+```
 
-The Step 5 prompt must instruct the AI to pass `epic_identity` to `generate_story_files`.
+When `stories_index` did not exist at workflow start, the Step 5 prompt must include this source prompt text:
 
-The Step 5 prompt must tell the AI that generated story files can be found in `drafts_folder`.
+```text
+Call generate_story_files to generate one templatized story file for each story in {stories_index}. Use {epic_identity} when calling the tool.
+```
+
+After the selected Step 5 branch text, the Step 5 prompt must render this source prompt text:
+
+```text
+Generated story files can be found in {drafts_folder}.
+```
+
+The Step 5 prompt must not render source-document conditional marker text such as `Shown only if` or `end conditional prompt block`.
 
 Step 5 tool schema must expose exactly:
 
@@ -550,9 +617,9 @@ The pi-planning module must include module tests for:
 - `target_story` setup fail-closed behavior for missing, malformed or noncanonical, unsupported-status, or unresolved selected story targets
 - Step 2 prompt source output for optional-context states: brainstorming only, additional context only, both present, and neither present
 - Step 2 prompt output excluding absent optional context lines and excluding the invented fallback text `not provided`
-- Step 3 prompt source output, including the existing-story-index conditional prompt section
-- Step 4 prompt source output for existing and missing story-index branches
-- Step 5 prompt source output for existing and missing story-index branches
+- Step 3 prompt source output, including the source-backed existing-story-index conditional prompt section, the source-backed shared prompt body, and exclusion of source-document conditional marker text
+- Step 4 prompt source output for existing and missing story-index branches, including source-backed branch text, the shared story-index location line, and exclusion of source-document conditional marker text
+- Step 5 prompt source output for existing and missing story-index branches, including source-backed branch text, the shared generated-story-file location line, and exclusion of source-document conditional marker text
 - Step 6 prompt source output for the initial-buildout variant
 - Step 6 prompt source output for the edit-existing-story variant
 - Step 2 through Step 6 decision-tree route structure
