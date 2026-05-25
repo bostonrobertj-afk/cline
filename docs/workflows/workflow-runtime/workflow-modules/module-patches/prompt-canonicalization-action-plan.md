@@ -258,7 +258,7 @@ Do not add exact full-prompt equality assertions.
 Add these exact assertions after `expect(remediationPrompt).to.include(remediationStory)`:
 
 ```ts
-		expect(remediationPrompt).to.include("For findings listed under \"upstream failure\"")
+		expect(remediationPrompt).not.to.include("For findings listed under \"upstream failure\"")
 		expect(remediationPrompt).to.include("You'll now prepare a remediation story based on the documented review findings.")
 ```
 
@@ -282,7 +282,22 @@ Do not add exact full-prompt equality assertions.
   - `CORRECT_COURSE_STEP_3_STORY_SOURCE_PROMPT_TEMPLATE`
   - `CORRECT_COURSE_STEP_3_FINAL_PROMPT_TEMPLATE`
 
-The base constant must contain the existing AI-facing text from the start of the current `CORRECT_COURSE_STEP_3_PROMPT_TEMPLATE` through `- review files including documented findings from implemented stories which have been assessed via the code review workflow`, preserving existing workflow tokens.
+The base constant must be exactly:
+
+```ts
+const CORRECT_COURSE_STEP_3_BASE_PROMPT_TEMPLATE = `You are a Scrum Master navigating change management. Analyze the triggering issue, assess impact across project artifacts, and produce an actionable change management plan with clear handoff. You will document your plan in the provided change management plan. You should actively engage the user while carrying out the steps prescribed below to ensure that they are kept abreast of your progress and are able to provide input.
+
+- Project: {workflow.projectTitle}
+- Project Folder: {workflow.projectFolderName}
+- Architecture Document: {workflow.architecture_document}
+- Change Management Plan: {workflow.output_document}
+
+The project folder contains all existing documentation for this project, which can include:
+- discovery documents
+- planning documents, including previous change management, architecture, epics, and epics index files
+- implementation documents, including story files and story index files
+- review files including documented findings from implemented stories which have been assessed via the code review workflow`
+```
 
 The epic-source constant must be exactly:
 
@@ -299,7 +314,70 @@ const CORRECT_COURSE_STEP_3_STORY_SOURCE_PROMPT_TEMPLATE = `Discovered while aut
 Story: {workflow.story_source_identifier}`
 ```
 
-The final constant must contain the existing AI-facing text from `Define the core problem and assign it to one of the following categories:` through the end of the current prompt, preserving existing workflow tokens.
+The final constant must be exactly:
+
+```ts
+const CORRECT_COURSE_STEP_3_FINAL_PROMPT_TEMPLATE = `Define the core problem and assign it to one of the following categories:
+- technical limitation discovered during implementation
+- new requirement emerged
+- requirements mistranslated in story document
+- strategic pivot desired
+- failed approach requires a solution
+
+- Assess initial impact and gather supporting evidence including concrete examples, error messages, user feedback, or technical constraints. Record your findings under the "Impact Assessment" heading in {workflow.output_document} and note the issue's source under the "Issue Source" heading.
+
+Assess the project's stories:
+Keep analysis and modification constrained to stories belonging to a single epic whenever feasible. Consider the following:
+- Can the issue be addressed by modifying existing stories?
+- Should new stories be added within the current epic structure?
+- Would this approach maintain project timeline and scope as documented in {workflow.architecture_document}?
+- Would reverting work from recently-completed stories simplify addressing this issue?
+- If so, which stories' changes should be rolled back?
+
+Add content under the "Story Modifications" heading in {workflow.output_document} indicating what work is needed for each story that should be touched as part of this change management process.
+
+Assess the project's epics:
+- Evaluate the story's parent epic and, if needed, other epics in the same project and consider:
+    - Can the parent epic still be delivered as-documented?
+    - Do future epics in the project require revisions?
+    - Does the issue invalidate any existing epics?
+    - Do new epics need to be introduced?
+    - Does the sequencing of the project's epics need to be modified?
+- Determine which of the following are necessary:
+    - modify existing epic
+    - add new epic
+    - remove an existing epic
+
+Add content under the "Epic Modifications" heading in {workflow.output_document} indicating what work is needed for each epic that should be touched as part of this change management process.
+
+Assess the project's architecture:
+- Evaluate {workflow.architecture_document} and consider:
+-   Do the project's scope, architectural goals, core architectural rules, responsibility boundaries, or durable vs transient ownership, blast radius, dependencies, or roadmap need to be modified?
+
+Add content under the "Architecture Modifications" heading in {workflow.output_document} indicating what work is needed in the architecture document as part of this change management process.
+
+Build a change management action plan using the following guidelines:
+Indicate workflows which should be run with intended sequencing. This is the standard sequential workflow structure:
+    - create-architecture: defines initial architectural expectations, produces the architecture document
+    - create-epics: breaks the project down into clearly-scoped epics, sequences them appropriately, and generates Epics.md and epics.index.json.
+    - pi-planning: breaks a single epic down into user stories, defines each story's objective, scope, scope boundary, and requirements, and generates story documents and a story index file for the target epic.
+    - create-story: builds out the tasks and subtasks for a single story, adds them to story documents generated during the pi-planning workflow
+    - dev-story: implements a single user story
+    - code-review: conducts QA analysis on a completed user story, produces findings documents and, if needed, a remediation story with initial story content
+    - write-remediation-story: Builds tasks and subtasks for a single remediation story, adds them to a story document produced by the code-review workflow
+
+For each prescribed workflow, include details regarding what should be done to resolve the identified issue which agents executing those workflows can follow.
+
+Add the action plan under the "Change Management Implementation" heading in {workflow.output_document}.
+
+Provide an overview of what you've documented to the user including the full file path for {workflow.output_document}. Revise as needed based on their feedback. Once they are satisfied with your documentation, use attempt_completion to provide them with a closing set of instructions which include the following where relevant:
+    - if the user needs to run the create-architecture or create-epics workflows, they must provide the full file path to {workflow.output_document} when prompted for context files.
+    - if epics are to be deleted, added, or resequenced, or if stories are to be added, deleted, or resequenced, the user must run the following workflows in order:
+        - create-epics (once)
+        - pi-planning (once per modified/new epic)
+        - create-story (once per modified/new story)
+    - The user should not resume the normal dev-story - > code-review - > write-remediation-story cycle until all project documentation has been updated per the change management plan.`
+```
 
 Do not include `*** conditional`, `*** end conditional ***`, `String.raw`, or `: string = String.raw` in any replacement constant.
   - Allowed files:
