@@ -531,77 +531,73 @@ Do not add exact full-prompt equality assertions.
   - Allowed files:
     - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
 
-- [ ] Subtask 6.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`, inside test `projects create-architecture current step details into the full-turn input payload only`, replace these current Step 3 prompt assertions:
-
-```ts
-			expect(workflowInputPayloadBlock).to.include(`Read \`${CREATE_ARCHITECTURE_OUTPUT_FILE}\`.`)
-			expect(workflowInputPayloadBlock).to.include("Draft and propose content for Project Context Analysis")
-```
-
-with these exact assertions:
-
-```ts
-			expect(workflowInputPayloadBlock).to.include(
-				`Review ${CREATE_ARCHITECTURE_OUTPUT_FILE} and any additional files listed within it as relevant context.`,
-			)
-			expect(workflowInputPayloadBlock).to.include("project context analysis section")
-			expect(workflowInputPayloadBlock).to.include("If the existing is vague")
-```
-
-In the same test, replace these current `systemPrompt` negative assertions:
-
-```ts
-				expect(systemPrompt).to.not.include(`Read \`${CREATE_ARCHITECTURE_OUTPUT_FILE}\`.`)
-				expect(systemPrompt).to.not.include("Draft and propose content for Project Context Analysis")
-```
-
-with these exact assertions:
-
-```ts
-				expect(systemPrompt).to.not.include(
-					`Review ${CREATE_ARCHITECTURE_OUTPUT_FILE} and any additional files listed within it as relevant context.`,
-				)
-				expect(systemPrompt).to.not.include("project context analysis section")
-				expect(systemPrompt).to.not.include("If the existing is vague")
-```
-  - Allowed files:
-    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
-
 ## Task 7: Create Epics Step 2 Optional Context Sections
 
-- [ ] Subtask 7.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsToolSchemas.ts`, add this exact exported builder immediately after `buildCreateEpicsUpsertEpicToolSchema()`:
+- [ ] Subtask 7.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsToolSchemas.ts`, update the shared/default tool-schema wiring exactly as follows.
+
+Add these imports:
 
 ```ts
-export function buildCreateEpicsApplyPatchToolSchema(): ClineToolSpec {
-	return {
-		variant: CREATE_EPICS_TOOL_SCHEMA_VARIANT,
-		id: ClineDefaultTool.APPLY_PATCH,
-		name: "apply_patch",
-		description: "Apply a structured patch to one or more files using the repository apply_patch format.",
-		parameters: [
-			{
-				name: "input",
-				required: true,
-				type: "string",
-				instruction: "The apply_patch command that you wish to execute.",
-				description: "The apply_patch command that you wish to execute.",
-			},
-		],
+import { ClineToolSet } from "@/core/prompts/system-prompt/registry/ClineToolSet"
+import { registerClineToolSets } from "@/core/prompts/system-prompt/tools/init"
+```
+
+Remove this import:
+
+```ts
+import { AGENT_FEEDBACK_PARAMETER } from "@/core/prompts/system-prompt/types"
+```
+
+Immediately after `const CREATE_EPICS_TOOL_SCHEMA_VARIANT = ModelFamily.NATIVE_GPT_5`, add these exact constants and helper:
+
+```ts
+const CREATE_EPICS_STEP_2_SHARED_TOOL_IDS_BEFORE_UPSERT_EPIC: readonly ClineDefaultTool[] = [
+	ClineDefaultTool.FILE_READ,
+]
+
+const CREATE_EPICS_STEP_2_SHARED_TOOL_IDS_AFTER_UPSERT_EPIC: readonly ClineDefaultTool[] = [
+	ClineDefaultTool.APPLY_PATCH,
+	ClineDefaultTool.SEND_USER_MESSAGE,
+	ClineDefaultTool.ASK,
+	ClineDefaultTool.ATTEMPT,
+]
+
+function resolveCreateEpicsSharedToolSpec(toolId: ClineDefaultTool): ClineToolSpec {
+	registerClineToolSets()
+	const tool = ClineToolSet.getToolByNameWithFallback(toolId, CREATE_EPICS_TOOL_SCHEMA_VARIANT)
+	if (tool === undefined) {
+		throw new Error(`Missing shared/default tool schema for ${toolId}.`)
 	}
+
+	return tool.config
 }
 ```
 
-Then update `buildCreateEpicsStep2ToolSchemas()` so the returned array order is exactly:
+Delete these local shared/default tool builders completely:
 
 ```ts
-[
-	buildCreateEpicsReadFileToolSchema(),
-	buildCreateEpicsUpsertEpicToolSchema(),
-	buildCreateEpicsApplyPatchToolSchema(),
-	buildCreateEpicsSendUserMessageToolSchema(),
-	buildCreateEpicsAskFollowupQuestionToolSchema(),
-	buildCreateEpicsAttemptCompletionToolSchema(),
-]
+buildCreateEpicsReadFileToolSchema
+buildCreateEpicsSendUserMessageToolSchema
+buildCreateEpicsAskFollowupQuestionToolSchema
+buildCreateEpicsAttemptCompletionToolSchema
+```
+
+Do not delete `buildCreateEpicsUpsertEpicToolSchema()`.
+
+Then replace `buildCreateEpicsStep2ToolSchemas()` with this exact body:
+
+```ts
+export function buildCreateEpicsStep2ToolSchemas(): readonly ClineToolSpec[] {
+	return [
+		...CREATE_EPICS_STEP_2_SHARED_TOOL_IDS_BEFORE_UPSERT_EPIC.map((toolId) =>
+			resolveCreateEpicsSharedToolSpec(toolId),
+		),
+		buildCreateEpicsUpsertEpicToolSchema(),
+		...CREATE_EPICS_STEP_2_SHARED_TOOL_IDS_AFTER_UPSERT_EPIC.map((toolId) =>
+			resolveCreateEpicsSharedToolSpec(toolId),
+		),
+	]
+}
 ```
   - Allowed files:
     - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsToolSchemas.ts`
@@ -825,50 +821,6 @@ Do not add exact full-prompt equality assertions.
 Do not add exact full-prompt equality assertions.
   - Allowed files:
     - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
-
-- [ ] Subtask 7.10. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`, inside test `projects active create-epics Step 2 tools into native GPT-5 prompts`, update the expected `nativeToolNames` array to exactly:
-
-```ts
-[
-	"read_file",
-	"upsert_epic",
-	"apply_patch",
-	"send_user_message",
-	"ask_followup_question",
-	"attempt_completion",
-]
-```
-
-Then delete `expect(nativeToolNames).to.not.include("apply_patch")` from that test. Do not change the remaining forbidden-tool assertions.
-
-In test `projects create-epics current step details into the full-turn input payload only`, replace the existing Step 2 prompt assertions from `expect(workflowInputPayloadBlock).to.include(\`Read \`${CREATE_EPICS_OUTPUT_FILE}\`.\`)` through the assertion for the `After the user indicates alignment...` sentence with these exact assertions:
-
-```ts
-				expect(workflowInputPayloadBlock).to.include("Read the following:")
-				expect(workflowInputPayloadBlock).to.include(`- \`${CREATE_EPICS_OUTPUT_FILE}\``)
-				expect(workflowInputPayloadBlock).to.include(`- \`${CREATE_EPICS_ARCHITECTURE_DOCUMENT}\``)
-				expect(workflowInputPayloadBlock).to.include(`- \`${CREATE_EPICS_BRAINSTORMING_DOCUMENT}\``)
-				expect(workflowInputPayloadBlock).to.include(`- \`${CREATE_EPICS_ADDITIONAL_CONTEXT_FILES}\``)
-				expect(workflowInputPayloadBlock).to.include(
-					"Identify the work necessary to deliver the project based on the provided architecture document.",
-				)
-				expect(workflowInputPayloadBlock).to.include("Each epic must:")
-				expect(workflowInputPayloadBlock).to.include("Adjust as needed using `apply_patch` based on their feedback.")
-				expect(workflowInputPayloadBlock).to.include("use attempt_completion to provide a final recap")
-```
-
-In the same test, replace the matching `systemPrompt` negative assertions for the old read/upsert/final recap snippets with these exact assertions:
-
-```ts
-					expect(systemPrompt).to.not.include("Read the following:")
-					expect(systemPrompt).to.not.include(`- \`${CREATE_EPICS_OUTPUT_FILE}\``)
-					expect(systemPrompt).to.not.include(
-						"Identify the work necessary to deliver the project based on the provided architecture document.",
-					)
-					expect(systemPrompt).to.not.include("Adjust as needed using `apply_patch` based on their feedback.")
-```
-  - Allowed files:
-    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
 ## Task 8: Create Story Prompt Marker Regression Coverage
 
@@ -1368,7 +1320,87 @@ Do not add exact full-prompt equality assertions.
   - Allowed files:
     - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
 
-- [ ] Subtask 10.12. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`, inside test `projects pi-planning current step details into the full-turn input payload only`, replace the three current Step 2 prompt assertions:
+## Task 11: Prompt Projection Integration Fallout
+
+- [ ] Subtask 11.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`, make all prompt-projection and tool-projection fallout updates for this file exactly as follows.
+
+Inside test `projects create-architecture current step details into the full-turn input payload only`, replace these current Step 3 prompt assertions:
+
+```ts
+			expect(workflowInputPayloadBlock).to.include(`Read \`${CREATE_ARCHITECTURE_OUTPUT_FILE}\`.`)
+			expect(workflowInputPayloadBlock).to.include("Draft and propose content for Project Context Analysis")
+```
+
+with these exact assertions:
+
+```ts
+			expect(workflowInputPayloadBlock).to.include(
+				`Review ${CREATE_ARCHITECTURE_OUTPUT_FILE} and any additional files listed within it as relevant context.`,
+			)
+			expect(workflowInputPayloadBlock).to.include("project context analysis section")
+			expect(workflowInputPayloadBlock).to.include("If the existing is vague")
+```
+
+In the same test, replace these current `systemPrompt` negative assertions:
+
+```ts
+				expect(systemPrompt).to.not.include(`Read \`${CREATE_ARCHITECTURE_OUTPUT_FILE}\`.`)
+				expect(systemPrompt).to.not.include("Draft and propose content for Project Context Analysis")
+```
+
+with these exact assertions:
+
+```ts
+				expect(systemPrompt).to.not.include(
+					`Review ${CREATE_ARCHITECTURE_OUTPUT_FILE} and any additional files listed within it as relevant context.`,
+				)
+				expect(systemPrompt).to.not.include("project context analysis section")
+				expect(systemPrompt).to.not.include("If the existing is vague")
+```
+
+Inside test `projects active create-epics Step 2 tools into native GPT-5 prompts`, update the expected `nativeToolNames` array to exactly:
+
+```ts
+[
+	"read_file",
+	"upsert_epic",
+	"apply_patch",
+	"send_user_message",
+	"ask_followup_question",
+	"attempt_completion",
+]
+```
+
+Then delete `expect(nativeToolNames).to.not.include("apply_patch")` from that test. Do not change the remaining forbidden-tool assertions.
+
+Inside test `projects create-epics current step details into the full-turn input payload only`, replace the existing Step 2 prompt assertions from `expect(workflowInputPayloadBlock).to.include(\`Read \`${CREATE_EPICS_OUTPUT_FILE}\`.\`)` through the assertion for the `After the user indicates alignment...` sentence with these exact assertions:
+
+```ts
+				expect(workflowInputPayloadBlock).to.include("Read the following:")
+				expect(workflowInputPayloadBlock).to.include(`- \`${CREATE_EPICS_OUTPUT_FILE}\``)
+				expect(workflowInputPayloadBlock).to.include(`- \`${CREATE_EPICS_ARCHITECTURE_DOCUMENT}\``)
+				expect(workflowInputPayloadBlock).to.include(`- \`${CREATE_EPICS_BRAINSTORMING_DOCUMENT}\``)
+				expect(workflowInputPayloadBlock).to.include(`- \`${CREATE_EPICS_ADDITIONAL_CONTEXT_FILES}\``)
+				expect(workflowInputPayloadBlock).to.include(
+					"Identify the work necessary to deliver the project based on the provided architecture document.",
+				)
+				expect(workflowInputPayloadBlock).to.include("Each epic must:")
+				expect(workflowInputPayloadBlock).to.include("Adjust as needed using `apply_patch` based on their feedback.")
+				expect(workflowInputPayloadBlock).to.include("use attempt_completion to provide a final recap")
+```
+
+In the same test, replace the matching `systemPrompt` negative assertions for the old read/upsert/final recap snippets with these exact assertions:
+
+```ts
+					expect(systemPrompt).to.not.include("Read the following:")
+					expect(systemPrompt).to.not.include(`- \`${CREATE_EPICS_OUTPUT_FILE}\``)
+					expect(systemPrompt).to.not.include(
+						"Identify the work necessary to deliver the project based on the provided architecture document.",
+					)
+					expect(systemPrompt).to.not.include("Adjust as needed using `apply_patch` based on their feedback.")
+```
+
+Inside test `projects pi-planning current step details into the full-turn input payload only`, replace the three current Step 2 prompt assertions:
 
 ```ts
 				expect(workflowInputPayloadBlock).to.include("Prepare to break a single epic down into deliverable user stories.")
@@ -1407,9 +1439,9 @@ In the same test, replace the matching three `systemPrompt` negative assertions 
   - Allowed files:
     - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-## Task 11: Static Guards And Validation
+## Task 12: Static Guards And Validation
 
-- [ ] Subtask 11.1. Run this exact focused unit-test command:
+- [ ] Subtask 12.1. Run this exact focused unit-test command:
 
 ```sh
 npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/acceptance-audit-review/__tests__/acceptanceAuditReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/correct-course/__tests__/correctCourseWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/dev-story/__tests__/devStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts
@@ -1418,16 +1450,16 @@ npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/acceptance-
 Mark this subtask complete only if the command exits successfully.
   - Allowed files: none.
 
-- [ ] Subtask 11.2. Run this exact static guard command and confirm it returns no matches:
+- [ ] Subtask 12.2. Run this exact static guard command and confirm it returns no matches:
 
 ```sh
-! rg -n 'Conditional prompting|conditional prompt|Shown only if|end conditional|not provided|String.raw|(_PROMPT|_PROMPT_TEMPLATE)(: [^=]+)? = ".*\\n|\bcurrent_story_task\b|Offer challenges to to|Help the user to refine their topic and goals|Additional Context:|Story-index branch|Story-file branch|An existing story index is present|no story index existed at workflow start' src/core/task/workflow-runtime/workflow-modules/acceptance-audit-review/acceptanceAuditReviewWorkflow.ts src/core/task/workflow-runtime/workflow-modules/blind-review/blindReviewWorkflow.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts src/core/task/workflow-runtime/workflow-modules/correct-course/correctCourseWorkflow.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryWorkflow.ts src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts
+! rg -n 'Conditional prompting|conditional prompt|Shown only if|end conditional|not provided|String.raw|(_PROMPT|_PROMPT_TEMPLATE)(: [^=]+)? = (["`]).*\\n|\bcurrent_story_task\b|Offer challenges to to|Help the user to refine their topic and goals|Additional Context:|Story-index branch|Story-file branch|An existing story index is present|no story index existed at workflow start' src/core/task/workflow-runtime/workflow-modules/acceptance-audit-review/acceptanceAuditReviewWorkflow.ts src/core/task/workflow-runtime/workflow-modules/blind-review/blindReviewWorkflow.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts src/core/task/workflow-runtime/workflow-modules/correct-course/correctCourseWorkflow.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryWorkflow.ts src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts
 ```
 
 Mark this subtask complete only if the command exits successfully.
   - Allowed files: none.
 
-- [ ] Subtask 11.3. Run this exact typecheck command:
+- [ ] Subtask 12.3. Run this exact typecheck command:
 
 ```sh
 npm run check-types
@@ -1436,7 +1468,7 @@ npm run check-types
 Mark this subtask complete only if the command exits successfully.
   - Allowed files: none.
 
-- [ ] Subtask 11.4. Run this exact lint command:
+- [ ] Subtask 12.4. Run this exact lint command:
 
 ```sh
 npm run lint
@@ -1445,7 +1477,7 @@ npm run lint
 Mark this subtask complete only if the command exits successfully.
   - Allowed files: none.
 
-- [ ] Subtask 11.5. Run this exact package command:
+- [ ] Subtask 12.5. Run this exact package command:
 
 ```sh
 npm run package
@@ -1454,7 +1486,7 @@ npm run package
 Mark this subtask complete only if the command exits successfully.
   - Allowed files: none.
 
-- [ ] Subtask 11.6. Run this exact scope-diff command:
+- [ ] Subtask 12.6. Run this exact scope-diff command:
 
 ```sh
 git diff --name-only
@@ -1489,7 +1521,7 @@ src/core/prompts/system-prompt/__tests__/integration.test.ts
 If any other file appears, stop and ask the user before proceeding.
   - Allowed files: none.
 
-- [ ] Subtask 11.7. Run this exact untracked-file command:
+- [ ] Subtask 12.7. Run this exact untracked-file command:
 
 ```sh
 git ls-files --others --exclude-standard
@@ -1504,69 +1536,68 @@ If any untracked file appears, stop and ask the user before proceeding.
 
 | Task/Subtask | Requirement Source | Target File | Symbols Verified | Live Contract Verified | Fallout Cleanup Prescribed | Validation Coverage |
 | --- | --- | --- | --- | --- | --- | --- |
-| Task 1 | module-build-guide Prompt Construction; runtime revisions acceptance-audit-review | `acceptanceAuditReviewWorkflow.ts` | Task owns Subtask 1.1 | Live Step 2 prompt constant formatting verified | Subtask 1.1 prescribes no helper/import fallout | 11.1, 11.3, 11.4, 11.5 |
-| 1.1 | module-build-guide Prompt Construction; runtime revisions acceptance-audit-review | `acceptanceAuditReviewWorkflow.ts` | `ACCEPTANCE_AUDIT_REVIEW_STEP_2_PROMPT`, `buildStep2PromptSource`, Step 2 `promptTemplates` | Step 2 returns `current_step_instruction_template` and existing test renders through `renderWorkflowPromptTemplate` | No imports/helpers removed; promptTemplates unchanged | 11.1, 11.3, 11.4, 11.5 |
-| Task 2 | module-build-guide Prompt Construction; runtime revisions blind-review | `blindReviewWorkflow.ts` | Task owns Subtask 2.1 | Live Step 2 prompt constant formatting verified | Subtask 2.1 prescribes no helper/import fallout | 11.1, 11.3, 11.4, 11.5 |
-| 2.1 | module-build-guide Prompt Construction; runtime revisions blind-review | `blindReviewWorkflow.ts` | `BLIND_REVIEW_STEP_2_PROMPT`, `buildStep2PromptSource`, Step 2 `promptTemplates` | Step 2 returns `current_step_instruction_template` and existing test renders through `renderWorkflowPromptTemplate` | No imports/helpers removed; promptTemplates unchanged | 11.1, 11.3, 11.4, 11.5 |
-| Task 3 | brainstorming requirements Step 3 | `brainstormingWorkflow.ts`; `brainstormingWorkflow.test.ts` | Task owns Subtasks 3.1, 3.2, 3.3, and 3.4 | Live Step 3 branch builder, templates, and tests verified | Subtasks preserve two-variant structure and update prompt assertions | 11.1, 11.2, 11.3 |
-| 3.1 | brainstorming requirements Step 3 | `brainstormingWorkflow.ts` | `STEP_3_SHARED_FACILITATION_PROMPT`, `BRAINSTORMING_STEP_3_SUGGEST_PROMPT_TEMPLATE`, `BRAINSTORMING_STEP_3_STANDARD_PROMPT_TEMPLATE` | Existing two-variant prompt constants are live in Step 3 | No imports/helpers removed | 3.4, 11.1, 11.2 |
-| 3.2 | brainstorming requirements Step 3 | `brainstormingWorkflow.ts` | `buildStep3PromptSource`, `readSelectedApproach`, `BrainstormingSelectedApproach.Suggest` | Step 3 receives `WorkflowPromptBuilderInput` and returns `current_step_instruction_template` | No local workflow-value substitution added | 3.4, 11.1, 11.3 |
-| 3.3 | brainstorming requirements Step 3 prompt template inventory | `brainstormingWorkflow.ts` | Step 3 `promptTemplates` | Step 3 templates are two complete branch templates | No imports added | 11.1, 11.3 |
-| 3.4 | brainstorming testing requirements | `brainstormingWorkflow.test.ts` | Test `builds Step 3 prompt and tool variants and routes workflow progress decisions` | Existing helper renders through shared renderer | No imports added | 11.1 |
-| Task 4 | code-review requirements Step 2 and Step 4 | `codeReviewWorkflow.ts`; `codeReviewWorkflow.test.ts` | Task owns Subtasks 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, and 4.7 | Live Step 2 generated-content branch and Step 4 conditional branches verified | Subtasks remove marker text and separate generated missing-output content | 11.1, 11.2, 11.3 |
-| 4.1 | code-review requirements Step 4 upstream prompt | `codeReviewWorkflow.ts` | `CODE_REVIEW_STEP_4_UPSTREAM_FAILURE_PROMPT` | Step 4 branch appends upstream fragment conditionally | Marker-only lines removed | 4.7, 11.1, 11.2 |
-| 4.2 | code-review requirements Step 4 remediation prompt | `codeReviewWorkflow.ts` | `CODE_REVIEW_STEP_4_REMEDIATION_STORY_PROMPT` | Step 4 branch appends remediation fragment conditionally | Marker-only lines removed | 4.7, 11.1, 11.2 |
-| 4.3 | code-review generated missing-output content requirement | `codeReviewWorkflow.ts` | `CODE_REVIEW_STEP_2_MISSING_SUBAGENT_OUTPUT_HEADER`, `CODE_REVIEW_STEP_2_MISSING_SUBAGENT_OUTPUT_INSTRUCTION` | Step 2 missing-output static text is separated from generated file list | No imports added | 4.6, 11.1 |
-| 4.4 | code-review Step 2 missing-output branch | `codeReviewWorkflow.ts` | `buildStep2PromptSource`, `missingSubagentOutputFiles` | Generated missing-file list remains runtime content | Generated list excluded from promptTemplates | 4.6, 11.1, 11.3 |
-| 4.5 | code-review Step 2 prompt template inventory | `codeReviewWorkflow.ts` | Step 2 `promptTemplates` | Static templates only are listed | Generated missing list excluded | 11.1, 11.3 |
-| 4.6 | code-review Step 2 tests | `codeReviewWorkflow.test.ts` | `missingPrompt` assertions | Existing helper renders through shared renderer | No imports added | 11.1 |
-| 4.7 | code-review Step 4 tests | `codeReviewWorkflow.test.ts` | `basePrompt`, `upstreamPrompt`, `remediationPrompt` assertions | Existing helper renders through shared renderer | No imports added | 11.1 |
-| Task 5 | correct-course requirements Step 3 | `correctCourseWorkflow.ts`; `correctCourseWorkflow.test.ts` | Task owns Subtasks 5.1, 5.2, 5.3, 5.4, and 5.5 | Live Step 3 monolithic prompt, marker helpers, and tests verified | Subtasks remove marker helpers and obsolete monolithic prompt | 11.1, 11.2, 11.3, 11.4 |
-| 5.1 | correct-course requirements Step 3 source sections | `correctCourseWorkflow.ts` | `CORRECT_COURSE_STEP_3_BASE_PROMPT_TEMPLATE`, `CORRECT_COURSE_STEP_3_EPIC_SOURCE_PROMPT_TEMPLATE`, `CORRECT_COURSE_STEP_3_STORY_SOURCE_PROMPT_TEMPLATE`, `CORRECT_COURSE_STEP_3_FINAL_PROMPT_TEMPLATE` | Step 3 section constants replace monolithic `String.raw` prompt | Obsolete monolithic constant removed | 5.5, 11.1, 11.2 |
-| 5.2 | correct-course marker helper cleanup | `correctCourseWorkflow.ts` | Marker constants, `removeDelimitedBlock`, `removeConditionalMarkers` | Section assembly removes need for marker stripping | Dead helpers/constants removed | 11.2, 11.3, 11.4 |
-| 5.3 | correct-course Step 3 section assembly | `correctCourseWorkflow.ts` | `buildStep3PromptSource`, source indicator enum keys | Step 3 conditionally appends epic/story sections | No local workflow-value substitution added | 5.5, 11.1, 11.3 |
-| 5.4 | correct-course Step 3 prompt template inventory | `correctCourseWorkflow.ts` | Step 3 `promptTemplates` | Every static section returned by builder is listed | Obsolete promptTemplate reference removed | 11.1, 11.3 |
-| 5.5 | correct-course Step 3 tests | `correctCourseWorkflow.test.ts` | Test `includes Step 3 conditional sections only when source indicators are yes` | Existing prompt rendering helper covers each branch | Test terminology updated | 11.1 |
-| Task 6 | create-architecture requirements Steps 3-9 | `createArchitectureWorkflow.ts`; `createArchitectureWorkflow.test.ts`; `integration.test.ts` | Task owns Subtasks 6.1, 6.2, and 6.3 | Live Step 3-9 prompt constants, module tests, and integration projection tests verified | Subtasks replace stale prompt snippets and keep builders unchanged | 11.1, 11.2 |
-| 6.1 | create-architecture requirements Steps 3-9 source prompts | `createArchitectureWorkflow.ts` | `STEP_3_PROMPT` through `STEP_9_FINAL_PROMPT` | Existing Step 3-9 builders and promptTemplates consume these constants | No builder/promptTemplates changes prescribed | 6.2, 11.1, 11.2 |
-| 6.2 | create-architecture prompt tests | `createArchitectureWorkflow.test.ts` | Step 3-8 `promptExpectations`; Step 9 branch tests | Existing `buildPrompt` renders through shared renderer | No imports added | 11.1 |
-| 6.3 | create-architecture prompt integration fallout | `integration.test.ts` | Test `projects create-architecture current step details into the full-turn input payload only` | Full-turn payload and system prompt negative assertions match new Step 3 text | Stale Step 3 prompt projection assertions removed | 11.1 |
-| Task 7 | create-epics requirements Step 2 | `createEpicsWorkflow.ts`; `createEpicsToolSchemas.ts`; `createEpicsWorkflow.test.ts`; `createEpicsToolSchemas.test.ts`; `integration.test.ts` | Task owns Subtasks 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, and 7.10 | Live Step 2 prompt, schema, tests, and integration projection verified | Subtasks add `apply_patch` schema and remove stale forbidden assertions | 11.1, 11.3 |
-| 7.1 | create-epics requirements Step 2 tool schema | `createEpicsToolSchemas.ts` | `buildCreateEpicsApplyPatchToolSchema`, `buildCreateEpicsStep2ToolSchemas` | Step 2 schema order includes `apply_patch` after `upsert_epic` | No imports needed because `ClineDefaultTool` already imported | 7.6, 11.1, 11.3 |
-| 7.2 | create-epics requirements Step 2 prompt builder input | `createEpicsWorkflow.ts` | `WorkflowPromptBuilderInput` import | Step 2 builder will accept runtime prompt-builder input | Import added | 11.3, 11.4 |
-| 7.3 | create-epics requirements Step 2 source prompt | `createEpicsWorkflow.ts` | `CREATE_EPICS_STEP_2_REQUIRED_CONTEXT_PROMPT`, optional context line constants, `CREATE_EPICS_STEP_2_BODY_PROMPT` | Source prompt verbiage and optional list structure preserved | Obsolete full prompt constant replaced | 7.7, 7.8, 7.9, 11.1 |
-| 7.4 | create-epics Step 2 conditional assembly | `createEpicsWorkflow.ts` | `buildStep2PromptSource`, `contextLines` | Optional list items append only when backing values are non-empty | No local workflow-value substitution added | 7.8, 7.9, 11.1 |
-| 7.5 | create-epics prompt template inventory | `createEpicsWorkflow.ts` | Step 2 `promptTemplates` | Every static template/fragment returned by builder is listed | Obsolete promptTemplate reference removed | 11.1, 11.3 |
-| 7.6 | create-epics tool-schema tests | `createEpicsToolSchemas.test.ts` | `STEP_2_TOOL_NAMES`, `FORBIDDEN_STEP_2_TOOL_NAMES` | Exact schema order assertion matches requirements | `apply_patch` removed from forbidden list | 11.1 |
-| 7.7 | create-epics Step 2 prompt/schema test | `createEpicsWorkflow.test.ts` | Existing Step 2 prompt test; `step2ToolNames` | Prompt and schema assertions match source and tool requirements | `apply_patch` removed from forbidden loop | 11.1 |
-| 7.8 | create-epics absent optional context test | `createEpicsWorkflow.test.ts` | New absent optional context test | Renderer receives Step 2 template and no optional values | No imports added | 11.1 |
-| 7.9 | create-epics optional context branch test | `createEpicsWorkflow.test.ts` | New optional context branch test | Renderer covers brainstorming-only and additional-context-only branches | No imports added | 11.1 |
-| 7.10 | create-epics prompt integration fallout | `integration.test.ts` | Create-epics native tool projection test; create-epics current-step payload test | Full-turn payload, tool list, and system prompt negative assertions match new Step 2 text/schema | Stale prompt projection and forbidden `apply_patch` assertions removed | 11.1 |
-| Task 8 | create-story requirements prompt marker exclusion | `createStoryWorkflow.test.ts` | Task owns Subtask 8.1 | Live prompt-token helper verified | Subtask adds marker regression assertions only | 11.1 |
-| 8.1 | create-story requirements Step 2 and Step 3 marker exclusion | `createStoryWorkflow.test.ts` | `expectNoCreateStoryWorkflowPromptTokens` | Existing helper is used by Step 2, Step 3, and Step 4 prompt tests | No runtime edits; no imports added | 11.1 |
-| Task 9 | dev-story requirements Step 2 static/generated separation | `devStoryWorkflow.ts`; `devStoryWorkflow.test.ts` | Task owns Subtasks 9.1, 9.2, 9.3, and 9.4 | Live Step 2 static prompt, current-task generated detail, and tests verified | Subtasks remove obsolete marker/current-task placeholder from static template | 11.1, 11.2, 11.3 |
-| 9.1 | dev-story requirements Step 2 static prompt | `devStoryWorkflow.ts` | `DEV_STORY_STEP_2_STATIC_PROMPT_TEMPLATE`, `DEV_STORY_STEP_2_CURRENT_TASK_PROMPT_SEPARATOR` | Static prompt excludes generated current task and marker prose | Obsolete marker prose not copied | 9.4, 11.1, 11.2 |
-| 9.2 | dev-story Step 2 initial branch assembly | `devStoryWorkflow.ts` | `buildStep2PromptSource`, `currentTaskDetail` | Initial branch returns static template plus generated task detail | Task-loop branch preserved | 9.4, 11.1, 11.3 |
-| 9.3 | dev-story Step 2 prompt template inventory | `devStoryWorkflow.ts` | Step 2 `promptTemplates` | Static template only is listed | Obsolete prompt constant removed | 11.1, 11.3 |
-| 9.4 | dev-story testing requirements | `devStoryWorkflow.test.ts` | `expectNoDevStoryWorkflowPromptTokens`, Step 2 initial prompt test | Existing helper covers initial and task-loop prompt tests | No imports added | 11.1 |
-| Task 10 | pi-planning requirements Steps 2-5 | `piPlanningWorkflow.ts`; `piPlanningWorkflow.test.ts`; `integration.test.ts` | Task owns Subtasks 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 10.8, 10.9, 10.10, 10.11, and 10.12 | Live Step 2-5 prompt constants, builders, templates, tests, and integration projection verified | Subtasks remove obsolete full-prompt constants and stale branch-label assertions | 11.1, 11.2, 11.3 |
-| 10.1 | pi-planning requirements Step 2 source prompt sections | `piPlanningWorkflow.ts` | `PI_PLANNING_STEP_2_BASE_PROMPT_TEMPLATE`, secondary context constants, `PI_PLANNING_STEP_2_ASSESSMENT_PROMPT_TEMPLATE` | One base section, one conditional secondary context block, one assessment section | Four obsolete Step 2 full-prompt constants removed; no `Additional Context` label | 10.9, 10.11, 10.12, 11.1, 11.2 |
-| 10.2 | pi-planning requirements Steps 3-5 source prompt sections | `piPlanningWorkflow.ts` | `PI_PLANNING_STEP_3_EXISTING_STORY_INDEX_PROMPT_TEMPLATE`, `PI_PLANNING_STEP_3_BODY_PROMPT_TEMPLATE`, `PI_PLANNING_STEP_4_EXISTING_STORY_INDEX_PROMPT_TEMPLATE`, `PI_PLANNING_STEP_4_NEW_STORY_INDEX_PROMPT_TEMPLATE`, `PI_PLANNING_STEP_4_STORY_INDEX_LOCATION_PROMPT_TEMPLATE`, `PI_PLANNING_STEP_5_EXISTING_STORY_INDEX_PROMPT_TEMPLATE`, `PI_PLANNING_STEP_5_NEW_STORY_INDEX_PROMPT_TEMPLATE`, `PI_PLANNING_STEP_5_STORY_FILES_LOCATION_PROMPT_TEMPLATE` | Source prompt text replaces recast branch labels | Six obsolete Step 3-5 full-prompt constants removed | 10.9, 10.10, 11.1, 11.2 |
-| 10.3 | pi-planning Step 2 conditional assembly | `piPlanningWorkflow.ts` | `buildStep2PromptSource`, `secondaryContextLines` | Secondary context header appears only when at least one optional value exists | No local workflow-value substitution added | 10.11, 10.12, 11.1 |
-| 10.4 | pi-planning Step 3 conditional assembly | `piPlanningWorkflow.ts` | `buildStep3PromptSource`, `storiesIndexExistedAtWorkflowStart`, `promptSections` | Existing-story-file instruction appears only when story index existed at workflow start | No local workflow-value substitution added | 10.9, 10.10, 11.1 |
-| 10.5 | pi-planning Step 4 conditional assembly | `piPlanningWorkflow.ts` | `buildStep4PromptSource`, `branchPromptTemplate` | Existing-index and new-index branches are selected by `stories_index_existed_at_workflow_start` | No local workflow-value substitution added | 10.9, 10.10, 11.1 |
-| 10.6 | pi-planning Step 5 conditional assembly | `piPlanningWorkflow.ts` | `buildStep5PromptSource`, `branchPromptTemplate` | Existing-index and new-index branches are selected by `stories_index_existed_at_workflow_start` | No local workflow-value substitution added | 10.9, 10.10, 11.1 |
-| 10.7 | pi-planning Step 2 prompt template inventory | `piPlanningWorkflow.ts` | Step 2 `promptTemplates` | Every static Step 2 section/fragment used by builder is listed | Obsolete Step 2 constants removed | 11.1, 11.3 |
-| 10.8 | pi-planning Steps 3-5 prompt template inventory | `piPlanningWorkflow.ts` | Step 3, Step 4, and Step 5 `promptTemplates` | Every static Step 3-5 section/fragment used by builders is listed | Obsolete Step 3-5 constants removed | 11.1, 11.3 |
-| 10.9 | pi-planning module prompt test | `piPlanningWorkflow.test.ts` | `expectNoPiPlanningWorkflowPromptTokens`; `promptExpectations` in `renders Step 2 through Step 5 prompts...` | Existing helper renders through shared renderer | Stale prompt snippets and stale branch-label allowances replaced with source-backed snippets and forbidden-token coverage | 11.1 |
-| 10.10 | pi-planning Step 3-5 branch test | `piPlanningWorkflow.test.ts` | Test `uses stories_index_existed_at_workflow_start for Step 3 through Step 5 existing-index prompt branches` | Existing and new story-index prompt branches are asserted by source-backed branch snippets | Stale branch-label assertions removed | 11.1 |
-| 10.11 | pi-planning optional context test | `piPlanningWorkflow.test.ts` | New optional context branch test | Existing `buildPrompt`, `SAMPLE_WORKFLOW_VALUES`, and helper cover optional combinations | No imports added | 11.1 |
-| 10.12 | pi-planning prompt integration fallout | `integration.test.ts` | Test `projects pi-planning current step details into the full-turn input payload only` | Full-turn payload and system prompt negative assertions match new Step 2 text | Stale prompt projection assertions removed | 11.1 |
-| Task 11 | action-plan-guide validation | Validation commands | Task owns Subtasks 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, and 11.7 | Command paths and scripts verified | Scope and untracked guards prescribed | 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7 |
-| 11.1 | module-build-guide validation expectations | Validation command | Focused unit/integration test paths | Command paths exist in repo | Includes `integration.test.ts` and create-epics schema tests | 11.1 |
-| 11.2 | approved static guard requirements | Validation command | `rg` guard pattern and target files | Guard avoids `current_story_task_id` false positive through word-boundary pattern, includes every changed workflow file, and checks one-line `\n` prompt-body regressions | Guard includes acceptance-audit-review and blind-review workflow files | 11.2 |
-| 11.3 | repo typecheck gate | Validation command | `npm run check-types` | Script exists in `package.json` | None | 11.3 |
-| 11.4 | repo lint gate | Validation command | `npm run lint` | Script exists in `package.json` | None | 11.4 |
-| 11.5 | package validation requirement | Validation command | `npm run package` | Script exists in `package.json` | None | 11.5 |
-| 11.6 | action-plan-guide scope diff | Validation command | `git diff --name-only` allowlist | Allowlist includes every code/test file touched by subtasks | Integration and create-epics schema fallout included | 11.6 |
-| 11.7 | action-plan-guide untracked-file guard | Validation command | `git ls-files --others --exclude-standard` | Output must be empty | Broad module-patches exception removed | 11.7 |
+| Task 1 | module-build-guide Prompt Construction; runtime revisions acceptance-audit-review | `acceptanceAuditReviewWorkflow.ts` | Task owns Subtask 1.1 | Live Step 2 prompt constant formatting verified | Subtask 1.1 prescribes no helper/import fallout | 12.1, 12.3, 12.4, 12.5 |
+| 1.1 | module-build-guide Prompt Construction; runtime revisions acceptance-audit-review | `acceptanceAuditReviewWorkflow.ts` | `ACCEPTANCE_AUDIT_REVIEW_STEP_2_PROMPT`, `buildStep2PromptSource`, Step 2 `promptTemplates` | Step 2 returns `current_step_instruction_template` and existing test renders through `renderWorkflowPromptTemplate` | No imports/helpers removed; promptTemplates unchanged | 12.1, 12.3, 12.4, 12.5 |
+| Task 2 | module-build-guide Prompt Construction; runtime revisions blind-review | `blindReviewWorkflow.ts` | Task owns Subtask 2.1 | Live Step 2 prompt constant formatting verified | Subtask 2.1 prescribes no helper/import fallout | 12.1, 12.3, 12.4, 12.5 |
+| 2.1 | module-build-guide Prompt Construction; runtime revisions blind-review | `blindReviewWorkflow.ts` | `BLIND_REVIEW_STEP_2_PROMPT`, `buildStep2PromptSource`, Step 2 `promptTemplates` | Step 2 returns `current_step_instruction_template` and existing test renders through `renderWorkflowPromptTemplate` | No imports/helpers removed; promptTemplates unchanged | 12.1, 12.3, 12.4, 12.5 |
+| Task 3 | brainstorming requirements Step 3 | `brainstormingWorkflow.ts`; `brainstormingWorkflow.test.ts` | Task owns Subtasks 3.1, 3.2, 3.3, and 3.4 | Live Step 3 branch builder, templates, and tests verified | Subtasks preserve two-variant structure and update prompt assertions | 12.1, 12.2, 12.3 |
+| 3.1 | brainstorming requirements Step 3 | `brainstormingWorkflow.ts` | `STEP_3_SHARED_FACILITATION_PROMPT`, `BRAINSTORMING_STEP_3_SUGGEST_PROMPT_TEMPLATE`, `BRAINSTORMING_STEP_3_STANDARD_PROMPT_TEMPLATE` | Existing two-variant prompt constants are live in Step 3 | No imports/helpers removed | 3.4, 12.1, 12.2 |
+| 3.2 | brainstorming requirements Step 3 | `brainstormingWorkflow.ts` | `buildStep3PromptSource`, `readSelectedApproach`, `BrainstormingSelectedApproach.Suggest` | Step 3 receives `WorkflowPromptBuilderInput` and returns `current_step_instruction_template` | No local workflow-value substitution added | 3.4, 12.1, 12.3 |
+| 3.3 | brainstorming requirements Step 3 prompt template inventory | `brainstormingWorkflow.ts` | Step 3 `promptTemplates` | Step 3 templates are two complete branch templates | No imports added | 12.1, 12.3 |
+| 3.4 | brainstorming testing requirements | `brainstormingWorkflow.test.ts` | Test `builds Step 3 prompt and tool variants and routes workflow progress decisions` | Existing helper renders through shared renderer | No imports added | 12.1 |
+| Task 4 | code-review requirements Step 2 and Step 4 | `codeReviewWorkflow.ts`; `codeReviewWorkflow.test.ts` | Task owns Subtasks 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, and 4.7 | Live Step 2 generated-content branch and Step 4 conditional branches verified | Subtasks remove marker text and separate generated missing-output content | 12.1, 12.2, 12.3 |
+| 4.1 | code-review requirements Step 4 upstream prompt | `codeReviewWorkflow.ts` | `CODE_REVIEW_STEP_4_UPSTREAM_FAILURE_PROMPT` | Step 4 branch appends upstream fragment conditionally | Marker-only lines removed | 4.7, 12.1, 12.2 |
+| 4.2 | code-review requirements Step 4 remediation prompt | `codeReviewWorkflow.ts` | `CODE_REVIEW_STEP_4_REMEDIATION_STORY_PROMPT` | Step 4 branch appends remediation fragment conditionally | Marker-only lines removed | 4.7, 12.1, 12.2 |
+| 4.3 | code-review generated missing-output content requirement | `codeReviewWorkflow.ts` | `CODE_REVIEW_STEP_2_MISSING_SUBAGENT_OUTPUT_HEADER`, `CODE_REVIEW_STEP_2_MISSING_SUBAGENT_OUTPUT_INSTRUCTION` | Step 2 missing-output static text is separated from generated file list | No imports added | 4.6, 12.1 |
+| 4.4 | code-review Step 2 missing-output branch | `codeReviewWorkflow.ts` | `buildStep2PromptSource`, `missingSubagentOutputFiles` | Generated missing-file list remains runtime content | Generated list excluded from promptTemplates | 4.6, 12.1, 12.3 |
+| 4.5 | code-review Step 2 prompt template inventory | `codeReviewWorkflow.ts` | Step 2 `promptTemplates` | Static templates only are listed | Generated missing list excluded | 12.1, 12.3 |
+| 4.6 | code-review Step 2 tests | `codeReviewWorkflow.test.ts` | `missingPrompt` assertions | Existing helper renders through shared renderer | No imports added | 12.1 |
+| 4.7 | code-review Step 4 tests | `codeReviewWorkflow.test.ts` | `basePrompt`, `upstreamPrompt`, `remediationPrompt` assertions | Existing helper renders through shared renderer | No imports added | 12.1 |
+| Task 5 | correct-course requirements Step 3 | `correctCourseWorkflow.ts`; `correctCourseWorkflow.test.ts` | Task owns Subtasks 5.1, 5.2, 5.3, 5.4, and 5.5 | Live Step 3 monolithic prompt, marker helpers, and tests verified | Subtasks remove marker helpers and obsolete monolithic prompt | 12.1, 12.2, 12.3, 12.4 |
+| 5.1 | correct-course requirements Step 3 source sections | `correctCourseWorkflow.ts` | `CORRECT_COURSE_STEP_3_BASE_PROMPT_TEMPLATE`, `CORRECT_COURSE_STEP_3_EPIC_SOURCE_PROMPT_TEMPLATE`, `CORRECT_COURSE_STEP_3_STORY_SOURCE_PROMPT_TEMPLATE`, `CORRECT_COURSE_STEP_3_FINAL_PROMPT_TEMPLATE` | Step 3 section constants replace monolithic `String.raw` prompt | Obsolete monolithic constant removed | 5.5, 12.1, 12.2 |
+| 5.2 | correct-course marker helper cleanup | `correctCourseWorkflow.ts` | Marker constants, `removeDelimitedBlock`, `removeConditionalMarkers` | Section assembly removes need for marker stripping | Dead helpers/constants removed | 12.2, 12.3, 12.4 |
+| 5.3 | correct-course Step 3 section assembly | `correctCourseWorkflow.ts` | `buildStep3PromptSource`, source indicator enum keys | Step 3 conditionally appends epic/story sections | No local workflow-value substitution added | 5.5, 12.1, 12.3 |
+| 5.4 | correct-course Step 3 prompt template inventory | `correctCourseWorkflow.ts` | Step 3 `promptTemplates` | Every static section returned by builder is listed | Obsolete promptTemplate reference removed | 12.1, 12.3 |
+| 5.5 | correct-course Step 3 tests | `correctCourseWorkflow.test.ts` | Test `includes Step 3 conditional sections only when source indicators are yes` | Existing prompt rendering helper covers each branch | Test terminology updated | 12.1 |
+| Task 6 | create-architecture requirements Steps 3-9 | `createArchitectureWorkflow.ts`; `createArchitectureWorkflow.test.ts` | Task owns Subtasks 6.1 and 6.2 | Live Step 3-9 prompt constants and module tests verified | Subtasks replace stale prompt snippets and keep builders unchanged; integration fallout moved to Subtask 11.1 | 11.1, 12.1, 12.2 |
+| 6.1 | create-architecture requirements Steps 3-9 source prompts | `createArchitectureWorkflow.ts` | `STEP_3_PROMPT` through `STEP_9_FINAL_PROMPT` | Existing Step 3-9 builders and promptTemplates consume these constants | No builder/promptTemplates changes prescribed; integration fallout prescribed in 11.1 | 6.2, 11.1, 12.1, 12.2 |
+| 6.2 | create-architecture prompt tests | `createArchitectureWorkflow.test.ts` | Step 3-8 `promptExpectations`; Step 9 branch tests | Existing `buildPrompt` renders through shared renderer | No imports added; integration fallout prescribed in 11.1 | 12.1 |
+| Task 7 | create-epics requirements Step 2 | `createEpicsWorkflow.ts`; `createEpicsToolSchemas.ts`; `createEpicsWorkflow.test.ts`; `createEpicsToolSchemas.test.ts` | Task owns Subtasks 7.1 through 7.9 | Live Step 2 prompt, schema, and module tests verified | Subtasks use shared/default schema registry and remove stale forbidden assertions; integration fallout moved to Subtask 11.1 | 11.1, 12.1, 12.3 |
+| 7.1 | create-epics requirements Step 2 tool schema | `createEpicsToolSchemas.ts` | `ClineToolSet`, `registerClineToolSets`, `CREATE_EPICS_STEP_2_SHARED_TOOL_IDS_BEFORE_UPSERT_EPIC`, `CREATE_EPICS_STEP_2_SHARED_TOOL_IDS_AFTER_UPSERT_EPIC`, `resolveCreateEpicsSharedToolSpec`, `buildCreateEpicsStep2ToolSchemas`, `buildCreateEpicsUpsertEpicToolSchema` | Step 2 schema order resolves shared tools from registry and keeps local `upsert_epic` between `read_file` and `apply_patch` | Removes `AGENT_FEEDBACK_PARAMETER` import and deletes local shared/default builders | 7.6, 11.1, 12.1, 12.3 |
+| 7.2 | create-epics requirements Step 2 prompt builder input | `createEpicsWorkflow.ts` | `WorkflowPromptBuilderInput` import | Step 2 builder will accept runtime prompt-builder input | Import added | 12.3, 12.4 |
+| 7.3 | create-epics requirements Step 2 source prompt | `createEpicsWorkflow.ts` | `CREATE_EPICS_STEP_2_REQUIRED_CONTEXT_PROMPT`, optional context line constants, `CREATE_EPICS_STEP_2_BODY_PROMPT` | Source prompt verbiage and optional list structure preserved | Obsolete full prompt constant replaced; integration fallout prescribed in 11.1 | 7.7, 7.8, 7.9, 11.1, 12.1 |
+| 7.4 | create-epics Step 2 conditional assembly | `createEpicsWorkflow.ts` | `buildStep2PromptSource`, `contextLines` | Optional list items append only when backing values are non-empty | No local workflow-value substitution added | 7.8, 7.9, 12.1 |
+| 7.5 | create-epics prompt template inventory | `createEpicsWorkflow.ts` | Step 2 `promptTemplates` | Every static template/fragment returned by builder is listed | Obsolete promptTemplate reference removed | 12.1, 12.3 |
+| 7.6 | create-epics tool-schema tests | `createEpicsToolSchemas.test.ts` | `STEP_2_TOOL_NAMES`, `FORBIDDEN_STEP_2_TOOL_NAMES` | Exact schema order assertion matches requirements | `apply_patch` removed from forbidden list | 12.1 |
+| 7.7 | create-epics Step 2 prompt/schema test | `createEpicsWorkflow.test.ts` | Existing Step 2 prompt test; `step2ToolNames` | Prompt and schema assertions match source and tool requirements | `apply_patch` removed from forbidden loop | 12.1 |
+| 7.8 | create-epics absent optional context test | `createEpicsWorkflow.test.ts` | New absent optional context test | Renderer receives Step 2 template and no optional values | No imports added | 12.1 |
+| 7.9 | create-epics optional context branch test | `createEpicsWorkflow.test.ts` | New optional context branch test | Renderer covers brainstorming-only and additional-context-only branches | No imports added | 12.1 |
+| Task 8 | create-story requirements prompt marker exclusion | `createStoryWorkflow.test.ts` | Task owns Subtask 8.1 | Live prompt-token helper verified | Subtask adds marker regression assertions only | 12.1 |
+| 8.1 | create-story requirements Step 2 and Step 3 marker exclusion | `createStoryWorkflow.test.ts` | `expectNoCreateStoryWorkflowPromptTokens` | Existing helper is used by Step 2, Step 3, and Step 4 prompt tests | No runtime edits; no imports added | 12.1 |
+| Task 9 | dev-story requirements Step 2 static/generated separation | `devStoryWorkflow.ts`; `devStoryWorkflow.test.ts` | Task owns Subtasks 9.1, 9.2, 9.3, and 9.4 | Live Step 2 static prompt, current-task generated detail, and tests verified | Subtasks remove obsolete marker/current-task placeholder from static template | 12.1, 12.2, 12.3 |
+| 9.1 | dev-story requirements Step 2 static prompt | `devStoryWorkflow.ts` | `DEV_STORY_STEP_2_STATIC_PROMPT_TEMPLATE`, `DEV_STORY_STEP_2_CURRENT_TASK_PROMPT_SEPARATOR` | Static prompt excludes generated current task and marker prose | Obsolete marker prose not copied | 9.4, 12.1, 12.2 |
+| 9.2 | dev-story Step 2 initial branch assembly | `devStoryWorkflow.ts` | `buildStep2PromptSource`, `currentTaskDetail` | Initial branch returns static template plus generated task detail | Task-loop branch preserved | 9.4, 12.1, 12.3 |
+| 9.3 | dev-story Step 2 prompt template inventory | `devStoryWorkflow.ts` | Step 2 `promptTemplates` | Static template only is listed | Obsolete prompt constant removed | 12.1, 12.3 |
+| 9.4 | dev-story testing requirements | `devStoryWorkflow.test.ts` | `expectNoDevStoryWorkflowPromptTokens`, Step 2 initial prompt test | Existing helper covers initial and task-loop prompt tests | No imports added | 12.1 |
+| Task 10 | pi-planning requirements Steps 2-5 | `piPlanningWorkflow.ts`; `piPlanningWorkflow.test.ts` | Task owns Subtasks 10.1 through 10.11 | Live Step 2-5 prompt constants, builders, templates, and module tests verified | Subtasks remove obsolete full-prompt constants and stale branch-label assertions; integration fallout moved to Subtask 11.1 | 11.1, 12.1, 12.2, 12.3 |
+| 10.1 | pi-planning requirements Step 2 source prompt sections | `piPlanningWorkflow.ts` | `PI_PLANNING_STEP_2_BASE_PROMPT_TEMPLATE`, secondary context constants, `PI_PLANNING_STEP_2_ASSESSMENT_PROMPT_TEMPLATE` | One base section, one conditional secondary context block, one assessment section | Four obsolete Step 2 full-prompt constants removed; no `Additional Context` label; integration fallout prescribed in 11.1 | 10.9, 10.11, 11.1, 12.1, 12.2 |
+| 10.2 | pi-planning requirements Steps 3-5 source prompt sections | `piPlanningWorkflow.ts` | `PI_PLANNING_STEP_3_EXISTING_STORY_INDEX_PROMPT_TEMPLATE`, `PI_PLANNING_STEP_3_BODY_PROMPT_TEMPLATE`, `PI_PLANNING_STEP_4_EXISTING_STORY_INDEX_PROMPT_TEMPLATE`, `PI_PLANNING_STEP_4_NEW_STORY_INDEX_PROMPT_TEMPLATE`, `PI_PLANNING_STEP_4_STORY_INDEX_LOCATION_PROMPT_TEMPLATE`, `PI_PLANNING_STEP_5_EXISTING_STORY_INDEX_PROMPT_TEMPLATE`, `PI_PLANNING_STEP_5_NEW_STORY_INDEX_PROMPT_TEMPLATE`, `PI_PLANNING_STEP_5_STORY_FILES_LOCATION_PROMPT_TEMPLATE` | Source prompt text replaces recast branch labels | Six obsolete Step 3-5 full-prompt constants removed | 10.9, 10.10, 12.1, 12.2 |
+| 10.3 | pi-planning Step 2 conditional assembly | `piPlanningWorkflow.ts` | `buildStep2PromptSource`, `secondaryContextLines` | Secondary context header appears only when at least one optional value exists | No local workflow-value substitution added; integration fallout prescribed in 11.1 | 10.11, 11.1, 12.1 |
+| 10.4 | pi-planning Step 3 conditional assembly | `piPlanningWorkflow.ts` | `buildStep3PromptSource`, `storiesIndexExistedAtWorkflowStart`, `promptSections` | Existing-story-file instruction appears only when story index existed at workflow start | No local workflow-value substitution added | 10.9, 10.10, 12.1 |
+| 10.5 | pi-planning Step 4 conditional assembly | `piPlanningWorkflow.ts` | `buildStep4PromptSource`, `branchPromptTemplate` | Existing-index and new-index branches are selected by `stories_index_existed_at_workflow_start` | No local workflow-value substitution added | 10.9, 10.10, 12.1 |
+| 10.6 | pi-planning Step 5 conditional assembly | `piPlanningWorkflow.ts` | `buildStep5PromptSource`, `branchPromptTemplate` | Existing-index and new-index branches are selected by `stories_index_existed_at_workflow_start` | No local workflow-value substitution added | 10.9, 10.10, 12.1 |
+| 10.7 | pi-planning Step 2 prompt template inventory | `piPlanningWorkflow.ts` | Step 2 `promptTemplates` | Every static Step 2 section/fragment used by builder is listed | Obsolete Step 2 constants removed | 12.1, 12.3 |
+| 10.8 | pi-planning Steps 3-5 prompt template inventory | `piPlanningWorkflow.ts` | Step 3, Step 4, and Step 5 `promptTemplates` | Every static Step 3-5 section/fragment used by builders is listed | Obsolete Step 3-5 constants removed | 12.1, 12.3 |
+| 10.9 | pi-planning module prompt test | `piPlanningWorkflow.test.ts` | `expectNoPiPlanningWorkflowPromptTokens`; `promptExpectations` in `renders Step 2 through Step 5 prompts...` | Existing helper renders through shared renderer | Stale prompt snippets and stale branch-label allowances replaced with source-backed snippets and forbidden-token coverage | 12.1 |
+| 10.10 | pi-planning Step 3-5 branch test | `piPlanningWorkflow.test.ts` | Test `uses stories_index_existed_at_workflow_start for Step 3 through Step 5 existing-index prompt branches` | Existing and new story-index prompt branches are asserted by source-backed branch snippets | Stale branch-label assertions removed | 12.1 |
+| 10.11 | pi-planning optional context test | `piPlanningWorkflow.test.ts` | New optional context branch test | Existing `buildPrompt`, `SAMPLE_WORKFLOW_VALUES`, and helper cover optional combinations | No imports added | 12.1 |
+| Task 11 | action-plan-guide file-owned fallout requirement; prompt projection requirements | `integration.test.ts` | Task owns Subtask 11.1 | Live integration projection tests for create-architecture, create-epics, and pi-planning verified | Consolidates all `integration.test.ts` revisions into one file-owned subtask | 12.1 |
+| 11.1 | create-architecture/create-epics/pi-planning prompt projection fallout | `integration.test.ts` | Tests `projects create-architecture current step details into the full-turn input payload only`, `projects active create-epics Step 2 tools into native GPT-5 prompts`, `projects create-epics current step details into the full-turn input payload only`, and `projects pi-planning current step details into the full-turn input payload only` | Full-turn payload, system-prompt negative assertions, and native tool list assertions match revised module contracts | Removes stale Step 3, Step 2, and forbidden `apply_patch` integration assertions | 12.1 |
+| Task 12 | action-plan-guide validation | Validation commands | Task owns Subtasks 12.1 through 12.7 | Command paths and scripts verified | Scope and untracked guards prescribed | 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7 |
+| 12.1 | module-build-guide validation expectations | Validation command | Focused unit/integration test paths | Command paths exist in repo | Includes `integration.test.ts` and create-epics schema tests | 12.1 |
+| 12.2 | approved static guard requirements | Validation command | `rg` guard pattern and target files | Guard avoids `current_story_task_id` false positive through word-boundary pattern, includes every changed workflow file, and checks double-quoted or backtick one-line `\n` prompt-body regressions | Guard includes acceptance-audit-review and blind-review workflow files | 12.2 |
+| 12.3 | repo typecheck gate | Validation command | `npm run check-types` | Script exists in `package.json` | None | 12.3 |
+| 12.4 | repo lint gate | Validation command | `npm run lint` | Script exists in `package.json` | None | 12.4 |
+| 12.5 | package validation requirement | Validation command | `npm run package` | Script exists in `package.json` | None | 12.5 |
+| 12.6 | action-plan-guide scope diff | Validation command | `git diff --name-only` allowlist | Allowlist includes every code/test file touched by subtasks | Integration and create-epics schema fallout included | 12.6 |
+| 12.7 | action-plan-guide untracked-file guard | Validation command | `git ls-files --others --exclude-standard` | Output must be empty | Broad module-patches exception removed | 12.7 |
