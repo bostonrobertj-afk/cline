@@ -130,7 +130,7 @@ No imports are added or removed by this subtask.
 - [ ] Subtask 3.4. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`, inside test `builds Step 3 prompt and tool variants and routes workflow progress decisions`, add these exact assertions after `expect(suggestPrompt).to.include(OUTPUT_FILE)`:
 
 ```ts
-			expect(suggestPrompt).to.include("Goal: Guide an interactive brainstorming session")
+			expect(suggestPrompt).to.include("You have been called inside a workflow to conduct an interactive brainstorming session")
 			expect(suggestPrompt).to.include("Call `get_brainstorming_methods`")
 			expect(suggestPrompt).to.include("call `append_brainstorming_selected_technique`")
 			expect(suggestPrompt).to.include("Do not call `set_workflow_values` for `selected_techniques`.")
@@ -146,7 +146,7 @@ No imports are added or removed by this subtask.
 Add these exact assertions after `expect(choosePrompt).to.include(OUTPUT_FILE)`:
 
 ```ts
-		expect(choosePrompt).to.include("Goal: Guide an interactive brainstorming session")
+		expect(choosePrompt).to.include("You have been called inside a workflow to conduct an interactive brainstorming session")
 		expect(choosePrompt).to.include("Use the already selected brainstorming technique recorded")
 		expect(choosePrompt).not.to.include("Call `get_brainstorming_methods`")
 		expect(choosePrompt).not.to.include("call `append_brainstorming_selected_technique`")
@@ -530,6 +530,42 @@ In test `renders the Step 9 existing-document prompt without a change plan`, aft
 Do not add exact full-prompt equality assertions.
   - Allowed files:
     - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
+
+- [ ] Subtask 6.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`, inside test `projects create-architecture current step details into the full-turn input payload only`, replace these current Step 3 prompt assertions:
+
+```ts
+			expect(workflowInputPayloadBlock).to.include(`Read \`${CREATE_ARCHITECTURE_OUTPUT_FILE}\`.`)
+			expect(workflowInputPayloadBlock).to.include("Draft and propose content for Project Context Analysis")
+```
+
+with these exact assertions:
+
+```ts
+			expect(workflowInputPayloadBlock).to.include(
+				`Review ${CREATE_ARCHITECTURE_OUTPUT_FILE} and any additional files listed within it as relevant context.`,
+			)
+			expect(workflowInputPayloadBlock).to.include("project context analysis section")
+			expect(workflowInputPayloadBlock).to.include("If the existing is vague")
+```
+
+In the same test, replace these current `systemPrompt` negative assertions:
+
+```ts
+				expect(systemPrompt).to.not.include(`Read \`${CREATE_ARCHITECTURE_OUTPUT_FILE}\`.`)
+				expect(systemPrompt).to.not.include("Draft and propose content for Project Context Analysis")
+```
+
+with these exact assertions:
+
+```ts
+				expect(systemPrompt).to.not.include(
+					`Review ${CREATE_ARCHITECTURE_OUTPUT_FILE} and any additional files listed within it as relevant context.`,
+				)
+				expect(systemPrompt).to.not.include("project context analysis section")
+				expect(systemPrompt).to.not.include("If the existing is vague")
+```
+  - Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
 ## Task 7: Create Epics Step 2 Optional Context Sections
 
@@ -1385,7 +1421,7 @@ Mark this subtask complete only if the command exits successfully.
 - [ ] Subtask 11.2. Run this exact static guard command and confirm it returns no matches:
 
 ```sh
-! rg -n 'Conditional prompting|conditional prompt|Shown only if|end conditional|not provided|String.raw|\bcurrent_story_task\b|Offer challenges to to|Help the user to refine their topic and goals|Additional Context:|Story-index branch|Story-file branch|An existing story index is present|no story index existed at workflow start' src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts src/core/task/workflow-runtime/workflow-modules/correct-course/correctCourseWorkflow.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryWorkflow.ts src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts
+! rg -n 'Conditional prompting|conditional prompt|Shown only if|end conditional|not provided|String.raw|(_PROMPT|_PROMPT_TEMPLATE)(: [^=]+)? = ".*\\n|\bcurrent_story_task\b|Offer challenges to to|Help the user to refine their topic and goals|Additional Context:|Story-index branch|Story-file branch|An existing story index is present|no story index existed at workflow start' src/core/task/workflow-runtime/workflow-modules/acceptance-audit-review/acceptanceAuditReviewWorkflow.ts src/core/task/workflow-runtime/workflow-modules/blind-review/blindReviewWorkflow.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingWorkflow.ts src/core/task/workflow-runtime/workflow-modules/code-review/codeReviewWorkflow.ts src/core/task/workflow-runtime/workflow-modules/correct-course/correctCourseWorkflow.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/createArchitectureWorkflow.ts src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts src/core/task/workflow-runtime/workflow-modules/dev-story/devStoryWorkflow.ts src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts
 ```
 
 Mark this subtask complete only if the command exits successfully.
@@ -1491,9 +1527,10 @@ If any untracked file appears, stop and ask the user before proceeding.
 | 5.3 | correct-course Step 3 section assembly | `correctCourseWorkflow.ts` | `buildStep3PromptSource`, source indicator enum keys | Step 3 conditionally appends epic/story sections | No local workflow-value substitution added | 5.5, 11.1, 11.3 |
 | 5.4 | correct-course Step 3 prompt template inventory | `correctCourseWorkflow.ts` | Step 3 `promptTemplates` | Every static section returned by builder is listed | Obsolete promptTemplate reference removed | 11.1, 11.3 |
 | 5.5 | correct-course Step 3 tests | `correctCourseWorkflow.test.ts` | Test `includes Step 3 conditional sections only when source indicators are yes` | Existing prompt rendering helper covers each branch | Test terminology updated | 11.1 |
-| Task 6 | create-architecture requirements Steps 3-9 | `createArchitectureWorkflow.ts`; `createArchitectureWorkflow.test.ts` | Task owns Subtasks 6.1 and 6.2 | Live Step 3-9 prompt constants and tests verified | Subtasks replace stale prompt snippets and keep builders unchanged | 11.1, 11.2 |
+| Task 6 | create-architecture requirements Steps 3-9 | `createArchitectureWorkflow.ts`; `createArchitectureWorkflow.test.ts`; `integration.test.ts` | Task owns Subtasks 6.1, 6.2, and 6.3 | Live Step 3-9 prompt constants, module tests, and integration projection tests verified | Subtasks replace stale prompt snippets and keep builders unchanged | 11.1, 11.2 |
 | 6.1 | create-architecture requirements Steps 3-9 source prompts | `createArchitectureWorkflow.ts` | `STEP_3_PROMPT` through `STEP_9_FINAL_PROMPT` | Existing Step 3-9 builders and promptTemplates consume these constants | No builder/promptTemplates changes prescribed | 6.2, 11.1, 11.2 |
 | 6.2 | create-architecture prompt tests | `createArchitectureWorkflow.test.ts` | Step 3-8 `promptExpectations`; Step 9 branch tests | Existing `buildPrompt` renders through shared renderer | No imports added | 11.1 |
+| 6.3 | create-architecture prompt integration fallout | `integration.test.ts` | Test `projects create-architecture current step details into the full-turn input payload only` | Full-turn payload and system prompt negative assertions match new Step 3 text | Stale Step 3 prompt projection assertions removed | 11.1 |
 | Task 7 | create-epics requirements Step 2 | `createEpicsWorkflow.ts`; `createEpicsToolSchemas.ts`; `createEpicsWorkflow.test.ts`; `createEpicsToolSchemas.test.ts`; `integration.test.ts` | Task owns Subtasks 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, and 7.10 | Live Step 2 prompt, schema, tests, and integration projection verified | Subtasks add `apply_patch` schema and remove stale forbidden assertions | 11.1, 11.3 |
 | 7.1 | create-epics requirements Step 2 tool schema | `createEpicsToolSchemas.ts` | `buildCreateEpicsApplyPatchToolSchema`, `buildCreateEpicsStep2ToolSchemas` | Step 2 schema order includes `apply_patch` after `upsert_epic` | No imports needed because `ClineDefaultTool` already imported | 7.6, 11.1, 11.3 |
 | 7.2 | create-epics requirements Step 2 prompt builder input | `createEpicsWorkflow.ts` | `WorkflowPromptBuilderInput` import | Step 2 builder will accept runtime prompt-builder input | Import added | 11.3, 11.4 |
@@ -1527,7 +1564,7 @@ If any untracked file appears, stop and ask the user before proceeding.
 | 10.12 | pi-planning prompt integration fallout | `integration.test.ts` | Test `projects pi-planning current step details into the full-turn input payload only` | Full-turn payload and system prompt negative assertions match new Step 2 text | Stale prompt projection assertions removed | 11.1 |
 | Task 11 | action-plan-guide validation | Validation commands | Task owns Subtasks 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, and 11.7 | Command paths and scripts verified | Scope and untracked guards prescribed | 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7 |
 | 11.1 | module-build-guide validation expectations | Validation command | Focused unit/integration test paths | Command paths exist in repo | Includes `integration.test.ts` and create-epics schema tests | 11.1 |
-| 11.2 | approved static guard requirements | Validation command | `rg` guard pattern and target files | Guard avoids `current_story_task_id` false positive through word-boundary pattern | Guard includes changed workflow files | 11.2 |
+| 11.2 | approved static guard requirements | Validation command | `rg` guard pattern and target files | Guard avoids `current_story_task_id` false positive through word-boundary pattern, includes every changed workflow file, and checks one-line `\n` prompt-body regressions | Guard includes acceptance-audit-review and blind-review workflow files | 11.2 |
 | 11.3 | repo typecheck gate | Validation command | `npm run check-types` | Script exists in `package.json` | None | 11.3 |
 | 11.4 | repo lint gate | Validation command | `npm run lint` | Script exists in `package.json` | None | 11.4 |
 | 11.5 | package validation requirement | Validation command | `npm run package` | Script exists in `package.json` | None | 11.5 |
