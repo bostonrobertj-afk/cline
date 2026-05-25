@@ -223,7 +223,7 @@ Step 1 must be runtime-driven and must expose an empty tool schema through an ex
 
 The implementation must add a specialized backend workflow tool named `upsert_epic`.
 
-`upsert_epic` is the only model-facing write surface for adding or revising epics in `Epics.md`. The Step 2 prompt must not instruct the AI to use `apply_patch`, `build_workflow_document`, `set_workflow_values`, or raw markdown editing for epic creation.
+`upsert_epic` is the only model-facing write surface for adding epics in `Epics.md`.
 
 The tool must accept these required parameters:
 

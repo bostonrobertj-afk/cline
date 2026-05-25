@@ -253,7 +253,7 @@ Use the already selected brainstorming technique recorded in `{output_file}`.
 
 Then include these shared brainstorming facilitation instructions for both prompt variants:
 
-Goal: Guide an interactive brainstorming session from setup through technique selection, idea capture, and final organization, pausing whenever user input or confirmation is needed.
+`You have been called inside a workflow to conduct an interactive brainstorming session from setup through technique selection, idea capture, and final organization, pausing whenever user input or confirmation is needed.
 
 - Engage the user in interactive brainstorming using the selected approach.
 - Keep the user in control at each decision point. Pause for clarification, a technique switch, or continuation whenever needed. Record `techniques_used` and `ideas_generated` in `{output_file}` as needed.
