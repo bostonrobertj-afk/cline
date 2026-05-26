@@ -719,7 +719,7 @@ For new modules, prefer phases like:
 4. Workflow definition and registration.
 5. Prompt and tool projection verification.
 6. Cleanup and compatibility checks.
-7. Final validation and packaged smoke testing.
+7. Final validation testing.
 
 ## Common Failure Modes
 
