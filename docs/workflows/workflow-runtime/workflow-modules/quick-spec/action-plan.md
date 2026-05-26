@@ -158,49 +158,49 @@ Relevant requirements: Runtime Artifacts And Output Documents, Source Verbiage F
 
 After completing this phase, pause for QA review before moving to Phase 3.
 
-[ ] Task 5: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts`, add the module-owned initial quick-spec document builder.
+[x] Task 5: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts`, add the module-owned initial quick-spec document builder.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 5.1: Create `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts` with no imports.
+    [x] Subtask 5.1: Create `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts` with no imports.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 5.2: In `quickSpecDocument.ts`, export heading constants with exact names and values: `QUICK_SPEC_DOCUMENT_HEADING_PRODUCT_VISION = "Product Vision"`, `QUICK_SPEC_DOCUMENT_HEADING_USER_CONTEXT = "User Context"`, `QUICK_SPEC_DOCUMENT_HEADING_PROJECT_SCOPE = "Project Scope"`, `QUICK_SPEC_DOCUMENT_HEADING_BOUNDARIES_CONSTRAINTS = "Boundaries & Constraints"`, `QUICK_SPEC_DOCUMENT_HEADING_TECHNICAL_DECISIONS = "Technical Decisions"`, `QUICK_SPEC_DOCUMENT_HEADING_SOLUTION_OVERVIEW = "Solution Overview"`, `QUICK_SPEC_DOCUMENT_HEADING_ACCEPTANCE_CRITERIA = "Acceptance Criteria"`, `QUICK_SPEC_DOCUMENT_HEADING_CODE_MAP = "Code Map"`, `QUICK_SPEC_DOCUMENT_HEADING_SEQUENCING = "Sequencing"`, `QUICK_SPEC_DOCUMENT_HEADING_DEV_AGENT_INSTRUCTIONS = "Dev Agent Instructions"`, and `QUICK_SPEC_DOCUMENT_HEADING_IMPLEMENTATION_PHASES = "Implementation Phases"`.
+    [x] Subtask 5.2: In `quickSpecDocument.ts`, export heading constants with exact names and values: `QUICK_SPEC_DOCUMENT_HEADING_PRODUCT_VISION = "Product Vision"`, `QUICK_SPEC_DOCUMENT_HEADING_USER_CONTEXT = "User Context"`, `QUICK_SPEC_DOCUMENT_HEADING_PROJECT_SCOPE = "Project Scope"`, `QUICK_SPEC_DOCUMENT_HEADING_BOUNDARIES_CONSTRAINTS = "Boundaries & Constraints"`, `QUICK_SPEC_DOCUMENT_HEADING_TECHNICAL_DECISIONS = "Technical Decisions"`, `QUICK_SPEC_DOCUMENT_HEADING_SOLUTION_OVERVIEW = "Solution Overview"`, `QUICK_SPEC_DOCUMENT_HEADING_ACCEPTANCE_CRITERIA = "Acceptance Criteria"`, `QUICK_SPEC_DOCUMENT_HEADING_CODE_MAP = "Code Map"`, `QUICK_SPEC_DOCUMENT_HEADING_SEQUENCING = "Sequencing"`, `QUICK_SPEC_DOCUMENT_HEADING_DEV_AGENT_INSTRUCTIONS = "Dev Agent Instructions"`, and `QUICK_SPEC_DOCUMENT_HEADING_IMPLEMENTATION_PHASES = "Implementation Phases"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 5.3: In `quickSpecDocument.ts`, export `QUICK_SPEC_DOCUMENT_HEADINGS: readonly string[]` in this exact order: `QUICK_SPEC_DOCUMENT_HEADING_PRODUCT_VISION`, `QUICK_SPEC_DOCUMENT_HEADING_USER_CONTEXT`, `QUICK_SPEC_DOCUMENT_HEADING_PROJECT_SCOPE`, `QUICK_SPEC_DOCUMENT_HEADING_BOUNDARIES_CONSTRAINTS`, `QUICK_SPEC_DOCUMENT_HEADING_TECHNICAL_DECISIONS`, `QUICK_SPEC_DOCUMENT_HEADING_SOLUTION_OVERVIEW`, `QUICK_SPEC_DOCUMENT_HEADING_ACCEPTANCE_CRITERIA`, `QUICK_SPEC_DOCUMENT_HEADING_CODE_MAP`, `QUICK_SPEC_DOCUMENT_HEADING_SEQUENCING`, `QUICK_SPEC_DOCUMENT_HEADING_DEV_AGENT_INSTRUCTIONS`, `QUICK_SPEC_DOCUMENT_HEADING_IMPLEMENTATION_PHASES`.
+    [x] Subtask 5.3: In `quickSpecDocument.ts`, export `QUICK_SPEC_DOCUMENT_HEADINGS: readonly string[]` in this exact order: `QUICK_SPEC_DOCUMENT_HEADING_PRODUCT_VISION`, `QUICK_SPEC_DOCUMENT_HEADING_USER_CONTEXT`, `QUICK_SPEC_DOCUMENT_HEADING_PROJECT_SCOPE`, `QUICK_SPEC_DOCUMENT_HEADING_BOUNDARIES_CONSTRAINTS`, `QUICK_SPEC_DOCUMENT_HEADING_TECHNICAL_DECISIONS`, `QUICK_SPEC_DOCUMENT_HEADING_SOLUTION_OVERVIEW`, `QUICK_SPEC_DOCUMENT_HEADING_ACCEPTANCE_CRITERIA`, `QUICK_SPEC_DOCUMENT_HEADING_CODE_MAP`, `QUICK_SPEC_DOCUMENT_HEADING_SEQUENCING`, `QUICK_SPEC_DOCUMENT_HEADING_DEV_AGENT_INSTRUCTIONS`, `QUICK_SPEC_DOCUMENT_HEADING_IMPLEMENTATION_PHASES`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 5.4: In `quickSpecDocument.ts`, export `function buildInitialQuickSpecDocument(): string` returning `` `${QUICK_SPEC_DOCUMENT_HEADINGS.map((heading) => `# ${heading}`).join("\n\n")}\n` ``. Do not read files, import markdown templates, import `.cline/skills`, import `fs`, import `path`, add frontmatter, add title/slug/date/status fields, or reference `tech-spec-wip.md`.
+    [x] Subtask 5.4: In `quickSpecDocument.ts`, export `function buildInitialQuickSpecDocument(): string` returning `` `${QUICK_SPEC_DOCUMENT_HEADINGS.map((heading) => `# ${heading}`).join("\n\n")}\n` ``. Do not read files, import markdown templates, import `.cline/skills`, import `fs`, import `path`, add frontmatter, add title/slug/date/status fields, or reference `tech-spec-wip.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-[ ] Task 6: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`, add focused quick-spec document builder tests.
+[x] Task 6: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`, add focused quick-spec document builder tests.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 6.1: Create `quickSpecDocument.test.ts` with imports `expect` from `chai`, `describe` and `it` from `mocha`, and `QUICK_SPEC_DOCUMENT_HEADINGS` plus `buildInitialQuickSpecDocument` from `../quickSpecDocument`.
+    [x] Subtask 6.1: Create `quickSpecDocument.test.ts` with imports `expect` from `chai`, `describe` and `it` from `mocha`, and `QUICK_SPEC_DOCUMENT_HEADINGS` plus `buildInitialQuickSpecDocument` from `../quickSpecDocument`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 6.2: In `quickSpecDocument.test.ts`, add `const EXPECTED_INITIAL_QUICK_SPEC_DOCUMENT` with this exact string value:
+    [x] Subtask 6.2: In `quickSpecDocument.test.ts`, add `const EXPECTED_INITIAL_QUICK_SPEC_DOCUMENT` with this exact string value:
 
 ```ts
 `# Product Vision
@@ -231,44 +231,44 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 6.3: In `quickSpecDocument.test.ts`, add a test named `builds the initial quick-spec heading shell exactly` asserting `buildInitialQuickSpecDocument()` equals `EXPECTED_INITIAL_QUICK_SPEC_DOCUMENT`, `buildInitialQuickSpecDocument().match(/^# /gm)` has length `QUICK_SPEC_DOCUMENT_HEADINGS.length`, and `QUICK_SPEC_DOCUMENT_HEADINGS` deep-equals `["Product Vision", "User Context", "Project Scope", "Boundaries & Constraints", "Technical Decisions", "Solution Overview", "Acceptance Criteria", "Code Map", "Sequencing", "Dev Agent Instructions", "Implementation Phases"]`.
+    [x] Subtask 6.3: In `quickSpecDocument.test.ts`, add a test named `builds the initial quick-spec heading shell exactly` asserting `buildInitialQuickSpecDocument()` equals `EXPECTED_INITIAL_QUICK_SPEC_DOCUMENT`, `buildInitialQuickSpecDocument().match(/^# /gm)` has length `QUICK_SPEC_DOCUMENT_HEADINGS.length`, and `QUICK_SPEC_DOCUMENT_HEADINGS` deep-equals `["Product Vision", "User Context", "Project Scope", "Boundaries & Constraints", "Technical Decisions", "Solution Overview", "Acceptance Criteria", "Code Map", "Sequencing", "Dev Agent Instructions", "Implementation Phases"]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 6.4: In `quickSpecDocument.test.ts`, add a test named `does not preserve legacy quick-spec scaffold text` asserting the generated document does not include any of these strings: `"tech-spec-wip.md"`, `"title:"`, `"slug:"`, `"date:"`, `"status:"`, `"quick-spec.md"`, `"*** begin quick spec template example ***"`, and `"*** end quick spec template example ***"`.
+    [x] Subtask 6.4: In `quickSpecDocument.test.ts`, add a test named `does not preserve legacy quick-spec scaffold text` asserting the generated document does not include any of these strings: `"tech-spec-wip.md"`, `"title:"`, `"slug:"`, `"date:"`, `"status:"`, `"quick-spec.md"`, `"*** begin quick spec template example ***"`, and `"*** end quick spec template example ***"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-[ ] Task 7: In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`, run Phase 2 validation.
+[x] Task 7: In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`, run Phase 2 validation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 7.1: Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`.
+    [x] Subtask 7.1: Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 7.2: Run `npm run check-types`. If it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` before treating the failure as a code defect.
+    [x] Subtask 7.2: Run `npm run check-types`. If it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` before treating the failure as a code defect.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 7.3: Run `npm run lint`.
+    [x] Subtask 7.3: Run `npm run lint`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 7.4: Run `rg -n "fs|readFile|readFileSync|\\.cline/skills|quick-spec\\.md|tech-spec-wip\\.md|title:|slug:|date:|status:" src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts` and confirm it returns no matches; exit code `1` with no output is success for this no-match guard.
+    [x] Subtask 7.4: Run `rg -n "fs|readFile|readFileSync|\\.cline/skills|quick-spec\\.md|tech-spec-wip\\.md|title:|slug:|date:|status:" src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts` and confirm it returns no matches; exit code `1` with no output is success for this no-match guard.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 7.5: Run `git diff --name-only` and `git ls-files --others --exclude-standard`; confirm persistent diffs and untracked files are limited to Phase 1 and Phase 2 authorized files: `src/core/task/workflow-runtime/artifactFamilies.ts`, `src/core/task/workflow-runtime/types.ts`, `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`, and this action plan.
+    [x] Subtask 7.5: Run `git diff --name-only` and `git ls-files --others --exclude-standard`; confirm persistent diffs and untracked files are limited to Phase 1 and Phase 2 authorized files: `src/core/task/workflow-runtime/artifactFamilies.ts`, `src/core/task/workflow-runtime/types.ts`, `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`, and this action plan.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
