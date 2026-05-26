@@ -443,6 +443,7 @@ export type WorkflowArtifactDefinition =
 				| WorkflowArtifactFamily.EpicsIndex
 				| WorkflowArtifactFamily.BrainstormingSession
 				| WorkflowArtifactFamily.ArchitectureDocument
+				| WorkflowArtifactFamily.QuickSpec
 			intentMode: "new"
 			parentIdentitySource: undefined
 			targetIdentitySource: undefined

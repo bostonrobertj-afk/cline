@@ -6410,6 +6410,7 @@ export class WorkflowRuntime {
 			case WorkflowArtifactFamily.EpicsIndex:
 			case WorkflowArtifactFamily.BrainstormingSession:
 			case WorkflowArtifactFamily.ArchitectureDocument:
+			case WorkflowArtifactFamily.QuickSpec:
 				if (normalizedIdentity === args.familyDefinition.singletonIdentity) {
 					return args.familyDefinition.singletonIdentity
 				}
@@ -6734,7 +6735,8 @@ export class WorkflowRuntime {
 			case WorkflowArtifactFamily.Epics:
 			case WorkflowArtifactFamily.EpicsIndex:
 			case WorkflowArtifactFamily.BrainstormingSession:
-			case WorkflowArtifactFamily.ArchitectureDocument: {
+			case WorkflowArtifactFamily.ArchitectureDocument:
+			case WorkflowArtifactFamily.QuickSpec: {
 				if (args.familyDefinition.allocationMode !== "singleton_project") {
 					throw new Error(`Workflow artifact ${args.artifactDefinition.id} requires a singleton project family.`)
 				}
@@ -7169,6 +7171,7 @@ export class WorkflowRuntime {
 			case WorkflowArtifactFamily.EpicsIndex:
 			case WorkflowArtifactFamily.BrainstormingSession:
 			case WorkflowArtifactFamily.ArchitectureDocument:
+			case WorkflowArtifactFamily.QuickSpec:
 			case WorkflowArtifactFamily.ChangeManagementPlan:
 				return undefined
 			case WorkflowArtifactFamily.EpicDeliverySpec:

@@ -17,7 +17,7 @@ The module produces one runtime-owned singleton project artifact, `quick-spec.md
 
 Approved implementation decisions derived from the requirements and module build guide:
 
-- The new `quick_spec` artifact family is runtime-owned in `artifactFamilies.ts` and `types.ts`.
+- The new `quick_spec` artifact family is runtime-owned in `artifactFamilies.ts`, `types.ts`, and `WorkflowRuntime.ts` singleton-family resolution switches.
 - The quick-spec module owns metadata, persona, form definition, prompts, decision trees, document shell rendering, and tool-schema selection.
 - The quick-spec tool schemas resolve normal shared/default tools through `ClineToolSet.getToolByNameWithFallback(..., ModelFamily.NATIVE_GPT_5)`.
 - The Step 2 conditional prompt uses named section assembly and must not render source-authoring conditional markers.
@@ -54,81 +54,100 @@ Relevant requirements: Runtime Artifacts And Output Documents, Expected Implemen
 
 After completing this phase, pause for QA review before moving to Phase 2.
 
-[ ] Task 1: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`, register the runtime-owned quick-spec singleton artifact family.
+[x] Task 1: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`, register the runtime-owned quick-spec singleton artifact family.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 1.1: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`, add enum member `QuickSpec = "quick_spec"` immediately after `ArchitectureDocument = "architecture_document"`.
+    [x] Subtask 1.1: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`, add enum member `QuickSpec = "quick_spec"` immediately after `ArchitectureDocument = "architecture_document"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 1.2: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`, add `| WorkflowArtifactFamily.QuickSpec` to `WorkflowSingletonProjectArtifactFamilyDefinition.family` and add `| "quick_spec"` to `WorkflowSingletonProjectArtifactFamilyDefinition.singletonIdentity`.
+    [x] Subtask 1.2: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`, add `| WorkflowArtifactFamily.QuickSpec` to `WorkflowSingletonProjectArtifactFamilyDefinition.family` and add `| "quick_spec"` to `WorkflowSingletonProjectArtifactFamilyDefinition.singletonIdentity`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 1.3: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`, add this registry entry immediately after `[WorkflowArtifactFamily.ArchitectureDocument]`: `{ family: WorkflowArtifactFamily.QuickSpec, allocationMode: "singleton_project", identityRequirement: "none", filenamePattern: "quick-spec.md", fileExtension: ".md", contentKind: "markdown", numberingScope: "project_singleton", singletonIdentity: "quick_spec", discoveryPattern: /^quick-spec\.md$/ }`.
+    [x] Subtask 1.3: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`, add this registry entry immediately after `[WorkflowArtifactFamily.ArchitectureDocument]`: `{ family: WorkflowArtifactFamily.QuickSpec, allocationMode: "singleton_project", identityRequirement: "none", filenamePattern: "quick-spec.md", fileExtension: ".md", contentKind: "markdown", numberingScope: "project_singleton", singletonIdentity: "quick_spec", discoveryPattern: /^quick-spec\.md$/ }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/artifactFamilies.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-[ ] Task 2: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`, extend the workflow artifact definition union for quick-spec singleton artifacts.
+[x] Task 2: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts` and `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`, extend the workflow artifact definition union and runtime singleton-family switch logic for quick-spec singleton artifacts.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
+
+    [x] Subtask 2.1: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`, add `| WorkflowArtifactFamily.QuickSpec` to the first `WorkflowArtifactDefinition` union member's `family` union that currently includes `WorkflowArtifactFamily.Epics`, `WorkflowArtifactFamily.EpicsIndex`, `WorkflowArtifactFamily.BrainstormingSession`, and `WorkflowArtifactFamily.ArchitectureDocument`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 2.1: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`, add `| WorkflowArtifactFamily.QuickSpec` to the first `WorkflowArtifactDefinition` union member's `family` union that currently includes `WorkflowArtifactFamily.Epics`, `WorkflowArtifactFamily.EpicsIndex`, `WorkflowArtifactFamily.BrainstormingSession`, and `WorkflowArtifactFamily.ArchitectureDocument`.
+    [x] Subtask 2.2: In `WorkflowRuntime.ts`, in `normalizeExistingProjectArtifactIdentity(...)`, add `case WorkflowArtifactFamily.QuickSpec:` immediately after `case WorkflowArtifactFamily.ArchitectureDocument:` so quick-spec uses the existing singleton identity comparison branch.
 
 Allowed files:
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-[ ] Task 3: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add runtime artifact-family coverage for `quick_spec`.
+    [x] Subtask 2.3: In `WorkflowRuntime.ts`, in `resolveWorkflowArtifactIdentity(...)`, add `case WorkflowArtifactFamily.QuickSpec:` immediately after `case WorkflowArtifactFamily.ArchitectureDocument:` so quick-spec uses the existing singleton allocation branch that returns `artifactIdentity: args.familyDefinition.singletonIdentity`, `parentIdentity: undefined`, and `targetIdentity: undefined`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
+
+    [x] Subtask 2.4: In `WorkflowRuntime.ts`, in `parseWorkflowArtifactFilenameIdentity(...)`, add `case WorkflowArtifactFamily.QuickSpec:` immediately after `case WorkflowArtifactFamily.ArchitectureDocument:` so quick-spec is treated as a singleton/no-parsed-identity artifact and returns `undefined`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
+
+[x] Task 3: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add runtime artifact-family coverage for `quick_spec`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 3.1: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, in the `allocates and creates canonical workflow artifacts with persisted output values` test, add `const quickSpecKeys = createStandaloneArtifactOutputValueKeys("quick_spec")`; include `quickSpecKeys` in `collectArtifactOutputWorkflowValueKeys(...)`; add artifact definition key `quick_spec_doc` with `id: "quick_spec_doc"`, `family: WorkflowArtifactFamily.QuickSpec`, `intentMode: "new"`, `parentIdentitySource: undefined`, `targetIdentitySource: undefined`, and `outputValueKeys: quickSpecKeys`; call `runtime.createWorkflowArtifact({ taskState, artifactId: "quick_spec_doc", expectedArtifactAbsolutePath: undefined })`; assert the result includes `artifactIdentity: "quick_spec"`, `artifactFilename: "quick-spec.md"`, `artifactRelativePath: join("planning", "quick-spec.md")`, `artifactAbsolutePath: join(cwd, "docs", "projects", "artifact-allocation-project", "planning", "quick-spec.md")`, `parentIdentity: undefined`, and `targetIdentity: undefined`; call `await access(quickSpecResult.artifactAbsolutePath)`; and assert active workflow values include `[quickSpecKeys.artifactFamily]: WorkflowArtifactFamily.QuickSpec`, `[quickSpecKeys.artifactIdentity]: "quick_spec"`, and `[quickSpecKeys.artifactFilename]: "quick-spec.md"`.
+    [x] Subtask 3.1: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, in the `allocates and creates canonical workflow artifacts with persisted output values` test, add `const quickSpecKeys = createStandaloneArtifactOutputValueKeys("quick_spec")`; include `quickSpecKeys` in `collectArtifactOutputWorkflowValueKeys(...)`; add artifact definition key `quick_spec_doc` with `id: "quick_spec_doc"`, `family: WorkflowArtifactFamily.QuickSpec`, `intentMode: "new"`, `parentIdentitySource: undefined`, `targetIdentitySource: undefined`, and `outputValueKeys: quickSpecKeys`; call `runtime.createWorkflowArtifact({ taskState, artifactId: "quick_spec_doc", expectedArtifactAbsolutePath: undefined })`; assert the result includes `artifactIdentity: "quick_spec"`, `artifactFilename: "quick-spec.md"`, `artifactRelativePath: join("planning", "quick-spec.md")`, `artifactAbsolutePath: join(cwd, "docs", "projects", "artifact-allocation-project", "planning", "quick-spec.md")`, `parentIdentity: undefined`, and `targetIdentity: undefined`; call `await access(quickSpecResult.artifactAbsolutePath)`; and assert active workflow values include `[quickSpecKeys.artifactFamily]: WorkflowArtifactFamily.QuickSpec`, `[quickSpecKeys.artifactIdentity]: "quick_spec"`, and `[quickSpecKeys.artifactFilename]: "quick-spec.md"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 3.2: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add a test named `allocates the quick-spec singleton artifact in planning and maps its absolute path to output_document`. The test must create `const quickSpecKeys = { ...createStandaloneArtifactOutputValueKeys("quick_spec"), artifactAbsolutePath: "output_document" }`, create a workflow with `projectSubfolder: "planning"`, `workflowValueKeys: collectArtifactOutputWorkflowValueKeys(quickSpecKeys)`, and artifact `quick_spec` using `WorkflowArtifactFamily.QuickSpec`; activate it, submit new project selection `"Quick Spec Artifact Project"`, call `runtime.createWorkflowArtifact({ taskState, artifactId: "quick_spec", expectedArtifactAbsolutePath: undefined })`, and assert the result includes identity `quick_spec`, filename `quick-spec.md`, relative path `join("planning", "quick-spec.md")`, absolute path `join(cwd, "docs", "projects", "quick-spec-artifact-project", "planning", "quick-spec.md")`, `parentIdentity: undefined`, and `targetIdentity: undefined`. The test must assert workflow values include `[quickSpecKeys.artifactFamily]: WorkflowArtifactFamily.QuickSpec`, `[quickSpecKeys.artifactIdentity]: "quick_spec"`, `[quickSpecKeys.artifactFilename]: "quick-spec.md"`, and `output_document: artifactAbsolutePath`, then call `await access(artifactAbsolutePath)`.
+    [x] Subtask 3.2: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add a test named `allocates the quick-spec singleton artifact in planning and maps its absolute path to output_document`. The test must create `const quickSpecKeys = { ...createStandaloneArtifactOutputValueKeys("quick_spec"), artifactAbsolutePath: "output_document" }`, create a workflow with `projectSubfolder: "planning"`, `workflowValueKeys: collectArtifactOutputWorkflowValueKeys(quickSpecKeys)`, and artifact `quick_spec` using `WorkflowArtifactFamily.QuickSpec`; activate it, submit new project selection `"Quick Spec Artifact Project"`, call `runtime.createWorkflowArtifact({ taskState, artifactId: "quick_spec", expectedArtifactAbsolutePath: undefined })`, and assert the result includes identity `quick_spec`, filename `quick-spec.md`, relative path `join("planning", "quick-spec.md")`, absolute path `join(cwd, "docs", "projects", "quick-spec-artifact-project", "planning", "quick-spec.md")`, `parentIdentity: undefined`, and `targetIdentity: undefined`. The test must assert workflow values include `[quickSpecKeys.artifactFamily]: WorkflowArtifactFamily.QuickSpec`, `[quickSpecKeys.artifactIdentity]: "quick_spec"`, `[quickSpecKeys.artifactFilename]: "quick-spec.md"`, and `output_document: artifactAbsolutePath`, then call `await access(artifactAbsolutePath)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-[ ] Task 4: In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`, run Phase 1 validation.
+[x] Task 4: In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`, run Phase 1 validation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 4.1: Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`.
+    [x] Subtask 4.1: Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 4.2: Run `npm run check-types`. If it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` before treating the failure as a code defect.
+    [x] Subtask 4.2: Run `npm run check-types`. If it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` before treating the failure as a code defect.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 4.3: Run `npm run lint`.
+    [x] Subtask 4.3: Run `npm run lint`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 4.4: Run `git diff --name-only` and `git ls-files --others --exclude-standard`; confirm persistent diffs and untracked files are limited to Phase 1 authorized files: `src/core/task/workflow-runtime/artifactFamilies.ts`, `src/core/task/workflow-runtime/types.ts`, `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, and this action plan.
+    [x] Subtask 4.4: Run `git diff --name-only` and `git ls-files --others --exclude-standard`; confirm persistent diffs and untracked files are limited to Phase 1 authorized files: `src/core/task/workflow-runtime/artifactFamilies.ts`, `src/core/task/workflow-runtime/types.ts`, `src/core/task/workflow-runtime/WorkflowRuntime.ts`, `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, and this action plan.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`

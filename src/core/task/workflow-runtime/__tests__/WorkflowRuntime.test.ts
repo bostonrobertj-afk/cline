@@ -10894,6 +10894,7 @@ describe("WorkflowRuntime", () => {
 		discoverWorkflowCandidatesStub.restore()
 		const epicsKeys = createStandaloneArtifactOutputValueKeys("epics")
 		const epicsIndexKeys = createStandaloneArtifactOutputValueKeys("epics_index")
+		const quickSpecKeys = createStandaloneArtifactOutputValueKeys("quick_spec")
 		const deliverySpecKeys = createStandaloneArtifactOutputValueKeys("epic_delivery_spec")
 		const storyKeys = createParentedArtifactOutputValueKeys("story")
 		const remediationStoryKeys = createParentedArtifactOutputValueKeys("remediation_story")
@@ -10906,6 +10907,7 @@ describe("WorkflowRuntime", () => {
 			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(
 				epicsKeys,
 				epicsIndexKeys,
+				quickSpecKeys,
 				deliverySpecKeys,
 				storyKeys,
 				remediationStoryKeys,
@@ -10931,6 +10933,14 @@ describe("WorkflowRuntime", () => {
 					parentIdentitySource: undefined,
 					targetIdentitySource: undefined,
 					outputValueKeys: epicsIndexKeys,
+				},
+				quick_spec_doc: {
+					id: "quick_spec_doc",
+					family: WorkflowArtifactFamily.QuickSpec,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys: quickSpecKeys,
 				},
 				epic_delivery_spec_doc: {
 					id: "epic_delivery_spec_doc",
@@ -11034,6 +11044,11 @@ describe("WorkflowRuntime", () => {
 			artifactId: "epics_index_doc",
 			expectedArtifactAbsolutePath: undefined,
 		})
+		const quickSpecResult = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "quick_spec_doc",
+			expectedArtifactAbsolutePath: undefined,
+		})
 		await writeFile(
 			epicsIndexResult.artifactAbsolutePath,
 			JSON.stringify({
@@ -11096,6 +11111,14 @@ describe("WorkflowRuntime", () => {
 			artifactFilename: "Epics.index.json",
 			artifactRelativePath: join("planning", "Epics.index.json"),
 			artifactAbsolutePath: join(cwd, "docs", "projects", "artifact-allocation-project", "planning", "Epics.index.json"),
+			parentIdentity: undefined,
+			targetIdentity: undefined,
+		})
+		expect(quickSpecResult).to.deep.include({
+			artifactIdentity: "quick_spec",
+			artifactFilename: "quick-spec.md",
+			artifactRelativePath: join("planning", "quick-spec.md"),
+			artifactAbsolutePath: join(cwd, "docs", "projects", "artifact-allocation-project", "planning", "quick-spec.md"),
 			parentIdentity: undefined,
 			targetIdentity: undefined,
 		})
@@ -11215,6 +11238,7 @@ describe("WorkflowRuntime", () => {
 
 		await access(epicsResult.artifactAbsolutePath)
 		await access(epicsIndexResult.artifactAbsolutePath)
+		await access(quickSpecResult.artifactAbsolutePath)
 		await access(deliverySpecResult.artifactAbsolutePath)
 		await access(storyResult.artifactAbsolutePath)
 		await access(remediationStoryResult.artifactAbsolutePath)
@@ -11253,6 +11277,9 @@ describe("WorkflowRuntime", () => {
 				"planning",
 				"Epics.index.json",
 			),
+			[quickSpecKeys.artifactFamily]: WorkflowArtifactFamily.QuickSpec,
+			[quickSpecKeys.artifactIdentity]: "quick_spec",
+			[quickSpecKeys.artifactFilename]: "quick-spec.md",
 			[deliverySpecKeys.artifactFamily]: WorkflowArtifactFamily.EpicDeliverySpec,
 			[deliverySpecKeys.artifactIdentity]: "1",
 			[deliverySpecKeys.artifactFilename]: "Epic-1-delivery-spec.md",
@@ -11625,6 +11652,55 @@ describe("WorkflowRuntime", () => {
 			[architectureKeys.artifactIdentity]: "architecture_document",
 			[architectureKeys.artifactFilename]: "architecture.md",
 			output_file: artifactAbsolutePath,
+		})
+		await access(artifactAbsolutePath)
+	})
+
+	it("allocates the quick-spec singleton artifact in planning and maps its absolute path to output_document", async () => {
+		discoverWorkflowCandidatesStub.restore()
+		const quickSpecKeys = {
+			...createStandaloneArtifactOutputValueKeys("quick_spec"),
+			artifactAbsolutePath: "output_document",
+		}
+		const workflow = createWorkflowDefinition({
+			projectSubfolder: "planning",
+			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(quickSpecKeys),
+			artifacts: {
+				quick_spec: {
+					id: "quick_spec",
+					family: WorkflowArtifactFamily.QuickSpec,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys: quickSpecKeys,
+				},
+			},
+		})
+
+		await activateWorkflow(taskState, workflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Quick Spec Artifact Project")
+
+		const result = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "quick_spec",
+			expectedArtifactAbsolutePath: undefined,
+		})
+		const artifactAbsolutePath = join(cwd, "docs", "projects", "quick-spec-artifact-project", "planning", "quick-spec.md")
+
+		expect(result).to.deep.include({
+			artifactIdentity: "quick_spec",
+			artifactFilename: "quick-spec.md",
+			artifactRelativePath: join("planning", "quick-spec.md"),
+			artifactAbsolutePath,
+			parentIdentity: undefined,
+			targetIdentity: undefined,
+		})
+		expect(getActiveWorkflowSession(taskState).workflowValues).to.deep.include({
+			[quickSpecKeys.artifactFamily]: WorkflowArtifactFamily.QuickSpec,
+			[quickSpecKeys.artifactIdentity]: "quick_spec",
+			[quickSpecKeys.artifactFilename]: "quick-spec.md",
+			output_document: artifactAbsolutePath,
 		})
 		await access(artifactAbsolutePath)
 	})

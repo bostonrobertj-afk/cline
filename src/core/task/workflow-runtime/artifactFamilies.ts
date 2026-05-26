@@ -3,6 +3,7 @@ export enum WorkflowArtifactFamily {
 	EpicsIndex = "epics_index",
 	BrainstormingSession = "brainstorming_session",
 	ArchitectureDocument = "architecture_document",
+	QuickSpec = "quick_spec",
 	ChangeManagementPlan = "change_management_plan",
 	EpicDeliverySpec = "epic_delivery_spec",
 	EpicStoriesIndex = "epic_stories_index",
@@ -50,10 +51,11 @@ export interface WorkflowSingletonProjectArtifactFamilyDefinition extends Workfl
 		| WorkflowArtifactFamily.EpicsIndex
 		| WorkflowArtifactFamily.BrainstormingSession
 		| WorkflowArtifactFamily.ArchitectureDocument
+		| WorkflowArtifactFamily.QuickSpec
 	allocationMode: "singleton_project"
 	identityRequirement: "none"
 	numberingScope: "project_singleton"
-	singletonIdentity: "epics" | "epics_index" | "brainstorming_session" | "architecture_document"
+	singletonIdentity: "epics" | "epics_index" | "brainstorming_session" | "architecture_document" | "quick_spec"
 }
 
 export interface WorkflowEpicIndexDerivedArtifactFamilyDefinition extends WorkflowArtifactFamilyDefinitionBase {
@@ -140,6 +142,17 @@ export const WORKFLOW_ARTIFACT_FAMILY_REGISTRY: Readonly<Record<WorkflowArtifact
 		numberingScope: "project_singleton",
 		singletonIdentity: "architecture_document",
 		discoveryPattern: /^architecture\.md$/,
+	},
+	[WorkflowArtifactFamily.QuickSpec]: {
+		family: WorkflowArtifactFamily.QuickSpec,
+		allocationMode: "singleton_project",
+		identityRequirement: "none",
+		filenamePattern: "quick-spec.md",
+		fileExtension: ".md",
+		contentKind: "markdown",
+		numberingScope: "project_singleton",
+		singletonIdentity: "quick_spec",
+		discoveryPattern: /^quick-spec\.md$/,
 	},
 	[WorkflowArtifactFamily.ChangeManagementPlan]: {
 		family: WorkflowArtifactFamily.ChangeManagementPlan,
