@@ -650,7 +650,75 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecWorkflow.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 11.15: In `quickSpecWorkflow.ts`, add helpers `sourceRouteMatches(sourceRoute: { branchId: string; routeId: string }, branchId: string, routeId: string): boolean`, `toolBackedOperationSucceeded(branchId: string, routeId: string): WorkflowDecisionBranchTrigger`, `toolBackedOperationFailed(branchId: string, routeId: string): WorkflowDecisionBranchTrigger`, `entryArtifactResolutionCompletedWithCreationRequired(creationRequired: boolean): WorkflowDecisionBranchTrigger`, `workflowFormCompleted(workflowFormId: string): WorkflowDecisionBranchTrigger`, `workflowProgressRequestConfirmed(): WorkflowDecisionBranchTrigger`, `workflowProgressRequestDenied(): WorkflowDecisionBranchTrigger`, and `attemptCompletionSucceeded(): WorkflowDecisionBranchTrigger`. The first two tool-backed helpers must match `triggerEvent.kind` to `tool_backed_operation_succeeded` or `tool_backed_operation_failed` and must compare `triggerEvent.sourceRoute` with `sourceRouteMatches(...)`. The entry artifact helper must match `triggerEvent.kind === "entry_artifact_resolution_completed"` and an artifact resolution with `artifactId === QUICK_SPEC_ARTIFACT_ID` and matching `creationRequired`.
+    [ ] Subtask 11.15: In `quickSpecWorkflow.ts`, add the following helper bodies exactly:
+
+```ts
+function sourceRouteMatches(sourceRoute: { branchId: string; routeId: string }, branchId: string, routeId: string): boolean {
+	return sourceRoute.branchId === branchId && sourceRoute.routeId === routeId
+}
+
+function toolBackedOperationSucceeded(branchId: string, routeId: string): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "event_predicate",
+		matches: ({ triggerEvent }) =>
+			triggerEvent.kind === "tool_backed_operation_succeeded" &&
+			sourceRouteMatches(triggerEvent.sourceRoute, branchId, routeId),
+	}
+}
+
+function toolBackedOperationFailed(branchId: string, routeId: string): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "event_predicate",
+		matches: ({ triggerEvent }) =>
+			triggerEvent.kind === "tool_backed_operation_failed" &&
+			sourceRouteMatches(triggerEvent.sourceRoute, branchId, routeId),
+	}
+}
+
+function entryArtifactResolutionCompletedWithCreationRequired(
+	creationRequired: boolean,
+): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "event_predicate",
+		matches: ({ triggerEvent }) =>
+			triggerEvent.kind === "entry_artifact_resolution_completed" &&
+			triggerEvent.artifactResolutions.some(
+				(artifactResolution) =>
+					artifactResolution.artifactId === QUICK_SPEC_ARTIFACT_ID &&
+					artifactResolution.creationRequired === creationRequired,
+			),
+	}
+}
+
+function workflowFormCompleted(workflowFormId: string): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "event_predicate",
+		matches: ({ triggerEvent }) =>
+			triggerEvent.kind === "workflow_form_completed" && triggerEvent.workflowFormId === workflowFormId,
+	}
+}
+
+function workflowProgressRequestConfirmed(): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "on_event",
+		eventKind: "workflow_progress_request_confirmed",
+	}
+}
+
+function workflowProgressRequestDenied(): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "on_event",
+		eventKind: "workflow_progress_request_denied",
+	}
+}
+
+function attemptCompletionSucceeded(): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "on_event",
+		eventKind: "attempt_completion_succeeded",
+	}
+}
+```
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecWorkflow.ts`
@@ -944,7 +1012,30 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 17.5: In `integration.test.ts`, add helper `const buildQuickSpecPromptContext = async (activeStepNumber: QuickSpecPromptStepNumber, args?: { additionalContext?: string }): Promise<SystemPromptContext & WorkflowPromptProjection>` that constructs `WorkflowRuntime` with `cwd: "/test/project"` and workspace path policy accepting access, creates a `TaskState`, sets `taskState.activeWorkflowName = quickSpecWorkflowDefinition.name`, sets `taskState.activeWorkflowSession = createQuickSpecWorkflowSession(activeStepNumber, args)`, sets `taskState.apiRequestCount = 1`, builds workflow projection, and returns `baseContext` with `mcpHub: makeMcpHub([])`, `providerInfo: makeProviderInfo("gpt-5-codex", "openai")`, `enableNativeToolCalls: true`, `useMinimalGptPrompt: true`, and the workflow projection.
+    [ ] Subtask 17.5: In `integration.test.ts`, add the following helper body exactly:
+
+```ts
+const buildQuickSpecPromptContext = async (
+	activeStepNumber: QuickSpecPromptStepNumber,
+	args?: { additionalContext?: string },
+): Promise<SystemPromptContext & WorkflowPromptProjection> => {
+	const workspacePathPolicy: WorkflowWorkspacePathPolicy = { validateAccess: () => true }
+	const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })
+	const taskState = new TaskState()
+	taskState.activeWorkflowName = quickSpecWorkflowDefinition.name
+	taskState.activeWorkflowSession = createQuickSpecWorkflowSession(activeStepNumber, args)
+	taskState.apiRequestCount = 1
+	const workflowProjection = await runtime.buildTurnProjection({ taskState })
+	return {
+		...baseContext,
+		mcpHub: makeMcpHub([]),
+		providerInfo: makeProviderInfo("gpt-5-codex", "openai"),
+		enableNativeToolCalls: true,
+		useMinimalGptPrompt: true,
+		...workflowProjection,
+	}
+}
+```
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
