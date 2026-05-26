@@ -498,6 +498,8 @@ src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecToolSchemas.
 
 For normal shared tools, the quick-spec tool-schema file must declare exact ordered `ClineDefaultTool[]` lists and resolve those ids through the registered shared/default `ClineToolSet` registry. It must not hand-build or copy shared/default tool specs.
 
+Because `workflow_progress_request` is a reusable workflow progression tool, this work must add it to the shared/default prompt-tool registry instead of defining a quick-spec-local `ClineToolSpec` for it. The shared/default prompt-tool spec must live under `src/core/prompts/system-prompt/tools/`, must use `ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST`, must expose tool name `workflow_progress_request`, must have generic workflow-step progression wording, must define no parameters, must be exported from the tools barrel, and must be registered by `registerClineToolSets()`. Quick-spec Step 2 and Step 3 tool schemas must consume `workflow_progress_request` through `ClineToolSet.getToolByNameWithFallback(...)` like the other shared/default tools.
+
 The module must define these exact model-visible tool ids by step:
 
 | Step | Tool ids |
@@ -577,12 +579,16 @@ The action plan must inspect and prescribe exact changes for every affected live
 - `src/core/task/workflow-runtime/artifactFamilies.ts`
 - `src/core/task/workflow-runtime/types.ts`
 - `src/core/task/workflow-runtime/WorkflowRegistry.ts`
+- `src/core/prompts/system-prompt/tools/workflow_progress_request.ts`
+- `src/core/prompts/system-prompt/tools/init.ts`
+- `src/core/prompts/system-prompt/tools/index.ts`
 - `src/core/task/workflow-runtime/workflow-modules/quick-spec/index.ts`
 - `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecWorkflow.ts`
 - `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecToolSchemas.ts`
 - `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts`
 - focused module tests under `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/`
 - prompt integration tests under `src/core/prompts/system-prompt/__tests__/integration.test.ts`
+- shared prompt-tool registry tests under `src/core/prompts/system-prompt/__tests__/`
 - registry/metadata/slash-command tests affected by shipped workflow registration
 - runtime tests affected by singleton artifact-family registration and entry artifact resolution
 - legacy cleanup files and tests if the legacy surfaces still exist
@@ -622,6 +628,8 @@ Document builder tests must cover:
 
 Tool schema tests must assert exact ordered tool ids for Steps 1 through 4 and must assert forbidden tool ids are absent.
 
+Shared prompt-tool registry tests must prove `workflow_progress_request` is registered as a shared/default `ClineToolSet` spec, resolves through `getToolByNameWithFallback(...)` for `ModelFamily.NATIVE_GPT_5`, has no parameters, and uses the canonical shared tool id and name.
+
 Prompt integration tests must prove:
 
 - current step details appear in the correct projected payload location
@@ -650,6 +658,8 @@ git ls-files --others --exclude-standard
 ```
 
 The action plan must add any additional focused unit commands required by the exact files it touches, including registry, metadata, slash-command, or cleanup test files.
+
+The phase that adds the shared/default `workflow_progress_request` prompt-tool spec must include focused unit validation for both the shared prompt-tool registry coverage and the quick-spec tool-schema coverage that consumes the registered spec.
 
 The action plan must include focused static guards for approved forbidden legacy concepts. At minimum, final validation must guard against live source references to the patterns below. The expected result for each guard is no matches; an `rg` exit code caused only by no matches is passing and must not be treated as a code defect.
 

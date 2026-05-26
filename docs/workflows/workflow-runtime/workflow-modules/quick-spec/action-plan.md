@@ -20,6 +20,7 @@ Approved implementation decisions derived from the requirements and module build
 - The new `quick_spec` artifact family is runtime-owned in `artifactFamilies.ts`, `types.ts`, and `WorkflowRuntime.ts` singleton-family resolution switches.
 - The quick-spec module owns metadata, persona, form definition, prompts, decision trees, document shell rendering, and tool-schema selection.
 - The quick-spec tool schemas resolve normal shared/default tools through `ClineToolSet.getToolByNameWithFallback(..., ModelFamily.NATIVE_GPT_5)`.
+- `workflow_progress_request` is registered as a shared/default prompt tool in `src/core/prompts/system-prompt/tools/` and consumed by quick-spec through the shared/default tool registry.
 - The Step 2 conditional prompt uses named section assembly and must not render source-authoring conditional markers.
 - The module defines no AI-writable workflow values, no `prerequisiteFiles`, no child workflow activation, no specialized backend tools, and no markdown filename activation alias.
 
@@ -268,7 +269,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [x] Subtask 7.5: Run `git diff --name-only` and `git ls-files --others --exclude-standard`; confirm persistent diffs and untracked files are limited to Phase 1 and Phase 2 authorized files: `src/core/task/workflow-runtime/artifactFamilies.ts`, `src/core/task/workflow-runtime/types.ts`, `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`, and this action plan.
+    [x] Subtask 7.5: Run `git diff --name-only` and `git ls-files --others --exclude-standard`; confirm persistent diffs and untracked files are limited to Phase 1 and Phase 2 authorized files: `src/core/task/workflow-runtime/artifactFamilies.ts`, `src/core/task/workflow-runtime/types.ts`, `src/core/task/workflow-runtime/WorkflowRuntime.ts`, `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`, and this action plan.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
@@ -279,92 +280,178 @@ Relevant requirements: Tool Schema Requirements, Decision Tree Requirements, Exp
 
 After completing this phase, pause for QA review before moving to Phase 4.
 
-[ ] Task 8: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecToolSchemas.ts`, add quick-spec shared/default tool-schema builders.
+[x] Task 8: Add quick-spec shared/default tool-schema builders and register `workflow_progress_request` as a shared/default prompt tool.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecToolSchemas.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/tools/workflow_progress_request.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/tools/init.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/tools/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
+
+    [x] Subtask 8.1: Create `quickSpecToolSchemas.ts` with exactly these imports: `ClineToolSet` from `@/core/prompts/system-prompt/registry/ClineToolSet`, type `ClineToolSpec` from `@/core/prompts/system-prompt/spec`, `registerClineToolSets` from `@/core/prompts/system-prompt/tools/init`, `ModelFamily` from `@/shared/prompts`, and `ClineDefaultTool` from `@/shared/tools`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 8.1: Create `quickSpecToolSchemas.ts` with exactly these imports: `ClineToolSet` from `@/core/prompts/system-prompt/registry/ClineToolSet`, type `ClineToolSpec` from `@/core/prompts/system-prompt/spec`, `registerClineToolSets` from `@/core/prompts/system-prompt/tools/init`, `ModelFamily` from `@/shared/prompts`, and `ClineDefaultTool` from `@/shared/tools`.
+    [x] Subtask 8.2: In `quickSpecToolSchemas.ts`, add `const QUICK_SPEC_TOOL_SCHEMA_VARIANT = ModelFamily.NATIVE_GPT_5`; export `QUICK_SPEC_STEP_2_TOOL_IDS` with exact ordered array `[ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_READ_RANGE, ClineDefaultTool.LIST_FILES, ClineDefaultTool.SEARCH, ClineDefaultTool.LIST_CODE_DEF, ClineDefaultTool.APPLY_PATCH, ClineDefaultTool.SEND_USER_MESSAGE, ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST]`; export `QUICK_SPEC_STEP_3_TOOL_IDS` with the same exact ordered array; and export `QUICK_SPEC_STEP_4_TOOL_IDS` with exact ordered array `[ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_READ_RANGE, ClineDefaultTool.LIST_FILES, ClineDefaultTool.SEARCH, ClineDefaultTool.LIST_CODE_DEF, ClineDefaultTool.APPLY_PATCH, ClineDefaultTool.SEND_USER_MESSAGE, ClineDefaultTool.USE_SUBAGENTS, ClineDefaultTool.ATTEMPT]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 8.2: In `quickSpecToolSchemas.ts`, add `const QUICK_SPEC_TOOL_SCHEMA_VARIANT = ModelFamily.NATIVE_GPT_5`; export `QUICK_SPEC_STEP_2_TOOL_IDS` with exact ordered array `[ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_READ_RANGE, ClineDefaultTool.LIST_FILES, ClineDefaultTool.SEARCH, ClineDefaultTool.LIST_CODE_DEF, ClineDefaultTool.APPLY_PATCH, ClineDefaultTool.SEND_USER_MESSAGE, ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST]`; export `QUICK_SPEC_STEP_3_TOOL_IDS` with the same exact ordered array; and export `QUICK_SPEC_STEP_4_TOOL_IDS` with exact ordered array `[ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_READ_RANGE, ClineDefaultTool.LIST_FILES, ClineDefaultTool.SEARCH, ClineDefaultTool.LIST_CODE_DEF, ClineDefaultTool.APPLY_PATCH, ClineDefaultTool.SEND_USER_MESSAGE, ClineDefaultTool.USE_SUBAGENTS, ClineDefaultTool.ATTEMPT]`.
+    [x] Subtask 8.3: In `quickSpecToolSchemas.ts`, add `function resolveQuickSpecSharedToolSpec(toolId: ClineDefaultTool): ClineToolSpec` that calls `registerClineToolSets()`, assigns `const tool = ClineToolSet.getToolByNameWithFallback(toolId, QUICK_SPEC_TOOL_SCHEMA_VARIANT)`, throws `new Error(\`Missing shared/default tool schema for ${toolId}.\`)` when `tool === undefined`, and returns `tool.config`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 8.3: In `quickSpecToolSchemas.ts`, add `function resolveQuickSpecSharedToolSpec(toolId: ClineDefaultTool): ClineToolSpec` that calls `registerClineToolSets()`, assigns `const tool = ClineToolSet.getToolByNameWithFallback(toolId, QUICK_SPEC_TOOL_SCHEMA_VARIANT)`, throws `new Error(\`Missing shared/default tool schema for ${toolId}.\`)` when `tool === undefined`, and returns `tool.config`.
+    [x] Subtask 8.4: In `quickSpecToolSchemas.ts`, export `buildQuickSpecStep1ToolSchemas(): readonly ClineToolSpec[]` returning `[]`; export `buildQuickSpecStep2ToolSchemas(): readonly ClineToolSpec[]` returning `QUICK_SPEC_STEP_2_TOOL_IDS.map((toolId) => resolveQuickSpecSharedToolSpec(toolId))`; export `buildQuickSpecStep3ToolSchemas(): readonly ClineToolSpec[]` returning `QUICK_SPEC_STEP_3_TOOL_IDS.map((toolId) => resolveQuickSpecSharedToolSpec(toolId))`; and export `buildQuickSpecStep4ToolSchemas(): readonly ClineToolSpec[]` returning `QUICK_SPEC_STEP_4_TOOL_IDS.map((toolId) => resolveQuickSpecSharedToolSpec(toolId))`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 8.4: In `quickSpecToolSchemas.ts`, export `buildQuickSpecStep1ToolSchemas(): readonly ClineToolSpec[]` returning `[]`; export `buildQuickSpecStep2ToolSchemas(): readonly ClineToolSpec[]` returning `QUICK_SPEC_STEP_2_TOOL_IDS.map((toolId) => resolveQuickSpecSharedToolSpec(toolId))`; export `buildQuickSpecStep3ToolSchemas(): readonly ClineToolSpec[]` returning `QUICK_SPEC_STEP_3_TOOL_IDS.map((toolId) => resolveQuickSpecSharedToolSpec(toolId))`; and export `buildQuickSpecStep4ToolSchemas(): readonly ClineToolSpec[]` returning `QUICK_SPEC_STEP_4_TOOL_IDS.map((toolId) => resolveQuickSpecSharedToolSpec(toolId))`.
+    [x] Subtask 8.5: Create `src/core/prompts/system-prompt/tools/workflow_progress_request.ts` with this exact file content:
+
+```ts
+import { ModelFamily } from "@/shared/prompts"
+import { ClineDefaultTool } from "@/shared/tools"
+import type { ClineToolSpec } from "../spec"
+
+const id = ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST
+
+const generic: ClineToolSpec = {
+	variant: ModelFamily.GENERIC,
+	id,
+	name: "workflow_progress_request",
+	description: "Ask the user to confirm whether the current workflow step is ready to advance.",
+	parameters: [],
+}
+
+export const workflow_progress_request_variants = [generic]
+```
 
 Allowed files:
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecToolSchemas.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/tools/workflow_progress_request.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-[ ] Task 9: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts`, add focused quick-spec tool-schema tests.
+    [x] Subtask 8.6: In `src/core/prompts/system-prompt/tools/init.ts`, add import `import { workflow_progress_request_variants } from "./workflow_progress_request"` immediately after `import { web_search_variants } from "./web_search"`, and add spread entry `...workflow_progress_request_variants,` immediately after `...web_search_variants,` in `allToolVariants`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/tools/init.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
+
+    [x] Subtask 8.7: In `src/core/prompts/system-prompt/tools/index.ts`, add export `export * from "./workflow_progress_request"` immediately after `export * from "./web_search"`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/tools/index.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
+
+[x] Task 9: Add focused quick-spec tool-schema tests and shared `workflow_progress_request` registry tests.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/workflow_progress_request.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
+
+    [x] Subtask 9.1: Create `quickSpecToolSchemas.test.ts` with imports `expect` from `chai`, `describe` and `it` from `mocha`, `ClineToolSet` from `@/core/prompts/system-prompt/registry/ClineToolSet`, type `ClineToolSpec` from `@/core/prompts/system-prompt/spec`, `registerClineToolSets` from `@/core/prompts/system-prompt/tools/init`, `ModelFamily` from `@/shared/prompts`, `ClineDefaultTool` from `@/shared/tools`, and `buildQuickSpecStep1ToolSchemas`, `buildQuickSpecStep2ToolSchemas`, `buildQuickSpecStep3ToolSchemas`, `buildQuickSpecStep4ToolSchemas`, `QUICK_SPEC_STEP_2_TOOL_IDS`, `QUICK_SPEC_STEP_3_TOOL_IDS`, and `QUICK_SPEC_STEP_4_TOOL_IDS` from `../quickSpecToolSchemas`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 9.1: Create `quickSpecToolSchemas.test.ts` with imports `expect` from `chai`, `describe` and `it` from `mocha`, `ClineToolSet` from `@/core/prompts/system-prompt/registry/ClineToolSet`, type `ClineToolSpec` from `@/core/prompts/system-prompt/spec`, `registerClineToolSets` from `@/core/prompts/system-prompt/tools/init`, `ModelFamily` from `@/shared/prompts`, `ClineDefaultTool` from `@/shared/tools`, and `buildQuickSpecStep1ToolSchemas`, `buildQuickSpecStep2ToolSchemas`, `buildQuickSpecStep3ToolSchemas`, `buildQuickSpecStep4ToolSchemas`, `QUICK_SPEC_STEP_2_TOOL_IDS`, `QUICK_SPEC_STEP_3_TOOL_IDS`, and `QUICK_SPEC_STEP_4_TOOL_IDS` from `../quickSpecToolSchemas`.
+    [x] Subtask 9.2: In `quickSpecToolSchemas.test.ts`, add constants `STEP_2_AND_3_TOOL_NAMES = ["read_file", "read_file_range", "list_files", "search_files", "list_code_definition_names", "apply_patch", "send_user_message", "workflow_progress_request"]`, `STEP_4_TOOL_NAMES = ["read_file", "read_file_range", "list_files", "search_files", "list_code_definition_names", "apply_patch", "send_user_message", "use_subagents", "attempt_completion"]`, and `FORBIDDEN_MODEL_FACING_TOOL_NAMES = ["set_workflow_values", "build_workflow_document", "create_workflow_artifact", "archive_workflow_artifact", "delete_workflow_artifact", "move_workflow_project_file", "write_to_file", "build_tech_spec_document"]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 9.2: In `quickSpecToolSchemas.test.ts`, add constants `STEP_2_AND_3_TOOL_NAMES = ["read_file", "read_file_range", "list_files", "search_files", "list_code_definition_names", "apply_patch", "send_user_message", "workflow_progress_request"]`, `STEP_4_TOOL_NAMES = ["read_file", "read_file_range", "list_files", "search_files", "list_code_definition_names", "apply_patch", "send_user_message", "use_subagents", "attempt_completion"]`, and `FORBIDDEN_MODEL_FACING_TOOL_NAMES = ["set_workflow_values", "build_workflow_document", "create_workflow_artifact", "archive_workflow_artifact", "delete_workflow_artifact", "move_workflow_project_file", "write_to_file", "build_tech_spec_document"]`.
+    [x] Subtask 9.3: In `quickSpecToolSchemas.test.ts`, add helper `function schemaNames(schemas: readonly ClineToolSpec[]): readonly string[]` returning `schemas.map((schema) => schema.name)` and helper `function expectedSharedToolSpecs(toolIds: readonly ClineDefaultTool[]): readonly ClineToolSpec[]` that calls `registerClineToolSets()`, resolves each id with `ClineToolSet.getToolByNameWithFallback(toolId, ModelFamily.NATIVE_GPT_5)`, throws `new Error(\`Missing shared/default tool schema for ${toolId}.\`)` when undefined, and returns each `tool.config`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 9.3: In `quickSpecToolSchemas.test.ts`, add helper `function schemaNames(schemas: readonly ClineToolSpec[]): readonly string[]` returning `schemas.map((schema) => schema.name)` and helper `function expectedSharedToolSpecs(toolIds: readonly ClineDefaultTool[]): readonly ClineToolSpec[]` that calls `registerClineToolSets()`, resolves each id with `ClineToolSet.getToolByNameWithFallback(toolId, ModelFamily.NATIVE_GPT_5)`, throws `new Error(\`Missing shared/default tool schema for ${toolId}.\`)` when undefined, and returns each `tool.config`.
+    [x] Subtask 9.4: In `quickSpecToolSchemas.test.ts`, add test `returns an empty model-facing schema for runtime-driven Step 1` with exact assertion `expect(buildQuickSpecStep1ToolSchemas()).to.deep.equal([])`. Add test `exposes the exact Step 2 shared/default tool schema order` assigning `const schemas = buildQuickSpecStep2ToolSchemas()` and asserting `schemaNames(schemas)` deep-equals `STEP_2_AND_3_TOOL_NAMES`. Add test `exposes the exact Step 3 shared/default tool schema order` assigning `const schemas = buildQuickSpecStep3ToolSchemas()` and asserting `schemaNames(schemas)` deep-equals `STEP_2_AND_3_TOOL_NAMES`. Add test `exposes the exact Step 4 shared/default tool schema order` assigning `const schemas = buildQuickSpecStep4ToolSchemas()` and asserting `schemaNames(schemas)` deep-equals `STEP_4_TOOL_NAMES`. Add test `uses shared default Step 2, Step 3, and Step 4 tool specs without module-owned schema prose` asserting `buildQuickSpecStep2ToolSchemas()` deep-equals `expectedSharedToolSpecs(QUICK_SPEC_STEP_2_TOOL_IDS)`, `buildQuickSpecStep3ToolSchemas()` deep-equals `expectedSharedToolSpecs(QUICK_SPEC_STEP_3_TOOL_IDS)`, and `buildQuickSpecStep4ToolSchemas()` deep-equals `expectedSharedToolSpecs(QUICK_SPEC_STEP_4_TOOL_IDS)`. Add test `uses only the approved Cline default tool ids` asserting `QUICK_SPEC_STEP_2_TOOL_IDS` deep-equals `[ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_READ_RANGE, ClineDefaultTool.LIST_FILES, ClineDefaultTool.SEARCH, ClineDefaultTool.LIST_CODE_DEF, ClineDefaultTool.APPLY_PATCH, ClineDefaultTool.SEND_USER_MESSAGE, ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST]`, `QUICK_SPEC_STEP_3_TOOL_IDS` deep-equals `[ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_READ_RANGE, ClineDefaultTool.LIST_FILES, ClineDefaultTool.SEARCH, ClineDefaultTool.LIST_CODE_DEF, ClineDefaultTool.APPLY_PATCH, ClineDefaultTool.SEND_USER_MESSAGE, ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST]`, and `QUICK_SPEC_STEP_4_TOOL_IDS` deep-equals `[ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_READ_RANGE, ClineDefaultTool.LIST_FILES, ClineDefaultTool.SEARCH, ClineDefaultTool.LIST_CODE_DEF, ClineDefaultTool.APPLY_PATCH, ClineDefaultTool.SEND_USER_MESSAGE, ClineDefaultTool.USE_SUBAGENTS, ClineDefaultTool.ATTEMPT]`. Add test `does not expose forbidden model-facing tools in any quick-spec step` assigning `const exposedNames = [...schemaNames(buildQuickSpecStep1ToolSchemas()), ...schemaNames(buildQuickSpecStep2ToolSchemas()), ...schemaNames(buildQuickSpecStep3ToolSchemas()), ...schemaNames(buildQuickSpecStep4ToolSchemas())]`, then for each `FORBIDDEN_MODEL_FACING_TOOL_NAMES` entry asserting `expect(exposedNames).to.not.include(forbiddenToolName)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 9.4: In `quickSpecToolSchemas.test.ts`, add test `returns an empty model-facing schema for runtime-driven Step 1` with exact assertion `expect(buildQuickSpecStep1ToolSchemas()).to.deep.equal([])`. Add test `exposes the exact Step 2 shared/default tool schema order` assigning `const schemas = buildQuickSpecStep2ToolSchemas()` and asserting `schemaNames(schemas)` deep-equals `STEP_2_AND_3_TOOL_NAMES`. Add test `exposes the exact Step 3 shared/default tool schema order` assigning `const schemas = buildQuickSpecStep3ToolSchemas()` and asserting `schemaNames(schemas)` deep-equals `STEP_2_AND_3_TOOL_NAMES`. Add test `exposes the exact Step 4 shared/default tool schema order` assigning `const schemas = buildQuickSpecStep4ToolSchemas()` and asserting `schemaNames(schemas)` deep-equals `STEP_4_TOOL_NAMES`. Add test `uses shared default Step 2, Step 3, and Step 4 tool specs without module-owned schema prose` asserting `buildQuickSpecStep2ToolSchemas()` deep-equals `expectedSharedToolSpecs(QUICK_SPEC_STEP_2_TOOL_IDS)`, `buildQuickSpecStep3ToolSchemas()` deep-equals `expectedSharedToolSpecs(QUICK_SPEC_STEP_3_TOOL_IDS)`, and `buildQuickSpecStep4ToolSchemas()` deep-equals `expectedSharedToolSpecs(QUICK_SPEC_STEP_4_TOOL_IDS)`. Add test `uses only the approved Cline default tool ids` asserting `QUICK_SPEC_STEP_2_TOOL_IDS` deep-equals `[ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_READ_RANGE, ClineDefaultTool.LIST_FILES, ClineDefaultTool.SEARCH, ClineDefaultTool.LIST_CODE_DEF, ClineDefaultTool.APPLY_PATCH, ClineDefaultTool.SEND_USER_MESSAGE, ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST]`, `QUICK_SPEC_STEP_3_TOOL_IDS` deep-equals `[ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_READ_RANGE, ClineDefaultTool.LIST_FILES, ClineDefaultTool.SEARCH, ClineDefaultTool.LIST_CODE_DEF, ClineDefaultTool.APPLY_PATCH, ClineDefaultTool.SEND_USER_MESSAGE, ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST]`, and `QUICK_SPEC_STEP_4_TOOL_IDS` deep-equals `[ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_READ_RANGE, ClineDefaultTool.LIST_FILES, ClineDefaultTool.SEARCH, ClineDefaultTool.LIST_CODE_DEF, ClineDefaultTool.APPLY_PATCH, ClineDefaultTool.SEND_USER_MESSAGE, ClineDefaultTool.USE_SUBAGENTS, ClineDefaultTool.ATTEMPT]`. Add test `does not expose forbidden model-facing tools in any quick-spec step` assigning `const exposedNames = [...schemaNames(buildQuickSpecStep1ToolSchemas()), ...schemaNames(buildQuickSpecStep2ToolSchemas()), ...schemaNames(buildQuickSpecStep3ToolSchemas()), ...schemaNames(buildQuickSpecStep4ToolSchemas())]`, then for each `FORBIDDEN_MODEL_FACING_TOOL_NAMES` entry asserting `expect(exposedNames).to.not.include(forbiddenToolName)`.
+    [x] Subtask 9.5: Create `src/core/prompts/system-prompt/__tests__/workflow_progress_request.test.ts` with this exact file content:
+
+```ts
+import { expect } from "chai"
+import { describe, it } from "mocha"
+import { ClineToolSet } from "@/core/prompts/system-prompt/registry/ClineToolSet"
+import { registerClineToolSets } from "@/core/prompts/system-prompt/tools/init"
+import { workflow_progress_request_variants } from "@/core/prompts/system-prompt/tools/workflow_progress_request"
+import { ModelFamily } from "@/shared/prompts"
+import { ClineDefaultTool } from "@/shared/tools"
+
+const EXPECTED_WORKFLOW_PROGRESS_REQUEST_SPEC = {
+	variant: ModelFamily.GENERIC,
+	id: ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
+	name: "workflow_progress_request",
+	description: "Ask the user to confirm whether the current workflow step is ready to advance.",
+	parameters: [],
+}
+
+describe("workflow_progress_request tool registration", () => {
+	it("defines the exact shared/default workflow progress request tool spec", () => {
+		expect(workflow_progress_request_variants).to.deep.equal([EXPECTED_WORKFLOW_PROGRESS_REQUEST_SPEC])
+	})
+
+	it("registers workflow_progress_request for native GPT-5 fallback lookup", () => {
+		registerClineToolSets()
+
+		const tool = ClineToolSet.getToolByNameWithFallback(
+			ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
+			ModelFamily.NATIVE_GPT_5,
+		)
+
+		if (tool === undefined) {
+			throw new Error("Expected workflow_progress_request to resolve through ClineToolSet fallback.")
+		}
+
+		expect(tool.config).to.deep.equal(EXPECTED_WORKFLOW_PROGRESS_REQUEST_SPEC)
+		expect(tool.config.parameters).to.deep.equal([])
+	})
+})
+```
 
 Allowed files:
-- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/workflow_progress_request.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-[ ] Task 10: In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`, run Phase 3 validation.
+[x] Task 10: In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`, run Phase 3 validation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 10.1: Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts`.
+    [x] Subtask 10.1: Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/workflow_progress_request.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 10.2: Run `npm run check-types`. If it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` before treating the failure as a code defect.
+    [x] Subtask 10.2: Run `npm run check-types`. If it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` before treating the failure as a code defect.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 10.3: Run `npm run lint`.
+    [x] Subtask 10.3: Run `npm run lint`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 10.4: Run `rg -n "build_workflow_document|create_workflow_artifact|archive_workflow_artifact|delete_workflow_artifact|move_workflow_project_file|set_workflow_values|write_to_file" src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecToolSchemas.ts` and confirm it returns no matches; exit code `1` with no output is success for this no-match guard.
+    [x] Subtask 10.4: Run `rg -n "build_workflow_document|create_workflow_artifact|archive_workflow_artifact|delete_workflow_artifact|move_workflow_project_file|set_workflow_values|write_to_file" src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecToolSchemas.ts` and confirm it returns no matches; exit code `1` with no output is success for this no-match guard.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 10.5: Run `git diff --name-only` and `git ls-files --others --exclude-standard`; confirm persistent diffs and untracked files are limited to Phase 1, Phase 2, and Phase 3 authorized files: `src/core/task/workflow-runtime/artifactFamilies.ts`, `src/core/task/workflow-runtime/types.ts`, `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecToolSchemas.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts`, and this action plan.
+    [x] Subtask 10.5: Run `git diff --name-only` and `git ls-files --others --exclude-standard`; confirm persistent diffs and untracked files are limited to Phase 1, Phase 2, and Phase 3 authorized files: `src/core/task/workflow-runtime/artifactFamilies.ts`, `src/core/task/workflow-runtime/types.ts`, `src/core/task/workflow-runtime/WorkflowRuntime.ts`, `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`, `src/core/prompts/system-prompt/tools/workflow_progress_request.ts`, `src/core/prompts/system-prompt/tools/init.ts`, `src/core/prompts/system-prompt/tools/index.ts`, `src/core/prompts/system-prompt/__tests__/workflow_progress_request.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecToolSchemas.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts` `docs/workflows/workflow-runtime/workflow-modules/quick-spec/quick-spec-requirements.md`, and this action plan.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
@@ -904,7 +991,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 13.1: Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`.
+    [ ] Subtask 13.1: Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/workflow_progress_request.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
@@ -924,7 +1011,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 13.5: Run `git diff --name-only` and `git ls-files --others --exclude-standard`; confirm persistent diffs and untracked files are limited to Phase 1 through Phase 4 authorized files: `src/core/task/workflow-runtime/artifactFamilies.ts`, `src/core/task/workflow-runtime/types.ts`, `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecToolSchemas.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecWorkflow.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts`, and this action plan.
+    [ ] Subtask 13.5: Run `git diff --name-only` and `git ls-files --others --exclude-standard`; confirm persistent diffs and untracked files are limited to Phase 1 through Phase 4 authorized files: `src/core/task/workflow-runtime/artifactFamilies.ts`, `src/core/task/workflow-runtime/types.ts`, `src/core/task/workflow-runtime/WorkflowRuntime.ts`, `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`, `src/core/prompts/system-prompt/tools/workflow_progress_request.ts`, `src/core/prompts/system-prompt/tools/init.ts`, `src/core/prompts/system-prompt/tools/index.ts`, `src/core/prompts/system-prompt/__tests__/workflow_progress_request.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecToolSchemas.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecWorkflow.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts`, and this action plan.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
@@ -1137,7 +1224,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 21.1: Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`.
+    [ ] Subtask 21.1: Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/workflow_progress_request.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
@@ -1187,7 +1274,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 21.11: Run `git diff --name-only` and `git ls-files --others --exclude-standard`; confirm persistent diffs and untracked files are limited to Phase 1 through Phase 5 authorized files: `src/core/task/workflow-runtime/artifactFamilies.ts`, `src/core/task/workflow-runtime/types.ts`, `src/core/task/workflow-runtime/WorkflowRegistry.ts`, `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/index.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecWorkflow.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecToolSchemas.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`, `src/core/prompts/system-prompt/__tests__/integration.test.ts`, `src/test/slash-commands.test.ts`, `src/shared/build-tech-spec-document.ts`, `src/core/task/workflow-runtime/workflow-modules/correct-course/__tests__/correctCourseWorkflow.test.ts`, and this action plan.
+    [ ] Subtask 21.11: Run `git diff --name-only` and `git ls-files --others --exclude-standard`; confirm persistent diffs and untracked files are limited to Phase 1 through Phase 5 authorized files: `src/core/task/workflow-runtime/artifactFamilies.ts`, `src/core/task/workflow-runtime/types.ts`, `src/core/task/workflow-runtime/WorkflowRuntime.ts`, `src/core/task/workflow-runtime/WorkflowRegistry.ts`, `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `src/core/prompts/system-prompt/tools/workflow_progress_request.ts`, `src/core/prompts/system-prompt/tools/init.ts`, `src/core/prompts/system-prompt/tools/index.ts`, `src/core/prompts/system-prompt/__tests__/workflow_progress_request.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/index.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecWorkflow.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecToolSchemas.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`, `src/core/prompts/system-prompt/__tests__/integration.test.ts`, `src/test/slash-commands.test.ts`, `src/shared/build-tech-spec-document.ts`, `src/core/task/workflow-runtime/workflow-modules/correct-course/__tests__/correctCourseWorkflow.test.ts`, and this action plan.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
@@ -1201,7 +1288,7 @@ Relevant requirements: Validation Requirements, Action Plan Requirements.
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 22.1: Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`.
+    [ ] Subtask 22.1: Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/workflow_progress_request.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
@@ -1256,7 +1343,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 22.12: Run `git diff --name-only` and `git ls-files --others --exclude-standard`; confirm persistent diffs and untracked files introduced by this action plan are limited to this final authorized file set: `src/core/task/workflow-runtime/artifactFamilies.ts`, `src/core/task/workflow-runtime/types.ts`, `src/core/task/workflow-runtime/WorkflowRegistry.ts`, `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/index.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecWorkflow.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecToolSchemas.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`, `src/core/prompts/system-prompt/__tests__/integration.test.ts`, `src/test/slash-commands.test.ts`, `src/shared/build-tech-spec-document.ts`, `src/core/task/workflow-runtime/workflow-modules/correct-course/__tests__/correctCourseWorkflow.test.ts`, and `docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`.
+    [ ] Subtask 22.12: Run `git diff --name-only` and `git ls-files --others --exclude-standard`; confirm persistent diffs and untracked files introduced by this action plan are limited to this final authorized file set: `src/core/task/workflow-runtime/artifactFamilies.ts`, `src/core/task/workflow-runtime/types.ts`, `src/core/task/workflow-runtime/WorkflowRuntime.ts`, `src/core/task/workflow-runtime/WorkflowRegistry.ts`, `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `src/core/prompts/system-prompt/tools/workflow_progress_request.ts`, `src/core/prompts/system-prompt/tools/init.ts`, `src/core/prompts/system-prompt/tools/index.ts`, `src/core/prompts/system-prompt/__tests__/workflow_progress_request.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/index.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecWorkflow.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecToolSchemas.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/quickSpecDocument.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecToolSchemas.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`, `src/core/prompts/system-prompt/__tests__/integration.test.ts`, `src/test/slash-commands.test.ts`, `src/shared/build-tech-spec-document.ts`, `src/core/task/workflow-runtime/workflow-modules/correct-course/__tests__/correctCourseWorkflow.test.ts`, and `docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`

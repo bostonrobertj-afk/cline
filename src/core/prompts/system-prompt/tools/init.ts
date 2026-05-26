@@ -24,6 +24,7 @@ import { use_mcp_tool_variants } from "./use_mcp_tool"
 import { use_skill_variants } from "./use_skill"
 import { web_fetch_variants } from "./web_fetch"
 import { web_search_variants } from "./web_search"
+import { workflow_progress_request_variants } from "./workflow_progress_request"
 import { write_to_file_variants } from "./write_to_file"
 
 /**
@@ -57,6 +58,7 @@ export function registerClineToolSets(): void {
 		...use_skill_variants,
 		...web_fetch_variants,
 		...web_search_variants,
+		...workflow_progress_request_variants,
 		...write_to_file_variants,
 		...apply_patch_variants,
 	]
