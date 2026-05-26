@@ -81,6 +81,11 @@ import {
 	piPlanningWorkflowDefinition,
 } from "@/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow"
 import {
+	VALIDATE_STORY_WORKFLOW_NAME,
+	ValidateStoryWorkflowValueKey,
+} from "@/core/task/workflow-runtime/workflow-modules/validate-story"
+import { buildValidateStoryStep1ToolSchemas } from "@/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas"
+import {
 	buildWriteRemediationStoryStep3ToolSchemas,
 	WriteRemediationStoryWorkflowValueKey,
 	writeRemediationStoryWorkflowDefinition,
@@ -1224,6 +1229,89 @@ async function buildEdgeCaseHunterReviewPromptContext(
 	const taskState = new TaskState()
 	taskState.activeWorkflowName = "edge-case-hunter-review"
 	taskState.activeWorkflowSession = createEdgeCaseHunterReviewWorkflowSession(activeStepNumber, workflowValues)
+	taskState.apiRequestCount = 1
+	const workflowProjection = await runtime.buildTurnProjection({ taskState })
+
+	return {
+		...baseContext,
+		mcpHub: makeMcpHub([]),
+		providerInfo: makeProviderInfo("gpt-5-codex", "openai"),
+		enableNativeToolCalls: true,
+		useMinimalGptPrompt: true,
+		...workflowProjection,
+	}
+}
+
+const VALIDATE_STORY_PROJECT_ROOT = "/tmp/validate-story-project"
+const VALIDATE_STORY_TARGET_STORY = `${VALIDATE_STORY_PROJECT_ROOT}/implementation/stories-backlog/Story-1-1.md`
+const VALIDATE_STORY_EPICS_DOCUMENT = `${VALIDATE_STORY_PROJECT_ROOT}/planning/Epics.md`
+const VALIDATE_STORY_ARCHITECTURE_DOCUMENT = `${VALIDATE_STORY_PROJECT_ROOT}/planning/architecture.md`
+const VALIDATE_STORY_FORBIDDEN_PROMPT_TOOL_NAMES: readonly string[] = [
+	"apply_patch",
+	"write_to_file",
+	"set_workflow_values",
+	"workflow_progress_request",
+	"ask_followup_question",
+	"use_subagents",
+	"create_workflow_artifact",
+	"build_workflow_document",
+	"archive_workflow_artifact",
+	"delete_workflow_artifact",
+	"move_workflow_project_file",
+	"resolve_prerequisite_files",
+	"resolve_existing_project_artifact",
+	"validate_story_index_entry",
+]
+
+function createValidateStoryWorkflowValues(overrides: WorkflowValues = {}): WorkflowValues {
+	return {
+		[ValidateStoryWorkflowValueKey.ProjectMode]: "existing",
+		[ValidateStoryWorkflowValueKey.ProjectTitle]: "Validate Story Session",
+		[ValidateStoryWorkflowValueKey.ProjectFolderName]: "validate-story-project",
+		[ValidateStoryWorkflowValueKey.TargetStory]: VALIDATE_STORY_TARGET_STORY,
+		[ValidateStoryWorkflowValueKey.EpicsDocument]: VALIDATE_STORY_EPICS_DOCUMENT,
+		[ValidateStoryWorkflowValueKey.ArchitectureDocument]: VALIDATE_STORY_ARCHITECTURE_DOCUMENT,
+		...overrides,
+	}
+}
+
+function createValidateStoryWorkflowSession(
+	workflowValues: WorkflowValues = createValidateStoryWorkflowValues(),
+): ActiveWorkflowSession {
+	return {
+		activeStepNumber: 1,
+		workflowValues,
+		projectSelection: {
+			projectMode: "existing",
+			projectTitle: "Validate Story Session",
+			projectFolderName: "validate-story-project",
+		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
+		entryArtifactResolution: undefined,
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: {
+			activeBranchId: "step-1-await-attempt-completion",
+		},
+	}
+}
+
+async function buildValidateStoryPromptContext(
+	workflowValues: WorkflowValues = createValidateStoryWorkflowValues(),
+): Promise<SystemPromptContext & WorkflowPromptProjection> {
+	const workspacePathPolicy: WorkflowWorkspacePathPolicy = {
+		validateAccess: () => true,
+	}
+	const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })
+	const taskState = new TaskState()
+	taskState.activeWorkflowName = VALIDATE_STORY_WORKFLOW_NAME
+	taskState.activeWorkflowSession = createValidateStoryWorkflowSession(workflowValues)
 	taskState.apiRequestCount = 1
 	const workflowProjection = await runtime.buildTurnProjection({ taskState })
 
@@ -2836,6 +2924,76 @@ describe("Prompt System Integration Tests", () => {
 				}
 				for (const forbiddenToolName of EDGE_CASE_HUNTER_REVIEW_FORBIDDEN_PROMPT_TOOL_NAMES) {
 					expect(systemPrompt).to.not.include(forbiddenToolName)
+				}
+			})
+		})
+
+		it("projects active validate-story Step 1 tools from module-owned builders into native GPT-5 prompts", async function () {
+			const context = await buildValidateStoryPromptContext()
+			expect(context.workflowToolSchemaOverride).to.deep.equal(buildValidateStoryStep1ToolSchemas())
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ tools }) => {
+				expect(getNativeToolNames(tools)).to.deep.equal(buildValidateStoryStep1ToolSchemas().map((tool) => tool.name))
+			})
+		})
+
+		it("projects validate-story Step 1 materialized values into full-turn and continuation payloads", async () => {
+			const context = await buildValidateStoryPromptContext()
+			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+			const continuationWorkflowInputPayloadBlock = context.continuationWorkflowInputPayloadBlock
+			if (workflowInputPayloadBlock === undefined || workflowInputPayloadBlock === "") {
+				throw new Error("Expected validate-story Step 1 workflow input payload.")
+			}
+			if (continuationWorkflowInputPayloadBlock === undefined || continuationWorkflowInputPayloadBlock === "") {
+				throw new Error("Expected validate-story Step 1 continuation workflow input payload.")
+			}
+
+			const payloadBlocks: readonly string[] = [workflowInputPayloadBlock, continuationWorkflowInputPayloadBlock]
+			for (const payloadBlock of payloadBlocks) {
+				expect(payloadBlock.trim()).to.not.equal("")
+				expect(payloadBlock).to.include(VALIDATE_STORY_TARGET_STORY)
+				expect(payloadBlock).to.include(VALIDATE_STORY_EPICS_DOCUMENT)
+				expect(payloadBlock).to.include(VALIDATE_STORY_ARCHITECTURE_DOCUMENT)
+				expect(payloadBlock).to.include("Validate Story Session")
+				expect(payloadBlock).to.include("validate-story-project")
+				expect(payloadBlock).to.not.include("{workflow.target_story}")
+				expect(payloadBlock).to.not.include("{workflow.epics_document}")
+				expect(payloadBlock).to.not.include("{workflow.architecture_document}")
+				expect(payloadBlock).to.not.include("{workflow.projectTitle}")
+				expect(payloadBlock).to.not.include("{workflow.projectFolderName}")
+				expect(payloadBlock).to.not.include("target_story")
+				expect(payloadBlock).to.not.include("epics_document")
+				expect(payloadBlock).to.not.include("architecture_document")
+				expect(payloadBlock).to.not.include("projectTitle")
+				expect(payloadBlock).to.not.include("projectFolderName")
+			}
+		})
+
+		it("does not expose forbidden tools in validate-story Step 1 prompt projection", async () => {
+			const context = await buildValidateStoryPromptContext()
+			const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
+			for (const forbiddenToolName of VALIDATE_STORY_FORBIDDEN_PROMPT_TOOL_NAMES) {
+				expect(projectedToolNames).to.not.include(forbiddenToolName)
+			}
+		})
+
+		it("renders validate-story Step 1 tools through non-native prompt text without forbidden tools", async function () {
+			const nativeContext = await buildValidateStoryPromptContext()
+			const context: SystemPromptContext = {
+				...nativeContext,
+				providerInfo: makeProviderInfo("gpt-3", "openai"),
+				enableNativeToolCalls: false,
+			}
+			const approvedToolNames = buildValidateStoryStep1ToolSchemas().map((tool) => tool.name)
+			const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
+
+			await runPromptTest(this, context, "gpt-3", async ({ systemPrompt, tools }) => {
+				expect(tools).to.equal(undefined)
+				for (const toolName of approvedToolNames) {
+					expect(systemPrompt).to.include(toolName)
+				}
+				for (const forbiddenToolName of VALIDATE_STORY_FORBIDDEN_PROMPT_TOOL_NAMES) {
+					expect(projectedToolNames).to.not.include(forbiddenToolName)
 				}
 			})
 		})
