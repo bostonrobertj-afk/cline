@@ -136,25 +136,25 @@ The module must define this one step, using this exact `checklistLabel` value:
 
 Step 1 is model-driven after project selection and successful required-prerequisite resolution.
 
-The Step 1 prompt builder must render these workflow values into the source prompt:
+The Step 1 prompt template must reference these workflow values through shared runtime prompt-template tokens:
 
-- `projectTitle`
-- `projectFolderName`
-- `architecture_document`
-- `epics_document`
-- `target_story`
+- `{workflow.projectTitle}`
+- `{workflow.projectFolderName}`
+- `{workflow.architecture_document}`
+- `{workflow.epics_document}`
+- `{workflow.target_story}`
 
-The source document uses bare placeholder tokens in the prompt. The implementation must replace only those literal workflow-value tokens in the approved prompt body and must not require bracketed placeholder syntax in the source document.
+The source document records these placeholders as bare workflow-value tokens. The implementation must translate those source placeholders into `{workflow.<workflowValueKey>}` prompt-template tokens in the module-owned TypeScript prompt constant and must let the shared `WorkflowRuntime` prompt-template renderer materialize them. The module must not perform local `replace`, `replaceAll`, regex, or hand-built substitution for these workflow-value references.
 
-The Step 1 current-step prompt must use this exact source text, with only the listed workflow-value tokens replaced by runtime values:
+The Step 1 current-step prompt template must use this exact source text, with only the listed workflow-value placeholders converted to shared runtime prompt-template tokens:
 
 ```text
 You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.
-- Project: projectTitle
-- Project Folder: projectFolderName
-- Architecture Document: architecture_document
-- Epics Documentation: epics_document
-- Target Story: target_story
+- Project: {workflow.projectTitle}
+- Project Folder: {workflow.projectFolderName}
+- Architecture Document: {workflow.architecture_document}
+- Epics Documentation: {workflow.epics_document}
+- Target Story: {workflow.target_story}
 
 Perform a line-by-line review to ensure that the provided story document meets all relevant project and quality standards, including:
 - Objective, scope, scope boundary, and requirements are appropriate for the story and aligned with the upstream epics and architecture documentation
@@ -325,8 +325,8 @@ The module build must include focused unit tests covering:
 - runtime prerequisite behavior that persists selected absolute paths to `target_story`, `epics_document`, and `architecture_document`
 - runtime prerequisite behavior that stops before model-driven work when a required prerequisite is missing, rejected, or canceled
 - Step 1 `checklistLabel`, prompt-source shape, and `project_prompt` route after prerequisite resolution
-- Step 1 prompt projection preserving source wording while rendering `projectTitle`, `projectFolderName`, `architecture_document`, `epics_document`, and `target_story`
-- prompt projection proving the raw source tokens `projectTitle`, `projectFolderName`, `architecture_document`, `epics_document`, and `target_story` do not leak after all runtime values are provided
+- Step 1 prompt projection preserving source wording while rendering `{workflow.projectTitle}`, `{workflow.projectFolderName}`, `{workflow.architecture_document}`, `{workflow.epics_document}`, and `{workflow.target_story}`
+- prompt projection proving the raw prompt-template tokens `{workflow.projectTitle}`, `{workflow.projectFolderName}`, `{workflow.architecture_document}`, `{workflow.epics_document}`, and `{workflow.target_story}` do not leak after all runtime values are provided
 - Step 1 exported tool-schema builder returning exactly the approved model-visible tool names in order and using existing shared/default specs
 - prompt integration proving Step 1 projected tools are present in active workflow native/non-native prompt surfaces and forbidden tools are absent
 - Step 1 `attempt_completion_succeeded` routing to workflow completion without story index updates, story file moves, artifact allocation, document generation, subagent dispatch, or parent workflow mutation
