@@ -181,7 +181,32 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 6.2: In `quickSpecDocument.test.ts`, add `const EXPECTED_INITIAL_QUICK_SPEC_DOCUMENT` equal to the exact eleven-heading document shell required by `quick-spec-requirements.md`, ending with a trailing newline after `# Implementation Phases`.
+    [ ] Subtask 6.2: In `quickSpecDocument.test.ts`, add `const EXPECTED_INITIAL_QUICK_SPEC_DOCUMENT` with this exact string value:
+
+```ts
+`# Product Vision
+
+# User Context
+
+# Project Scope
+
+# Boundaries & Constraints
+
+# Technical Decisions
+
+# Solution Overview
+
+# Acceptance Criteria
+
+# Code Map
+
+# Sequencing
+
+# Dev Agent Instructions
+
+# Implementation Phases
+`
+```
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecDocument.test.ts`
@@ -871,13 +896,13 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 16.3: In `WorkflowRuntime.test.ts`, add a test named `activates the quick-spec workflow through the shared entry form and resolves its first Step 1 action`. The test must register `quickSpecWorkflowDefinition`, activate it by `quickSpecWorkflowDefinition.name`, assert the entry form payload prompt equals the workflow description, assert the focus-chain checklist is `1. Gather Context & Generate Spec Document - Active\n2. Assess Vision & Develop Solution Foundation - Not Started\n3. Finalize Solution & Implementation Spec - Not Started\n4. Generate Implementation Details - Not Started`, submit new project selection `"Quick Spec Runtime Project"`, assert the next action is `execute_tool_backed_operation` for `ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT` with `{ artifact_id: "quick_spec" }`, assert `runtimeOwnedSourceRoute` is `{ branchId: "step-1-resolve-entry-artifact", routeId: "step-1-allocate-artifact" }`, and assert entry artifact resolution persisted `artifactFamily: WorkflowArtifactFamily.QuickSpec`, `artifactIdentity: "quick_spec"`, filename `quick-spec.md`, relative path `join("planning", "quick-spec.md")`, absolute path under `quick-spec-runtime-project/planning/quick-spec.md`, `creationRequired: true`, and `existingArtifactAction: "none"`.
+    [ ] Subtask 16.3: In `WorkflowRuntime.test.ts`, add a test named `activates the quick-spec workflow through the shared entry form and resolves its first Step 1 action`. The test must call `registerResolvedWorkflow(quickSpecWorkflowDefinition)`, assign `const entryFormAction = await runtime.activateWorkflow({ taskState, workflowName: quickSpecWorkflowDefinition.name })`, assert `entryFormAction.kind === "render_workflow_form"`, narrow by throwing `new Error(\`Expected render_workflow_form, received ${entryFormAction.kind}.\`)` when not render, assert `entryFormAction.payload.panel?.promptMarkdown === quickSpecWorkflowDefinition.description`, assert `taskState.currentFocusChainChecklist === "1. Gather Context & Generate Spec Document - Active\n2. Assess Vision & Develop Solution Foundation - Not Started\n3. Finalize Solution & Implementation Spec - Not Started\n4. Generate Implementation Details - Not Started"`, assign `const stepOneAction = await submitNewProjectSelection(taskState, "Quick Spec Runtime Project")`, assert `stepOneAction.kind === "execute_tool_backed_operation"`, narrow by throwing `new Error(\`Expected execute_tool_backed_operation, received ${stepOneAction.kind}.\`)` when not execute, assert `stepOneAction.toolRequest.toolName === ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT`, assert `stepOneAction.toolRequest.toolParams` deep-equals `{ artifact_id: "quick_spec" }`, assert `stepOneAction.runtimeOwnedSourceRoute` deep-equals `{ branchId: "step-1-resolve-entry-artifact", routeId: "step-1-allocate-artifact" }`, assert `stepOneAction.toolBackedOperationSession === undefined`, and assert `getActiveWorkflowSession(taskState).entryArtifactResolution?.artifactResolutions` deep-equals `[{ artifactId: "quick_spec", artifactFamily: WorkflowArtifactFamily.QuickSpec, artifactIdentity: "quick_spec", artifactFilename: "quick-spec.md", artifactRelativePath: join("planning", "quick-spec.md"), artifactAbsolutePath: join(cwd, "docs", "projects", "quick-spec-runtime-project", "planning", "quick-spec.md"), creationRequired: true, existingArtifactAction: "none" }]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 16.4: In `WorkflowRuntime.test.ts`, add a test named `routes quick-spec allocation success and initial document build success to the Step 1 input form`. The test must register `quickSpecWorkflowDefinition`, activate it, submit new project selection, create the `quick_spec` artifact, handle the allocation success event, assert the document build action uses `ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT`, `artifact_id: "quick_spec"`, destination path equal to the artifact absolute path, and source route `{ branchId: "step-1-await-allocation", routeId: "step-1-build-initial-shell" }`; then handle document build success and assert the next action is `render_workflow_form` with `formSession.workflowFormId === "step-1-quick-spec-input-form"` and `formSession.currentPanelId === "step-1-existing-documentation-panel"`.
+    [ ] Subtask 16.4: In `WorkflowRuntime.test.ts`, add a test named `routes quick-spec allocation success and initial document build success to the Step 1 input form`. The test must call `registerResolvedWorkflow(quickSpecWorkflowDefinition)`, activate quick-spec with `await runtime.activateWorkflow({ taskState, workflowName: quickSpecWorkflowDefinition.name })`, assign `const allocationAction = await submitNewProjectSelection(taskState, "Quick Spec Runtime Project")`, assert `allocationAction.kind === "execute_tool_backed_operation"`, narrow by throwing `new Error(\`Expected execute_tool_backed_operation, received ${allocationAction.kind}.\`)` when not execute, assign `const artifactResult = await runtime.createWorkflowArtifact({ taskState, artifactId: "quick_spec", expectedArtifactAbsolutePath: undefined })`, assign `const documentBuildAction = await runtime.handleToolBackedOperationToolResult({ taskState, toolResultText: JSON.stringify({ ok: true }), runtimeOwnedSourceRoute: allocationAction.runtimeOwnedSourceRoute })`, assert `documentBuildAction.kind === "execute_tool_backed_operation"`, narrow by throwing `new Error(\`Expected execute_tool_backed_operation, received ${documentBuildAction.kind}.\`)` when not execute, assert `documentBuildAction.toolRequest.toolName === ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT`, assert `documentBuildAction.toolRequest.toolParams.artifact_id === "quick_spec"`, assert `documentBuildAction.toolRequest.toolParams.destination_path === artifactResult.artifactAbsolutePath`, assert `documentBuildAction.runtimeOwnedSourceRoute` deep-equals `{ branchId: "step-1-await-allocation", routeId: "step-1-build-initial-shell" }`, assign `const inputFormAction = await runtime.handleToolBackedOperationToolResult({ taskState, toolResultText: JSON.stringify({ ok: true }), runtimeOwnedSourceRoute: documentBuildAction.runtimeOwnedSourceRoute })`, assert `inputFormAction.kind === "render_workflow_form"`, narrow by throwing `new Error(\`Expected render_workflow_form, received ${inputFormAction.kind}.\`)` when not render, assert `inputFormAction.formSession.workflowFormId === "step-1-quick-spec-input-form"`, and assert `inputFormAction.formSession.currentPanelId === "step-1-existing-documentation-panel"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
@@ -937,13 +962,13 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 17.8: In `integration.test.ts`, add a test named `projects quick-spec current step details into the workflow input payload only`. Build Step 2 context, assert `workflowInputPayloadBlock` is defined, assert it includes `Workflow:\nquick spec`, exact quick-spec description, `Name: Bob`, `Role: Scrum Master`, the exact persona identity, `1. Gather Context & Generate Spec Document - Complete`, `2. Assess Vision & Develop Solution Foundation - Active`, `4. Generate Implementation Details - Not Started`, `CURRENT STEP DETAILED INSTRUCTIONS`, `Step 2: Assess Vision & Develop Solution Foundation`, `QUICK_SPEC_OUTPUT_DOCUMENT`, `QUICK_SPEC_ADDITIONAL_CONTEXT`, and `QUICK_SPEC_VISION_STATEMENT`; assert the system prompt from `runPromptTest` does not include `CURRENT STEP DETAILED INSTRUCTIONS`.
+    [ ] Subtask 17.8: In `integration.test.ts`, add a test named `projects quick-spec current step details into the workflow input payload only`. Build Step 2 context with `const context = await buildQuickSpecPromptContext(2)`, assign `const workflowInputPayloadBlock = context.workflowInputPayloadBlock`, then add exact narrowing block `if (workflowInputPayloadBlock === undefined || workflowInputPayloadBlock === "") { throw new Error("Expected quick-spec Step 2 workflow input payload.") }` before any includes assertions. Assert `workflowInputPayloadBlock` includes `Workflow:\nquick spec`, exact quick-spec description, `Name: Bob`, `Role: Scrum Master`, the exact persona identity, `1. Gather Context & Generate Spec Document - Complete`, `2. Assess Vision & Develop Solution Foundation - Active`, `4. Generate Implementation Details - Not Started`, `CURRENT STEP DETAILED INSTRUCTIONS`, `Step 2: Assess Vision & Develop Solution Foundation`, `QUICK_SPEC_OUTPUT_DOCUMENT`, `QUICK_SPEC_ADDITIONAL_CONTEXT`, and `QUICK_SPEC_VISION_STATEMENT`; assert the system prompt from `runPromptTest` does not include `CURRENT STEP DETAILED INSTRUCTIONS`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 17.9: In `integration.test.ts`, add a test named `renders quick-spec Step 2 conditional additional context only when non-empty`. Build Step 2 contexts with `{ additionalContext: QUICK_SPEC_ADDITIONAL_CONTEXT }` and `{ additionalContext: "   " }`; for both `workflowInputPayloadBlock` and `continuationWorkflowInputPayloadBlock`, assert the non-empty context includes `QUICK_SPEC_ADDITIONAL_CONTEXT` and `Add the additional context provided to the spec file under the "User Context" heading.`, and the blank context excludes both; assert neither payload includes `{workflow.output_document}`, `{workflow.additional_context}`, `{workflow.vision_statement}`, `*** conditional prompt segment`, or `*** end conditional prompt segment ***`.
+    [ ] Subtask 17.9: In `integration.test.ts`, add a test named `renders quick-spec Step 2 conditional additional context only when non-empty`. Build Step 2 contexts with `const contextWithAdditionalContext = await buildQuickSpecPromptContext(2, { additionalContext: QUICK_SPEC_ADDITIONAL_CONTEXT })` and `const contextWithoutAdditionalContext = await buildQuickSpecPromptContext(2, { additionalContext: "   " })`. Assign `const fullPayloadWithAdditionalContext = contextWithAdditionalContext.workflowInputPayloadBlock`, `const continuationPayloadWithAdditionalContext = contextWithAdditionalContext.continuationWorkflowInputPayloadBlock`, `const fullPayloadWithoutAdditionalContext = contextWithoutAdditionalContext.workflowInputPayloadBlock`, and `const continuationPayloadWithoutAdditionalContext = contextWithoutAdditionalContext.continuationWorkflowInputPayloadBlock`. Before includes/excludes assertions, add exact narrowing blocks `if (fullPayloadWithAdditionalContext === undefined || fullPayloadWithAdditionalContext === "") { throw new Error("Expected quick-spec Step 2 full workflow input payload with additional context.") }`, `if (continuationPayloadWithAdditionalContext === undefined || continuationPayloadWithAdditionalContext === "") { throw new Error("Expected quick-spec Step 2 continuation workflow input payload with additional context.") }`, `if (fullPayloadWithoutAdditionalContext === undefined || fullPayloadWithoutAdditionalContext === "") { throw new Error("Expected quick-spec Step 2 full workflow input payload without additional context.") }`, and `if (continuationPayloadWithoutAdditionalContext === undefined || continuationPayloadWithoutAdditionalContext === "") { throw new Error("Expected quick-spec Step 2 continuation workflow input payload without additional context.") }`. For `fullPayloadWithAdditionalContext` and `continuationPayloadWithAdditionalContext`, assert each includes `QUICK_SPEC_ADDITIONAL_CONTEXT` and `Add the additional context provided to the spec file under the "User Context" heading.`. For `fullPayloadWithoutAdditionalContext` and `continuationPayloadWithoutAdditionalContext`, assert each excludes `QUICK_SPEC_ADDITIONAL_CONTEXT` and `Add the additional context provided to the spec file under the "User Context" heading.`. For all four narrowed payloads, assert each does not include `{workflow.output_document}`, `{workflow.additional_context}`, `{workflow.vision_statement}`, `*** conditional prompt segment`, or `*** end conditional prompt segment ***`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
@@ -1037,7 +1062,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 21.8: Run `rg -n "build_tech_spec_document|build-tech-spec-document|BuildTechSpecDocumentToolHandler|QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_DEFINITION_ID|tech-spec-wip\\.md" src -g "*.ts" -g "!**/__tests__/**" -g "!**/*.test.ts"` and confirm it returns no matches; exit code `1` with no output is success for this no-match guard.
+    [ ] Subtask 21.8: Run `test ! -e src/shared/build-tech-spec-document.ts` and confirm it exits `0`. Then run `rg -n "build_tech_spec_document|build-tech-spec-document|BuildTechSpecDocumentToolHandler|BUILD_TECH_SPEC_DOCUMENT_WORKFLOW_STEPS|isBuildTechSpecDocumentStep|shouldExposeBuildTechSpecDocument|QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_DEFINITION_ID|tech-spec-wip\\.md" src -g "*.ts" -g "!**/__tests__/**" -g "!**/*.test.ts"` and confirm it returns no matches; exit code `1` with no output is success for the no-match guard.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
@@ -1106,7 +1131,7 @@ Allowed files:
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
 
-    [ ] Subtask 22.9: Run `rg -n "build_tech_spec_document|build-tech-spec-document|BuildTechSpecDocumentToolHandler|QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_DEFINITION_ID|tech-spec-wip\\.md" src -g "*.ts" -g "!**/__tests__/**" -g "!**/*.test.ts"` and confirm it returns no matches; exit code `1` with no output is success for this no-match guard.
+    [ ] Subtask 22.9: Run `test ! -e src/shared/build-tech-spec-document.ts` and confirm it exits `0`. Then run `rg -n "build_tech_spec_document|build-tech-spec-document|BuildTechSpecDocumentToolHandler|BUILD_TECH_SPEC_DOCUMENT_WORKFLOW_STEPS|isBuildTechSpecDocumentStep|shouldExposeBuildTechSpecDocument|QUICK_SPEC_STEP_2_BUILD_TECH_SPEC_DOCUMENT_DEFINITION_ID|tech-spec-wip\\.md" src -g "*.ts" -g "!**/__tests__/**" -g "!**/*.test.ts"` and confirm it returns no matches; exit code `1` with no output is success for the no-match guard.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-spec/action-plan.md`
