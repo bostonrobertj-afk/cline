@@ -1016,7 +1016,7 @@ describe("correctCourseWorkflow", () => {
 		}
 	})
 
-	it("includes Step 3 conditional blocks only when source indicators are yes", () => {
+	it("includes Step 3 conditional sections only when source indicators are yes", () => {
 		const fullPrompt = buildPrompt("step-3", SAMPLE_WORKFLOW_VALUES)
 		expect(fullPrompt).to.include("Correct Course Session")
 		expect(fullPrompt).to.include("correct-course-project")
@@ -1027,10 +1027,14 @@ describe("correctCourseWorkflow", () => {
 		expect(fullPrompt).to.include("1.1")
 		expect(fullPrompt).to.include("Discovered while authoring a specific epic:")
 		expect(fullPrompt).to.include("Discovered while authoring, implementing, or reviewing a specific story:")
+		expect(fullPrompt).not.to.include("*** conditional")
+		expect(fullPrompt).not.to.include("*** end conditional ***")
 
 		const noEpicPrompt = buildPrompt("step-3", { ...SAMPLE_WORKFLOW_VALUES, epic_source_indicator: "no" })
 		expect(noEpicPrompt).not.to.include("Discovered while authoring a specific epic:")
 		expect(noEpicPrompt).to.include("Discovered while authoring, implementing, or reviewing a specific story:")
+		expect(noEpicPrompt).not.to.include("*** conditional")
+		expect(noEpicPrompt).not.to.include("*** end conditional ***")
 
 		const notFoundEpicPrompt = buildPrompt("step-3", {
 			...SAMPLE_WORKFLOW_VALUES,
@@ -1046,6 +1050,8 @@ describe("correctCourseWorkflow", () => {
 		const noStoryIndicatorPrompt = buildPrompt("step-3", { ...SAMPLE_WORKFLOW_VALUES, story_source_indicator: "no" })
 		expect(noStoryIndicatorPrompt).to.include("Discovered while authoring a specific epic:")
 		expect(noStoryIndicatorPrompt).not.to.include("Discovered while authoring, implementing, or reviewing a specific story:")
+		expect(noStoryIndicatorPrompt).not.to.include("*** conditional")
+		expect(noStoryIndicatorPrompt).not.to.include("*** end conditional ***")
 	})
 
 	it("delegates every step to the module-owned tool schema builders", () => {

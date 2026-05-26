@@ -372,81 +372,79 @@ export async function validateAndPersistBlindReviewCommit(
 	}
 }
 
-const BLIND_REVIEW_STEP_2_PROMPT = [
-	"Your job is to perform a blind adversarial review using git-backed evidence to identify misconfigured or lazily-written code. You are not to read any project documentation during this review.",
-	"Use these commit hashes:",
-	"commit hash: {workflow.review_commit_hash}",
-	"parent hash: {workflow.review_commit_parent}",
-	"",
-	"Use only the provided commit hash and parent hash to inspect the implementation changes.",
-	"",
-	"1. Run `git diff --name-status {workflow.review_commit_parent} {workflow.review_commit_hash}` to identify every changed, added, deleted, renamed, or copied file.",
-	"",
-	"2. For each changed file from the name-status output, inspect the implementation diff with:",
-	"   `git diff {workflow.review_commit_parent} {workflow.review_commit_hash} -- <path>`",
-	"   - Ignore project documents which were included in the name-status output.",
-	"",
-	"3. Review every changed file that is not a project document. Do not skip files because they appear small, generated, deleted, renamed, copied, test-only, or configuration-only.",
-	"  - Ignore files located in docs/projects",
-	"",
-	"4. For renamed or copied files, assess both the path change and the content change shown by Git.",
-	"",
-	"5. Do not read the story document, review scope manifest, epics document, architecture document, requirements, action plan, or other planning/source-instruction documents. This is a blind review of the implementation diff only.",
-	"",
-	"6. Based only on the implementation diff, assess the changes using these review lenses:",
-	"",
-	"- Contract pass:",
-	"  - For every changed symbol, ask what visible caller, callee, serializer, validator, storage path, UI path, or test depends on this shape, name, default, or behavior.",
-	"  - Look for changed code that references symbols, files, routes, tools, values, or tests that were not updated in the same commit.",
-	"  - Look for broken or stale imports/exports, inconsistent names/constants, and deleted or renamed files that leave visible stale references.",
-	"",
-	"- Omission pass:",
-	"  - Ask what should have changed with this based only on the diff.",
-	"  - Look for missing wiring, registrations, migrations, feature flags, permissions, cleanup, or tests that are implied by changed code.",
-	"",
-	"- Failure-path pass:",
-	"  - Ignore happy path and test the diff mentally under null, empty, malformed, duplicate, stale, slow, unauthorized, partial, retried, and concurrent conditions.",
-	"  - Look for missing error handling around newly introduced failure paths.",
-	"",
-	"- State pass:",
-	"  - Track changed state lifecycle by hand: where it is created, transformed, cached, invalidated, retried, rolled back, and cleared.",
-	"  - Look for new persistence/writes without a corresponding read/use path visible in the diff.",
-	"",
-	"- Config pass:",
-	"  - Check assumptions in constants, defaults, env vars, paths, timeout values, fallback branches, and temporary bypasses.",
-	"  - Look for hardcoded values where the diff itself shows an existing constant, enum, helper, or configuration path should be used.",
-	"",
-	"- Compatibility pass:",
-	"  - Ask what older callers, persisted data, or partial deploys would do against the changed behavior when that risk is visible from the diff.",
-	"  - Look for interface drift: renamed fields, changed enums, altered return shapes, optionality changes, and default changes.",
-	"",
-	"- Type-safety pass:",
-	"  - Look for `any`, `as any`, forced casts used instead of narrowing, non-null assertions where runtime absence is possible, incomplete discriminated-union handling, missing explicit return types on new helpers, and truthy/falsy checks where explicit checks are needed.",
-	"",
-	"- Implementation hygiene pass:",
-	"  - Look for unused imports, unused helpers, dead branches, commented-out experiments, duplicate logic, partial scaffolding, broad catches, silent fallbacks, optionalized requirements, deferred TODOs, and code that appears added only to satisfy checks rather than to preserve correctness.",
-	"",
-	"- Test skepticism pass:",
-	"  - Treat tests as claims, not proof.",
-	"  - Look for tests asserting implementation trivia without behavior, incomplete or malformed fixtures, tests updated inconsistently with runtime behavior, happy-path-only coverage, snapshots hiding logic changes, mocks that no longer match reality, and missing regression coverage.",
-	"",
-	"- Behavioral-risk pass:",
-	"  - Look for changed conditionals that appear inverted or unreachable.",
-	"  - Look for new async operations without awaiting or error handling.",
-	"  - Look for boundary violations visible in the diff, such as trust moved from server to client, authorization checked only in UI, skipped sanitization, or path/command injection risk.",
-	"",
-	"7. Document your findings in {workflow.blind_review_output} including:",
-	"   - any findings, ordered by severity.",
-	"   - for each finding, include:",
-	"    - a brief title for the finding",
-	"    - file/path references for each finding",
-	"    - a detailed description of the finding",
-	"   - a clear statement if no actionable issues were found",
-	"",
-	"Once you've completed your review and documented your findings, use attempt_completion to provide a review summary including:",
-	"- number of findings, or statement that no findings were identified",
-	"- full file path for your output: {workflow.blind_review_output}",
-].join("\n")
+const BLIND_REVIEW_STEP_2_PROMPT = `Your job is to perform a blind adversarial review using git-backed evidence to identify misconfigured or lazily-written code. You are not to read any project documentation during this review.
+Use these commit hashes:
+commit hash: {workflow.review_commit_hash}
+parent hash: {workflow.review_commit_parent}
+
+Use only the provided commit hash and parent hash to inspect the implementation changes.
+
+1. Run \`git diff --name-status {workflow.review_commit_parent} {workflow.review_commit_hash}\` to identify every changed, added, deleted, renamed, or copied file.
+
+2. For each changed file from the name-status output, inspect the implementation diff with:
+   \`git diff {workflow.review_commit_parent} {workflow.review_commit_hash} -- <path>\`
+   - Ignore project documents which were included in the name-status output.
+
+3. Review every changed file that is not a project document. Do not skip files because they appear small, generated, deleted, renamed, copied, test-only, or configuration-only.
+  - Ignore files located in docs/projects
+
+4. For renamed or copied files, assess both the path change and the content change shown by Git.
+
+5. Do not read the story document, review scope manifest, epics document, architecture document, requirements, action plan, or other planning/source-instruction documents. This is a blind review of the implementation diff only.
+
+6. Based only on the implementation diff, assess the changes using these review lenses:
+
+- Contract pass:
+  - For every changed symbol, ask what visible caller, callee, serializer, validator, storage path, UI path, or test depends on this shape, name, default, or behavior.
+  - Look for changed code that references symbols, files, routes, tools, values, or tests that were not updated in the same commit.
+  - Look for broken or stale imports/exports, inconsistent names/constants, and deleted or renamed files that leave visible stale references.
+
+- Omission pass:
+  - Ask what should have changed with this based only on the diff.
+  - Look for missing wiring, registrations, migrations, feature flags, permissions, cleanup, or tests that are implied by changed code.
+
+- Failure-path pass:
+  - Ignore happy path and test the diff mentally under null, empty, malformed, duplicate, stale, slow, unauthorized, partial, retried, and concurrent conditions.
+  - Look for missing error handling around newly introduced failure paths.
+
+- State pass:
+  - Track changed state lifecycle by hand: where it is created, transformed, cached, invalidated, retried, rolled back, and cleared.
+  - Look for new persistence/writes without a corresponding read/use path visible in the diff.
+
+- Config pass:
+  - Check assumptions in constants, defaults, env vars, paths, timeout values, fallback branches, and temporary bypasses.
+  - Look for hardcoded values where the diff itself shows an existing constant, enum, helper, or configuration path should be used.
+
+- Compatibility pass:
+  - Ask what older callers, persisted data, or partial deploys would do against the changed behavior when that risk is visible from the diff.
+  - Look for interface drift: renamed fields, changed enums, altered return shapes, optionality changes, and default changes.
+
+- Type-safety pass:
+  - Look for \`any\`, \`as any\`, forced casts used instead of narrowing, non-null assertions where runtime absence is possible, incomplete discriminated-union handling, missing explicit return types on new helpers, and truthy/falsy checks where explicit checks are needed.
+
+- Implementation hygiene pass:
+  - Look for unused imports, unused helpers, dead branches, commented-out experiments, duplicate logic, partial scaffolding, broad catches, silent fallbacks, optionalized requirements, deferred TODOs, and code that appears added only to satisfy checks rather than to preserve correctness.
+
+- Test skepticism pass:
+  - Treat tests as claims, not proof.
+  - Look for tests asserting implementation trivia without behavior, incomplete or malformed fixtures, tests updated inconsistently with runtime behavior, happy-path-only coverage, snapshots hiding logic changes, mocks that no longer match reality, and missing regression coverage.
+
+- Behavioral-risk pass:
+  - Look for changed conditionals that appear inverted or unreachable.
+  - Look for new async operations without awaiting or error handling.
+  - Look for boundary violations visible in the diff, such as trust moved from server to client, authorization checked only in UI, skipped sanitization, or path/command injection risk.
+
+7. Document your findings in {workflow.blind_review_output} including:
+   - any findings, ordered by severity.
+   - for each finding, include:
+    - a brief title for the finding
+    - file/path references for each finding
+    - a detailed description of the finding
+   - a clear statement if no actionable issues were found
+
+Once you've completed your review and documented your findings, use attempt_completion to provide a review summary including:
+- number of findings, or statement that no findings were identified
+- full file path for your output: {workflow.blind_review_output}`
 
 function buildStep2PromptSource(): WorkflowStepPromptSource {
 	return {

@@ -406,215 +406,70 @@ function createStepDefinition(args: {
 	return stepDefinition
 }
 
-const PI_PLANNING_STEP_2_WITH_BRAINSTORMING_AND_ADDITIONAL_CONTEXT_PROMPT_TEMPLATE = `Prepare to break a single epic down into deliverable user stories.
+const PI_PLANNING_STEP_2_BASE_PROMPT_TEMPLATE = `Your goal in this workflow is to break a single epic down into deliverable user stories. In this step, you will prepare by reading relevant context. Do not begin generating stories in this step.
+You will be focusing on \`{workflow.target_epic}\` during this workflow.
+*** Primary Context: ***
+  \`{workflow.epics_index}\`
+  \`{workflow.epics_document}\`
+  \`{workflow.architecture_document}\``
 
-Focus only on \`{workflow.target_epic}\`.
+const PI_PLANNING_STEP_2_SECONDARY_CONTEXT_HEADER_PROMPT_TEMPLATE = `*** Secondary Context ***`
 
-Read \`{workflow.epics_index}\`, \`{workflow.epics_document}\`, and \`{workflow.architecture_document}\`.
+const PI_PLANNING_STEP_2_BRAINSTORMING_CONTEXT_PROMPT_TEMPLATE = `  \`{workflow.brainstorming_document}\``
 
-Read the optional brainstorming document when present and approved: \`{workflow.brainstorming_document}\`.
+const PI_PLANNING_STEP_2_ADDITIONAL_CONTEXT_PROMPT_TEMPLATE = `  \`{workflow.additional_context}\``
 
-Read additional context files when provided and relevant: \`{workflow.additional_context}\`.
+const PI_PLANNING_STEP_2_ASSESSMENT_PROMPT_TEMPLATE = `Assess the provided context for issues, guidance, scope, risks, or requirements relevant to \`{workflow.target_epic}\`, including:
+- conflicts between the target epic and architecture decisions, constraints, components, data models, integrations, or deployment assumptions
+- ambiguity in the epic objective, requirements, scope, or scope boundary
+- missing architectural guidance needed to sequence or size stories
+- missing dependencies, prerequisite capabilities, shared contracts, or validation expectations
+- requirements in the epic that appear unsupported by the architecture document
+- architecture decisions that imply work not captured in the target epic
+- risks that would prevent coherent story breakdown, such as unclear ownership, incomplete external-system behavior, unresolved UX/data/API expectations, or contradictory constraints
 
-Assess the available context for issues, guidance, scope, risks, or requirements relevant to \`{workflow.target_epic}\`.
+Do not silently resolve conflicts or fill gaps with assumptions. If you identify material conflicts, ambiguities, or missing information, summarize them for the user as questions or decisions needed before story drafting can begin.
 
-Identify conflicts between the target epic and architecture decisions, constraints, components, data models, integrations, or deployment assumptions.
+If issues are minor and do not block story drafting, note them briefly and explain to the user how you will account for them during story decomposition.
 
-Identify ambiguity in the epic objective, requirements, scope, or scope boundary.
+Only proceed after the user has clarified blocking issues or confirmed that the current context is sufficient. At that point call workflow_progress_request to unlock the next workflow step's instructions.`
 
-Identify missing architectural guidance needed to sequence or size stories.
+const PI_PLANNING_STEP_3_EXISTING_STORY_INDEX_PROMPT_TEMPLATE = `Review the existing story files for this epic in {workflow.drafts_folder}.`
 
-Identify missing dependencies, prerequisite capabilities, shared contracts, or validation expectations.
+const PI_PLANNING_STEP_3_BODY_PROMPT_TEMPLATE = `Review provided context and existing runtime code/ tests to determine the full set of stories needed to support delivery of {workflow.target_epic}.
 
-Identify requirements in the epic that appear unsupported by the architecture document.
+A story should represent one coherent, testable capability outcome. It may include backend, UI, prompt/schema, state, docs, and tests later, but only when those pieces are required to deliver the same outcome.
 
-Identify architecture decisions that imply work not captured in the target epic.
+Split a story if:
+- The objective contains multiple independent outcomes.
+- One part can ship or be validated without the other.
+- It crosses a major lifecycle boundary.
+- It would need separate QA gates.
+- Its requirements cannot be summarized clearly under one Objective.
 
-Identify risks that would prevent coherent story breakdown.
+Stories should not be created that are only file edits, test updates, cleanup chores, or technical layers unless that layer is itself the deliverable contract.
 
-Do not silently resolve conflicts or fill gaps with assumptions.
+Once you've determined how many stories are needed, provide an update to the user explaining how many stories are needed, then call workflow_progress_request to unlock the next workflow step's instructions.`
 
-Summarize material conflicts, ambiguities, or missing information to the user as questions or decisions needed before story drafting can begin.
+const PI_PLANNING_STEP_4_EXISTING_STORY_INDEX_PROMPT_TEMPLATE = `This system uses a story index as the canonical indicator of which stories must exist for each epic.
+Target epic: {workflow.target_epic}
+Story Index: {workflow.stories_index}
 
-Briefly note non-blocking issues and explain how they will be accounted for during story decomposition.
+Review the existing story index, then call plan_story_artifacts if additional stories are required beyond what the story index indicates. Use {workflow.epic_identity} when calling the tool. Indicate how many story files are needed to support delivery of {workflow.target_epic}. This tool will add additional stories to the existing story index when you indicate a number of stories greater than the index already contains. e.g. if a story index exists with three story files, and you call plan_story_artifacts and include story_count: 5, the tool will add 2 additional stories to the index so that it contains a total of 5 stories.
 
-Call \`workflow_progress_request\` only after the user clarifies blocking issues or confirms the current context is sufficient.`
+If the existing story index does not need additional stories added, use workflow_progress_request to unlock the next workflow step's instructions.`
 
-const PI_PLANNING_STEP_2_WITH_BRAINSTORMING_ONLY_PROMPT_TEMPLATE = `Prepare to break a single epic down into deliverable user stories.
+const PI_PLANNING_STEP_4_NEW_STORY_INDEX_PROMPT_TEMPLATE = `This system uses a story index as the canonical indicator of which stories must exist for each epic. Generate the story index by calling plan_story_artifacts and including the total number of stories required in the story_count field. Use {workflow.epic_identity} when calling the tool.
 
-Focus only on \`{workflow.target_epic}\`.
+Once you generate the story index, call set_workflow_values to set the generated file's full file path as the stories_index workflow session key.`
 
-Read \`{workflow.epics_index}\`, \`{workflow.epics_document}\`, and \`{workflow.architecture_document}\`.
+const PI_PLANNING_STEP_4_STORY_INDEX_LOCATION_PROMPT_TEMPLATE = `The story index file can be found in {workflow.implementation_folder}.`
 
-Read the optional brainstorming document when present and approved: \`{workflow.brainstorming_document}\`.
+const PI_PLANNING_STEP_5_EXISTING_STORY_INDEX_PROMPT_TEMPLATE = `Call generate_story_files to generate one templatized story for each story in {workflow.stories_index} for which a story file does not already exist. The tool automatically identifies stories with index entries for which there is not an existing story document and generates the files for you. Use {workflow.epic_identity} when calling the tool.`
 
-Read additional context files when provided and relevant: \`not provided\`.
+const PI_PLANNING_STEP_5_NEW_STORY_INDEX_PROMPT_TEMPLATE = `Call generate_story_files to generate one templatized story file for each story in {workflow.stories_index}. Use {workflow.epic_identity} when calling the tool.`
 
-Assess the available context for issues, guidance, scope, risks, or requirements relevant to \`{workflow.target_epic}\`.
-
-Identify conflicts between the target epic and architecture decisions, constraints, components, data models, integrations, or deployment assumptions.
-
-Identify ambiguity in the epic objective, requirements, scope, or scope boundary.
-
-Identify missing architectural guidance needed to sequence or size stories.
-
-Identify missing dependencies, prerequisite capabilities, shared contracts, or validation expectations.
-
-Identify requirements in the epic that appear unsupported by the architecture document.
-
-Identify architecture decisions that imply work not captured in the target epic.
-
-Identify risks that would prevent coherent story breakdown.
-
-Do not silently resolve conflicts or fill gaps with assumptions.
-
-Summarize material conflicts, ambiguities, or missing information to the user as questions or decisions needed before story drafting can begin.
-
-Briefly note non-blocking issues and explain how they will be accounted for during story decomposition.
-
-Call \`workflow_progress_request\` only after the user clarifies blocking issues or confirms the current context is sufficient.`
-
-const PI_PLANNING_STEP_2_WITH_ADDITIONAL_CONTEXT_ONLY_PROMPT_TEMPLATE = `Prepare to break a single epic down into deliverable user stories.
-
-Focus only on \`{workflow.target_epic}\`.
-
-Read \`{workflow.epics_index}\`, \`{workflow.epics_document}\`, and \`{workflow.architecture_document}\`.
-
-Read the optional brainstorming document when present and approved: \`not provided\`.
-
-Read additional context files when provided and relevant: \`{workflow.additional_context}\`.
-
-Assess the available context for issues, guidance, scope, risks, or requirements relevant to \`{workflow.target_epic}\`.
-
-Identify conflicts between the target epic and architecture decisions, constraints, components, data models, integrations, or deployment assumptions.
-
-Identify ambiguity in the epic objective, requirements, scope, or scope boundary.
-
-Identify missing architectural guidance needed to sequence or size stories.
-
-Identify missing dependencies, prerequisite capabilities, shared contracts, or validation expectations.
-
-Identify requirements in the epic that appear unsupported by the architecture document.
-
-Identify architecture decisions that imply work not captured in the target epic.
-
-Identify risks that would prevent coherent story breakdown.
-
-Do not silently resolve conflicts or fill gaps with assumptions.
-
-Summarize material conflicts, ambiguities, or missing information to the user as questions or decisions needed before story drafting can begin.
-
-Briefly note non-blocking issues and explain how they will be accounted for during story decomposition.
-
-Call \`workflow_progress_request\` only after the user clarifies blocking issues or confirms the current context is sufficient.`
-
-const PI_PLANNING_STEP_2_WITHOUT_OPTIONAL_CONTEXT_PROMPT_TEMPLATE = `Prepare to break a single epic down into deliverable user stories.
-
-Focus only on \`{workflow.target_epic}\`.
-
-Read \`{workflow.epics_index}\`, \`{workflow.epics_document}\`, and \`{workflow.architecture_document}\`.
-
-Read the optional brainstorming document when present and approved: \`not provided\`.
-
-Read additional context files when provided and relevant: \`not provided\`.
-
-Assess the available context for issues, guidance, scope, risks, or requirements relevant to \`{workflow.target_epic}\`.
-
-Identify conflicts between the target epic and architecture decisions, constraints, components, data models, integrations, or deployment assumptions.
-
-Identify ambiguity in the epic objective, requirements, scope, or scope boundary.
-
-Identify missing architectural guidance needed to sequence or size stories.
-
-Identify missing dependencies, prerequisite capabilities, shared contracts, or validation expectations.
-
-Identify requirements in the epic that appear unsupported by the architecture document.
-
-Identify architecture decisions that imply work not captured in the target epic.
-
-Identify risks that would prevent coherent story breakdown.
-
-Do not silently resolve conflicts or fill gaps with assumptions.
-
-Summarize material conflicts, ambiguities, or missing information to the user as questions or decisions needed before story drafting can begin.
-
-Briefly note non-blocking issues and explain how they will be accounted for during story decomposition.
-
-Call \`workflow_progress_request\` only after the user clarifies blocking issues or confirms the current context is sufficient.`
-
-const PI_PLANNING_STEP_3_WITH_EXISTING_STORY_INDEX_PROMPT_TEMPLATE = `Review the provided context and existing runtime code/tests to determine the full set of stories needed to support delivery of \`{workflow.target_epic}\`.
-
-An existing story index is present at \`{workflow.stories_index}\`. Review the existing story files for this epic in \`{workflow.drafts_folder}\` before deciding whether more stories are needed.
-
-Treat a story as one coherent, testable capability outcome.
-
-Allow backend, UI, prompt/schema, state, docs, and tests in one story only when those pieces are required to deliver the same outcome.
-
-Split a story when the objective contains multiple independent outcomes, one part can ship or be validated without the other, it crosses a major lifecycle boundary, it would need separate QA gates, or its requirements cannot be summarized clearly under one objective.
-
-Avoid stories that are only file edits, test updates, cleanup chores, or technical layers unless that layer is itself the deliverable contract.
-
-Provide an update to the user explaining how many stories are needed.
-
-Call \`workflow_progress_request\` after explaining the story count.`
-
-const PI_PLANNING_STEP_3_WITHOUT_EXISTING_STORY_INDEX_PROMPT_TEMPLATE = `Review the provided context and existing runtime code/tests to determine the full set of stories needed to support delivery of \`{workflow.target_epic}\`.
-
-Treat a story as one coherent, testable capability outcome.
-
-Allow backend, UI, prompt/schema, state, docs, and tests in one story only when those pieces are required to deliver the same outcome.
-
-Split a story when the objective contains multiple independent outcomes, one part can ship or be validated without the other, it crosses a major lifecycle boundary, it would need separate QA gates, or its requirements cannot be summarized clearly under one objective.
-
-Avoid stories that are only file edits, test updates, cleanup chores, or technical layers unless that layer is itself the deliverable contract.
-
-Provide an update to the user explaining how many stories are needed.
-
-Call \`workflow_progress_request\` after explaining the story count.`
-
-const PI_PLANNING_STEP_4_WITH_EXISTING_STORY_INDEX_PROMPT_TEMPLATE = `Generate an updated story index for \`{workflow.target_epic}\`.
-
-The story index file is in \`{workflow.implementation_folder}\`.
-
-Story-index branch: an existing \`stories_index\` is present at \`{workflow.stories_index}\`.
-
-Review the existing story index.
-
-Call \`plan_story_artifacts\` only if additional stories are required beyond what the story index indicates.
-
-When calling \`plan_story_artifacts\`, pass \`{workflow.epic_identity}\` as \`epic_identity\`.
-
-When calling \`plan_story_artifacts\`, provide the total number of stories required for \`{workflow.target_epic}\` as \`story_count\`, not the number of newly added stories.
-
-Calling \`plan_story_artifacts\` with a \`story_count\` greater than the existing indexed count appends missing primary story entries up to that total.
-
-Call \`workflow_progress_request\` when no additional stories are required.`
-
-const PI_PLANNING_STEP_4_WITHOUT_EXISTING_STORY_INDEX_PROMPT_TEMPLATE = `Generate an updated story index for \`{workflow.target_epic}\`.
-
-The story index file is in \`{workflow.implementation_folder}\`.
-
-Story-index branch: no \`stories_index\` existed at workflow start for \`{workflow.target_epic}\`.
-
-Call \`plan_story_artifacts\`.
-
-Pass \`{workflow.epic_identity}\` as \`epic_identity\`.
-
-Provide the total number of stories required for \`{workflow.target_epic}\` as \`story_count\`.
-
-After successful story-index generation, call \`set_workflow_values\` to persist the generated story index absolute path as \`stories_index\`. The story index file belongs in \`{workflow.implementation_folder}\` and should use the selected epic identity in the generated story-index filename.`
-
-const PI_PLANNING_STEP_5_WITH_EXISTING_STORY_INDEX_PROMPT_TEMPLATE = `Story-file branch: an existing \`stories_index\` was present at workflow start at \`{workflow.stories_index}\`. Call \`generate_story_files\` to generate one templatized story for each indexed story that does not already have an existing story document.
-
-Pass \`{workflow.epic_identity}\` as \`epic_identity\` when calling \`generate_story_files\`.
-
-Generated story files can be found in \`{workflow.drafts_folder}\`.`
-
-const PI_PLANNING_STEP_5_WITHOUT_EXISTING_STORY_INDEX_PROMPT_TEMPLATE = `Story-file branch: no story index existed at workflow start. Call \`generate_story_files\` to generate one templatized story file for each story in \`stories_index\`.
-
-Pass \`{workflow.epic_identity}\` as \`epic_identity\` when calling \`generate_story_files\`.
-
-Generated story files can be found in \`{workflow.drafts_folder}\`.`
+const PI_PLANNING_STEP_5_STORY_FILES_LOCATION_PROMPT_TEMPLATE = `Generated story files can be found in {workflow.drafts_folder}.`
 
 const PI_PLANNING_STEP_6_EDIT_EXISTING_STORY_FILE_PROMPT_TEMPLATE = `You have been called inside a workflow designed to revise the initial sections of an implementation-ready story file in response to violations found during pre-implementation validation.
 - Project: {workflow.projectTitle}
@@ -673,56 +528,81 @@ Once every story file in {workflow.drafts_folder} contains the required informat
 Once the user is fully aligned with the story set and each story's content, use attempt_completion to provide a final workflow recap to the user, and remind them to run create_story for each generated story to generate story tasks before implementation.`
 
 function buildStep2PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
-	const hasBrainstormingDocument =
-		readWorkflowStringValue(input.session.workflowValues, PiPlanningWorkflowValueKey.BrainstormingDocument) !== undefined
-	const hasAdditionalContext =
-		readWorkflowStringValue(input.session.workflowValues, PiPlanningWorkflowValueKey.AdditionalContext) !== undefined
-	const currentStepInstructionTemplate =
-		hasBrainstormingDocument === true && hasAdditionalContext === true
-			? PI_PLANNING_STEP_2_WITH_BRAINSTORMING_AND_ADDITIONAL_CONTEXT_PROMPT_TEMPLATE
-			: hasBrainstormingDocument === true
-				? PI_PLANNING_STEP_2_WITH_BRAINSTORMING_ONLY_PROMPT_TEMPLATE
-				: hasAdditionalContext === true
-					? PI_PLANNING_STEP_2_WITH_ADDITIONAL_CONTEXT_ONLY_PROMPT_TEMPLATE
-					: PI_PLANNING_STEP_2_WITHOUT_OPTIONAL_CONTEXT_PROMPT_TEMPLATE
+	const promptSections = [PI_PLANNING_STEP_2_BASE_PROMPT_TEMPLATE]
+	const secondaryContextLines: string[] = []
+	const brainstormingDocument = input.session.workflowValues[PiPlanningWorkflowValueKey.BrainstormingDocument]
+	const additionalContext = input.session.workflowValues[PiPlanningWorkflowValueKey.AdditionalContext]
 
-	return { kind: "current_step_instruction_template", currentStepInstructionTemplate }
+	if (typeof brainstormingDocument === "string" && brainstormingDocument.trim().length > 0) {
+		secondaryContextLines.push(PI_PLANNING_STEP_2_BRAINSTORMING_CONTEXT_PROMPT_TEMPLATE)
+	}
+
+	if (typeof additionalContext === "string" && additionalContext.trim().length > 0) {
+		secondaryContextLines.push(PI_PLANNING_STEP_2_ADDITIONAL_CONTEXT_PROMPT_TEMPLATE)
+	}
+
+	if (secondaryContextLines.length > 0) {
+		promptSections.push([PI_PLANNING_STEP_2_SECONDARY_CONTEXT_HEADER_PROMPT_TEMPLATE, ...secondaryContextLines].join("\n"))
+	}
+
+	promptSections.push(PI_PLANNING_STEP_2_ASSESSMENT_PROMPT_TEMPLATE)
+
+	return {
+		kind: "current_step_instruction_template",
+		currentStepInstructionTemplate: promptSections.join("\n\n"),
+	}
 }
 
 function buildStep3PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
 	const storiesIndexExistedAtWorkflowStart =
 		readWorkflowBooleanValue(input.session.workflowValues, PiPlanningWorkflowValueKey.StoriesIndexExistedAtWorkflowStart) ===
 		true
-	const currentStepInstructionTemplate =
-		storiesIndexExistedAtWorkflowStart === true
-			? PI_PLANNING_STEP_3_WITH_EXISTING_STORY_INDEX_PROMPT_TEMPLATE
-			: PI_PLANNING_STEP_3_WITHOUT_EXISTING_STORY_INDEX_PROMPT_TEMPLATE
+	const promptSections: string[] = []
 
-	return { kind: "current_step_instruction_template", currentStepInstructionTemplate }
+	if (storiesIndexExistedAtWorkflowStart === true) {
+		promptSections.push(PI_PLANNING_STEP_3_EXISTING_STORY_INDEX_PROMPT_TEMPLATE)
+	}
+
+	promptSections.push(PI_PLANNING_STEP_3_BODY_PROMPT_TEMPLATE)
+
+	return {
+		kind: "current_step_instruction_template",
+		currentStepInstructionTemplate: promptSections.join("\n\n"),
+	}
 }
 
 function buildStep4PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
 	const storiesIndexExistedAtWorkflowStart =
 		readWorkflowBooleanValue(input.session.workflowValues, PiPlanningWorkflowValueKey.StoriesIndexExistedAtWorkflowStart) ===
 		true
-	const currentStepInstructionTemplate =
+	const branchPromptTemplate =
 		storiesIndexExistedAtWorkflowStart === true
-			? PI_PLANNING_STEP_4_WITH_EXISTING_STORY_INDEX_PROMPT_TEMPLATE
-			: PI_PLANNING_STEP_4_WITHOUT_EXISTING_STORY_INDEX_PROMPT_TEMPLATE
+			? PI_PLANNING_STEP_4_EXISTING_STORY_INDEX_PROMPT_TEMPLATE
+			: PI_PLANNING_STEP_4_NEW_STORY_INDEX_PROMPT_TEMPLATE
 
-	return { kind: "current_step_instruction_template", currentStepInstructionTemplate }
+	return {
+		kind: "current_step_instruction_template",
+		currentStepInstructionTemplate: [branchPromptTemplate, PI_PLANNING_STEP_4_STORY_INDEX_LOCATION_PROMPT_TEMPLATE].join(
+			"\n\n",
+		),
+	}
 }
 
 function buildStep5PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
 	const storiesIndexExistedAtWorkflowStart =
 		readWorkflowBooleanValue(input.session.workflowValues, PiPlanningWorkflowValueKey.StoriesIndexExistedAtWorkflowStart) ===
 		true
-	const currentStepInstructionTemplate =
+	const branchPromptTemplate =
 		storiesIndexExistedAtWorkflowStart === true
-			? PI_PLANNING_STEP_5_WITH_EXISTING_STORY_INDEX_PROMPT_TEMPLATE
-			: PI_PLANNING_STEP_5_WITHOUT_EXISTING_STORY_INDEX_PROMPT_TEMPLATE
+			? PI_PLANNING_STEP_5_EXISTING_STORY_INDEX_PROMPT_TEMPLATE
+			: PI_PLANNING_STEP_5_NEW_STORY_INDEX_PROMPT_TEMPLATE
 
-	return { kind: "current_step_instruction_template", currentStepInstructionTemplate }
+	return {
+		kind: "current_step_instruction_template",
+		currentStepInstructionTemplate: [branchPromptTemplate, PI_PLANNING_STEP_5_STORY_FILES_LOCATION_PROMPT_TEMPLATE].join(
+			"\n\n",
+		),
+	}
 }
 
 function buildStep6PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
@@ -1757,10 +1637,11 @@ export const piPlanningWorkflowDefinition: WorkflowDefinition = {
 			decisionTree: buildStep2DecisionTree(),
 			buildPromptSource: buildStep2PromptSource,
 			promptTemplates: [
-				PI_PLANNING_STEP_2_WITH_BRAINSTORMING_AND_ADDITIONAL_CONTEXT_PROMPT_TEMPLATE,
-				PI_PLANNING_STEP_2_WITH_BRAINSTORMING_ONLY_PROMPT_TEMPLATE,
-				PI_PLANNING_STEP_2_WITH_ADDITIONAL_CONTEXT_ONLY_PROMPT_TEMPLATE,
-				PI_PLANNING_STEP_2_WITHOUT_OPTIONAL_CONTEXT_PROMPT_TEMPLATE,
+				PI_PLANNING_STEP_2_BASE_PROMPT_TEMPLATE,
+				PI_PLANNING_STEP_2_SECONDARY_CONTEXT_HEADER_PROMPT_TEMPLATE,
+				PI_PLANNING_STEP_2_BRAINSTORMING_CONTEXT_PROMPT_TEMPLATE,
+				PI_PLANNING_STEP_2_ADDITIONAL_CONTEXT_PROMPT_TEMPLATE,
+				PI_PLANNING_STEP_2_ASSESSMENT_PROMPT_TEMPLATE,
 			],
 			buildToolSchema: buildPiPlanningStep2ToolSchemas,
 		}),
@@ -1769,10 +1650,7 @@ export const piPlanningWorkflowDefinition: WorkflowDefinition = {
 			checklistLabel: "Determine How Many Stories Are Needed",
 			decisionTree: buildStep3DecisionTree(),
 			buildPromptSource: buildStep3PromptSource,
-			promptTemplates: [
-				PI_PLANNING_STEP_3_WITH_EXISTING_STORY_INDEX_PROMPT_TEMPLATE,
-				PI_PLANNING_STEP_3_WITHOUT_EXISTING_STORY_INDEX_PROMPT_TEMPLATE,
-			],
+			promptTemplates: [PI_PLANNING_STEP_3_EXISTING_STORY_INDEX_PROMPT_TEMPLATE, PI_PLANNING_STEP_3_BODY_PROMPT_TEMPLATE],
 			buildToolSchema: buildPiPlanningStep3ToolSchemas,
 		}),
 		"step-4": createStepDefinition({
@@ -1781,8 +1659,9 @@ export const piPlanningWorkflowDefinition: WorkflowDefinition = {
 			decisionTree: buildStep4DecisionTree(),
 			buildPromptSource: buildStep4PromptSource,
 			promptTemplates: [
-				PI_PLANNING_STEP_4_WITH_EXISTING_STORY_INDEX_PROMPT_TEMPLATE,
-				PI_PLANNING_STEP_4_WITHOUT_EXISTING_STORY_INDEX_PROMPT_TEMPLATE,
+				PI_PLANNING_STEP_4_EXISTING_STORY_INDEX_PROMPT_TEMPLATE,
+				PI_PLANNING_STEP_4_NEW_STORY_INDEX_PROMPT_TEMPLATE,
+				PI_PLANNING_STEP_4_STORY_INDEX_LOCATION_PROMPT_TEMPLATE,
 			],
 			buildToolSchema: buildPiPlanningStep4ToolSchemas,
 		}),
@@ -1792,8 +1671,9 @@ export const piPlanningWorkflowDefinition: WorkflowDefinition = {
 			decisionTree: buildStep5DecisionTree(),
 			buildPromptSource: buildStep5PromptSource,
 			promptTemplates: [
-				PI_PLANNING_STEP_5_WITH_EXISTING_STORY_INDEX_PROMPT_TEMPLATE,
-				PI_PLANNING_STEP_5_WITHOUT_EXISTING_STORY_INDEX_PROMPT_TEMPLATE,
+				PI_PLANNING_STEP_5_EXISTING_STORY_INDEX_PROMPT_TEMPLATE,
+				PI_PLANNING_STEP_5_NEW_STORY_INDEX_PROMPT_TEMPLATE,
+				PI_PLANNING_STEP_5_STORY_FILES_LOCATION_PROMPT_TEMPLATE,
 			],
 			buildToolSchema: buildPiPlanningStep5ToolSchemas,
 		}),

@@ -164,6 +164,12 @@ Launch three subagents and assign their specialized code review workflows:
 
 Once all three subagents are done and shut down, call workflow_progress_request to unlock the next workflow step's instructions.`
 
+const CODE_REVIEW_STEP_2_MISSING_SUBAGENT_OUTPUT_HEADER =
+	"These subagent output files were not found in the project's review folder:"
+
+const CODE_REVIEW_STEP_2_MISSING_SUBAGENT_OUTPUT_INSTRUCTION =
+	"Please launch a new subagent and assign them to the workflow associated with the missing file."
+
 const CODE_REVIEW_STEP_3_PROMPT = `Subagent findings are available:
 Blind Review: {workflow.blind_review_output}
 Edge Case Hunter: {workflow.edge_case_review_output}
@@ -201,16 +207,13 @@ After presenting findings to the user, call workflow_progress_request to unlock 
 
 const CODE_REVIEW_STEP_4_BASE_PROMPT = "Review the findings in {workflow.code_review_output}."
 
-const CODE_REVIEW_STEP_4_UPSTREAM_FAILURE_PROMPT = `*** Conditional prompting: Runtime must assess the findings in the code-review-output document. If any findings are present under "upstream failure", then the following prompt must be shown: ***
-For findings listed under "upstream failure", determine which project documents require revision before a remediation story can be generated. Project documents include:
+const CODE_REVIEW_STEP_4_UPSTREAM_FAILURE_PROMPT = `For findings listed under "upstream failure", determine which project documents require revision before a remediation story can be generated. Project documents include:
 - {workflow.architecture_document}
 - {workflow.epics_document}
 
-Determine the exact revisions necessary, then message the user providing the exact proposed revisions and justification. Upon user approval, update the project documents with the approved revisions only, then follow the additional instructions below.
-*** end conditional prompt block ***`
+Determine the exact revisions necessary, then message the user providing the exact proposed revisions and justification. Upon user approval, update the project documents with the approved revisions only, then follow the additional instructions below.`
 
-const CODE_REVIEW_STEP_4_REMEDIATION_STORY_PROMPT = `*** Conditional prompting: shown only if a remediation story was generated: ***
-You'll now prepare a remediation story based on the documented review findings.
+const CODE_REVIEW_STEP_4_REMEDIATION_STORY_PROMPT = `You'll now prepare a remediation story based on the documented review findings.
 Read the following relevant files:
 - {workflow.architecture_document}
 - {workflow.epics_document}
@@ -230,8 +233,7 @@ Present proposed drafts for the content to be added to the user, and add it to t
 
 You must not populate the tasks section of the story document. 
 
-Once you've populated the assigned sections of the story document, use attempt_completion to send a final message to the user informing them that you have produced the remediation story. Include the full file path to the document in your message, which is {workflow.remediation_story}, and remind the user to run the write-remediation-story workflow to finalize the story by generating tasks and subtasks.
-*** End conditional prompt block ***`
+Once you've populated the assigned sections of the story document, use attempt_completion to send a final message to the user informing them that you have produced the remediation story. Include the full file path to the document in your message, which is {workflow.remediation_story}, and remind the user to run the write-remediation-story workflow to finalize the story by generating tasks and subtasks.`
 
 const CODE_REVIEW_FINDINGS_HEADINGS = ["## Task Failures", "## Dev Agent Failures", "## Upstream Failures"] as const
 
@@ -1280,11 +1282,15 @@ function buildStep2PromptSource(input: WorkflowPromptBuilderInput): WorkflowStep
 		}
 	}
 
+	const promptSections = [
+		CODE_REVIEW_STEP_2_MISSING_SUBAGENT_OUTPUT_HEADER,
+		missingSubagentOutputFiles.join("\n"),
+		CODE_REVIEW_STEP_2_MISSING_SUBAGENT_OUTPUT_INSTRUCTION,
+	]
+
 	return {
 		kind: "current_step_instruction_template",
-		currentStepInstructionTemplate: `These subagent output files were not found in the project's review folder:
-${missingSubagentOutputFiles.join("\n")}
-Please launch a new subagent and assign them to the workflow associated with the missing file.`,
+		currentStepInstructionTemplate: promptSections.join("\n"),
 	}
 }
 
@@ -1822,7 +1828,11 @@ export const codeReviewWorkflowDefinition: WorkflowDefinition = {
 			decisionTree: buildStep2DecisionTree(),
 			buildPromptSource: buildStep2PromptSource,
 			buildToolSchema: buildCodeReviewStep2ToolSchemas,
-			promptTemplates: [CODE_REVIEW_STEP_2_INITIAL_PROMPT],
+			promptTemplates: [
+				CODE_REVIEW_STEP_2_INITIAL_PROMPT,
+				CODE_REVIEW_STEP_2_MISSING_SUBAGENT_OUTPUT_HEADER,
+				CODE_REVIEW_STEP_2_MISSING_SUBAGENT_OUTPUT_INSTRUCTION,
+			],
 		}),
 		"step-3": createStepDefinition({
 			stepNumber: 3,

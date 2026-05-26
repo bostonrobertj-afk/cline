@@ -707,7 +707,7 @@ export function failWithToolBackedOperationReason(session: ActiveWorkflowSession
 	}
 }
 
-const CORRECT_COURSE_STEP_3_PROMPT_TEMPLATE: string = String.raw`You are a Scrum Master navigating change management. Analyze the triggering issue, assess impact across project artifacts, and produce an actionable change management plan with clear handoff. You will document your plan in the provided change management plan. You should actively engage the user while carrying out the steps prescribed below to ensure that they are kept abreast of your progress and are able to provide input.
+const CORRECT_COURSE_STEP_3_BASE_PROMPT_TEMPLATE = `You are a Scrum Master navigating change management. Analyze the triggering issue, assess impact across project artifacts, and produce an actionable change management plan with clear handoff. You will document your plan in the provided change management plan. You should actively engage the user while carrying out the steps prescribed below to ensure that they are kept abreast of your progress and are able to provide input.
 
 - Project: {workflow.projectTitle}
 - Project Folder: {workflow.projectFolderName}
@@ -718,19 +718,16 @@ The project folder contains all existing documentation for this project, which c
 - discovery documents
 - planning documents, including previous change management, architecture, epics, and epics index files
 - implementation documents, including story files and story index files
-- review files including documented findings from implemented stories which have been assessed via the code review workflow
+- review files including documented findings from implemented stories which have been assessed via the code review workflow`
 
-*** conditional: only shown if {workflow.epic_source_indicator} = yes ***
-Discovered while authoring a specific epic: {workflow.epic_source_indicator}
+const CORRECT_COURSE_STEP_3_EPIC_SOURCE_PROMPT_TEMPLATE = `Discovered while authoring a specific epic: {workflow.epic_source_indicator}
 Epic: {workflow.epic_source_identifier}
-Epic Document: {workflow.epics_document}
-*** end conditional ***
-*** conditional: only shown if {workflow.story_source_indicator} = yes ***
-Discovered while authoring, implementing, or reviewing a specific story: {workflow.story_source_indicator}
-Story: {workflow.story_source_identifier}
-*** end conditional ***
+Epic Document: {workflow.epics_document}`
 
-Define the core problem and assign it to one of the following categories:
+const CORRECT_COURSE_STEP_3_STORY_SOURCE_PROMPT_TEMPLATE = `Discovered while authoring, implementing, or reviewing a specific story: {workflow.story_source_indicator}
+Story: {workflow.story_source_identifier}`
+
+const CORRECT_COURSE_STEP_3_FINAL_PROMPT_TEMPLATE = `Define the core problem and assign it to one of the following categories:
 - technical limitation discovered during implementation
 - new requirement emerged
 - requirements mistranslated in story document
@@ -767,7 +764,7 @@ Assess the project's architecture:
 - Evaluate {workflow.architecture_document} and consider:
 -   Do the project's scope, architectural goals, core architectural rules, responsibility boundaries, or durable vs transient ownership, blast radius, dependencies, or roadmap need to be modified?
 
-Add content under the "Architecture Modifications" heading in {workflow.output_document} indicating what work is needed in the architecture document as part of this change management process. 
+Add content under the "Architecture Modifications" heading in {workflow.output_document} indicating what work is needed in the architecture document as part of this change management process.
 
 Build a change management action plan using the following guidelines:
 Indicate workflows which should be run with intended sequencing. This is the standard sequential workflow structure:
@@ -791,51 +788,22 @@ Provide an overview of what you've documented to the user including the full fil
         - create-story (once per modified/new story)
     - The user should not resume the normal dev-story - > code-review - > write-remediation-story cycle until all project documentation has been updated per the change management plan.`
 
-const CORRECT_COURSE_EPIC_CONDITIONAL_START = "*** conditional: only shown if {workflow.epic_source_indicator} = yes ***"
-const CORRECT_COURSE_EPIC_CONDITIONAL_END = "*** end conditional ***"
-const CORRECT_COURSE_STORY_CONDITIONAL_START = "*** conditional: only shown if {workflow.story_source_indicator} = yes ***"
-const CORRECT_COURSE_STORY_CONDITIONAL_END = "*** end conditional ***"
-
-function removeDelimitedBlock(template: string, startMarker: string, endMarker: string): string {
-	const startIndex = template.indexOf(startMarker)
-	const endIndex = template.indexOf(endMarker, startIndex + startMarker.length)
-	if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
-		return template
-	}
-
-	return `${template.slice(0, startIndex)}${template.slice(endIndex + endMarker.length)}`
-}
-
-function removeConditionalMarkers(template: string): string {
-	return template
-		.replaceAll(CORRECT_COURSE_EPIC_CONDITIONAL_START, "")
-		.replaceAll(CORRECT_COURSE_EPIC_CONDITIONAL_END, "")
-		.replaceAll(CORRECT_COURSE_STORY_CONDITIONAL_START, "")
-		.replaceAll(CORRECT_COURSE_STORY_CONDITIONAL_END, "")
-		.replace(/\n{3,}/g, "\n\n")
-}
-
 function buildStep3PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
-	let promptTemplate = CORRECT_COURSE_STEP_3_PROMPT_TEMPLATE
-	if (readWorkflowStringValue(input.session.workflowValues, CorrectCourseWorkflowValueKey.EpicSourceIndicator) !== "yes") {
-		promptTemplate = removeDelimitedBlock(
-			promptTemplate,
-			CORRECT_COURSE_EPIC_CONDITIONAL_START,
-			CORRECT_COURSE_EPIC_CONDITIONAL_END,
-		)
+	const promptSections = [CORRECT_COURSE_STEP_3_BASE_PROMPT_TEMPLATE]
+
+	if (input.session.workflowValues[CorrectCourseWorkflowValueKey.EpicSourceIndicator] === "yes") {
+		promptSections.push(CORRECT_COURSE_STEP_3_EPIC_SOURCE_PROMPT_TEMPLATE)
 	}
 
-	if (readWorkflowStringValue(input.session.workflowValues, CorrectCourseWorkflowValueKey.StorySourceIndicator) !== "yes") {
-		promptTemplate = removeDelimitedBlock(
-			promptTemplate,
-			CORRECT_COURSE_STORY_CONDITIONAL_START,
-			CORRECT_COURSE_STORY_CONDITIONAL_END,
-		)
+	if (input.session.workflowValues[CorrectCourseWorkflowValueKey.StorySourceIndicator] === "yes") {
+		promptSections.push(CORRECT_COURSE_STEP_3_STORY_SOURCE_PROMPT_TEMPLATE)
 	}
+
+	promptSections.push(CORRECT_COURSE_STEP_3_FINAL_PROMPT_TEMPLATE)
 
 	return {
 		kind: "current_step_instruction_template",
-		currentStepInstructionTemplate: removeConditionalMarkers(promptTemplate),
+		currentStepInstructionTemplate: promptSections.join("\n\n"),
 	}
 }
 
@@ -1197,7 +1165,12 @@ export const correctCourseWorkflowDefinition: WorkflowDefinition = {
 			decisionTree: buildStep3DecisionTree(),
 			buildPromptSource: buildStep3PromptSource,
 			buildToolSchema: buildCorrectCourseStep3ToolSchemas,
-			promptTemplates: [CORRECT_COURSE_STEP_3_PROMPT_TEMPLATE],
+			promptTemplates: [
+				CORRECT_COURSE_STEP_3_BASE_PROMPT_TEMPLATE,
+				CORRECT_COURSE_STEP_3_EPIC_SOURCE_PROMPT_TEMPLATE,
+				CORRECT_COURSE_STEP_3_STORY_SOURCE_PROMPT_TEMPLATE,
+				CORRECT_COURSE_STEP_3_FINAL_PROMPT_TEMPLATE,
+			],
 		}),
 	},
 }

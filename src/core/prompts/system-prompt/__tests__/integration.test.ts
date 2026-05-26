@@ -2395,7 +2395,6 @@ describe("Prompt System Integration Tests", () => {
 				const nativeToolNames = getNativeToolNames(tools)
 				const approvedStep3ToolNames = [
 					"get_brainstorming_methods",
-					"append_brainstorming_selected_technique",
 					"read_file",
 					"apply_patch",
 					"send_user_message",
@@ -2406,6 +2405,7 @@ describe("Prompt System Integration Tests", () => {
 				expect(nativeToolNames).to.deep.equal(approvedStep3ToolNames)
 				expect(nativeToolNames).to.not.include("build_workflow_document")
 				expect(nativeToolNames).to.not.include("set_workflow_values")
+				expect(nativeToolNames).to.not.include("append_brainstorming_selected_technique")
 				expect(systemPrompt).to.not.include("Workflow: brainstorming")
 				expect(systemPrompt).to.not.include("Call `get_brainstorming_methods`")
 				expect(systemPrompt).to.not.include("call `append_brainstorming_selected_technique`")
@@ -2486,13 +2486,13 @@ describe("Prompt System Integration Tests", () => {
 				expect(nativeToolNames).to.deep.equal([
 					"read_file",
 					"upsert_epic",
+					"apply_patch",
 					"send_user_message",
 					"ask_followup_question",
 					"attempt_completion",
 				])
 				expect(nativeToolNames).to.not.include("workflow_progress_request")
 				expect(nativeToolNames).to.not.include("build_workflow_document")
-				expect(nativeToolNames).to.not.include("apply_patch")
 				expect(nativeToolNames).to.not.include("set_workflow_values")
 				expect(nativeToolNames).to.not.include("create_workflow_artifact")
 				expect(nativeToolNames).to.not.include("archive_workflow_artifact")
@@ -3271,14 +3271,20 @@ describe("Prompt System Integration Tests", () => {
 			expect(workflowInputPayloadBlock).to.include("9. Finalize Architecture Document - Not Started")
 			expect(workflowInputPayloadBlock).to.include("CURRENT STEP DETAILED INSTRUCTIONS")
 			expect(workflowInputPayloadBlock).to.include("Step 3: Establish Architecture Foundational Elements")
-			expect(workflowInputPayloadBlock).to.include(`Read \`${CREATE_ARCHITECTURE_OUTPUT_FILE}\`.`)
-			expect(workflowInputPayloadBlock).to.include("Draft and propose content for Project Context Analysis")
+			expect(workflowInputPayloadBlock).to.include(
+				`Review ${CREATE_ARCHITECTURE_OUTPUT_FILE} and any additional files listed within it as relevant context.`,
+			)
+			expect(workflowInputPayloadBlock).to.include("project context analysis section")
+			expect(workflowInputPayloadBlock).to.include("If the existing is vague")
 
 			await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt }) => {
 				expect(systemPrompt).to.not.include("CURRENT STEP DETAILED INSTRUCTIONS")
 				expect(systemPrompt).to.not.include("Step 3: Establish Architecture Foundational Elements")
-				expect(systemPrompt).to.not.include(`Read \`${CREATE_ARCHITECTURE_OUTPUT_FILE}\`.`)
-				expect(systemPrompt).to.not.include("Draft and propose content for Project Context Analysis")
+				expect(systemPrompt).to.not.include(
+					`Review ${CREATE_ARCHITECTURE_OUTPUT_FILE} and any additional files listed within it as relevant context.`,
+				)
+				expect(systemPrompt).to.not.include("project context analysis section")
+				expect(systemPrompt).to.not.include("If the existing is vague")
 			})
 		})
 
@@ -3300,29 +3306,27 @@ describe("Prompt System Integration Tests", () => {
 			expect(workflowInputPayloadBlock).to.include("2. Draft Epics - Active")
 			expect(workflowInputPayloadBlock).to.include("CURRENT STEP DETAILED INSTRUCTIONS")
 			expect(workflowInputPayloadBlock).to.include("Step 2: Draft Epics")
-			expect(workflowInputPayloadBlock).to.include(`Read \`${CREATE_EPICS_OUTPUT_FILE}\`.`)
-			expect(workflowInputPayloadBlock).to.include(`Read \`${CREATE_EPICS_ARCHITECTURE_DOCUMENT}\`.`)
-			expect(workflowInputPayloadBlock).to.include(`Read \`${CREATE_EPICS_BRAINSTORMING_DOCUMENT}\` when present.`)
+			expect(workflowInputPayloadBlock).to.include("Read the following:")
+			expect(workflowInputPayloadBlock).to.include(`- \`${CREATE_EPICS_OUTPUT_FILE}\``)
+			expect(workflowInputPayloadBlock).to.include(`- \`${CREATE_EPICS_ARCHITECTURE_DOCUMENT}\``)
+			expect(workflowInputPayloadBlock).to.include(`- \`${CREATE_EPICS_BRAINSTORMING_DOCUMENT}\``)
+			expect(workflowInputPayloadBlock).to.include(`- \`${CREATE_EPICS_ADDITIONAL_CONTEXT_FILES}\``)
 			expect(workflowInputPayloadBlock).to.include(
-				`Read any files listed in \`${CREATE_EPICS_ADDITIONAL_CONTEXT_FILES}\` when present.`,
+				"Identify the work necessary to deliver the project based on the provided architecture document.",
 			)
-			expect(workflowInputPayloadBlock).to.include(
-				"Call `upsert_epic` for each user-aligned epic. Use `upsert_epic` to persist every accepted epic and every accepted revision.",
-			)
-			expect(workflowInputPayloadBlock).to.include(
-				"After the user indicates alignment with the drafted epics, use `attempt_completion` to provide a final recap and remind the user to run the `pi-planning` workflow for each epic to define that epic's user stories.",
-			)
+			expect(workflowInputPayloadBlock).to.include("Each epic must:")
+			expect(workflowInputPayloadBlock).to.include("Adjust as needed using `apply_patch` based on their feedback.")
+			expect(workflowInputPayloadBlock).to.include("use attempt_completion to provide a final recap")
 
 			await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt }) => {
 				expect(systemPrompt).to.not.include("CURRENT STEP DETAILED INSTRUCTIONS")
 				expect(systemPrompt).to.not.include("Step 2: Draft Epics")
-				expect(systemPrompt).to.not.include(`Read \`${CREATE_EPICS_OUTPUT_FILE}\`.`)
+				expect(systemPrompt).to.not.include("Read the following:")
+				expect(systemPrompt).to.not.include(`- \`${CREATE_EPICS_OUTPUT_FILE}\``)
 				expect(systemPrompt).to.not.include(
-					"Call `upsert_epic` for each user-aligned epic. Use `upsert_epic` to persist every accepted epic and every accepted revision.",
+					"Identify the work necessary to deliver the project based on the provided architecture document.",
 				)
-				expect(systemPrompt).to.not.include(
-					"After the user indicates alignment with the drafted epics, use `attempt_completion` to provide a final recap and remind the user to run the `pi-planning` workflow for each epic to define that epic's user stories.",
-				)
+				expect(systemPrompt).to.not.include("Adjust as needed using `apply_patch` based on their feedback.")
 			})
 		})
 
@@ -3395,20 +3399,27 @@ describe("Prompt System Integration Tests", () => {
 			expect(workflowInputPayloadBlock).to.include("6. Populate Story Files with Initial Details - Not Started")
 			expect(workflowInputPayloadBlock).to.include("CURRENT STEP DETAILED INSTRUCTIONS")
 			expect(workflowInputPayloadBlock).to.include("Step 2: Review Context")
-			expect(workflowInputPayloadBlock).to.include("Prepare to break a single epic down into deliverable user stories.")
-			expect(workflowInputPayloadBlock).to.include(`Focus only on \`${PI_PLANNING_TARGET_EPIC}\`.`)
 			expect(workflowInputPayloadBlock).to.include(
-				`Read \`${PI_PLANNING_EPICS_INDEX}\`, \`${PI_PLANNING_EPICS_DOCUMENT}\`, and \`${PI_PLANNING_ARCHITECTURE_DOCUMENT}\`.`,
+				"Your goal in this workflow is to break a single epic down into deliverable user stories. In this step, you will prepare by reading relevant context. Do not begin generating stories in this step.",
 			)
+			expect(workflowInputPayloadBlock).to.include(
+				`You will be focusing on \`${PI_PLANNING_TARGET_EPIC}\` during this workflow.`,
+			)
+			expect(workflowInputPayloadBlock).to.include("*** Primary Context: ***")
+			expect(workflowInputPayloadBlock).to.include(`  \`${PI_PLANNING_EPICS_INDEX}\``)
+			expect(workflowInputPayloadBlock).to.include(`  \`${PI_PLANNING_EPICS_DOCUMENT}\``)
+			expect(workflowInputPayloadBlock).to.include(`  \`${PI_PLANNING_ARCHITECTURE_DOCUMENT}\``)
 
 			await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt }) => {
 				expect(systemPrompt).to.not.include("CURRENT STEP DETAILED INSTRUCTIONS")
 				expect(systemPrompt).to.not.include("Step 2: Review Context")
-				expect(systemPrompt).to.not.include("Prepare to break a single epic down into deliverable user stories.")
-				expect(systemPrompt).to.not.include(`Focus only on \`${PI_PLANNING_TARGET_EPIC}\`.`)
 				expect(systemPrompt).to.not.include(
-					`Read \`${PI_PLANNING_EPICS_INDEX}\`, \`${PI_PLANNING_EPICS_DOCUMENT}\`, and \`${PI_PLANNING_ARCHITECTURE_DOCUMENT}\`.`,
+					"Your goal in this workflow is to break a single epic down into deliverable user stories.",
 				)
+				expect(systemPrompt).to.not.include(
+					`You will be focusing on \`${PI_PLANNING_TARGET_EPIC}\` during this workflow.`,
+				)
+				expect(systemPrompt).to.not.include("*** Primary Context: ***")
 			})
 		})
 
@@ -3461,7 +3472,6 @@ describe("Prompt System Integration Tests", () => {
 			const selectedApproaches = ["I want to choose", "I want a random technique"] as const
 			const approvedStep3ToolNames = [
 				"get_brainstorming_methods",
-				"append_brainstorming_selected_technique",
 				"read_file",
 				"apply_patch",
 				"send_user_message",
@@ -3484,6 +3494,7 @@ describe("Prompt System Integration Tests", () => {
 					expect(nativeToolNames).to.deep.equal(approvedStep3ToolNames)
 					expect(nativeToolNames).to.not.include("build_workflow_document")
 					expect(nativeToolNames).to.not.include("set_workflow_values")
+					expect(nativeToolNames).to.not.include("append_brainstorming_selected_technique")
 				})
 			}
 		})

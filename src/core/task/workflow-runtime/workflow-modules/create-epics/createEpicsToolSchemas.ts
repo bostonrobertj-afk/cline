@@ -1,31 +1,32 @@
+import { ClineToolSet } from "@/core/prompts/system-prompt/registry/ClineToolSet"
 import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"
-import { AGENT_FEEDBACK_PARAMETER } from "@/core/prompts/system-prompt/types"
+import { registerClineToolSets } from "@/core/prompts/system-prompt/tools/init"
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 
 const CREATE_EPICS_TOOL_SCHEMA_VARIANT = ModelFamily.NATIVE_GPT_5
 
-export function buildCreateEpicsStep1ToolSchemas(): readonly ClineToolSpec[] {
-	return []
+const CREATE_EPICS_STEP_2_SHARED_TOOL_IDS_BEFORE_UPSERT_EPIC: readonly ClineDefaultTool[] = [ClineDefaultTool.FILE_READ]
+
+const CREATE_EPICS_STEP_2_SHARED_TOOL_IDS_AFTER_UPSERT_EPIC: readonly ClineDefaultTool[] = [
+	ClineDefaultTool.APPLY_PATCH,
+	ClineDefaultTool.SEND_USER_MESSAGE,
+	ClineDefaultTool.ASK,
+	ClineDefaultTool.ATTEMPT,
+]
+
+function resolveCreateEpicsSharedToolSpec(toolId: ClineDefaultTool): ClineToolSpec {
+	registerClineToolSets()
+	const tool = ClineToolSet.getToolByNameWithFallback(toolId, CREATE_EPICS_TOOL_SCHEMA_VARIANT)
+	if (tool === undefined) {
+		throw new Error(`Missing shared/default tool schema for ${toolId}.`)
+	}
+
+	return tool.config
 }
 
-export function buildCreateEpicsReadFileToolSchema(): ClineToolSpec {
-	return {
-		variant: CREATE_EPICS_TOOL_SCHEMA_VARIANT,
-		id: ClineDefaultTool.FILE_READ,
-		name: "read_file",
-		description:
-			"Request to read the contents of a file at the specified path. Automatically extracts raw text from PDF and DOCX files. Do NOT use this tool to list the contents of a directory.",
-		parameters: [
-			{
-				name: "path",
-				required: true,
-				type: "string",
-				instruction: "The path of the file to read.",
-				description: "The path of the file to read.",
-			},
-		],
-	}
+export function buildCreateEpicsStep1ToolSchemas(): readonly ClineToolSpec[] {
+	return []
 }
 
 export function buildCreateEpicsUpsertEpicToolSchema(): ClineToolSpec {
@@ -97,78 +98,10 @@ export function buildCreateEpicsUpsertEpicToolSchema(): ClineToolSpec {
 	}
 }
 
-export function buildCreateEpicsSendUserMessageToolSchema(): ClineToolSpec {
-	return {
-		variant: CREATE_EPICS_TOOL_SCHEMA_VARIANT,
-		id: ClineDefaultTool.SEND_USER_MESSAGE,
-		name: "send_user_message",
-		description:
-			"Send a direct user-visible message when other response tools are not appropriate or available. On success, this tool displays the message to the user and ends your current turn.",
-		parameters: [
-			{
-				name: "message",
-				required: true,
-				type: "string",
-				instruction: "The direct message to show to the user.",
-				description: "The direct message to show to the user.",
-			},
-			AGENT_FEEDBACK_PARAMETER,
-		],
-	}
-}
-
-export function buildCreateEpicsAskFollowupQuestionToolSchema(): ClineToolSpec {
-	return {
-		variant: CREATE_EPICS_TOOL_SCHEMA_VARIANT,
-		id: ClineDefaultTool.ASK,
-		name: "ask_followup_question",
-		description:
-			"Ask the user a concise question when clarification or a direct answer is needed. On success, this tool displays the question to the user and ends your current turn.",
-		parameters: [
-			{
-				name: "question",
-				required: true,
-				type: "string",
-				instruction: "The single question to ask the user.",
-				description: "The single question to ask the user.",
-			},
-			{
-				name: "options",
-				required: true,
-				type: "array",
-				items: { type: "string" },
-				instruction: "An array of 2-5 options for the user to choose from.",
-				description: "An array of 2-5 options for the user to choose from.",
-			},
-			AGENT_FEEDBACK_PARAMETER,
-		],
-	}
-}
-
-export function buildCreateEpicsAttemptCompletionToolSchema(): ClineToolSpec {
-	return {
-		variant: CREATE_EPICS_TOOL_SCHEMA_VARIANT,
-		id: ClineDefaultTool.ATTEMPT,
-		name: "attempt_completion",
-		description: "Deliver the final create-epics completion message to the user after the epics are aligned.",
-		parameters: [
-			{
-				name: "result",
-				required: true,
-				type: "string",
-				instruction: "Final user-facing completion recap.",
-				description: "Final user-facing completion recap.",
-			},
-		],
-	}
-}
-
 export function buildCreateEpicsStep2ToolSchemas(): readonly ClineToolSpec[] {
 	return [
-		buildCreateEpicsReadFileToolSchema(),
+		...CREATE_EPICS_STEP_2_SHARED_TOOL_IDS_BEFORE_UPSERT_EPIC.map((toolId) => resolveCreateEpicsSharedToolSpec(toolId)),
 		buildCreateEpicsUpsertEpicToolSchema(),
-		buildCreateEpicsSendUserMessageToolSchema(),
-		buildCreateEpicsAskFollowupQuestionToolSchema(),
-		buildCreateEpicsAttemptCompletionToolSchema(),
+		...CREATE_EPICS_STEP_2_SHARED_TOOL_IDS_AFTER_UPSERT_EPIC.map((toolId) => resolveCreateEpicsSharedToolSpec(toolId)),
 	]
 }

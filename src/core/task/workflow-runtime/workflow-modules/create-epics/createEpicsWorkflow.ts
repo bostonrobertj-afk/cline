@@ -5,6 +5,7 @@ import type {
 	WorkflowDecisionTree,
 	WorkflowDefinition,
 	WorkflowPersonaDefinition,
+	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
 	WorkflowStepPromptSource,
 } from "../../types"
@@ -45,35 +46,39 @@ const STEP_1_CONTEXT_FORM_ID = "step-1-context-form"
 const STEP_1_BRAINSTORMING_CHECK_PANEL_ID = "step-1-brainstorming-check-panel"
 const STEP_1_BRAINSTORMING_PATH_PANEL_ID = "step-1-brainstorming-path-panel"
 const STEP_1_ADDITIONAL_CONTEXT_PANEL_ID = "step-1-additional-context-panel"
-const CREATE_EPICS_STEP_2_PROMPT_TEMPLATE = `Read \`{workflow.output_file}\`.
-Read \`{workflow.architecture_document}\`.
-Read \`{workflow.brainstorming_document}\` when present.
-Read any files listed in \`{workflow.additional_context_files}\` when present.
-Read any other files provided within \`{workflow.output_file}\` as additional context, including files listed under Additional Context when useful.
+const CREATE_EPICS_STEP_2_REQUIRED_CONTEXT_PROMPT = `Read the following:
+- \`{workflow.output_file}\`
+- \`{workflow.architecture_document}\``
 
-Identify the work necessary to deliver the project based on the architecture document.
+const CREATE_EPICS_STEP_2_BRAINSTORMING_CONTEXT_PROMPT = `- \`{workflow.brainstorming_document}\``
 
-Provide your understanding of the necessary work to the user and confirm alignment before drafting epics.
+const CREATE_EPICS_STEP_2_ADDITIONAL_CONTEXT_PROMPT = `- \`{workflow.additional_context_files}\``
+
+const CREATE_EPICS_STEP_2_BODY_PROMPT = `Identify the work necessary to deliver the project based on the provided architecture document. Provide your understanding of the necessary work to the user, confirm their alignment, then break the work down into a logical set of epics to guide project delivery.
 
 Break the project into epics by coherent capability outcomes, not by files, layers, or implementation chores.
 
-Ensure each epic delivers one testable outcome, groups requirements that change together, has clear dependencies and completion criteria, and is small enough to implement through a focused set of downstream stories.
+Each epic must:
+- Deliver one testable outcome.
+- Group requirements that change together.
+- Have clear dependencies and completion criteria.
+- Be small enough to implement through a focused set of stories; split epics that contain multiple independent outcomes or major lifecycle transitions.
 
-Split epics that contain multiple independent outcomes or major lifecycle transitions.
+Sequence epics by dependency order with aid from the provided architecture document:
+1. Shared contracts/invariants.
+2. Core runtime/backend behavior.
+3. User-facing flows.
+4. Prompt/tool/schema behavior.
+5. Workflow/module consumers.
+6. Cleanup, migration, and validation.
 
-Sequence epics by dependency order with aid from the architecture document.
+Do not create epics that are only “backend,” “frontend,” or “tests” unless that is genuinely the user-facing capability boundary.
 
-Avoid epics that are only \`backend\`, \`frontend\`, or \`tests\` unless that is genuinely the user-facing capability boundary.
+Call \`upsert_epic\` for each user-aligned epic. Use \`upsert_epic\` to persist every accepted epic and every accepted revision.
 
-Call \`upsert_epic\` for each user-aligned epic. Use \`upsert_epic\` to persist every accepted epic and every accepted revision. Do not use \`apply_patch\`, \`build_workflow_document\`, \`set_workflow_values\`, or raw markdown editing for epic creation or revision.
+Once you've drafted the epics, notify the user and ask them to review the drafted epics. Adjust as needed using \`apply_patch\` based on their feedback.
 
-Do not draft stories, tasks, subtasks, acceptance criteria, action plans, implementation checklists, delivery specs, or downstream implementation plans.
-
-Notify the user and ask them to review the drafted epics.
-
-Revise epics through \`upsert_epic\` as needed based on user feedback.
-
-After the user indicates alignment with the drafted epics, use \`attempt_completion\` to provide a final recap and remind the user to run the \`pi-planning\` workflow for each epic to define that epic's user stories.`
+Once the user has indicated alignment with the drafted epics, use attempt_completion to provide a final recap and remind the user to run the pi-planning workflow for each epic to define the epics' user stories.`
 const CREATE_EPICS_WORKFLOW_PERSONA: WorkflowPersonaDefinition = {
 	name: "John",
 	role: "Product Manager",
@@ -326,8 +331,22 @@ function createStepDefinition(args: {
 	return stepDefinition
 }
 
-function buildStep2PromptSource(): WorkflowStepPromptSource {
-	return { kind: "current_step_instruction_template", currentStepInstructionTemplate: CREATE_EPICS_STEP_2_PROMPT_TEMPLATE }
+function buildStep2PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
+	const contextLines = [CREATE_EPICS_STEP_2_REQUIRED_CONTEXT_PROMPT]
+	const brainstormingDocument = input.session.workflowValues[CreateEpicsWorkflowValueKey.BrainstormingDocument]
+	const additionalContextFiles = input.session.workflowValues[CreateEpicsWorkflowValueKey.AdditionalContextFiles]
+
+	if (typeof brainstormingDocument === "string" && brainstormingDocument.trim().length > 0) {
+		contextLines.push(CREATE_EPICS_STEP_2_BRAINSTORMING_CONTEXT_PROMPT)
+	}
+
+	if (typeof additionalContextFiles === "string" && additionalContextFiles.trim().length > 0) {
+		contextLines.push(CREATE_EPICS_STEP_2_ADDITIONAL_CONTEXT_PROMPT)
+	}
+
+	const promptSections = [contextLines.join("\n"), CREATE_EPICS_STEP_2_BODY_PROMPT]
+
+	return { kind: "current_step_instruction_template", currentStepInstructionTemplate: promptSections.join("\n\n") }
 }
 
 function buildStep1DecisionTree(): WorkflowDecisionTree {
@@ -698,7 +717,12 @@ export const createEpicsWorkflowDefinition: WorkflowDefinition = {
 			checklistLabel: "Draft Epics",
 			decisionTree: buildStep2DecisionTree(),
 			buildPromptSource: buildStep2PromptSource,
-			promptTemplates: [CREATE_EPICS_STEP_2_PROMPT_TEMPLATE],
+			promptTemplates: [
+				CREATE_EPICS_STEP_2_REQUIRED_CONTEXT_PROMPT,
+				CREATE_EPICS_STEP_2_BRAINSTORMING_CONTEXT_PROMPT,
+				CREATE_EPICS_STEP_2_ADDITIONAL_CONTEXT_PROMPT,
+				CREATE_EPICS_STEP_2_BODY_PROMPT,
+			],
 			buildToolSchema: buildCreateEpicsStep2ToolSchemas,
 		}),
 	},

@@ -762,6 +762,16 @@ describe("codeReviewWorkflowDefinition", () => {
 		})
 		expect(missingPrompt.trim().length).to.be.greaterThan(0)
 		expect(missingPrompt).to.include("blind-review-1-1.md")
+		expect(missingPrompt).to.include("These subagent output files were not found in the project's review folder:")
+		expect(missingPrompt).to.include(
+			"Please launch a new subagent and assign them to the workflow associated with the missing file.",
+		)
+		expect(missingPrompt.indexOf("These subagent output files were not found")).to.be.lessThan(
+			missingPrompt.indexOf("blind-review-1-1.md"),
+		)
+		expect(missingPrompt.indexOf("blind-review-1-1.md")).to.be.lessThan(missingPrompt.indexOf("Please launch a new subagent"))
+		expect(missingPrompt).not.to.include("Conditional prompting")
+		expect(missingPrompt).not.to.include("end conditional prompt block")
 		expectNoCodeReviewWorkflowPromptTokens(missingPrompt)
 	})
 
@@ -1035,16 +1045,23 @@ describe("codeReviewWorkflowDefinition", () => {
 		expect(upstreamPrompt.trim().length).to.be.greaterThan(0)
 		expect(upstreamPrompt).not.to.include(remediationStory)
 		expect(upstreamPrompt).not.to.equal(basePrompt)
+		expect(upstreamPrompt).to.include('For findings listed under "upstream failure"')
+		expect(upstreamPrompt).not.to.include("You'll now prepare a remediation story based on the documented review findings.")
 
 		const remediationPrompt = buildPrompt("step-4", SAMPLE_WORKFLOW_VALUES)
 		expect(remediationPrompt).to.include(SAMPLE_WORKFLOW_VALUES[CodeReviewWorkflowValueKey.CodeReviewOutput].toString())
 		expect(remediationPrompt).to.include(SAMPLE_WORKFLOW_VALUES[CodeReviewWorkflowValueKey.RemediationStory].toString())
 		expect(remediationPrompt.trim().length).to.be.greaterThan(0)
 		expect(remediationPrompt).to.include(remediationStory)
+		expect(remediationPrompt).not.to.include('For findings listed under "upstream failure"')
+		expect(remediationPrompt).to.include("You'll now prepare a remediation story based on the documented review findings.")
 		expect(remediationPrompt.trim().length).to.be.greaterThan(upstreamPrompt.trim().length)
 
 		for (const prompt of [basePrompt, upstreamPrompt, remediationPrompt]) {
 			expect(prompt).to.include(codeReviewOutput)
+			expect(prompt).not.to.include("Conditional prompting")
+			expect(prompt).not.to.include("end conditional prompt block")
+			expect(prompt).not.to.include("End conditional prompt block")
 			expectNoCodeReviewWorkflowPromptTokens(prompt)
 		}
 	})

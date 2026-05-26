@@ -306,6 +306,9 @@ function expectNoDevStoryWorkflowPromptTokens(prompt: string): void {
 	for (const promptToken of promptTokens) {
 		expect(prompt).not.to.include(promptToken)
 	}
+	expect(prompt).not.to.include("Conditional Prompting")
+	expect(prompt).not.to.include("end conditional prompting block")
+	expect(prompt).not.to.include("current_story_task")
 }
 
 function buildModelToolSucceededEvent(toolName: ClineDefaultTool): WorkflowBranchTriggerEvent {
@@ -677,6 +680,17 @@ describe("devStoryWorkflowDefinition Step 2", () => {
 		expect(prompt).to.include("Objective detail")
 		expect(prompt).to.include("- [ ] Task 1: Update runtime")
 		expect(prompt).to.include("  - [ ] Subtask 1.1: Update runtime contract")
+		expect(prompt).to.include("You will use the following tools to manage your progress while implementing this story:")
+		expect(prompt).to.include("- story_task_complete: call this tool to mark a subtask complete.")
+		expect(prompt).to.include(
+			"- request_task_detail: call this tool to request the detailed instructions for a given task ID.",
+		)
+		expect(prompt).to.include("- show_incomplete_tasks: call this tool to request a list of incomplete tasks & subtasks.")
+		expect(prompt).to.include("*** Story Frontmatter ***")
+		expect(prompt).to.include("General Instructions:")
+		expect(prompt).to.include("Known Issues/ Risks/ Technical Debt:")
+		expect(prompt).not.to.include("*** Story General Instructions: ***")
+		expect(prompt).not.to.include("Complete only the task and subtasks provided to you in the current step instructions.")
 		expect(prompt).to.not.include("- [ ] Task 2: Update prompt projection")
 		expectNoDevStoryWorkflowPromptTokens(prompt)
 	})

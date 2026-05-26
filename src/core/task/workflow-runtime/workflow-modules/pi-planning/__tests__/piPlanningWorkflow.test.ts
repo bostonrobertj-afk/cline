@@ -176,6 +176,14 @@ function expectNoPiPlanningWorkflowPromptTokens(prompt: string): void {
 		"{workflow.projectTitle}",
 		"{workflow.projectFolderName}",
 		"{workflow.target_story}",
+		"Shown only if",
+		"end conditional prompt block",
+		"Story-index branch",
+		"Story-file branch",
+		"An existing story index is present",
+		"no story index existed at workflow start",
+		"Additional Context:",
+		"not provided",
 	]
 
 	for (const forbiddenToken of forbiddenTokens) {
@@ -1410,7 +1418,9 @@ describe("piPlanningWorkflowDefinition", () => {
 			{
 				stepId: "step-2",
 				requiredSnippets: [
+					"Your goal in this workflow is to break a single epic down into deliverable user stories.",
 					"Epic 1: Improve workflow runtime",
+					"*** Primary Context: ***",
 					SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.EpicsIndex].toString(),
 					SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.EpicsDocument].toString(),
 					SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.ArchitectureDocument].toString(),
@@ -1422,30 +1432,35 @@ describe("piPlanningWorkflowDefinition", () => {
 			{
 				stepId: "step-3",
 				requiredSnippets: [
-					"Epic 1: Improve workflow runtime",
-					SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.StoriesIndex].toString(),
+					"Review the existing story files for this epic in",
 					SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.DraftsFolder].toString(),
+					"Review provided context and existing runtime code/ tests to determine the full set of stories needed",
+					"Split a story if:",
+					"Stories should not be created that are only file edits, test updates, cleanup chores, or technical layers",
 					"workflow_progress_request",
 				],
 			},
 			{
 				stepId: "step-4",
 				requiredSnippets: [
+					"This system uses a story index as the canonical indicator of which stories must exist for each epic.",
 					"Epic 1: Improve workflow runtime",
+					SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.StoriesIndex].toString(),
 					SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.EpicIdentity].toString(),
 					SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.ImplementationFolder].toString(),
-					SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.StoriesIndex].toString(),
-					"plan_story_artifacts",
+					"Review the existing story index, then call plan_story_artifacts",
+					"The story index file can be found in",
 					"workflow_progress_request",
 				],
 			},
 			{
 				stepId: "step-5",
 				requiredSnippets: [
+					SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.StoriesIndex].toString(),
 					SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.EpicIdentity].toString(),
 					SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.DraftsFolder].toString(),
-					SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.StoriesIndex].toString(),
-					"generate_story_files",
+					"Call generate_story_files to generate one templatized story for each story in",
+					"Generated story files can be found in",
 				],
 			},
 		]
@@ -1458,6 +1473,57 @@ describe("piPlanningWorkflowDefinition", () => {
 			for (const forbiddenToolName of FORBIDDEN_BACKEND_ONLY_TOOL_NAMES) {
 				expect(prompt).not.to.include(forbiddenToolName)
 			}
+			expectNoPiPlanningWorkflowPromptTokens(prompt)
+			if (promptExpectation.stepId === "step-2") {
+				expect(prompt).to.include("*** Primary Context: ***")
+				expect(prompt).to.include("*** Secondary Context ***")
+				expect(prompt).not.to.include("Additional Context:")
+				expect(prompt).not.to.include("not provided")
+			}
+		}
+	})
+
+	it("renders Step 2 optional context sections only when backing values are present", () => {
+		const brainstormingOnlyPrompt = buildPrompt("step-2", {
+			...SAMPLE_WORKFLOW_VALUES,
+			[PiPlanningWorkflowValueKey.AdditionalContext]: "",
+		})
+		const additionalContextOnlyPrompt = buildPrompt("step-2", {
+			...SAMPLE_WORKFLOW_VALUES,
+			[PiPlanningWorkflowValueKey.BrainstormingDocument]: "",
+		})
+		const noOptionalContextPrompt = buildPrompt("step-2", {
+			...SAMPLE_WORKFLOW_VALUES,
+			[PiPlanningWorkflowValueKey.BrainstormingDocument]: "",
+			[PiPlanningWorkflowValueKey.AdditionalContext]: "",
+		})
+
+		expect(brainstormingOnlyPrompt).to.include(
+			SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.BrainstormingDocument].toString(),
+		)
+		expect(brainstormingOnlyPrompt).not.to.include(
+			SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.AdditionalContext].toString(),
+		)
+		expect(brainstormingOnlyPrompt).to.include("*** Secondary Context ***")
+		expect(brainstormingOnlyPrompt).not.to.include("Additional Context:")
+		expect(additionalContextOnlyPrompt).to.include(
+			SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.AdditionalContext].toString(),
+		)
+		expect(additionalContextOnlyPrompt).not.to.include(
+			SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.BrainstormingDocument].toString(),
+		)
+		expect(additionalContextOnlyPrompt).to.include("*** Secondary Context ***")
+		expect(additionalContextOnlyPrompt).not.to.include("Additional Context:")
+		expect(noOptionalContextPrompt).not.to.include(
+			SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.BrainstormingDocument].toString(),
+		)
+		expect(noOptionalContextPrompt).not.to.include(
+			SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.AdditionalContext].toString(),
+		)
+		expect(noOptionalContextPrompt).not.to.include("*** Secondary Context ***")
+		expect(noOptionalContextPrompt).not.to.include("Additional Context:")
+		for (const prompt of [brainstormingOnlyPrompt, additionalContextOnlyPrompt, noOptionalContextPrompt]) {
+			expect(prompt).not.to.include("not provided")
 			expectNoPiPlanningWorkflowPromptTokens(prompt)
 		}
 	})
@@ -1554,21 +1620,33 @@ Once the user is fully aligned with the story set and each story's content, use 
 		}
 
 		const step3ExistingPrompt = buildPrompt("step-3", existingIndexValues)
-		expect(step3ExistingPrompt).to.include("An existing story index is present")
+		expect(step3ExistingPrompt).to.include(
+			`Review the existing story files for this epic in ${SAMPLE_WORKFLOW_VALUES[
+				PiPlanningWorkflowValueKey.DraftsFolder
+			].toString()}.`,
+		)
 		const step3NewPrompt = buildPrompt("step-3", storyIndexPresentButCreatedDuringWorkflowValues)
-		expect(step3NewPrompt).not.to.include("An existing story index is present")
+		expect(step3NewPrompt).not.to.include("Review the existing story files for this epic in")
 
 		const step4ExistingPrompt = buildPrompt("step-4", existingIndexValues)
-		expect(step4ExistingPrompt).to.include("Review the existing story index.")
+		expect(step4ExistingPrompt).to.include(
+			`Story Index: ${SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.StoriesIndex].toString()}`,
+		)
+		expect(step4ExistingPrompt).to.include("Review the existing story index, then call plan_story_artifacts")
 		const step4NewPrompt = buildPrompt("step-4", storyIndexPresentButCreatedDuringWorkflowValues)
-		expect(step4NewPrompt).to.include("no `stories_index` existed at workflow start")
-		expect(step4NewPrompt).not.to.include("Review the existing story index.")
+		expect(step4NewPrompt).to.include("Generate the story index by calling plan_story_artifacts")
+		expect(step4NewPrompt).not.to.include("Review the existing story index, then call plan_story_artifacts")
 
 		const step5ExistingPrompt = buildPrompt("step-5", existingIndexValues)
-		expect(step5ExistingPrompt).to.include("existing `stories_index` was present at workflow start")
+		expect(step5ExistingPrompt).to.include(
+			`Call generate_story_files to generate one templatized story for each story in ${SAMPLE_WORKFLOW_VALUES[
+				PiPlanningWorkflowValueKey.StoriesIndex
+			].toString()} for which a story file does not already exist.`,
+		)
 		const step5NewPrompt = buildPrompt("step-5", storyIndexPresentButCreatedDuringWorkflowValues)
-		expect(step5NewPrompt).to.include("no story index existed at workflow start")
-		expect(step5NewPrompt).not.to.include("existing `stories_index` was present at workflow start")
+		expect(step5NewPrompt).to.include("Call generate_story_files to generate one templatized story file for each story in")
+		expect(step5NewPrompt).to.include(`${PROJECT_ROOT}/implementation/epic-1-stories.index.json`)
+		expect(step5NewPrompt).not.to.include("for which a story file does not already exist")
 	})
 
 	it("routes Step 2 and Step 3 only through confirmed or denied workflow progress requests", () => {

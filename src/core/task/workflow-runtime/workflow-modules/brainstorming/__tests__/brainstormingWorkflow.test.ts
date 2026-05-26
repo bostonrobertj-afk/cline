@@ -690,11 +690,18 @@ describe("brainstormingWorkflowDefinition", () => {
 			context: "brainstorming step-3 suggest test prompt",
 		})
 		expect(suggestPrompt).to.include(OUTPUT_FILE)
-		expect(suggestPrompt).to.include(`Read \`${OUTPUT_FILE}\`.`)
-		expect(suggestPrompt).to.include("Call `get_brainstorming_methods`")
-		expect(suggestPrompt).to.include("Do not call `set_workflow_values` for `selected_techniques`.")
-		expect(suggestPrompt).to.include("Once the user indicates they're ready")
+		expect(suggestPrompt).to.include(`Read \`${OUTPUT_FILE}\``)
+		expect(suggestPrompt).to.include("get_brainstorming_methods")
+		expect(suggestPrompt).to.include("apply_patch")
+		expect(suggestPrompt).to.include("user requested technique suggestion")
+		expect(suggestPrompt.indexOf(`Read \`${OUTPUT_FILE}\``)).to.be.lessThan(suggestPrompt.indexOf("apply_patch"))
+		expect(suggestPrompt.indexOf("apply_patch")).to.be.lessThan(suggestPrompt.indexOf("workflow_progress_request"))
+		expect(suggestPrompt).to.include("workflow_progress_request")
 		expect(suggestPrompt).not.to.include("{workflow.output_file}")
+		expect(suggestPrompt).not.to.include("append_brainstorming_selected_technique")
+		expect(suggestPrompt).not.to.include("set_workflow_values")
+		expect(suggestPrompt).not.to.include("Help the user to refine their topic and goals")
+		expect(suggestPrompt).not.to.include("Offer challenges to to")
 
 		const chooseWorkflowValues: WorkflowValues = {
 			selected_approach: "I want to choose",
@@ -712,14 +719,48 @@ describe("brainstormingWorkflowDefinition", () => {
 			context: "brainstorming step-3 choose test prompt",
 		})
 		expect(choosePrompt).to.include(OUTPUT_FILE)
-		expect(choosePrompt).to.include(`Read \`${OUTPUT_FILE}\`.`)
-		expect(choosePrompt).to.include("If at any point the user asks to switch to a new brainstorming technique")
+		expect(choosePrompt).to.include(`Read \`${OUTPUT_FILE}\``)
 		expect(choosePrompt).to.include("get_brainstorming_methods")
+		expect(choosePrompt).to.include("workflow_progress_request")
+		expect(choosePrompt).to.include(`update \`${OUTPUT_FILE}\` to reflect the additional technique`)
+		expect(choosePrompt).not.to.include("The user has requested a recommended brainstorming technique")
+		expect(choosePrompt).not.to.include("user requested technique suggestion")
+		expect(choosePrompt).not.to.include("apply_patch")
 		expect(choosePrompt).not.to.include("{workflow.output_file}")
+		expect(choosePrompt).not.to.include("append_brainstorming_selected_technique")
+		expect(choosePrompt).not.to.include("set_workflow_values")
+		expect(choosePrompt).not.to.include("Use the already selected brainstorming technique recorded")
+		expect(choosePrompt).not.to.include("Help the user to refine their topic and goals")
+		expect(choosePrompt).not.to.include("Offer challenges to to")
+
+		const randomWorkflowValues: WorkflowValues = {
+			selected_approach: "I want a random technique",
+			output_file: OUTPUT_FILE,
+		}
+		const randomPromptSource = step3.buildPromptSource(createPromptInput(step3, randomWorkflowValues))
+		expect(randomPromptSource).to.not.have.property("workflowSystemInstructions")
+		if (randomPromptSource.kind !== "current_step_instruction_template") {
+			throw new Error("Missing current step instruction template for step-3 random.")
+		}
+		const randomPrompt = renderWorkflowPromptTemplate({
+			template: randomPromptSource.currentStepInstructionTemplate,
+			workflowValueKeys: brainstormingWorkflowDefinition.workflowValueKeys,
+			workflowValues: randomWorkflowValues,
+			context: "brainstorming step-3 random test prompt",
+		})
+		expect(randomPrompt).to.include(OUTPUT_FILE)
+		expect(randomPrompt).to.include(`Read \`${OUTPUT_FILE}\``)
+		expect(randomPrompt).to.include("get_brainstorming_methods")
+		expect(randomPrompt).to.include("workflow_progress_request")
+		expect(randomPrompt).not.to.include("The user has requested a recommended brainstorming technique")
+		expect(randomPrompt).not.to.include("user requested technique suggestion")
+		expect(randomPrompt).not.to.include("apply_patch")
+		expect(randomPrompt).not.to.include("{workflow.output_file}")
+		expect(randomPrompt).not.to.include("append_brainstorming_selected_technique")
+		expect(randomPrompt).not.to.include("set_workflow_values")
 
 		const approvedStep3ToolNames = [
 			"get_brainstorming_methods",
-			"append_brainstorming_selected_technique",
 			"read_file",
 			"apply_patch",
 			"send_user_message",
@@ -753,6 +794,7 @@ describe("brainstormingWorkflowDefinition", () => {
 			expectToolNames(step3ToolNames, approvedStep3ToolNames)
 			expect(step3ToolNames).not.to.include("build_workflow_document")
 			expect(step3ToolNames).not.to.include("set_workflow_values")
+			expect(step3ToolNames).not.to.include("append_brainstorming_selected_technique")
 		}
 
 		expect(getAction("step-3", "step-3-await-progress-request", "step-3-transition-to-step-4")).to.deep.include({

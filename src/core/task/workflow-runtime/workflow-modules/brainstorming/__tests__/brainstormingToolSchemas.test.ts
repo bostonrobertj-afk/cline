@@ -3,7 +3,6 @@ import { describe, it } from "mocha"
 import { ClineDefaultTool } from "@/shared/tools"
 import type { WorkflowPromptBuilderInput, WorkflowValues } from "../../../types"
 import {
-	buildBrainstormingAppendSelectedTechniqueToolSchema,
 	buildBrainstormingGetMethodsToolSchema,
 	buildBrainstormingStep1ToolSchemas,
 	buildBrainstormingStep2ToolSchemas,
@@ -23,28 +22,11 @@ describe("brainstormingToolSchemas", () => {
 		expect(buildBrainstormingStep2ToolSchemas()).to.deep.equal([])
 	})
 
-	it("builds schemas for the Phase 3 suggestion-only brainstorming tools", () => {
-		const schemas = [buildBrainstormingGetMethodsToolSchema(), buildBrainstormingAppendSelectedTechniqueToolSchema()]
+	it("builds the Step 3 brainstorming method lookup schema", () => {
+		const schema = buildBrainstormingGetMethodsToolSchema()
 
-		expect(schemas.map((schema) => schema.name)).to.deep.equal([
-			"get_brainstorming_methods",
-			"append_brainstorming_selected_technique",
-		])
-		expect(schemas.map((schema) => schema.id)).to.deep.equal([
-			ClineDefaultTool.GET_BRAINSTORMING_METHODS,
-			ClineDefaultTool.APPEND_BRAINSTORMING_SELECTED_TECHNIQUE,
-		])
-
-		const appendSchema = buildBrainstormingAppendSelectedTechniqueToolSchema()
-		if (appendSchema.parameters === undefined) {
-			throw new Error("Expected append_brainstorming_selected_technique parameters.")
-		}
-		expect(appendSchema.parameters.map((parameter) => [parameter.name, parameter.required])).to.deep.equal([
-			["name", true],
-			["description", true],
-			["id", false],
-			["category", false],
-		])
+		expect(schema.name).to.equal("get_brainstorming_methods")
+		expect(schema.id).to.equal(ClineDefaultTool.GET_BRAINSTORMING_METHODS)
 	})
 
 	it("exposes exact Step 3 and Step 4 active-step tool schemas", () => {
@@ -60,7 +42,6 @@ describe("brainstormingToolSchemas", () => {
 		const step4ToolNames = buildBrainstormingStep4ToolSchemas().map((schema) => schema.name)
 		const approvedStep3ToolNames = [
 			"get_brainstorming_methods",
-			"append_brainstorming_selected_technique",
 			"read_file",
 			"apply_patch",
 			"send_user_message",
@@ -80,12 +61,13 @@ describe("brainstormingToolSchemas", () => {
 		])
 	})
 
-	it("keeps runtime-owned artifact tools out of model-facing brainstorming schemas", () => {
+	it("keeps runtime-owned and non-model-facing tools out of model-facing brainstorming schemas", () => {
 		const forbiddenToolNames = [
 			"archive_workflow_artifact",
 			"delete_workflow_artifact",
 			"create_workflow_artifact",
 			"build_workflow_document",
+			"append_brainstorming_selected_technique",
 		]
 		const modelFacingToolNames = [
 			...buildBrainstormingStep3ToolSchemas(

@@ -83,71 +83,59 @@ const CREATE_ARCHITECTURE_WORKFLOW_VALUE_KEYS = [
 	CreateArchitectureWorkflowValueKey.OutputArtifactRelativePath,
 ]
 
-const STEP_3_PROMPT = `Read \`{workflow.output_file}\`.
+const STEP_3_PROMPT = `Review {workflow.output_file} and any additional files listed within it as relevant context.
 
-Use any files listed in the Relevant Context section when they would help ground the architecture.
+If files were provided in the relevant context section, draft and propose content for the project context analysis section, then save it to {workflow.output_file} once the user approves.
 
-Draft and propose content for Project Context Analysis. After the user approves it, save the approved content to \`{workflow.output_file}\`.
+Ensure that the scope, architectural goals, and core architectural rules are sufficient to enable completion of the remaining document sections. If the existing is vague, overly broad, or lacks sufficient detail, engage the user and guide them through improving the content of these sections until it is appropriate for a project architecture document and sufficient to act as a basis for the remaining document sections.
 
-Review Scope, Architectural goals, and Core architectural rules for sufficiency. If any section is vague, overly broad, or insufficient for the remaining architecture work, ask the user for clarification or improvement and save approved refinements to \`{workflow.output_file}\`.
+Once the scope, architectural goals, and core architectural rules sections are sufficient, draft and propose content for the interpretation section of the document to the user, and save it to {workflow.output_file} once the user approves.
 
-Draft and propose content for Interpretation. After the user approves it, save the approved content to \`{workflow.output_file}\`.
+Once you've saved user-approved content to the document's interpretation section, use workflow_progress_request to confirm and unlock the next workflow step.`
 
-After approved interpretation content has been saved, use \`workflow_progress_request\` to confirm and unlock the next workflow step.`
+const STEP_4_PROMPT = `Guide the user through documenting the following sections of {workflow.output_file}:
+- Responsibility Boundaries
+- Durable vs Transient Ownership
+- Required Additional Baseline for Authority Enforcement
 
-const STEP_4_PROMPT = `Read \`{workflow.output_file}\`.
+Refer to relevant context, runtime code, and tests frequently to help keep things grounded in reality and ensure that the section's final content is comprehensive.
 
-Guide the user through documenting Responsibility Boundaries, Durable vs Transient Ownership, and Required Additional Baseline for Authority Enforcement.
+Once the user is aligned with this content, use workflow_progress_request to confirm and unlock the next workflow step.`
 
-Refer to relevant context, runtime code, and tests frequently so the content stays grounded in the project reality.
+const STEP_5_PROMPT = `Inform the user that you will now assess current runtime code & tests to identify what existing code is aligned, partially aligned, and not aligned with the intended architecture, then do a thorough assessment of the repository and record your findings in {workflow.output_file} under the appropriate section headings.
 
-Draft, discuss, and refine the content with the user. Save approved content under the matching headings in \`{workflow.output_file}\`.
+Brief the user on your findings, answer any questions they have, make adjustments if needed, then use workflow_progress_request to unlock the next workflow step once the user approves the content you've added based on your code alignment assessment.`
 
-Once the user is aligned with the saved content, use \`workflow_progress_request\` to confirm and unlock the next workflow step.`
+const STEP_6_PROMPT = `Identify the key tradeoffs and risks based on the existing contents of {workflow.output_file}, performing additional code assessment if needed. Provide a proposed draft for the key tradeoffs and risks section of the document to the user, refine as needed based on their feedback, and save the final version under the appropriate document headings once the user approves.
 
-const STEP_5_PROMPT = `Read \`{workflow.output_file}\`.
+Once the tradeoffs and risks sections are populated with user-approved content, use workflow_progress_request to unlock the next workflow step.`
 
-Tell the user that you will assess the current runtime code and tests for alignment with the intended architecture.
+const STEP_7_PROMPT = `Draft and propose a comprehensive blast radius for this project encompassing all files, modules, directories, shared components, and integration boundaries to the user, adjust based on their feedback, and save the approved content under the appropriate heading in {workflow.output_file}.
 
-Perform a thorough repository assessment using code and test files. Write findings under Aligned, Partially aligned, and Not aligned / conflicts in \`{workflow.output_file}\`.
+Once the blast radius section of the architecture document is populated with user-approved content, use workflow_progress_request to unlock the next workflow step.`
 
-Brief the user on the findings. Answer questions, revise the assessment when needed, and save approved changes to \`{workflow.output_file}\`.
+const STEP_8_PROMPT = `Identify the key dependencies that will matter during project implementation, provide them to the user, adjust based on their feedback, then save them in the dependencies section of {workflow.output_file}.
 
-Once the user approves the assessment content, use \`workflow_progress_request\` to confirm and unlock the next workflow step.`
+Next, build an implementation roadmap which establishes high-level project implementation sequencing based on the identified dependencies & blast radius. Provide the proposed draft to the user, adjust based on their feedback, then save it to the project roadmap section of {workflow.output_file}.
 
-const STEP_6_PROMPT = `Read \`{workflow.output_file}\` and identify key tradeoffs and risks from the current architecture content.
+Once you've populated the dependencies and implementation roadmap sections of {workflow.output_file} with user-approved content, use workflow_progress_request to unlock the final workflow step.`
 
-Perform additional code assessment if needed to keep the tradeoffs and risks concrete.
-
-Propose draft content for Tradeoffs and Risks, refine it based on user feedback, and save approved final content under the matching headings in \`{workflow.output_file}\`.
-
-Once Tradeoffs and Risks are populated with approved content, use \`workflow_progress_request\` to confirm and unlock the next workflow step.`
-
-const STEP_7_PROMPT = `Read \`{workflow.output_file}\`.
-
-Draft a comprehensive project blast radius. Include files, modules, directories, shared components, and integration boundaries.
-
-Propose the blast radius to the user, adjust based on feedback, and save approved content under Project Blast Radius in \`{workflow.output_file}\`.
-
-Once Project Blast Radius is populated with approved content, use \`workflow_progress_request\` to confirm and unlock the next workflow step.`
-
-const STEP_8_PROMPT = `Read \`{workflow.output_file}\`.
-
-Identify key dependencies that will matter during project implementation. Present those dependencies to the user, adjust based on feedback, and save approved dependencies under Dependencies in \`{workflow.output_file}\`.
-
-Build an implementation roadmap establishing high-level project implementation sequencing based on dependencies and blast radius. Present the roadmap to the user, adjust based on feedback, and save approved roadmap content under Project Roadmap in \`{workflow.output_file}\`.
-
-Once Dependencies and Project Roadmap are populated with approved content, use \`workflow_progress_request\` to confirm and unlock the final workflow step.`
-
-const STEP_9_EXISTING_DOCUMENT_HEADER_PROMPT =
-	"You have been called inside a workflow focused on revising an existing architecture document within the following project:\n- Project: {workflow.projectTitle}\n- Project Folder: {workflow.projectFolderName}\n- Architecture Document: {workflow.output_file}"
+const STEP_9_EXISTING_DOCUMENT_HEADER_PROMPT = `You have been called inside a workflow focused on revising an existing architecture document within the following project:
+- Project: {workflow.projectTitle}
+- Project Folder: {workflow.projectFolderName}
+- Architecture Document: {workflow.output_file}`
 const STEP_9_CHANGE_PLAN_PROMPT_LINE = "- Change Management Plan: {workflow.change_plan}"
-const STEP_9_EXISTING_DOCUMENT_BODY_PROMPT =
-	'Steps 1-8 were automatically completed by the system.\nReview the architecture document and any files listed in the "Relevant Context" section.\nAfter reviewing, confirm the scope of revisions that the user wishes to make in the architecture document, then work with them to identify the correct revisions to the existing document and update {workflow.output_file} appropriately.'
-const STEP_9_NEW_DOCUMENT_REVIEW_PROMPT =
-	"Review the full architecture for coherence and pattern and structure alignment.\nClassify any issues as critical, important, or minor.\nIf there are critical issues, present them and ask how the user wants to resolve them before implementation. If there are important or minor issues, present them as refinements and ask whether to address them now."
-const STEP_9_FINAL_PROMPT =
-	"When finished, present a short completion summary using attempt_completion and explain that the architecture document is now the technical source of truth and is ready to inform the create-epics workflow."
+
+const STEP_9_EXISTING_DOCUMENT_BODY_PROMPT = `Steps 1-8 were automatically completed by the system.
+
+Review the architecture document and any files listed in the "Relevant Context" section.
+After reviewing, confirm the scope of revisions that the user wishes to make in the architecture document, then work with them to identify the correct revisions to the existing document and update {workflow.output_file} appropriately.`
+
+const STEP_9_NEW_DOCUMENT_REVIEW_PROMPT = `Review the full architecture for coherence and pattern and structure alignment.
+Classify any issues as critical, important, or minor.
+If there are critical issues, present them and ask how the user wants to resolve them before implementation. If there are important or minor issues, present them as refinements and ask whether to address them now.`
+
+const STEP_9_FINAL_PROMPT = `When finished, present a short completion summary using attempt_completion and explain that the architecture document is now the technical source of truth and is ready to inform the create-epics workflow.`
 
 function buildTerminalTransition(): WorkflowFormDefinitionPayload["panels"][string]["transition"] {
 	return {

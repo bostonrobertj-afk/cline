@@ -148,7 +148,7 @@ interface DevStorySubtaskInventoryRecord {
 const PRIMARY_STORY_FILENAME_PATTERN = /^Story-(\d+)-(\d+)\.md$/
 const REMEDIATION_STORY_FILENAME_PATTERN = /^Remediation-story-(\d+)-(\d+)-(\d+)\.md$/
 
-const DEV_STORY_STEP_2_PROMPT_TEMPLATE = `You are tasked with implementing a story with a prescribed set of tasks and subtasks. You will be provided with the story's instructions and frontmatter, then will be provided with the assigned tasks one at a time. Once you've completed all subtasks for the provided task you will be provided with the next task.
+const DEV_STORY_STEP_2_STATIC_PROMPT_TEMPLATE = `You are tasked with implementing a story with a prescribed set of tasks and subtasks. You will be provided with the story's instructions and frontmatter, then will be provided with the assigned tasks one at a time. Once you've completed all subtasks for the provided task you will be provided with the next task.
 You will use the following tools to manage your progress while implementing this story:
 - story_task_complete: call this tool to mark a subtask complete. The tool will automatically mark a task complete once you complete all of it's subtasks.
 - request_task_detail: call this tool to request the detailed instructions for a given task ID. This info is automatically provided when a task is completed and a new task is unlocked, but you can use this tool if you need the system to re-send that information at any time.
@@ -175,11 +175,8 @@ Known Issues/ Risks/ Technical Debt:
 
 **Continue task impelentation until instructed otherwise- when the final task is complete the next workflow step will unlock and further instructions will be provided.**
 
-*** Current Story Task: ***
-current_story_task
-*** Conditional Prompting: ***
-Runtime must provide the first task and it's subtasks exactly as they are written in the target story document. When all subtasks for the provided task are complete, Runtime must provide the next task from the story document in the same manner. Existing tool story_task_reminder can likely be updated to serve this purpose.
-*** end conditional prompting block ***`
+*** Current Story Task: ***`
+const DEV_STORY_STEP_2_CURRENT_TASK_PROMPT_SEPARATOR = "\n"
 
 const DEV_STORY_STEP_3_PROMPT =
 	"Use attempt_completion to provide a final recap to the user summarizing the changes that you implemented during this workflow, and remind them to run the code-review workflow before committing the changed files."
@@ -478,7 +475,9 @@ function buildStep2PromptSource(input: WorkflowPromptBuilderInput): WorkflowStep
 
 	return {
 		kind: "current_step_instruction_template",
-		currentStepInstructionTemplate: DEV_STORY_STEP_2_PROMPT_TEMPLATE.replaceAll("current_story_task", currentTaskDetail),
+		currentStepInstructionTemplate: [DEV_STORY_STEP_2_STATIC_PROMPT_TEMPLATE, currentTaskDetail].join(
+			DEV_STORY_STEP_2_CURRENT_TASK_PROMPT_SEPARATOR,
+		),
 	}
 }
 
@@ -1184,7 +1183,7 @@ export const devStoryWorkflowDefinition: WorkflowDefinition = {
 			checklistLabel: "Execute Story Tasks",
 			decisionTree: buildStep2DecisionTree(),
 			buildPromptSource: buildStep2PromptSource,
-			promptTemplates: [DEV_STORY_STEP_2_PROMPT_TEMPLATE],
+			promptTemplates: [DEV_STORY_STEP_2_STATIC_PROMPT_TEMPLATE],
 			buildToolSchema: buildDevStoryStep2ToolSchemas,
 		}),
 		"step-3": createStepDefinition({

@@ -859,65 +859,57 @@ describe("createArchitectureWorkflowDefinition", () => {
 			{
 				stepId: "step-3",
 				requiredSnippets: [
-					`Read \`${OUTPUT_FILE}\`.`,
-					"Relevant Context",
-					"Project Context Analysis",
-					"Scope, Architectural goals, and Core architectural rules",
-					"Interpretation",
+					`Review ${OUTPUT_FILE} and any additional files listed within it as relevant context.`,
+					"project context analysis section",
+					"If the existing is vague",
+					"interpretation section",
 					"workflow_progress_request",
 				],
 			},
 			{
 				stepId: "step-4",
 				requiredSnippets: [
-					`Read \`${OUTPUT_FILE}\`.`,
+					`Guide the user through documenting the following sections of ${OUTPUT_FILE}:`,
 					"Responsibility Boundaries",
 					"Durable vs Transient Ownership",
 					"Required Additional Baseline for Authority Enforcement",
-					"runtime code, and tests",
+					"runtime code, and tests frequently",
 					"workflow_progress_request",
 				],
 			},
 			{
 				stepId: "step-5",
 				requiredSnippets: [
-					`Read \`${OUTPUT_FILE}\`.`,
-					"current runtime code and tests",
-					"Aligned",
-					"Partially aligned",
-					"Not aligned / conflicts",
-					"Brief the user",
+					"Inform the user that you will now assess current runtime code & tests",
+					"aligned, partially aligned, and not aligned",
+					`record your findings in ${OUTPUT_FILE}`,
 					"workflow_progress_request",
 				],
 			},
 			{
 				stepId: "step-6",
 				requiredSnippets: [
-					`Read \`${OUTPUT_FILE}\``,
-					"key tradeoffs and risks",
-					"additional code assessment",
-					"Tradeoffs and Risks",
+					`Identify the key tradeoffs and risks based on the existing contents of ${OUTPUT_FILE}`,
+					"performing additional code assessment if needed",
+					"key tradeoffs and risks section",
 					"workflow_progress_request",
 				],
 			},
 			{
 				stepId: "step-7",
 				requiredSnippets: [
-					`Read \`${OUTPUT_FILE}\`.`,
-					"comprehensive project blast radius",
-					"files, modules, directories, shared components, and integration boundaries",
-					"Project Blast Radius",
+					"Draft and propose a comprehensive blast radius for this project",
+					"all files, modules, directories, shared components, and integration boundaries",
+					`save the approved content under the appropriate heading in ${OUTPUT_FILE}`,
 					"workflow_progress_request",
 				],
 			},
 			{
 				stepId: "step-8",
 				requiredSnippets: [
-					`Read \`${OUTPUT_FILE}\`.`,
-					"key dependencies",
-					"Dependencies",
-					"dependencies and blast radius",
-					"Project Roadmap",
+					"Identify the key dependencies that will matter during project implementation",
+					"identified dependencies & blast radius",
+					`project roadmap section of ${OUTPUT_FILE}`,
 					"workflow_progress_request",
 				],
 			},
@@ -962,6 +954,8 @@ describe("createArchitectureWorkflowDefinition", () => {
 		})
 
 		expect(prompt).not.to.equal("")
+		expect(prompt).to.include("Review the full architecture for coherence and pattern and structure alignment.")
+		expect(prompt).to.include("When finished, present a short completion summary using attempt_completion")
 		expect(prompt).not.to.include(OUTPUT_FILE)
 		expect(prompt).not.to.include("Create Architecture Project")
 		expect(prompt).not.to.include("create-architecture-project")
@@ -990,6 +984,11 @@ describe("createArchitectureWorkflowDefinition", () => {
 		})
 
 		expect(prompt).not.to.equal("")
+		expect(prompt).to.include(
+			"You have been called inside a workflow focused on revising an existing architecture document within the following project:",
+		)
+		expect(prompt).to.include("Steps 1-8 were automatically completed by the system.")
+		expect(prompt).to.include('Review the architecture document and any files listed in the "Relevant Context" section.')
 		expect(prompt).to.include(OUTPUT_FILE)
 		expect(prompt).to.include("Create Architecture Project")
 		expect(prompt).to.include("create-architecture-project")

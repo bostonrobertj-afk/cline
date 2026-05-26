@@ -181,6 +181,8 @@ function expectNoCreateStoryWorkflowPromptTokens(prompt: string): void {
 	for (const promptToken of promptTokens) {
 		expect(prompt).not.to.include(promptToken)
 	}
+	expect(prompt).not.to.include("*** Shown only if")
+	expect(prompt).not.to.include("*** end conditional prompt block ***")
 }
 
 function getToolNamesForStep(stepId: WorkflowStepDefinition["id"]): string[] {

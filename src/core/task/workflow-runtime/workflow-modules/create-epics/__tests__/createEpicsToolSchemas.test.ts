@@ -6,6 +6,7 @@ import { buildCreateEpicsStep1ToolSchemas, buildCreateEpicsStep2ToolSchemas } fr
 const STEP_2_TOOL_NAMES = [
 	"read_file",
 	"upsert_epic",
+	"apply_patch",
 	"send_user_message",
 	"ask_followup_question",
 	"attempt_completion",
@@ -13,7 +14,6 @@ const STEP_2_TOOL_NAMES = [
 
 const FORBIDDEN_STEP_2_TOOL_NAMES = [
 	"build_workflow_document",
-	"apply_patch",
 	"set_workflow_values",
 	"workflow_progress_request",
 	"create_workflow_artifact",

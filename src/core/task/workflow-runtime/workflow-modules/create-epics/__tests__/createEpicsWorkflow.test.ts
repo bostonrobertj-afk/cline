@@ -621,12 +621,20 @@ describe("createEpicsWorkflowDefinition", () => {
 		expect(prompt).to.include("/tmp/create-epics-project/discovery/brainstorming.md")
 		expect(prompt).to.include("/tmp/create-epics-project/research.md")
 
-		expect(prompt).to.include(`Read \`${OUTPUT_FILE}\`.`)
-		expect(prompt).to.include("Read `/tmp/create-epics-project/planning/architecture.md`.")
-		expect(prompt).to.include("Read `/tmp/create-epics-project/discovery/brainstorming.md` when present.")
-		expect(prompt).to.include("Read any files listed in `/tmp/create-epics-project/research.md` when present.")
-		expect(prompt).to.include("Call `upsert_epic` for each user-aligned epic.")
-		expect(prompt).to.include("Do not use `apply_patch`, `build_workflow_document`, `set_workflow_values`")
+		expect(prompt).to.include("Read the following:")
+		expect(prompt).to.include(`- \`${OUTPUT_FILE}\``)
+		expect(prompt).to.include("- `/tmp/create-epics-project/planning/architecture.md`")
+		expect(prompt).to.include("- `/tmp/create-epics-project/discovery/brainstorming.md`")
+		expect(prompt).to.include("- `/tmp/create-epics-project/research.md`")
+		expect(prompt).to.include(
+			"Identify the work necessary to deliver the project based on the provided architecture document.",
+		)
+		expect(prompt).to.include("Each epic must:")
+		expect(prompt).to.include("Sequence epics by dependency order with aid from the provided architecture document:")
+		expect(prompt).to.include("Do not create epics that are only “backend,” “frontend,” or “tests”")
+		expect(prompt).to.include("Use `upsert_epic` to persist every accepted epic and every accepted revision.")
+		expect(prompt).to.include("Adjust as needed using `apply_patch` based on their feedback.")
+		expect(prompt).to.include("use attempt_completion to provide a final recap")
 		expect(prompt).not.to.include("{workflow.output_file}")
 		expect(prompt).not.to.include("{workflow.architecture_document}")
 		expect(prompt).not.to.include("{workflow.brainstorming_document}")
@@ -636,13 +644,13 @@ describe("createEpicsWorkflowDefinition", () => {
 		expect(step2ToolNames).to.deep.equal([
 			"read_file",
 			"upsert_epic",
+			"apply_patch",
 			"send_user_message",
 			"ask_followup_question",
 			"attempt_completion",
 		])
 		for (const forbiddenToolName of [
 			"build_workflow_document",
-			"apply_patch",
 			"set_workflow_values",
 			"workflow_progress_request",
 			"create_workflow_artifact",
@@ -652,5 +660,69 @@ describe("createEpicsWorkflowDefinition", () => {
 		]) {
 			expect(step2ToolNames).not.to.include(forbiddenToolName)
 		}
+	})
+
+	it("omits Step 2 optional context instructions when optional context values are absent", () => {
+		const step2 = createEpicsWorkflowDefinition.steps["step-2"]
+		const workflowValues: WorkflowValues = {
+			output_file: OUTPUT_FILE,
+			architecture_document: "/tmp/create-epics-project/planning/architecture.md",
+		}
+		const promptSource = step2.buildPromptSource(createPromptInput(step2, workflowValues))
+		if (promptSource.kind !== "current_step_instruction_template") {
+			throw new Error("Missing current step instruction template for step-2.")
+		}
+		const prompt = renderWorkflowPromptTemplate({
+			template: promptSource.currentStepInstructionTemplate,
+			workflowValueKeys: createEpicsWorkflowDefinition.workflowValueKeys,
+			workflowValues,
+			context: "create-epics step-2 optional context absent test prompt",
+		})
+
+		expect(prompt).to.include("Read the following:")
+		expect(prompt).to.include(`- \`${OUTPUT_FILE}\``)
+		expect(prompt).to.include("- `/tmp/create-epics-project/planning/architecture.md`")
+		expect(prompt).not.to.include("brainstorming.md")
+		expect(prompt).not.to.include("research.md")
+		expect(prompt).not.to.include("{workflow.brainstorming_document}")
+		expect(prompt).not.to.include("{workflow.additional_context_files}")
+	})
+
+	it("renders each Step 2 optional context instruction only when its value is present", () => {
+		const step2 = createEpicsWorkflowDefinition.steps["step-2"]
+		const renderStep2Prompt = (workflowValues: WorkflowValues, context: string): string => {
+			const promptSource = step2.buildPromptSource(createPromptInput(step2, workflowValues))
+			if (promptSource.kind !== "current_step_instruction_template") {
+				throw new Error("Missing current step instruction template for step-2.")
+			}
+			return renderWorkflowPromptTemplate({
+				template: promptSource.currentStepInstructionTemplate,
+				workflowValueKeys: createEpicsWorkflowDefinition.workflowValueKeys,
+				workflowValues,
+				context,
+			})
+		}
+
+		const brainstormingOnlyPrompt = renderStep2Prompt(
+			{
+				output_file: OUTPUT_FILE,
+				architecture_document: "/tmp/create-epics-project/planning/architecture.md",
+				brainstorming_document: "/tmp/create-epics-project/discovery/brainstorming.md",
+			},
+			"create-epics step-2 brainstorming-only test prompt",
+		)
+		const additionalContextOnlyPrompt = renderStep2Prompt(
+			{
+				output_file: OUTPUT_FILE,
+				architecture_document: "/tmp/create-epics-project/planning/architecture.md",
+				additional_context_files: "/tmp/create-epics-project/research.md",
+			},
+			"create-epics step-2 additional-context-only test prompt",
+		)
+
+		expect(brainstormingOnlyPrompt).to.include("- `/tmp/create-epics-project/discovery/brainstorming.md`")
+		expect(brainstormingOnlyPrompt).not.to.include("research.md")
+		expect(additionalContextOnlyPrompt).to.include("- `/tmp/create-epics-project/research.md`")
+		expect(additionalContextOnlyPrompt).not.to.include("brainstorming.md")
 	})
 })
