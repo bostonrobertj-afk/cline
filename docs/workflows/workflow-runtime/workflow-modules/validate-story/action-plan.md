@@ -61,116 +61,116 @@ Relevant requirements: Tool Schema Requirements, Module File Layout, Testing Req
 
 After completing this phase, pause for QA review before moving to Phase 2.
 
-[ ] Task 1: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts`, add the validate-story shared/default tool-schema builder file.
+[x] Task 1: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts`, add the validate-story shared/default tool-schema builder file.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`
 
-    [ ] Subtask 1.1: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts`, create the file with exactly these imports: `ClineToolSet` from `@/core/prompts/system-prompt/registry/ClineToolSet`, type `ClineToolSpec` from `@/core/prompts/system-prompt/spec`, `registerClineToolSets` from `@/core/prompts/system-prompt/tools/init`, `ModelFamily` from `@/shared/prompts`, and `ClineDefaultTool` from `@/shared/tools`.
+    [x] Subtask 1.1: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts`, create the file with exactly these imports: `ClineToolSet` from `@/core/prompts/system-prompt/registry/ClineToolSet`, type `ClineToolSpec` from `@/core/prompts/system-prompt/spec`, `registerClineToolSets` from `@/core/prompts/system-prompt/tools/init`, `ModelFamily` from `@/shared/prompts`, and `ClineDefaultTool` from `@/shared/tools`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`
 
-    [ ] Subtask 1.2: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts`, add `const VALIDATE_STORY_TOOL_SCHEMA_VARIANT = ModelFamily.NATIVE_GPT_5` and export `VALIDATE_STORY_STEP_1_TOOL_IDS: readonly ClineDefaultTool[]` with this exact ordered array: `ClineDefaultTool.FILE_READ`, `ClineDefaultTool.FILE_READ_RANGE`, `ClineDefaultTool.LIST_FILES`, `ClineDefaultTool.SEARCH`, `ClineDefaultTool.LIST_CODE_DEF`, `ClineDefaultTool.BASH`, `ClineDefaultTool.SEND_USER_MESSAGE`, `ClineDefaultTool.ATTEMPT`.
+    [x] Subtask 1.2: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts`, add `const VALIDATE_STORY_TOOL_SCHEMA_VARIANT = ModelFamily.NATIVE_GPT_5` and export `VALIDATE_STORY_STEP_1_TOOL_IDS: readonly ClineDefaultTool[]` with this exact ordered array: `ClineDefaultTool.FILE_READ`, `ClineDefaultTool.FILE_READ_RANGE`, `ClineDefaultTool.LIST_FILES`, `ClineDefaultTool.SEARCH`, `ClineDefaultTool.LIST_CODE_DEF`, `ClineDefaultTool.BASH`, `ClineDefaultTool.SEND_USER_MESSAGE`, `ClineDefaultTool.ATTEMPT`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`
 
-    [ ] Subtask 1.3: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts`, add `function resolveValidateStorySharedToolSpec(toolId: ClineDefaultTool): ClineToolSpec` that calls `registerClineToolSets()`, assigns `const tool = ClineToolSet.getToolByNameWithFallback(toolId, VALIDATE_STORY_TOOL_SCHEMA_VARIANT)`, throws `new Error(\`Missing shared/default tool schema for ${toolId}.\`)` when `tool === undefined`, and otherwise returns `tool.config`.
+    [x] Subtask 1.3: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts`, add `function resolveValidateStorySharedToolSpec(toolId: ClineDefaultTool): ClineToolSpec` that calls `registerClineToolSets()`, assigns `const tool = ClineToolSet.getToolByNameWithFallback(toolId, VALIDATE_STORY_TOOL_SCHEMA_VARIANT)`, throws `new Error(\`Missing shared/default tool schema for ${toolId}.\`)` when `tool === undefined`, and otherwise returns `tool.config`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`
 
-    [ ] Subtask 1.4: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts`, export `function buildValidateStoryStep1ToolSchemas(): readonly ClineToolSpec[]` returning `VALIDATE_STORY_STEP_1_TOOL_IDS.map((toolId) => resolveValidateStorySharedToolSpec(toolId))`.
+    [x] Subtask 1.4: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts`, export `function buildValidateStoryStep1ToolSchemas(): readonly ClineToolSpec[]` returning `VALIDATE_STORY_STEP_1_TOOL_IDS.map((toolId) => resolveValidateStorySharedToolSpec(toolId))`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`
 
-[ ] Task 2: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`, add focused validate-story tool-schema tests.
+[x] Task 2: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`, add focused validate-story tool-schema tests.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`
 
-    [ ] Subtask 2.1: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`, create the file with exactly these imports: `expect` from `chai`, `describe` and `it` from `mocha`, `ClineToolSet` from `@/core/prompts/system-prompt/registry/ClineToolSet`, type `ClineToolSpec` from `@/core/prompts/system-prompt/spec`, `registerClineToolSets` from `@/core/prompts/system-prompt/tools/init`, `ModelFamily` from `@/shared/prompts`, `ClineDefaultTool` from `@/shared/tools`, and `buildValidateStoryStep1ToolSchemas` plus `VALIDATE_STORY_STEP_1_TOOL_IDS` from `../validateStoryToolSchemas`.
+    [x] Subtask 2.1: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`, create the file with exactly these imports: `expect` from `chai`, `describe` and `it` from `mocha`, `ClineToolSet` from `@/core/prompts/system-prompt/registry/ClineToolSet`, type `ClineToolSpec` from `@/core/prompts/system-prompt/spec`, `registerClineToolSets` from `@/core/prompts/system-prompt/tools/init`, `ModelFamily` from `@/shared/prompts`, `ClineDefaultTool` from `@/shared/tools`, and `buildValidateStoryStep1ToolSchemas` plus `VALIDATE_STORY_STEP_1_TOOL_IDS` from `../validateStoryToolSchemas`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`
 
-    [ ] Subtask 2.2: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`, add `const STEP_1_TOOL_NAMES: readonly string[] = ["read_file", "read_file_range", "list_files", "search_files", "list_code_definition_names", "execute_command", "send_user_message", "attempt_completion"]` and `const FORBIDDEN_MODEL_FACING_TOOL_NAMES: readonly string[] = ["apply_patch", "write_to_file", "set_workflow_values", "workflow_progress_request", "ask_followup_question", "use_subagents", "create_workflow_artifact", "build_workflow_document", "archive_workflow_artifact", "delete_workflow_artifact", "move_workflow_project_file", "resolve_prerequisite_files", "resolve_existing_project_artifact", "validate_story_index_entry"]`.
+    [x] Subtask 2.2: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`, add `const STEP_1_TOOL_NAMES: readonly string[] = ["read_file", "read_file_range", "list_files", "search_files", "list_code_definition_names", "execute_command", "send_user_message", "attempt_completion"]` and `const FORBIDDEN_MODEL_FACING_TOOL_NAMES: readonly string[] = ["apply_patch", "write_to_file", "set_workflow_values", "workflow_progress_request", "ask_followup_question", "use_subagents", "create_workflow_artifact", "build_workflow_document", "archive_workflow_artifact", "delete_workflow_artifact", "move_workflow_project_file", "resolve_prerequisite_files", "resolve_existing_project_artifact", "validate_story_index_entry"]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`
 
-    [ ] Subtask 2.3: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`, add `function schemaNames(schemas: readonly ClineToolSpec[]): readonly string[]` returning `schemas.map((schema) => schema.name)`.
+    [x] Subtask 2.3: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`, add `function schemaNames(schemas: readonly ClineToolSpec[]): readonly string[]` returning `schemas.map((schema) => schema.name)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`
 
-    [ ] Subtask 2.4: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`, add `function expectedSharedStep1ToolSpecs(): readonly ClineToolSpec[]` that calls `registerClineToolSets()`, maps `VALIDATE_STORY_STEP_1_TOOL_IDS`, gets each tool with `ClineToolSet.getToolByNameWithFallback(toolId, ModelFamily.NATIVE_GPT_5)`, throws `new Error(\`Missing shared/default tool schema for ${toolId}.\`)` when the tool is `undefined`, and returns each `tool.config`.
+    [x] Subtask 2.4: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`, add `function expectedSharedStep1ToolSpecs(): readonly ClineToolSpec[]` that calls `registerClineToolSets()`, maps `VALIDATE_STORY_STEP_1_TOOL_IDS`, gets each tool with `ClineToolSet.getToolByNameWithFallback(toolId, ModelFamily.NATIVE_GPT_5)`, throws `new Error(\`Missing shared/default tool schema for ${toolId}.\`)` when the tool is `undefined`, and returns each `tool.config`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`
 
-    [ ] Subtask 2.5: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`, add a `describe` block named `validateStoryToolSchemas`; inside it, add a test named `exposes the exact Step 1 shared/default tool schema order` asserting `schemaNames(buildValidateStoryStep1ToolSchemas())` deep-equals `STEP_1_TOOL_NAMES`.
+    [x] Subtask 2.5: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`, add a `describe` block named `validateStoryToolSchemas`; inside it, add a test named `exposes the exact Step 1 shared/default tool schema order` asserting `schemaNames(buildValidateStoryStep1ToolSchemas())` deep-equals `STEP_1_TOOL_NAMES`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`
 
-    [ ] Subtask 2.6: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`, add a test named `uses shared default Step 1 tool specs without module-owned schema prose` asserting `buildValidateStoryStep1ToolSchemas()` deep-equals `expectedSharedStep1ToolSpecs()`.
+    [x] Subtask 2.6: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`, add a test named `uses shared default Step 1 tool specs without module-owned schema prose` asserting `buildValidateStoryStep1ToolSchemas()` deep-equals `expectedSharedStep1ToolSpecs()`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`
 
-    [ ] Subtask 2.7: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`, add a test named `uses only the approved Cline default tool ids for Step 1` asserting `VALIDATE_STORY_STEP_1_TOOL_IDS` deep-equals `[ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_READ_RANGE, ClineDefaultTool.LIST_FILES, ClineDefaultTool.SEARCH, ClineDefaultTool.LIST_CODE_DEF, ClineDefaultTool.BASH, ClineDefaultTool.SEND_USER_MESSAGE, ClineDefaultTool.ATTEMPT]`.
+    [x] Subtask 2.7: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`, add a test named `uses only the approved Cline default tool ids for Step 1` asserting `VALIDATE_STORY_STEP_1_TOOL_IDS` deep-equals `[ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_READ_RANGE, ClineDefaultTool.LIST_FILES, ClineDefaultTool.SEARCH, ClineDefaultTool.LIST_CODE_DEF, ClineDefaultTool.BASH, ClineDefaultTool.SEND_USER_MESSAGE, ClineDefaultTool.ATTEMPT]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`
 
-    [ ] Subtask 2.8: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`, add a test named `does not expose forbidden model-facing tools` that iterates `FORBIDDEN_MODEL_FACING_TOOL_NAMES` and asserts `schemaNames(buildValidateStoryStep1ToolSchemas())` does not include each forbidden tool name.
+    [x] Subtask 2.8: In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`, add a test named `does not expose forbidden model-facing tools` that iterates `FORBIDDEN_MODEL_FACING_TOOL_NAMES` and asserts `schemaNames(buildValidateStoryStep1ToolSchemas())` does not include each forbidden tool name.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`
 
-[ ] Task 3: In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`, run Phase 1 validation.
+[x] Task 3: In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`, run Phase 1 validation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`
 
-    [ ] Subtask 3.1: In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`, run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`.
+    [x] Subtask 3.1: In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`, run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`
 
-    [ ] Subtask 3.2: In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`, run `npm run check-types`. If it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` before treating the failure as a code defect.
+    [x] Subtask 3.2: In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`, run `npm run check-types`. If it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` before treating the failure as a code defect.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`
 
-    [ ] Subtask 3.3: In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`, run `npm run lint`.
+    [x] Subtask 3.3: In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`, run `npm run lint`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`
 
-    [ ] Subtask 3.4: In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`, run `rg -n "apply_patch|write_to_file|set_workflow_values|workflow_progress_request|ask_followup_question|use_subagents|create_workflow_artifact|build_workflow_document|archive_workflow_artifact|delete_workflow_artifact|move_workflow_project_file|resolve_prerequisite_files|resolve_existing_project_artifact|validate_story_index_entry" src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts` and confirm it returns no matches; exit code `1` with no output is success for this no-match guard.
+    [x] Subtask 3.4: In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`, run `rg -n "apply_patch|write_to_file|set_workflow_values|workflow_progress_request|ask_followup_question|use_subagents|create_workflow_artifact|build_workflow_document|archive_workflow_artifact|delete_workflow_artifact|move_workflow_project_file|resolve_prerequisite_files|resolve_existing_project_artifact|validate_story_index_entry" src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts` and confirm it returns no matches; exit code `1` with no output is success for this no-match guard.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`
 
-    [ ] Subtask 3.5: In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`, run `git diff --name-only && git ls-files --others --exclude-standard` and confirm persistent diffs and untracked files are limited to Phase 1 allowed files: `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts`, `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`, and `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`.
+    [x] Subtask 3.5: In `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`, run `git diff --name-only && git ls-files --others --exclude-standard` and confirm persistent diffs and untracked files are limited to Phase 1 allowed files: `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts`, `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`, and `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md`
