@@ -1,7 +1,9 @@
 import type {
+	WorkflowDecisionBranchTrigger,
 	WorkflowDecisionTree,
 	WorkflowDefinition,
 	WorkflowPersonaDefinition,
+	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
 	WorkflowStepPromptSource,
 } from "../../types"
@@ -31,6 +33,8 @@ export enum ValidateStoryWorkflowValueKey {
 	TargetStory = "target_story",
 	EpicsDocument = "epics_document",
 	ArchitectureDocument = "architecture_document",
+	OriginatingStory = "originating_story",
+	CodeReviewOutput = "code_review_output",
 }
 
 export const VALIDATE_STORY_WORKFLOW_VALUE_KEYS: readonly ValidateStoryWorkflowValueKey[] = [
@@ -40,6 +44,8 @@ export const VALIDATE_STORY_WORKFLOW_VALUE_KEYS: readonly ValidateStoryWorkflowV
 	ValidateStoryWorkflowValueKey.TargetStory,
 	ValidateStoryWorkflowValueKey.EpicsDocument,
 	ValidateStoryWorkflowValueKey.ArchitectureDocument,
+	ValidateStoryWorkflowValueKey.OriginatingStory,
+	ValidateStoryWorkflowValueKey.CodeReviewOutput,
 ]
 
 export const VALIDATE_STORY_ENTRY_PROJECT_VALUE_KEYS = {
@@ -84,60 +90,99 @@ export const VALIDATE_STORY_PREREQUISITE_FILES: NonNullable<WorkflowDefinition["
 	},
 }
 
-const VALIDATE_STORY_STEP_1_PROMPT_TEMPLATE = `You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.
+export const VALIDATE_STORY_STEP_1_IMPLEMENTATION_STORY_HEADER = `You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.
 - Project: {workflow.projectTitle}
 - Project Folder: {workflow.projectFolderName}
 - Architecture Document: {workflow.architecture_document}
 - Epics Documentation: {workflow.epics_document}
-- Target Story: {workflow.target_story}
+- Target Story: {workflow.target_story}`
 
-Perform a line-by-line review to ensure that the provided story document meets all relevant project and quality standards, including:
-- Objective, scope, scope boundary, and requirements are appropriate for the story and aligned with the upstream epics and architecture documentation
-- The story's tasks and subtasks fully comply with the following:
-    - Tasks & subtasks must start on a new line beginning with "[ ]", then the ID, then the target file's full file path, then the prescribed change.
-    - Tasks and subtasks are numbered sequentially with subtasks inheriting their parent task's ID, e.g. Task 1, Subtasks 1.1, 1.2
-    - The tasks/subtasks fully satisfy the story's requirements & objective while adhering to the scope and scope boundary
-    - Prescribed revisions are exact and leave no ambiguity for the developer to solve during implementation.
-    - Prescribed changes must include exact shapes for helpers, functions, fixtures, transition objects, discriminant narrowing, and object fields.
-    - Each subtask or task without subordinate subtasks prescribes exactly one revision in a single target file
-    - Tasks & Subtasks align with these quality expectations:
-        - Symbol lifecycle: every referenced helper, constant, type, builder, and test utility must be created, exported, and imported before first use. Import subtasks must list exact symbol names; phrases like "all helpers", "all exports", "the builders", or "matching sibling imports" are not permitted.
-        - Live contract verification: every prescribed constructor call, method call, return type, runtime action object, path-policy object, session object, form-session object, event object, and submitted-value payload must match the live exported TypeScript contract or a symbol created earlier in the same plan.
-        - Single-change granularity: a subtask must not bundle multiple helpers, multiple unrelated tests, or multiple runtime branches when splitting them would make sequencing, imports, or exact assertions clearer.
-        - Stable object assertions: tests for machine-consumed contracts must use exact deep-equality or exact field assertions, not "include", "deep-include", "transition type", or "action kind", when the requirements prescribe stable object fields.
-        - Fixture completeness: every test fixture must prescribe exact required object fields and exact setup calls/data, including runtime sessions, values, temp files, write data, cleanup, and second/fresh fixture setup where isolation is required.
-        - Deterministic helper behavior: helper subtasks must prescribe exact narrowing, intermediate variables, empty checks, return values, and error paths. Internally contradictory wording is not permitted.
-        - Filesystem/path-policy behavior: if a requirement involves selected-project containment, file type, workspace path policy, or runtime-owned artifact resolution, the story must prescribe that exact validation path.
-        - Legacy/forbidden coverage: unit tests and final validation guards must enumerate every forbidden legacy concept required by the requirements.
-    Tasks & subtasks must NEVER include the use of these low-quality code methods:
-        - "any" typing
-        - val as SomeType
-        - as any in tests
-        - optional properties most of the time (explicitly model which combinations exist and which don't whenever possible)
-        - one-letter generics
-        - non-boolean boolean checks
-        - bang bang operators (explicitly check for the condition instead)
-        - != null (explicitly check for the condition instead)
-        - not declaring function return types
-        - abuse of type assertions (use them only in special scenarios where the type is clearly known, and give priority to type declarations, interfaces, or generics)
-        - Failing to use utility types (use utility types such as partial, pick, omit, etc when appropriate)
-        - forcing assertions when types don't match
-        - not using enums to manage constants
-        - not using generics to abstract duplicated code
-        - not using type narrowing
-        - not explicitly defining generics parameters
-- Prescribed tests provide adequate coverage of both happy paths and failure paths for all code revisions
-- Tests are prescribed only for behavior, contracts, regression, and material risks required by the story document and project documentation
-- Any tests built via the story's tasks use exact assertions for canonical machine-consumed outputs and stable contracts, including tool names/ schema shape, artifact file formats, and persisted metadata.
-- Any tests built via the story's tasks use shape and invariant assertions for editable content: required fields exist, strings are non-empty, mappings are correct, and forbidden legacy values are absent.
-- Any tests built via the story's tasks do not add static guards unless they protect an approved boundary, forbidden legacy dependency, or known regression risk.
+export const VALIDATE_STORY_STEP_1_WRITE_REMEDIATION_STORY_HEADER = `You have been called inside a workflow designed to validate a remediation story before implementation. You will assess the remediation story against quality standards, ensure that the prescribed revisions are correct and comprehensive, and ensure that the story satisfies requirements as-written.
+- Story for Review: {workflow.target_story}
+- Story which had QA findings leading to generation of the story being reviewed: {workflow.originating_story}
+- Findings from QA pass on the original story: {workflow.code_review_output}`
 
-Once you've reviewed the story document, provide a response to the user using attempt_completion. In your response, list each story section and indicate "no violations" or provide specific violation details. For the task section, provide either a "no violations" or violations details for each task and subtask. If findings were present, instruct the user to run the create-story workflow and provide your findings to the agent in that workflow.`
+export const VALIDATE_STORY_STEP_1_QUICK_SPEC_HEADER = `You have been called inside a workflow designed to validate an implementation spec for a small project. You will assess the provided spec against quality standards, ensure that the prescribed revisions are correct and comprehensive, and ensure that the spec's tasks and subtasks satisfy the project's objective and requirements.
+Spec for review: {workflow.target_story}
 
-function buildStep1PromptSource(): WorkflowStepPromptSource {
+Read the entire provided spec, then assess the spec's tasks and subtasks following the criteria below.`
+
+export const VALIDATE_STORY_STEP_1_COMMON_REVIEW_CRITERIA = `Review each task and subtask individually, inspecting the indicated target file and determinining whether the prescribed change meets the following standards:
+1. Tasks and subtasks must be sequentially numbered.
+2. Tasks may summarize a file or capability area. Subtasks must prescribe exact changes.
+3. Each task or subtask must include:
+- Full target file path.
+- Allowed files list.
+- One exact prescribed revision unless subordinate subtasks split the work.
+- Exact imports to add or remove.
+- Exact helper/function/type/object shape.
+- Exact required narrowing before union-field access.
+- Exact fixture/session/action/event shape.
+- Exact assertions for stable machine-consumed contracts.
+- Exact raw-placeholder negative assertions for required prompt placeholders.
+- Exact cleanup of now-unused imports, helpers, exports, fixtures, assertions, and validation guards.
+4. Tasks & Subtasks must not use vague phrases such as:
+- “all helpers”
+- “matching sibling pattern”
+- “equivalent shape”
+- “update tests”
+- “as needed”
+- “fixture like the existing one”
+- “all exported constants”
+- “each static branch template”
+5. Each task & subtask meets the following quality standards:
+- It is requirements-backed.
+- It is compile-safe.
+- It has exact imports and cleanup.
+- It has exact fixture/action/session shapes.
+- It has exact assertions where stable contracts are involved.
+- It does not invent prose.
+- It does not preserve unauthorized legacy behavior.
+- It does not require the dev agent to infer implementation details.
+
+After assessing the tasks and subtasks thoroughly, consider whether the combined set delivers on the indicated requirements/objective while respecting the defined scope.`
+
+export const VALIDATE_STORY_STEP_1_SUBAGENT_FINAL_INSTRUCTION =
+	"Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent."
+
+export const VALIDATE_STORY_STEP_1_MAIN_AGENT_FINAL_INSTRUCTION =
+	'Once you\'ve reviewed the story document, provide a response to the user using attempt_completion. In your response, list each story section and indicate "no violations" or provide specific violation details. For the task section, provide either a "no violations" or violations details for each task and subtask. If findings were present, instruct the user to run the create-story workflow and provide your findings to the agent in that workflow.'
+
+export const VALIDATE_STORY_STEP_1_PROMPT_TEMPLATES: readonly string[] = [
+	VALIDATE_STORY_STEP_1_IMPLEMENTATION_STORY_HEADER,
+	VALIDATE_STORY_STEP_1_WRITE_REMEDIATION_STORY_HEADER,
+	VALIDATE_STORY_STEP_1_QUICK_SPEC_HEADER,
+	VALIDATE_STORY_STEP_1_COMMON_REVIEW_CRITERIA,
+	VALIDATE_STORY_STEP_1_SUBAGENT_FINAL_INSTRUCTION,
+	VALIDATE_STORY_STEP_1_MAIN_AGENT_FINAL_INSTRUCTION,
+]
+
+function resolveValidateStoryStep1Header(parentWorkflowName: WorkflowDefinition["name"] | undefined): string {
+	if (parentWorkflowName === "write-remediation-story") {
+		return VALIDATE_STORY_STEP_1_WRITE_REMEDIATION_STORY_HEADER
+	}
+	if (parentWorkflowName === "quick-spec") {
+		return VALIDATE_STORY_STEP_1_QUICK_SPEC_HEADER
+	}
+	return VALIDATE_STORY_STEP_1_IMPLEMENTATION_STORY_HEADER
+}
+
+function resolveValidateStoryStep1FinalInstruction(parentWorkflowName: WorkflowDefinition["name"] | undefined): string {
+	return parentWorkflowName === undefined
+		? VALIDATE_STORY_STEP_1_MAIN_AGENT_FINAL_INSTRUCTION
+		: VALIDATE_STORY_STEP_1_SUBAGENT_FINAL_INSTRUCTION
+}
+
+function buildStep1PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
+	const parentWorkflowName = input.session.lifecycle.parentWorkflowName
+	const sections = [
+		resolveValidateStoryStep1Header(parentWorkflowName),
+		VALIDATE_STORY_STEP_1_COMMON_REVIEW_CRITERIA,
+		resolveValidateStoryStep1FinalInstruction(parentWorkflowName),
+	]
 	return {
 		kind: "current_step_instruction_template",
-		currentStepInstructionTemplate: VALIDATE_STORY_STEP_1_PROMPT_TEMPLATE,
+		currentStepInstructionTemplate: sections.join("\n\n"),
 	}
 }
 
@@ -160,16 +205,30 @@ function createStepDefinition(args: {
 	}
 }
 
+function mainAgentInvocation(): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "session_predicate",
+		matches: (input) => input.session.lifecycle.parentWorkflowName === undefined,
+	}
+}
+
+function parentWorkflowInvocation(parentWorkflowName: WorkflowDefinition["name"]): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "session_predicate",
+		matches: (input) => input.session.lifecycle.parentWorkflowName === parentWorkflowName,
+	}
+}
+
 function buildStep1DecisionTree(): WorkflowDecisionTree {
 	return {
-		entryBranchId: "step-1-resolve-prerequisites",
+		entryBranchId: "step-1-route-by-invocation",
 		branches: {
-			"step-1-resolve-prerequisites": {
-				id: "step-1-resolve-prerequisites",
+			"step-1-route-by-invocation": {
+				id: "step-1-route-by-invocation",
 				routes: [
 					{
-						id: "step-1-resolve-prerequisites",
-						trigger: { kind: "always" },
+						id: "step-1-main-agent-resolve-prerequisites",
+						trigger: mainAgentInvocation(),
 						action: {
 							kind: "resolve_prerequisite_files",
 							prerequisiteIds: [
@@ -179,6 +238,24 @@ function buildStep1DecisionTree(): WorkflowDecisionTree {
 							],
 						},
 						followingBranchId: "step-1-start-review",
+					},
+					{
+						id: "step-1-create-story-project-prompt",
+						trigger: parentWorkflowInvocation("create-story"),
+						action: { kind: "project_prompt" },
+						followingBranchId: "step-1-await-attempt-completion",
+					},
+					{
+						id: "step-1-write-remediation-story-project-prompt",
+						trigger: parentWorkflowInvocation("write-remediation-story"),
+						action: { kind: "project_prompt" },
+						followingBranchId: "step-1-await-attempt-completion",
+					},
+					{
+						id: "step-1-quick-spec-project-prompt",
+						trigger: parentWorkflowInvocation("quick-spec"),
+						action: { kind: "project_prompt" },
+						followingBranchId: "step-1-await-attempt-completion",
 					},
 				],
 			},
@@ -219,6 +296,16 @@ export const validateStoryWorkflowDefinition: WorkflowDefinition = {
 	workflowValueKeys: VALIDATE_STORY_WORKFLOW_VALUE_KEYS,
 	entryProjectValueKeys: VALIDATE_STORY_ENTRY_PROJECT_VALUE_KEYS,
 	prerequisiteFiles: VALIDATE_STORY_PREREQUISITE_FILES,
+	childInheritance: [
+		{ parentKey: "projectTitle", childKey: "projectTitle" },
+		{ parentKey: "projectFolderName", childKey: "projectFolderName" },
+		{ parentKey: "target_story", childKey: "target_story" },
+		{ parentKey: "epics_document", childKey: "epics_document" },
+		{ parentKey: "architecture_document", childKey: "architecture_document" },
+		{ parentKey: "originating_story", childKey: "originating_story" },
+		{ parentKey: "code_review_output", childKey: "code_review_output" },
+		{ parentKey: "output_document", childKey: "target_story" },
+	],
 	steps: {
 		"step-1": createStepDefinition({
 			stepNumber: 1,
@@ -226,7 +313,7 @@ export const validateStoryWorkflowDefinition: WorkflowDefinition = {
 			decisionTree: buildStep1DecisionTree(),
 			buildPromptSource: buildStep1PromptSource,
 			buildToolSchema: buildValidateStoryStep1ToolSchemas,
-			promptTemplates: [VALIDATE_STORY_STEP_1_PROMPT_TEMPLATE],
+			promptTemplates: VALIDATE_STORY_STEP_1_PROMPT_TEMPLATES,
 		}),
 	},
 }

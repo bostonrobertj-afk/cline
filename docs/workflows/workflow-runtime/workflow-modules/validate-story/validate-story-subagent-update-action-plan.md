@@ -312,18 +312,18 @@ Allowed files:
 
 ### Task 6: Update Validate-Story Workflow Values And Prompt Sections
 
-- [ ] 6.1. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add `WorkflowDecisionBranchTrigger` and `WorkflowPromptBuilderInput` to the existing type-only import from `"../../types"`. Do not remove `WorkflowDecisionTree`, `WorkflowDefinition`, `WorkflowPersonaDefinition`, `WorkflowStepDefinition`, or `WorkflowStepPromptSource`.
+- [x] 6.1. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add `WorkflowDecisionBranchTrigger` and `WorkflowPromptBuilderInput` to the existing type-only import from `"../../types"`. Do not remove `WorkflowDecisionTree`, `WorkflowDefinition`, `WorkflowPersonaDefinition`, `WorkflowStepDefinition`, or `WorkflowStepPromptSource`.
 
-- [ ] 6.2. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add these enum members to `ValidateStoryWorkflowValueKey` after `ArchitectureDocument = "architecture_document"`:
+- [x] 6.2. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add these enum members to `ValidateStoryWorkflowValueKey` after `ArchitectureDocument = "architecture_document"`:
 
 ```ts
 OriginatingStory = "originating_story",
 CodeReviewOutput = "code_review_output",
 ```
 
-- [ ] 6.3. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add `ValidateStoryWorkflowValueKey.OriginatingStory` and `ValidateStoryWorkflowValueKey.CodeReviewOutput` to `VALIDATE_STORY_WORKFLOW_VALUE_KEYS` immediately after `ValidateStoryWorkflowValueKey.ArchitectureDocument`.
+- [x] 6.3. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add `ValidateStoryWorkflowValueKey.OriginatingStory` and `ValidateStoryWorkflowValueKey.CodeReviewOutput` to `VALIDATE_STORY_WORKFLOW_VALUE_KEYS` immediately after `ValidateStoryWorkflowValueKey.ArchitectureDocument`.
 
-- [ ] 6.4. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, replace `const VALIDATE_STORY_STEP_1_PROMPT_TEMPLATE = ...` with these exported prompt-section constants, preserving the exact text:
+- [x] 6.4. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, replace `const VALIDATE_STORY_STEP_1_PROMPT_TEMPLATE = ...` with these exported prompt-section constants, preserving the exact text:
 
 ```ts
 export const VALIDATE_STORY_STEP_1_IMPLEMENTATION_STORY_HEADER = `You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.
@@ -344,7 +344,7 @@ Spec for review: {workflow.target_story}
 Read the entire provided spec, then assess the spec's tasks and subtasks following the criteria below.`
 ```
 
-- [ ] 6.5. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add this exact constant immediately after the three header constants:
+- [x] 6.5. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add this exact constant immediately after the three header constants:
 
 ```ts
 export const VALIDATE_STORY_STEP_1_COMMON_REVIEW_CRITERIA = `Review each task and subtask individually, inspecting the indicated target file and determinining whether the prescribed change meets the following standards:
@@ -383,11 +383,11 @@ export const VALIDATE_STORY_STEP_1_COMMON_REVIEW_CRITERIA = `Review each task an
 After assessing the tasks and subtasks thoroughly, consider whether the combined set delivers on the indicated requirements/objective while respecting the defined scope.`
 ```
 
-- [ ] 6.6. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add `export const VALIDATE_STORY_STEP_1_SUBAGENT_FINAL_INSTRUCTION` with exact value `Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.`
+- [x] 6.6. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add `export const VALIDATE_STORY_STEP_1_SUBAGENT_FINAL_INSTRUCTION` with exact value `Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.`
 
-- [ ] 6.7. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add `export const VALIDATE_STORY_STEP_1_MAIN_AGENT_FINAL_INSTRUCTION` with exact value `Once you've reviewed the story document, provide a response to the user using attempt_completion. In your response, list each story section and indicate "no violations" or provide specific violation details. For the task section, provide either a "no violations" or violations details for each task and subtask. If findings were present, instruct the user to run the create-story workflow and provide your findings to the agent in that workflow.`
+- [x] 6.7. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add `export const VALIDATE_STORY_STEP_1_MAIN_AGENT_FINAL_INSTRUCTION` with exact value `Once you've reviewed the story document, provide a response to the user using attempt_completion. In your response, list each story section and indicate "no violations" or provide specific violation details. For the task section, provide either a "no violations" or violations details for each task and subtask. If findings were present, instruct the user to run the create-story workflow and provide your findings to the agent in that workflow.`
 
-- [ ] 6.8. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add `export const VALIDATE_STORY_STEP_1_PROMPT_TEMPLATES: readonly string[]` after the final instruction constants with this exact value:
+- [x] 6.8. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add `export const VALIDATE_STORY_STEP_1_PROMPT_TEMPLATES: readonly string[]` after the final instruction constants with this exact value:
 
 ```ts
 [
@@ -402,7 +402,7 @@ After assessing the tasks and subtasks thoroughly, consider whether the combined
 
 ### Task 7: Update Validate-Story Prompt Builder, Decision Tree, And Child Inheritance
 
-- [ ] 7.1. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add this exact helper before `buildStep1PromptSource(...)`:
+- [x] 7.1. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add this exact helper before `buildStep1PromptSource(...)`:
 
 ```ts
 function resolveValidateStoryStep1Header(parentWorkflowName: WorkflowDefinition["name"] | undefined): string {
@@ -416,7 +416,7 @@ function resolveValidateStoryStep1Header(parentWorkflowName: WorkflowDefinition[
 }
 ```
 
-- [ ] 7.2. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add this exact helper immediately after `resolveValidateStoryStep1Header(...)`:
+- [x] 7.2. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add this exact helper immediately after `resolveValidateStoryStep1Header(...)`:
 
 ```ts
 function resolveValidateStoryStep1FinalInstruction(parentWorkflowName: WorkflowDefinition["name"] | undefined): string {
@@ -426,7 +426,7 @@ function resolveValidateStoryStep1FinalInstruction(parentWorkflowName: WorkflowD
 }
 ```
 
-- [ ] 7.3. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, replace `function buildStep1PromptSource(): WorkflowStepPromptSource` with this exact function signature and body:
+- [x] 7.3. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, replace `function buildStep1PromptSource(): WorkflowStepPromptSource` with this exact function signature and body:
 
 ```ts
 function buildStep1PromptSource(input: WorkflowPromptBuilderInput): WorkflowStepPromptSource {
@@ -443,7 +443,7 @@ function buildStep1PromptSource(input: WorkflowPromptBuilderInput): WorkflowStep
 }
 ```
 
-- [ ] 7.4. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add these exact trigger helpers before `buildStep1DecisionTree()`:
+- [x] 7.4. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add these exact trigger helpers before `buildStep1DecisionTree()`:
 
 ```ts
 function mainAgentInvocation(): WorkflowDecisionBranchTrigger {
@@ -461,7 +461,7 @@ function parentWorkflowInvocation(parentWorkflowName: WorkflowDefinition["name"]
 }
 ```
 
-- [ ] 7.5. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, replace `buildStep1DecisionTree()` with this exact function:
+- [x] 7.5. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, replace `buildStep1DecisionTree()` with this exact function:
 
 ```ts
 function buildStep1DecisionTree(): WorkflowDecisionTree {
@@ -530,7 +530,7 @@ function buildStep1DecisionTree(): WorkflowDecisionTree {
 }
 ```
 
-- [ ] 7.6. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add this exact `childInheritance` property to `validateStoryWorkflowDefinition` immediately after `prerequisiteFiles: VALIDATE_STORY_PREREQUISITE_FILES`:
+- [x] 7.6. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add this exact `childInheritance` property to `validateStoryWorkflowDefinition` immediately after `prerequisiteFiles: VALIDATE_STORY_PREREQUISITE_FILES`:
 
 ```ts
 childInheritance: [
@@ -545,17 +545,17 @@ childInheritance: [
 ],
 ```
 
-- [ ] 7.7. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, update the Step 1 `promptTemplates` property from `[VALIDATE_STORY_STEP_1_PROMPT_TEMPLATE]` to `VALIDATE_STORY_STEP_1_PROMPT_TEMPLATES`.
+- [x] 7.7. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, update the Step 1 `promptTemplates` property from `[VALIDATE_STORY_STEP_1_PROMPT_TEMPLATE]` to `VALIDATE_STORY_STEP_1_PROMPT_TEMPLATES`.
 
-- [ ] 7.8. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, remove the now-deleted local symbol `VALIDATE_STORY_STEP_1_PROMPT_TEMPLATE`. Do not remove `buildValidateStoryStep1ToolSchemas`, prerequisite constants, persona constants, or existing workflow identity exports.
+- [x] 7.8. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, remove the now-deleted local symbol `VALIDATE_STORY_STEP_1_PROMPT_TEMPLATE`. Do not remove `buildValidateStoryStep1ToolSchemas`, prerequisite constants, persona constants, or existing workflow identity exports.
 
 ### Task 8: Update Validate-Story Workflow Tests
 
-- [ ] 8.1. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, add `WorkflowDecisionBranchEvaluationInput` to the existing type-only import from `"../../../types"`.
+- [x] 8.1. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, add `WorkflowDecisionBranchEvaluationInput` to the existing type-only import from `"../../../types"`.
 
-- [ ] 8.2. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, add `VALIDATE_STORY_STEP_1_PROMPT_TEMPLATES` to the existing import from `"../validateStoryWorkflow"`.
+- [x] 8.2. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, add `VALIDATE_STORY_STEP_1_PROMPT_TEMPLATES` to the existing import from `"../validateStoryWorkflow"`.
 
-- [ ] 8.3. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, add these constants after `ARCHITECTURE_DOCUMENT_PATH`:
+- [x] 8.3. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, add these constants after `ARCHITECTURE_DOCUMENT_PATH`:
 
 ```ts
 const ORIGINATING_STORY_PATH = "/tmp/validate-story-project/implementation/stories-complete/Story-1-0.md"
@@ -563,7 +563,7 @@ const CODE_REVIEW_OUTPUT_PATH = "/tmp/validate-story-project/review/code-review-
 const QUICK_SPEC_OUTPUT_DOCUMENT_PATH = "/tmp/validate-story-project/planning/quick-spec.md"
 ```
 
-- [ ] 8.4. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, replace `createPromptBuilderInput(workflowValues: WorkflowValues = createWorkflowValues())` with a helper accepting this exact argument shape:
+- [x] 8.4. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, replace `createPromptBuilderInput(workflowValues: WorkflowValues = createWorkflowValues())` with a helper accepting this exact argument shape:
 
 ```ts
 function createPromptBuilderInput(
@@ -583,7 +583,7 @@ lifecycle: {
 },
 ```
 
-- [ ] 8.5. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, add this helper after `createPromptBuilderInput(...)`:
+- [x] 8.5. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, add this helper after `createPromptBuilderInput(...)`:
 
 ```ts
 function createDecisionEvaluationInput(parentWorkflowName?: string): WorkflowDecisionBranchEvaluationInput {
@@ -597,7 +597,7 @@ function createDecisionEvaluationInput(parentWorkflowName?: string): WorkflowDec
 }
 ```
 
-- [ ] 8.6. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, update the workflow-values test name from `"declares workflow values without AI-writable values forms artifacts or child inheritance"` to `"declares workflow values child inheritance and no AI-writable values forms or artifacts"`. Replace the `expect(validateStoryWorkflowDefinition.childInheritance).to.equal(undefined)` assertion with this exact assertion:
+- [x] 8.6. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, update the workflow-values test name from `"declares workflow values without AI-writable values forms artifacts or child inheritance"` to `"declares workflow values child inheritance and no AI-writable values forms or artifacts"`. Replace the `expect(validateStoryWorkflowDefinition.childInheritance).to.equal(undefined)` assertion with this exact assertion:
 
 ```ts
 expect(validateStoryWorkflowDefinition.childInheritance).to.deep.equal([
@@ -612,9 +612,9 @@ expect(validateStoryWorkflowDefinition.childInheritance).to.deep.equal([
 ])
 ```
 
-- [ ] 8.7. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, update the `"declares Step 1 checklist label prompt builder and exact tool surface"` test so the existing `buildToolSchema(createPromptBuilderInput())` call and the existing `buildPromptSource(createPromptBuilderInput())` call keep using the new zero-argument helper shape. Replace the prompt-template assertion with `expect(getStep("step-1").promptTemplates).to.deep.equal(VALIDATE_STORY_STEP_1_PROMPT_TEMPLATES)`.
+- [x] 8.7. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, update the `"declares Step 1 checklist label prompt builder and exact tool surface"` test so the existing `buildToolSchema(createPromptBuilderInput())` call and the existing `buildPromptSource(createPromptBuilderInput())` call keep using the new zero-argument helper shape. Replace the prompt-template assertion with `expect(getStep("step-1").promptTemplates).to.deep.equal(VALIDATE_STORY_STEP_1_PROMPT_TEMPLATES)`.
 
-- [ ] 8.8. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, replace the `"renders Step 1 prompt with materialized workflow values and without raw placeholders"` test with four tests named exactly:
+- [x] 8.8. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, replace the `"renders Step 1 prompt with materialized workflow values and without raw placeholders"` test with four tests named exactly:
 
 ```text
 renders the main-agent Step 1 prompt variant with materialized workflow values
@@ -631,9 +631,9 @@ The write-remediation-story child test must use `createPromptBuilderInput({ pare
 
 The quick-spec child test must use `createPromptBuilderInput({ parentWorkflowName: "quick-spec", workflowValues: createWorkflowValues({ [ValidateStoryWorkflowValueKey.TargetStory]: QUICK_SPEC_OUTPUT_DOCUMENT_PATH }) })`, assert the rendered prompt includes `QUICK_SPEC_OUTPUT_DOCUMENT_PATH`, `Spec for review: ${QUICK_SPEC_OUTPUT_DOCUMENT_PATH}`, `You have been called inside a workflow designed to validate an implementation spec for a small project.`, and `Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.`, and assert it does not include `- Epics Documentation:`, `- Architecture Document:`, `You have been called inside a workflow designed to validate a remediation story before implementation.`, `{workflow.target_story}`, `*** conditional prompt`, or `*** end conditional`.
 
-- [ ] 8.9. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, update the `"routes Step 1 through prerequisite resolution project prompt and completion"` test name to `"routes Step 1 by invocation context through prerequisites child prompts and completion"`. Update expected branch keys to exactly `["step-1-route-by-invocation", "step-1-start-review", "step-1-await-attempt-completion"]`.
+- [x] 8.9. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, update the `"routes Step 1 through prerequisite resolution project prompt and completion"` test name to `"routes Step 1 by invocation context through prerequisites child prompts and completion"`. Update expected branch keys to exactly `["step-1-route-by-invocation", "step-1-start-review", "step-1-await-attempt-completion"]`.
 
-- [ ] 8.10. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, update the route assertions in the renamed routing test with these exact assertions for the route-by-invocation branch:
+- [x] 8.10. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, update the route assertions in the renamed routing test with these exact assertions for the route-by-invocation branch:
 
 ```ts
 const routeByInvocation = getStep("step-1").decisionTree.branches["step-1-route-by-invocation"]
@@ -752,7 +752,7 @@ expect(completionRoute.trigger).to.deep.equal({ kind: "on_event", eventKind: "at
 expect(completionRoute.action).to.deep.equal({ kind: "complete_workflow" })
 ```
 
-- [ ] 8.11. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, add a new test named exactly `"activates child contexts directly to project prompt with inherited values and no forms"` after the main-agent prerequisite runtime tests. The test must create three exact cases:
+- [x] 8.11. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, add a new test named exactly `"activates child contexts directly to project prompt with inherited values and no forms"` after the main-agent prerequisite runtime tests. The test must create three exact cases:
 
 ```ts
 [
@@ -836,13 +836,13 @@ For each case, activate `VALIDATE_STORY_WORKFLOW_NAME` through `WorkflowRuntime.
 
 ### Task 9: Phase 2 Validation
 
-- [ ] 9.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`.
+- [x] 9.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`.
 
-- [ ] 9.2. Run `npm run check-types` with elevated permissions. If this command fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` with elevated permissions before treating the failure as a code defect.
+- [x] 9.2. Run `npm run check-types` with elevated permissions. If this command fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` with elevated permissions before treating the failure as a code defect.
 
-- [ ] 9.3. Run `git diff --name-only` and confirm persistent tracked diffs are limited to files listed in the Phase 1 and Phase 2 allowed-files sets.
+- [x] 9.3. Run `git diff --name-only` and confirm persistent tracked diffs are limited to files listed in the Phase 1 and Phase 2 allowed-files sets.
 
-- [ ] 9.4. Run `git ls-files --others --exclude-standard` and confirm it returns no output.
+- [x] 9.4. Run `git ls-files --others --exclude-standard` and confirm it returns no output.
 
 ## Phase 3: Prompt Projection And Final Validation
 
