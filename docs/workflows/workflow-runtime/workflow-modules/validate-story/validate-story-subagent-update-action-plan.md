@@ -137,7 +137,7 @@ expect(childSession.lifecycle).to.deep.equal({
 
 - [ ] 4.7. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update every remaining `runtime.activateWorkflow({ ... parentSession ... })` object in these test cases to include `parentWorkflowName: "parent-workflow"` immediately after the `parentSession` property: `"creates workflow form sessions at a render action startPanelId"`, `"seeds workflow form session data only when creating a new form session"`, `"interpolates workflow values in workflow form and panel text"`, `"interpolates form session data in resolved field, action, and option text"`, `"leaves unresolved placeholders and expression-like placeholder syntax unchanged"`, `"does not write interpolated text back into workflow form session definitions"`, `"rejects render form actions with invalid startPanelId values before activation"`, `"rejects render form actions with non-function buildSessionData before activation"`, `"returns terminal_error when buildSessionData throws or returns invalid data"`, `"renders dropdown options from workflow-value-interpolated selected-project story index"`, `"fails before reading JSON options when dynamic source path placeholders stay unresolved"`, `"fails before reading JSON options when workflow values resolve source path placeholders to unsafe segments"`, and `"restores workflow form sessions with current panel, data, canonical definitions, and interpolated text"`.
 
-- [ ] 4.8. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, update the `"activates parent-assigned workflow before the first child model request"` test to assert `activateWorkflowSpy.firstCall.args[0].parentWorkflowName` equals `"parent-workflow"` immediately after the existing workflow-name assertion.
+- [ ] 4.8. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, update the `"auto-activates an explicitly assigned shipped workflow before the first subagent turn"` test to assert `activateWorkflowSpy.firstCall.args[0].parentWorkflowName` equals `"parent-workflow"` immediately after the existing workflow-name assertion.
 
 - [ ] 4.9. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, update the `"leaves the parent workflow state unchanged while inheriting declared values into the child workflow session"` test to assert `state.activeWorkflowSession?.lifecycle` deep-equals `{ projectSelectionCompleted: true, parentWorkflowName: "parent-workflow" }` and to assert `activateWorkflowSpy.firstCall.args[0].parentWorkflowName` equals `"parent-workflow"`.
 
@@ -652,7 +652,40 @@ expect(completionRoute.action).to.deep.equal({ kind: "complete_workflow" })
 ]
 ```
 
-For each case, activate `VALIDATE_STORY_WORKFLOW_NAME` through `WorkflowRuntime.activateWorkflow({ taskState, workflowName: VALIDATE_STORY_WORKFLOW_NAME, parentSession, parentWorkflowName: case.parentWorkflowName })`, assert the result kind is `"project_prompt"`, assert `taskState.activeWorkflowSession?.workflowValues` deep-equals `case.expectedChildValues`, assert lifecycle deep-equals `{ projectSelectionCompleted: true, parentWorkflowName: case.parentWorkflowName }`, assert `taskState.activeWorkflowSession?.ui.formSession` equals `undefined`, and assert the parent session's `workflowValues` object still deep-equals `case.parentValues`.
+For each case, construct `runtime`, `taskState`, `parentSession`, and `parentWorkflowValuesBeforeActivation` with this exact shape before activation:
+
+```ts
+const runtime = new WorkflowRuntime({
+	cwd: "/tmp/validate-story-child-context-test",
+	workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+})
+const taskState = new TaskState()
+const parentSession: ActiveWorkflowSession = {
+	activeStepNumber: 1,
+	workflowValues: { ...case.parentValues },
+	projectSelection: {
+		projectMode: "existing",
+		projectTitle: PROJECT_TITLE,
+		projectFolderName: PROJECT_FOLDER_NAME,
+	},
+	lifecycle: {
+		projectSelectionCompleted: true,
+	},
+	entryArtifactResolution: undefined,
+	ui: {
+		formSession: undefined,
+		stepResolutionSession: undefined,
+		suppressedWorkflowFormIds: [],
+		suppressedWorkflowStepResolutionRoutes: [],
+	},
+	branchContext: {
+		activeBranchId: "parent-workflow-branch",
+	},
+}
+const parentWorkflowValuesBeforeActivation = structuredClone(parentSession.workflowValues)
+```
+
+For each case, activate `VALIDATE_STORY_WORKFLOW_NAME` through `WorkflowRuntime.activateWorkflow({ taskState, workflowName: VALIDATE_STORY_WORKFLOW_NAME, parentSession, parentWorkflowName: case.parentWorkflowName })`, assert the result kind is `"project_prompt"`, assert `taskState.activeWorkflowSession?.workflowValues` deep-equals `case.expectedChildValues`, assert lifecycle deep-equals `{ projectSelectionCompleted: true, parentWorkflowName: case.parentWorkflowName }`, assert `taskState.activeWorkflowSession?.ui.formSession` equals `undefined`, and assert `parentSession.workflowValues` deep-equals `parentWorkflowValuesBeforeActivation`.
 
 ### Task 9: Phase 2 Validation
 
@@ -804,9 +837,9 @@ function getValidateStoryPayloadBlocks(
 
 For `createStoryContext`, iterate `for (const payloadBlock of getValidateStoryPayloadBlocks(createStoryContext, "create-story validate-story"))` and assert each `payloadBlock` includes `You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.`, `"Validate Story Session"`, `"validate-story-project"`, `VALIDATE_STORY_TARGET_STORY`, `VALIDATE_STORY_EPICS_DOCUMENT`, `VALIDATE_STORY_ARCHITECTURE_DOCUMENT`, and `Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.`; assert each `payloadBlock` excludes `You have been called inside a workflow designed to validate a remediation story before implementation.`, `You have been called inside a workflow designed to validate an implementation spec for a small project.`, `Once you've reviewed the story document, provide a response to the user using attempt_completion.`, `{workflow.projectTitle}`, `{workflow.projectFolderName}`, `{workflow.target_story}`, `{workflow.epics_document}`, `{workflow.architecture_document}`, `"*** conditional prompt"`, and `"*** end conditional"`.
 
-For `remediationContext`, iterate `for (const payloadBlock of getValidateStoryPayloadBlocks(remediationContext, "write-remediation-story validate-story"))` and assert each `payloadBlock` includes `You have been called inside a workflow designed to validate a remediation story before implementation.`, `VALIDATE_STORY_TARGET_STORY`, `VALIDATE_STORY_ORIGINATING_STORY`, `VALIDATE_STORY_CODE_REVIEW_OUTPUT`, and `Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.`; assert each `payloadBlock` excludes `You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.`, `You have been called inside a workflow designed to validate an implementation spec for a small project.`, `"- Epics Documentation:"`, `"- Architecture Document:"`, `{workflow.target_story}`, `{workflow.originating_story}`, `{workflow.code_review_output}`, `"*** conditional prompt"`, and `"*** end conditional"`.
+For `remediationContext`, iterate `for (const payloadBlock of getValidateStoryPayloadBlocks(remediationContext, "write-remediation-story validate-story"))` and assert each `payloadBlock` includes `You have been called inside a workflow designed to validate a remediation story before implementation.`, `VALIDATE_STORY_TARGET_STORY`, `VALIDATE_STORY_ORIGINATING_STORY`, `VALIDATE_STORY_CODE_REVIEW_OUTPUT`, and `Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.`; assert each `payloadBlock` excludes `You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.`, `You have been called inside a workflow designed to validate an implementation spec for a small project.`, `- Epics Documentation:`, `- Architecture Document:`, `{workflow.target_story}`, `{workflow.originating_story}`, `{workflow.code_review_output}`, `"*** conditional prompt"`, and `"*** end conditional"`.
 
-For `quickSpecContext`, iterate `for (const payloadBlock of getValidateStoryPayloadBlocks(quickSpecContext, "quick-spec validate-story"))` and assert each `payloadBlock` includes `You have been called inside a workflow designed to validate an implementation spec for a small project.`, `Spec for review: ${VALIDATE_STORY_QUICK_SPEC_DOCUMENT}`, and `Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.`; assert each `payloadBlock` excludes `You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.`, `You have been called inside a workflow designed to validate a remediation story before implementation.`, `"- Epics Documentation:"`, `"- Architecture Document:"`, `{workflow.target_story}`, `"*** conditional prompt"`, and `"*** end conditional"`.
+For `quickSpecContext`, iterate `for (const payloadBlock of getValidateStoryPayloadBlocks(quickSpecContext, "quick-spec validate-story"))` and assert each `payloadBlock` includes `You have been called inside a workflow designed to validate an implementation spec for a small project.`, `Spec for review: ${VALIDATE_STORY_QUICK_SPEC_DOCUMENT}`, and `Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.`; assert each `payloadBlock` excludes `You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.`, `You have been called inside a workflow designed to validate a remediation story before implementation.`, `- Epics Documentation:`, `- Architecture Document:`, `{workflow.target_story}`, `"*** conditional prompt"`, and `"*** end conditional"`.
 
 - [ ] 10.8. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, keep the validate-story Step 1 native tool projection assertion exactly `expect(context.workflowToolSchemaOverride).to.deep.equal(buildValidateStoryStep1ToolSchemas())` and keep the non-native prompt test's exact approved-tool assertions based on `buildValidateStoryStep1ToolSchemas().map((tool) => tool.name)`.
 
@@ -877,7 +910,7 @@ src/core/prompts/system-prompt/__tests__/integration.test.ts
 | 4.5 | lines 18-33, 56-71 | `WorkflowRuntime.test.ts` | incomplete parent activation test | exact activation arg | no cleanup | 5.1, 11.1 |
 | 4.6 | lines 56-71 | `WorkflowRuntime.test.ts` | new persistence/restore test | exact persisted and restored lifecycle assertions | no cleanup | 5.1, 11.1 |
 | 4.7 | lines 18-33, 56-71 | `WorkflowRuntime.test.ts` | named parentSession caller tests | exact parent workflow arg on each named call | activation-call fallout prescribed by test name | 5.1, 11.1 |
-| 4.8 | lines 18-33, 56-71 | `SubagentRunner.test.ts` | assigned-workflow activation test | exact spy arg assertion | no cleanup | 5.1, 11.2 |
+| 4.8 | lines 18-33, 56-71 | `SubagentRunner.test.ts` | `"auto-activates an explicitly assigned shipped workflow before the first subagent turn"` test | exact `parentWorkflowName` spy arg assertion | no cleanup | 5.1, 11.2 |
 | 4.9 | lines 18-33, 56-71 | `SubagentRunner.test.ts` | inheritance isolation test | exact lifecycle and spy arg assertions | no cleanup | 5.1, 11.2 |
 | 4.10 | lines 18-33, 56-71 | `blindReviewWorkflow.test.ts` | blind-review child activation test | exact activation arg and lifecycle assertion | no cleanup | 5.1, 11.3 |
 | 4.11 | lines 18-33, 56-71 | `edgeCaseHunterReviewWorkflow.test.ts` | edge-case child activation test | exact activation arg and lifecycle assertion | no cleanup | 5.1, 11.3 |
@@ -911,7 +944,7 @@ src/core/prompts/system-prompt/__tests__/integration.test.ts
 | 8.8 | lines 119-230, 282-301 | `validateStoryWorkflow.test.ts` | prompt variant tests | exact test names, fixtures, includes, exclusions | old single prompt test replaced | 9.1, 11.4 |
 | 8.9 | lines 92-117, 282-301 | `validateStoryWorkflow.test.ts` | routing test | exact test rename and branch-key assertion | stale branch list replaced | 9.1, 11.4 |
 | 8.10 | lines 92-117, 282-301 | `validateStoryWorkflow.test.ts` | route assertions | exact route lookup, narrowing, trigger/action/following-branch assertions | stale route assertions replaced | 9.1, 11.4 |
-| 8.11 | lines 73-117, 282-301 | `validateStoryWorkflow.test.ts` | child runtime activation test | exact case table, activation call, value/lifecycle/form/isolation assertions | no cleanup | 9.1, 11.4 |
+| 8.11 | lines 73-117, 282-301 | `validateStoryWorkflow.test.ts` | child runtime activation test, `ActiveWorkflowSession` fixture | exact case table, parent session shape, activation call, value/lifecycle/form/isolation assertions | no cleanup | 9.1, 11.4 |
 | 9.1 | lines 303-317 | command | focused validate-story tests | exact `npm run test:unit -- ...` command | no cleanup | direct validation |
 | 9.2 | lines 303-317 | command | typecheck/proto fallback | elevated exact command and fallback condition | no cleanup | direct validation |
 | 9.3 | lines 303-317 | command | tracked scope diff | exact Phase 1/2 allowed tracked scope | no cleanup | direct validation |
