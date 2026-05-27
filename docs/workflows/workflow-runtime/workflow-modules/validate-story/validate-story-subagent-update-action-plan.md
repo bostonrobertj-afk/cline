@@ -853,7 +853,7 @@ Allowed files:
 
 ### Task 10: Update Validate-Story Prompt Projection Coverage
 
-- [ ] 10.1. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add this exact import after the existing `WorkflowRuntime` import:
+- [x] 10.1. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add this exact import after the existing `WorkflowRuntime` import:
 
 ```ts
 import {
@@ -862,9 +862,17 @@ import {
 } from "@/core/task/workflow-runtime/WorkflowRegistry"
 ```
 
-In the existing import from `"@/core/task/workflow-runtime/workflow-modules/validate-story"`, add `VALIDATE_STORY_WORKFLOW_SLASH_COMMAND_NAME` and `VALIDATE_STORY_WORKFLOW_USE_SKILL_NAME` immediately after `VALIDATE_STORY_WORKFLOW_NAME`. Do not remove `VALIDATE_STORY_WORKFLOW_NAME` or `ValidateStoryWorkflowValueKey`.
+Replace the existing import from `"@/core/task/workflow-runtime/workflow-modules/validate-story"` with this exact import block:
 
-- [ ] 10.2. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add these constants after `VALIDATE_STORY_ARCHITECTURE_DOCUMENT`:
+```ts
+import {
+	VALIDATE_STORY_WORKFLOW_SLASH_COMMAND_NAME,
+	VALIDATE_STORY_WORKFLOW_USE_SKILL_NAME,
+	ValidateStoryWorkflowValueKey,
+} from "@/core/task/workflow-runtime/workflow-modules/validate-story"
+```
+
+- [x] 10.2. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add these constants after `VALIDATE_STORY_ARCHITECTURE_DOCUMENT`:
 
 ```ts
 const VALIDATE_STORY_ORIGINATING_STORY = `${VALIDATE_STORY_PROJECT_ROOT}/implementation/stories-complete/Story-1-0.md`
@@ -872,7 +880,7 @@ const VALIDATE_STORY_CODE_REVIEW_OUTPUT = `${VALIDATE_STORY_PROJECT_ROOT}/review
 const VALIDATE_STORY_QUICK_SPEC_DOCUMENT = `${VALIDATE_STORY_PROJECT_ROOT}/planning/quick-spec.md`
 ```
 
-- [ ] 10.3. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, update `createValidateStoryWorkflowSession(...)` to accept `parentWorkflowName?: string` as a second parameter and to build lifecycle with this exact shape:
+- [x] 10.3. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, update `createValidateStoryWorkflowSession(...)` to accept `parentWorkflowName?: string` as a second parameter and to build lifecycle with this exact shape:
 
 ```ts
 lifecycle: {
@@ -881,7 +889,7 @@ lifecycle: {
 },
 ```
 
-- [ ] 10.4. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, replace `buildValidateStoryPromptContext(...)` with this exact helper:
+- [x] 10.4. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, replace `buildValidateStoryPromptContext(...)` with this exact helper:
 
 ```ts
 async function buildValidateStoryPromptContext(
@@ -935,11 +943,11 @@ async function buildValidateStoryPromptContext(
 }
 ```
 
-- [ ] 10.5. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, update existing zero-argument calls to `buildValidateStoryPromptContext()` so they keep using the new zero-argument default object, which resolves validate-story through `resolveWorkflowBySlashCommand(VALIDATE_STORY_WORKFLOW_SLASH_COMMAND_NAME)`. Do not change prompt context helpers for other workflows.
+- [x] 10.5. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, update existing zero-argument calls to `buildValidateStoryPromptContext()` so they keep using the new zero-argument default object, which resolves validate-story through `resolveWorkflowBySlashCommand(VALIDATE_STORY_WORKFLOW_SLASH_COMMAND_NAME)`. Do not change prompt context helpers for other workflows.
 
-- [ ] 10.6. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, replace the existing `"projects validate-story Step 1 materialized values into full-turn and continuation payloads"` test with a test named exactly `"projects validate-story main-agent Step 1 materialized values into full-turn and continuation payloads"`. The test must build its context with `const context = await buildValidateStoryPromptContext({ activationKind: "slash_command" })`. Preserve the existing full-turn and continuation non-empty checks and exact includes for `VALIDATE_STORY_TARGET_STORY`, `VALIDATE_STORY_EPICS_DOCUMENT`, `VALIDATE_STORY_ARCHITECTURE_DOCUMENT`, `"Validate Story Session"`, and `"validate-story-project"`. Preserve exact negative assertions for `{workflow.target_story}`, `{workflow.epics_document}`, `{workflow.architecture_document}`, `{workflow.projectTitle}`, `{workflow.projectFolderName}`, `target_story`, `epics_document`, `architecture_document`, `projectTitle`, and `projectFolderName`. Add exact negative assertions for `"*** conditional prompt"` and `"*** end conditional"`.
+- [x] 10.6. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, replace the existing `"projects validate-story Step 1 materialized values into full-turn and continuation payloads"` test with a test named exactly `"projects validate-story main-agent Step 1 materialized values into full-turn and continuation payloads"`. The test must build its context with `const context = await buildValidateStoryPromptContext({ activationKind: "slash_command" })`. Preserve the existing full-turn and continuation non-empty checks and exact includes for `VALIDATE_STORY_TARGET_STORY`, `VALIDATE_STORY_EPICS_DOCUMENT`, `VALIDATE_STORY_ARCHITECTURE_DOCUMENT`, `"Validate Story Session"`, and `"validate-story-project"`. Preserve exact negative assertions for `{workflow.target_story}`, `{workflow.epics_document}`, `{workflow.architecture_document}`, `{workflow.projectTitle}`, `{workflow.projectFolderName}`, `target_story`, `epics_document`, `architecture_document`, `projectTitle`, and `projectFolderName`. Add exact negative assertions for `"*** conditional prompt"` and `"*** end conditional"`.
 
-- [ ] 10.7. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add a new test named exactly `"projects validate-story child prompt variants by parent workflow context"` after the renamed main-agent materialized-values test. The test must build three contexts through use-skill activation:
+- [x] 10.7. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add a new test named exactly `"projects validate-story child prompt variants by parent workflow context"` after the renamed main-agent materialized-values test. The test must build three contexts through use-skill activation:
 
 ```ts
 const createStoryContext = await buildValidateStoryPromptContext({
@@ -988,37 +996,37 @@ For `remediationContext`, iterate `for (const payloadBlock of getValidateStoryPa
 
 For `quickSpecContext`, iterate `for (const payloadBlock of getValidateStoryPayloadBlocks(quickSpecContext, "quick-spec validate-story"))` and assert each `payloadBlock` includes `You have been called inside a workflow designed to validate an implementation spec for a small project.`, `Spec for review: ${VALIDATE_STORY_QUICK_SPEC_DOCUMENT}`, and `Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.`; assert each `payloadBlock` excludes `You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.`, `You have been called inside a workflow designed to validate a remediation story before implementation.`, `- Epics Documentation:`, `- Architecture Document:`, `{workflow.target_story}`, `"*** conditional prompt"`, and `"*** end conditional"`.
 
-- [ ] 10.8. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, keep the validate-story Step 1 native tool projection assertion exactly `expect(context.workflowToolSchemaOverride).to.deep.equal(buildValidateStoryStep1ToolSchemas())` and keep the non-native prompt test's exact approved-tool assertions based on `buildValidateStoryStep1ToolSchemas().map((tool) => tool.name)`.
+- [x] 10.8. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, keep the validate-story Step 1 native tool projection assertion exactly `expect(context.workflowToolSchemaOverride).to.deep.equal(buildValidateStoryStep1ToolSchemas())` and keep the non-native prompt test's exact approved-tool assertions based on `buildValidateStoryStep1ToolSchemas().map((tool) => tool.name)`.
 
 ### Task 11: Final Validation
 
-- [ ] 11.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`.
+- [x] 11.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`.
 
-- [ ] 11.2. Run `npm run test:unit -- src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`.
+- [x] 11.2. Run `npm run test:unit -- src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`.
 
-- [ ] 11.3. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/acceptance-audit-review/__tests__/acceptanceAuditReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/correct-course/__tests__/correctCourseWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/dev-story/__tests__/devStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts`.
+- [x] 11.3. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/acceptance-audit-review/__tests__/acceptanceAuditReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/correct-course/__tests__/correctCourseWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/dev-story/__tests__/devStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts`.
 
-- [ ] 11.4. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`.
+- [x] 11.4. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`.
 
-- [ ] 11.5. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts`.
+- [x] 11.5. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts`.
 
-- [ ] 11.6. Run `npm run check-types` with elevated permissions. If this command fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` with elevated permissions before treating the failure as a code defect.
+- [x] 11.6. Run `npm run check-types` with elevated permissions. If this command fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` with elevated permissions before treating the failure as a code defect.
 
-- [ ] 11.7. Run `npm run lint`.
+- [x] 11.7. Run `npm run lint`.
 
-- [ ] 11.8. Run `npm run package`. If this command fails in its internal `npm run check-types` step before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, rerun `npm run check-types` with elevated permissions, then rerun `npm run package` before treating the failure as a code defect.
+- [x] 11.8. Run `npm run package`. If this command fails in its internal `npm run check-types` step before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, rerun `npm run check-types` with elevated permissions, then rerun `npm run package` before treating the failure as a code defect.
 
-- [ ] 11.9. Run `rg -n "conditional prompt|end conditional|shown when" src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts` and confirm it returns no matches.
+- [x] 11.9. Run `rg -n "conditional prompt|end conditional|shown when" src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts` and confirm it returns no matches.
 
-- [ ] 11.10. Run `rg -n "Perform a line-by-line review to ensure that the provided story document meets all relevant project and quality standards" src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts` and confirm it returns no matches.
+- [x] 11.10. Run `rg -n "Perform a line-by-line review to ensure that the provided story document meets all relevant project and quality standards" src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts` and confirm it returns no matches.
 
-- [ ] 11.11. Run `rg -n "apply_patch|write_to_file|set_workflow_values|workflow_progress_request|ask_followup_question|use_subagents|create_workflow_artifact|build_workflow_document|archive_workflow_artifact|delete_workflow_artifact|move_workflow_project_file|resolve_prerequisite_files|resolve_existing_project_artifact|validate_story_index_entry" src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts` and confirm it returns no matches.
+- [x] 11.11. Run `rg -n "apply_patch|write_to_file|set_workflow_values|workflow_progress_request|ask_followup_question|use_subagents|create_workflow_artifact|build_workflow_document|archive_workflow_artifact|delete_workflow_artifact|move_workflow_project_file|resolve_prerequisite_files|resolve_existing_project_artifact|validate_story_index_entry" src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts` and confirm it returns no matches.
 
-- [ ] 11.12. Run `rg -n "validate-story\\.md|bmad-validate-story|activeWorkflowFormSession|activeWorkflowStepResolutionSession|workflow-config\\.yaml" src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts` and confirm it returns no matches.
+- [x] 11.12. Run `rg -n "validate-story\\.md|bmad-validate-story|activeWorkflowFormSession|activeWorkflowStepResolutionSession|workflow-config\\.yaml" src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas.ts` and confirm it returns no matches.
 
-- [ ] 11.13. Run `git diff --name-only -- docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md` and confirm it returns no matches.
+- [x] 11.13. Run `git diff --name-only -- docs/workflows/workflow-runtime/workflow-modules/validate-story/action-plan.md` and confirm it returns no matches.
 
-- [ ] 11.14. Run `git diff --name-only` and confirm tracked diffs are limited to this exact set:
+- [x] 11.14. Run `git diff --name-only` and confirm tracked diffs are limited to this exact set:
 
 ```text
 docs/workflows/workflow-runtime/workflow-modules/validate-story/validate-story-subagent-update-action-plan.md
@@ -1045,7 +1053,7 @@ src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests_
 src/core/prompts/system-prompt/__tests__/integration.test.ts
 ```
 
-- [ ] 11.15. Run `git ls-files --others --exclude-standard` and confirm it returns no output.
+- [x] 11.15. Run `git ls-files --others --exclude-standard` and confirm it returns no output.
 
 ## Authoring Compliance Matrix
 
@@ -1109,7 +1117,7 @@ src/core/prompts/system-prompt/__tests__/integration.test.ts
 | 9.2 | lines 303-317 | command | typecheck/proto fallback | elevated exact command and fallback condition | no cleanup | direct validation |
 | 9.3 | lines 303-317 | command | tracked scope diff | exact Phase 1/2 allowed tracked scope | no cleanup | direct validation |
 | 9.4 | lines 303-317 | command | untracked scope diff | exact no-output expectation | no cleanup | direct validation |
-| 10.1 | lines 303-310 | `integration.test.ts` | `resolveWorkflowBySlashCommand`, `resolveWorkflowByUseSkillName`, validate-story activation constants | exact imports for slash-command and use-skill prompt projection | import additions named exactly | 11.5 |
+| 10.1 | lines 303-310 | `integration.test.ts` | `resolveWorkflowBySlashCommand`, `resolveWorkflowByUseSkillName`, `VALIDATE_STORY_WORKFLOW_SLASH_COMMAND_NAME`, `VALIDATE_STORY_WORKFLOW_USE_SKILL_NAME`, `ValidateStoryWorkflowValueKey` | exact imports for slash-command and use-skill prompt projection without unused workflow-name import | import replacement named exactly | 11.5, 11.7 |
 | 10.2 | lines 119-230, 282-301 | `integration.test.ts` | prompt path constants | exact constants and values | no cleanup | 11.5 |
 | 10.3 | lines 56-71, 282-301 | `integration.test.ts` | `createValidateStoryWorkflowSession` | exact second parameter and lifecycle shape | no cleanup | 11.5 |
 | 10.4 | lines 119-230, 282-310 | `integration.test.ts` | `buildValidateStoryPromptContext` | exact slash-command/use-skill activation helper body | old bare-value parameter replaced | 11.5 |

@@ -28,6 +28,7 @@ import type {
 	WorkflowValues,
 	WorkflowWorkspacePathPolicy,
 } from "@/core/task/workflow-runtime/types"
+import { resolveWorkflowBySlashCommand, resolveWorkflowByUseSkillName } from "@/core/task/workflow-runtime/WorkflowRegistry"
 import { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
 import {
 	AcceptanceAuditReviewWorkflowValueKey,
@@ -88,7 +89,8 @@ import {
 	quickSpecWorkflowDefinition,
 } from "@/core/task/workflow-runtime/workflow-modules/quick-spec"
 import {
-	VALIDATE_STORY_WORKFLOW_NAME,
+	VALIDATE_STORY_WORKFLOW_SLASH_COMMAND_NAME,
+	VALIDATE_STORY_WORKFLOW_USE_SKILL_NAME,
 	ValidateStoryWorkflowValueKey,
 } from "@/core/task/workflow-runtime/workflow-modules/validate-story"
 import { buildValidateStoryStep1ToolSchemas } from "@/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryToolSchemas"
@@ -1253,6 +1255,9 @@ const VALIDATE_STORY_PROJECT_ROOT = "/tmp/validate-story-project"
 const VALIDATE_STORY_TARGET_STORY = `${VALIDATE_STORY_PROJECT_ROOT}/implementation/stories-backlog/Story-1-1.md`
 const VALIDATE_STORY_EPICS_DOCUMENT = `${VALIDATE_STORY_PROJECT_ROOT}/planning/Epics.md`
 const VALIDATE_STORY_ARCHITECTURE_DOCUMENT = `${VALIDATE_STORY_PROJECT_ROOT}/planning/architecture.md`
+const VALIDATE_STORY_ORIGINATING_STORY = `${VALIDATE_STORY_PROJECT_ROOT}/implementation/stories-complete/Story-1-0.md`
+const VALIDATE_STORY_CODE_REVIEW_OUTPUT = `${VALIDATE_STORY_PROJECT_ROOT}/review/code-review-1-1.md`
+const VALIDATE_STORY_QUICK_SPEC_DOCUMENT = `${VALIDATE_STORY_PROJECT_ROOT}/planning/quick-spec.md`
 const VALIDATE_STORY_FORBIDDEN_PROMPT_TOOL_NAMES: readonly string[] = [
 	"apply_patch",
 	"write_to_file",
@@ -1284,6 +1289,7 @@ function createValidateStoryWorkflowValues(overrides: WorkflowValues = {}): Work
 
 function createValidateStoryWorkflowSession(
 	workflowValues: WorkflowValues = createValidateStoryWorkflowValues(),
+	parentWorkflowName?: string,
 ): ActiveWorkflowSession {
 	return {
 		activeStepNumber: 1,
@@ -1295,6 +1301,7 @@ function createValidateStoryWorkflowSession(
 		},
 		lifecycle: {
 			projectSelectionCompleted: true,
+			...(parentWorkflowName === undefined ? {} : { parentWorkflowName }),
 		},
 		entryArtifactResolution: undefined,
 		ui: {
@@ -1310,15 +1317,38 @@ function createValidateStoryWorkflowSession(
 }
 
 async function buildValidateStoryPromptContext(
-	workflowValues: WorkflowValues = createValidateStoryWorkflowValues(),
+	args: { workflowValues?: WorkflowValues; parentWorkflowName?: string; activationKind?: "slash_command" | "use_skill" } = {},
 ): Promise<SystemPromptContext & WorkflowPromptProjection> {
 	const workspacePathPolicy: WorkflowWorkspacePathPolicy = {
 		validateAccess: () => true,
 	}
 	const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })
 	const taskState = new TaskState()
-	taskState.activeWorkflowName = VALIDATE_STORY_WORKFLOW_NAME
-	taskState.activeWorkflowSession = createValidateStoryWorkflowSession(workflowValues)
+	const workflow =
+		args.activationKind === "use_skill"
+			? resolveWorkflowByUseSkillName(VALIDATE_STORY_WORKFLOW_USE_SKILL_NAME)
+			: resolveWorkflowBySlashCommand(VALIDATE_STORY_WORKFLOW_SLASH_COMMAND_NAME)
+	if (workflow === undefined) {
+		throw new Error("Expected validate-story workflow to resolve for prompt projection.")
+	}
+	const workflowValues = args.workflowValues ?? createValidateStoryWorkflowValues()
+	if (args.parentWorkflowName === undefined) {
+		const activation = await runtime.activateWorkflow({
+			taskState,
+			workflowName: workflow.name,
+		})
+		expect(activation.kind).to.equal("render_workflow_form")
+		taskState.activeWorkflowSession = createValidateStoryWorkflowSession(workflowValues, undefined)
+	} else {
+		const parentSession = createValidateStoryWorkflowSession(workflowValues, undefined)
+		const activation = await runtime.activateWorkflow({
+			taskState,
+			workflowName: workflow.name,
+			parentSession,
+			parentWorkflowName: args.parentWorkflowName,
+		})
+		expect(activation.kind).to.equal("project_prompt")
+	}
 	taskState.apiRequestCount = 1
 	const workflowProjection = await runtime.buildTurnProjection({ taskState })
 
@@ -3148,8 +3178,8 @@ describe("Prompt System Integration Tests", () => {
 			})
 		})
 
-		it("projects validate-story Step 1 materialized values into full-turn and continuation payloads", async () => {
-			const context = await buildValidateStoryPromptContext()
+		it("projects validate-story main-agent Step 1 materialized values into full-turn and continuation payloads", async () => {
+			const context = await buildValidateStoryPromptContext({ activationKind: "slash_command" })
 			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
 			const continuationWorkflowInputPayloadBlock = context.continuationWorkflowInputPayloadBlock
 			if (workflowInputPayloadBlock === undefined || workflowInputPayloadBlock === "") {
@@ -3177,6 +3207,124 @@ describe("Prompt System Integration Tests", () => {
 				expect(payloadBlock).to.not.include("architecture_document")
 				expect(payloadBlock).to.not.include("projectTitle")
 				expect(payloadBlock).to.not.include("projectFolderName")
+				expect(payloadBlock).to.not.include("*** conditional prompt")
+				expect(payloadBlock).to.not.include("*** end conditional")
+			}
+		})
+
+		it("projects validate-story child prompt variants by parent workflow context", async () => {
+			const createStoryContext = await buildValidateStoryPromptContext({
+				activationKind: "use_skill",
+				parentWorkflowName: "create-story",
+			})
+			const remediationContext = await buildValidateStoryPromptContext({
+				activationKind: "use_skill",
+				parentWorkflowName: "write-remediation-story",
+				workflowValues: createValidateStoryWorkflowValues({
+					[ValidateStoryWorkflowValueKey.OriginatingStory]: VALIDATE_STORY_ORIGINATING_STORY,
+					[ValidateStoryWorkflowValueKey.CodeReviewOutput]: VALIDATE_STORY_CODE_REVIEW_OUTPUT,
+				}),
+			})
+			const quickSpecContext = await buildValidateStoryPromptContext({
+				activationKind: "use_skill",
+				parentWorkflowName: "quick-spec",
+				workflowValues: createValidateStoryWorkflowValues({
+					output_document: VALIDATE_STORY_QUICK_SPEC_DOCUMENT,
+				}),
+			})
+
+			function getValidateStoryPayloadBlocks(
+				context: SystemPromptContext & WorkflowPromptProjection,
+				label: string,
+			): readonly [string, string] {
+				const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+				const continuationWorkflowInputPayloadBlock = context.continuationWorkflowInputPayloadBlock
+				if (workflowInputPayloadBlock === undefined || workflowInputPayloadBlock === "") {
+					throw new Error(`Expected ${label} workflow input payload.`)
+				}
+				if (continuationWorkflowInputPayloadBlock === undefined || continuationWorkflowInputPayloadBlock === "") {
+					throw new Error(`Expected ${label} continuation workflow input payload.`)
+				}
+				return [workflowInputPayloadBlock, continuationWorkflowInputPayloadBlock]
+			}
+
+			for (const payloadBlock of getValidateStoryPayloadBlocks(createStoryContext, "create-story validate-story")) {
+				expect(payloadBlock).to.include(
+					"You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.",
+				)
+				expect(payloadBlock).to.include("Validate Story Session")
+				expect(payloadBlock).to.include("validate-story-project")
+				expect(payloadBlock).to.include(VALIDATE_STORY_TARGET_STORY)
+				expect(payloadBlock).to.include(VALIDATE_STORY_EPICS_DOCUMENT)
+				expect(payloadBlock).to.include(VALIDATE_STORY_ARCHITECTURE_DOCUMENT)
+				expect(payloadBlock).to.include(
+					"Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.",
+				)
+				expect(payloadBlock).to.not.include(
+					"You have been called inside a workflow designed to validate a remediation story before implementation.",
+				)
+				expect(payloadBlock).to.not.include(
+					"You have been called inside a workflow designed to validate an implementation spec for a small project.",
+				)
+				expect(payloadBlock).to.not.include(
+					"Once you've reviewed the story document, provide a response to the user using attempt_completion.",
+				)
+				expect(payloadBlock).to.not.include("{workflow.projectTitle}")
+				expect(payloadBlock).to.not.include("{workflow.projectFolderName}")
+				expect(payloadBlock).to.not.include("{workflow.target_story}")
+				expect(payloadBlock).to.not.include("{workflow.epics_document}")
+				expect(payloadBlock).to.not.include("{workflow.architecture_document}")
+				expect(payloadBlock).to.not.include("*** conditional prompt")
+				expect(payloadBlock).to.not.include("*** end conditional")
+			}
+
+			for (const payloadBlock of getValidateStoryPayloadBlocks(
+				remediationContext,
+				"write-remediation-story validate-story",
+			)) {
+				expect(payloadBlock).to.include(
+					"You have been called inside a workflow designed to validate a remediation story before implementation.",
+				)
+				expect(payloadBlock).to.include(VALIDATE_STORY_TARGET_STORY)
+				expect(payloadBlock).to.include(VALIDATE_STORY_ORIGINATING_STORY)
+				expect(payloadBlock).to.include(VALIDATE_STORY_CODE_REVIEW_OUTPUT)
+				expect(payloadBlock).to.include(
+					"Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.",
+				)
+				expect(payloadBlock).to.not.include(
+					"You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.",
+				)
+				expect(payloadBlock).to.not.include(
+					"You have been called inside a workflow designed to validate an implementation spec for a small project.",
+				)
+				expect(payloadBlock).to.not.include("- Epics Documentation:")
+				expect(payloadBlock).to.not.include("- Architecture Document:")
+				expect(payloadBlock).to.not.include("{workflow.target_story}")
+				expect(payloadBlock).to.not.include("{workflow.originating_story}")
+				expect(payloadBlock).to.not.include("{workflow.code_review_output}")
+				expect(payloadBlock).to.not.include("*** conditional prompt")
+				expect(payloadBlock).to.not.include("*** end conditional")
+			}
+
+			for (const payloadBlock of getValidateStoryPayloadBlocks(quickSpecContext, "quick-spec validate-story")) {
+				expect(payloadBlock).to.include(
+					"You have been called inside a workflow designed to validate an implementation spec for a small project.",
+				)
+				expect(payloadBlock).to.include(`Spec for review: ${VALIDATE_STORY_QUICK_SPEC_DOCUMENT}`)
+				expect(payloadBlock).to.include(
+					"Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.",
+				)
+				expect(payloadBlock).to.not.include(
+					"You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.",
+				)
+				expect(payloadBlock).to.not.include(
+					"You have been called inside a workflow designed to validate a remediation story before implementation.",
+				)
+				expect(payloadBlock).to.not.include("- Epics Documentation:")
+				expect(payloadBlock).to.not.include("- Architecture Document:")
+				expect(payloadBlock).to.not.include("{workflow.target_story}")
+				expect(payloadBlock).to.not.include("*** conditional prompt")
+				expect(payloadBlock).to.not.include("*** end conditional")
 			}
 		})
 
