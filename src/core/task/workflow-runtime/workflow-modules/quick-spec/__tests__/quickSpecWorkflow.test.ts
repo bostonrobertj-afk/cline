@@ -5,6 +5,7 @@ import type {
 	ActiveWorkflowSession,
 	WorkflowBranchTriggerEvent,
 	WorkflowDecisionAction,
+	WorkflowDecisionBranchEvaluationInput,
 	WorkflowDecisionBranchRoute,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
@@ -44,6 +45,65 @@ function createSession(workflowValues: WorkflowValues): ActiveWorkflowSession {
 		branchContext: {
 			activeBranchId: "project-prompt",
 		},
+	}
+}
+
+function createPredicateSession(args: { activeBranchId: string; workflowValues: WorkflowValues }): ActiveWorkflowSession {
+	return {
+		activeStepNumber: 1,
+		workflowValues: args.workflowValues,
+		projectSelection: {
+			projectMode: "existing",
+			projectTitle: "Predicate Test Project",
+			projectFolderName: "predicate-test-project",
+		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
+		entryArtifactResolution: undefined,
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: {
+			activeBranchId: args.activeBranchId,
+		},
+	}
+}
+
+function createSessionPredicateInput(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+	step: WorkflowStepDefinition
+}): WorkflowDecisionBranchEvaluationInput {
+	return {
+		activeBranchId: args.activeBranchId,
+		workflowValues: args.workflowValues,
+		step: args.step,
+		session: createPredicateSession({
+			activeBranchId: args.activeBranchId,
+			workflowValues: args.workflowValues,
+		}),
+	}
+}
+
+function createEventPredicateInput(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+	step: WorkflowStepDefinition
+	triggerEvent: WorkflowBranchTriggerEvent
+}): WorkflowDecisionBranchEvaluationInput & { triggerEvent: WorkflowBranchTriggerEvent } {
+	return {
+		activeBranchId: args.activeBranchId,
+		workflowValues: args.workflowValues,
+		step: args.step,
+		session: createPredicateSession({
+			activeBranchId: args.activeBranchId,
+			workflowValues: args.workflowValues,
+		}),
+		triggerEvent: args.triggerEvent,
 	}
 }
 
@@ -111,12 +171,14 @@ function expectRouteMatchesEntryArtifactResolution(route: WorkflowDecisionBranch
 	}
 
 	expect(
-		route.trigger.matches({
-			activeBranchId: "step-1-resolve-entry-artifact",
-			workflowValues: {},
-			step: quickSpecWorkflowDefinition.steps["step-1"],
-			triggerEvent: buildEntryArtifactResolutionCompletedEvent(creationRequired),
-		}),
+		route.trigger.matches(
+			createEventPredicateInput({
+				activeBranchId: "step-1-resolve-entry-artifact",
+				workflowValues: {},
+				step: quickSpecWorkflowDefinition.steps["step-1"],
+				triggerEvent: buildEntryArtifactResolutionCompletedEvent(creationRequired),
+			}),
+		),
 	).to.equal(true)
 }
 
@@ -131,12 +193,14 @@ function expectRouteMatchesToolBackedOperationEvent(
 	}
 
 	expect(
-		route.trigger.matches({
-			activeBranchId: branchId,
-			workflowValues: {},
-			step: quickSpecWorkflowDefinition.steps["step-1"],
-			triggerEvent: buildToolBackedOperationEvent(kind, branchId, routeId),
-		}),
+		route.trigger.matches(
+			createEventPredicateInput({
+				activeBranchId: branchId,
+				workflowValues: {},
+				step: quickSpecWorkflowDefinition.steps["step-1"],
+				triggerEvent: buildToolBackedOperationEvent(kind, branchId, routeId),
+			}),
+		),
 	).to.equal(true)
 }
 
@@ -365,15 +429,17 @@ describe("quickSpecWorkflowDefinition", () => {
 			throw new Error(`Expected event_predicate trigger, received ${formCompletionRoute.trigger.kind}.`)
 		}
 		expect(
-			formCompletionRoute.trigger.matches({
-				activeBranchId: "step-1-await-input-form",
-				workflowValues: {},
-				step: step1,
-				triggerEvent: {
-					kind: "workflow_form_completed",
-					workflowFormId: "step-1-quick-spec-input-form",
-				},
-			}),
+			formCompletionRoute.trigger.matches(
+				createEventPredicateInput({
+					activeBranchId: "step-1-await-input-form",
+					workflowValues: {},
+					step: step1,
+					triggerEvent: {
+						kind: "workflow_form_completed",
+						workflowFormId: "step-1-quick-spec-input-form",
+					},
+				}),
+			),
 		).to.equal(true)
 		expect(formCompletionRoute.action).to.deep.equal({
 			kind: "transition_step",

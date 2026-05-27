@@ -1990,6 +1990,7 @@ describe("SubagentRunner", () => {
 		sinon.assert.calledOnce(consumeNextActionSpy)
 		sinon.assert.callOrder(consumeNextActionSpy, promptRegistryGetStub)
 		assert.equal(activateWorkflowSpy.firstCall.args[0].workflowName, "review-workflow")
+		assert.equal(activateWorkflowSpy.firstCall.args[0].parentWorkflowName, "parent-workflow")
 	})
 
 	it("fails marker-present runs without complete parent project selection before the first child model request", async () => {
@@ -2338,8 +2339,13 @@ describe("SubagentRunner", () => {
 		assert.deepEqual(state.activeWorkflowSession?.workflowValues, { review_input: "/tmp/review-input.md" })
 		assert.deepEqual(state.activeWorkflowSession?.projectSelection, parentWorkflowSession.projectSelection)
 		assert.notEqual(state.activeWorkflowSession?.projectSelection, parentWorkflowSession.projectSelection)
+		assert.deepEqual(state.activeWorkflowSession?.lifecycle, {
+			projectSelectionCompleted: true,
+			parentWorkflowName: "parent-workflow",
+		})
 		assert.equal(state.activeWorkflowSession?.ui.formSession, undefined)
 		assert.equal(activationResult.kind, "project_prompt")
+		assert.equal(activateWorkflowSpy.firstCall.args[0].parentWorkflowName, "parent-workflow")
 		state.activeWorkflowSession!.workflowValues.review_input = "/tmp/child-mutated.md"
 		state.activeWorkflowSession!.projectSelection.projectTitle = "Child Project"
 		assert.equal(config.taskState.activeWorkflowSession?.workflowValues.review_input, "/tmp/review-input.md")

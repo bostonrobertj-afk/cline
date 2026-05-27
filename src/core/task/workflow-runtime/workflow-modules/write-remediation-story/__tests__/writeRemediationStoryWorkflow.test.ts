@@ -16,6 +16,7 @@ import type {
 	ActiveWorkflowSession,
 	WorkflowBranchTriggerEvent,
 	WorkflowDecisionAction,
+	WorkflowDecisionBranchEvaluationInput,
 	WorkflowDecisionBranchRoute,
 	WorkflowDeterministicProcedureResult,
 	WorkflowPromptBuilderInput,
@@ -143,6 +144,65 @@ function createSession(
 			suppressedWorkflowStepResolutionRoutes: [],
 		},
 		branchContext,
+	}
+}
+
+function createPredicateSession(args: { activeBranchId: string; workflowValues: WorkflowValues }): ActiveWorkflowSession {
+	return {
+		activeStepNumber: 1,
+		workflowValues: args.workflowValues,
+		projectSelection: {
+			projectMode: "existing",
+			projectTitle: "Predicate Test Project",
+			projectFolderName: "predicate-test-project",
+		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
+		entryArtifactResolution: undefined,
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: {
+			activeBranchId: args.activeBranchId,
+		},
+	}
+}
+
+function createSessionPredicateInput(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+	step: WorkflowStepDefinition
+}): WorkflowDecisionBranchEvaluationInput {
+	return {
+		activeBranchId: args.activeBranchId,
+		workflowValues: args.workflowValues,
+		step: args.step,
+		session: createPredicateSession({
+			activeBranchId: args.activeBranchId,
+			workflowValues: args.workflowValues,
+		}),
+	}
+}
+
+function createEventPredicateInput(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+	step: WorkflowStepDefinition
+	triggerEvent: WorkflowBranchTriggerEvent
+}): WorkflowDecisionBranchEvaluationInput & { triggerEvent: WorkflowBranchTriggerEvent } {
+	return {
+		activeBranchId: args.activeBranchId,
+		workflowValues: args.workflowValues,
+		step: args.step,
+		session: createPredicateSession({
+			activeBranchId: args.activeBranchId,
+			workflowValues: args.workflowValues,
+		}),
+		triggerEvent: args.triggerEvent,
 	}
 }
 
@@ -489,11 +549,13 @@ describe("writeRemediationStoryWorkflow", () => {
 			throw new Error(`Expected session_predicate trigger, received ${route.trigger.kind}.`)
 		}
 		expect(
-			route.trigger.matches({
-				activeBranchId: "step-1-route-replacement-choice",
-				workflowValues,
-				step: getStep("step-1"),
-			}),
+			route.trigger.matches(
+				createSessionPredicateInput({
+					activeBranchId: "step-1-route-replacement-choice",
+					workflowValues,
+					step: getStep("step-1"),
+				}),
+			),
 		).to.equal(true)
 		if (route.action.kind !== "continue_workflow_form") {
 			throw new Error(`Expected continue_workflow_form action, received ${route.action.kind}.`)
@@ -525,11 +587,13 @@ describe("writeRemediationStoryWorkflow", () => {
 			throw new Error(`Expected session_predicate trigger, received ${route.trigger.kind}.`)
 		}
 		expect(
-			route.trigger.matches({
-				activeBranchId: "step-1-route-replacement-choice",
-				workflowValues,
-				step: getStep("step-1"),
-			}),
+			route.trigger.matches(
+				createSessionPredicateInput({
+					activeBranchId: "step-1-route-replacement-choice",
+					workflowValues,
+					step: getStep("step-1"),
+				}),
+			),
 		).to.equal(true)
 		if (route.action.kind !== "continue_workflow_form") {
 			throw new Error(`Expected continue_workflow_form action, received ${route.action.kind}.`)
@@ -601,11 +665,13 @@ describe("writeRemediationStoryWorkflow", () => {
 			throw new Error(`Expected session_predicate trigger, received ${route.trigger.kind}.`)
 		}
 		expect(
-			route.trigger.matches({
-				activeBranchId: "step-1-route-after-replacement-submit",
-				workflowValues: values,
-				step: getStep("step-1"),
-			}),
+			route.trigger.matches(
+				createSessionPredicateInput({
+					activeBranchId: "step-1-route-after-replacement-submit",
+					workflowValues: values,
+					step: getStep("step-1"),
+				}),
+			),
 		).to.equal(true)
 		expect(route.action).to.deep.equal({
 			kind: "terminal_error",
@@ -619,12 +685,14 @@ describe("writeRemediationStoryWorkflow", () => {
 			throw new Error(`Expected event_predicate trigger, received ${route.trigger.kind}.`)
 		}
 		expect(
-			route.trigger.matches({
-				activeBranchId: "step-1-await-replacement-form",
-				workflowValues: SAMPLE_WORKFLOW_VALUES,
-				step: getStep("step-1"),
-				triggerEvent: buildWorkflowFormPanelSubmittedEvent(WRITE_REMEDIATION_STORY_PANEL_B_REPLACE_STORY_ID),
-			}),
+			route.trigger.matches(
+				createEventPredicateInput({
+					activeBranchId: "step-1-await-replacement-form",
+					workflowValues: SAMPLE_WORKFLOW_VALUES,
+					step: getStep("step-1"),
+					triggerEvent: buildWorkflowFormPanelSubmittedEvent(WRITE_REMEDIATION_STORY_PANEL_B_REPLACE_STORY_ID),
+				}),
+			),
 		).to.equal(true)
 		expect(expectResolveExistingProjectArtifactAction(route.action)).to.deep.include({
 			artifactFamily: WorkflowArtifactFamily.RemediationStory,
@@ -641,12 +709,14 @@ describe("writeRemediationStoryWorkflow", () => {
 			throw new Error(`Expected event_predicate trigger, received ${route.trigger.kind}.`)
 		}
 		expect(
-			route.trigger.matches({
-				activeBranchId: "step-1-await-replacement-form",
-				workflowValues: SAMPLE_WORKFLOW_VALUES,
-				step: getStep("step-1"),
-				triggerEvent: buildWorkflowFormPanelSubmittedEvent(WRITE_REMEDIATION_STORY_PANEL_C_REPLACE_FINDINGS_ID),
-			}),
+			route.trigger.matches(
+				createEventPredicateInput({
+					activeBranchId: "step-1-await-replacement-form",
+					workflowValues: SAMPLE_WORKFLOW_VALUES,
+					step: getStep("step-1"),
+					triggerEvent: buildWorkflowFormPanelSubmittedEvent(WRITE_REMEDIATION_STORY_PANEL_C_REPLACE_FINDINGS_ID),
+				}),
+			),
 		).to.equal(true)
 		expect(expectResolveExistingProjectArtifactAction(route.action)).to.deep.include({
 			artifactFamily: WorkflowArtifactFamily.CodeReviewOutput,
@@ -752,15 +822,17 @@ describe("writeRemediationStoryWorkflow", () => {
 			throw new Error(`Expected event_predicate trigger, received ${route.trigger.kind}.`)
 		}
 		expect(
-			route.trigger.matches({
-				activeBranchId: "step-4-await-story-index-status-update",
-				workflowValues: SAMPLE_WORKFLOW_VALUES,
-				step: getStep("step-4"),
-				triggerEvent: buildToolBackedOperationSucceededEvent(
-					"step-4-update-story-index-status",
-					"step-4-update-story-index-status",
-				),
-			}),
+			route.trigger.matches(
+				createEventPredicateInput({
+					activeBranchId: "step-4-await-story-index-status-update",
+					workflowValues: SAMPLE_WORKFLOW_VALUES,
+					step: getStep("step-4"),
+					triggerEvent: buildToolBackedOperationSucceededEvent(
+						"step-4-update-story-index-status",
+						"step-4-update-story-index-status",
+					),
+				}),
+			),
 		).to.equal(true)
 		expect(route.action).to.deep.include({
 			kind: "move_project_file",
@@ -780,15 +852,17 @@ describe("writeRemediationStoryWorkflow", () => {
 			throw new Error(`Expected event_predicate trigger, received ${statusUpdateFailureRoute.trigger.kind}.`)
 		}
 		expect(
-			statusUpdateFailureRoute.trigger.matches({
-				activeBranchId: "step-4-await-story-index-status-update",
-				workflowValues: SAMPLE_WORKFLOW_VALUES,
-				step: getStep("step-4"),
-				triggerEvent: buildToolBackedOperationFailedEvent(
-					"step-4-update-story-index-status",
-					"step-4-update-story-index-status",
-				),
-			}),
+			statusUpdateFailureRoute.trigger.matches(
+				createEventPredicateInput({
+					activeBranchId: "step-4-await-story-index-status-update",
+					workflowValues: SAMPLE_WORKFLOW_VALUES,
+					step: getStep("step-4"),
+					triggerEvent: buildToolBackedOperationFailedEvent(
+						"step-4-update-story-index-status",
+						"step-4-update-story-index-status",
+					),
+				}),
+			),
 		).to.equal(true)
 		if (statusUpdateFailureRoute.action.kind !== "run_deterministic_procedure") {
 			throw new Error(`Expected run_deterministic_procedure action, received ${statusUpdateFailureRoute.action.kind}.`)
@@ -800,15 +874,17 @@ describe("writeRemediationStoryWorkflow", () => {
 			throw new Error(`Expected event_predicate trigger, received ${moveFailureRoute.trigger.kind}.`)
 		}
 		expect(
-			moveFailureRoute.trigger.matches({
-				activeBranchId: "step-4-await-remediation-story-move",
-				workflowValues: SAMPLE_WORKFLOW_VALUES,
-				step: getStep("step-4"),
-				triggerEvent: buildToolBackedOperationFailedEvent(
-					"step-4-await-story-index-status-update",
-					"step-4-move-remediation-story-to-backlog",
-				),
-			}),
+			moveFailureRoute.trigger.matches(
+				createEventPredicateInput({
+					activeBranchId: "step-4-await-remediation-story-move",
+					workflowValues: SAMPLE_WORKFLOW_VALUES,
+					step: getStep("step-4"),
+					triggerEvent: buildToolBackedOperationFailedEvent(
+						"step-4-await-story-index-status-update",
+						"step-4-move-remediation-story-to-backlog",
+					),
+				}),
+			),
 		).to.equal(true)
 		if (moveFailureRoute.action.kind !== "run_deterministic_procedure") {
 			throw new Error(`Expected run_deterministic_procedure action, received ${moveFailureRoute.action.kind}.`)
@@ -828,15 +904,17 @@ describe("writeRemediationStoryWorkflow", () => {
 			throw new Error(`Expected event_predicate trigger, received ${completionRoute.trigger.kind}.`)
 		}
 		expect(
-			completionRoute.trigger.matches({
-				activeBranchId: "step-4-await-remediation-story-move",
-				workflowValues: SAMPLE_WORKFLOW_VALUES,
-				step: getStep("step-4"),
-				triggerEvent: buildToolBackedOperationSucceededEvent(
-					"step-4-await-story-index-status-update",
-					"step-4-move-remediation-story-to-backlog",
-				),
-			}),
+			completionRoute.trigger.matches(
+				createEventPredicateInput({
+					activeBranchId: "step-4-await-remediation-story-move",
+					workflowValues: SAMPLE_WORKFLOW_VALUES,
+					step: getStep("step-4"),
+					triggerEvent: buildToolBackedOperationSucceededEvent(
+						"step-4-await-story-index-status-update",
+						"step-4-move-remediation-story-to-backlog",
+					),
+				}),
+			),
 		).to.equal(true)
 		expect(completionRoute.action).to.deep.equal({ kind: "complete_workflow" })
 	})

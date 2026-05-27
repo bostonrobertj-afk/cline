@@ -6,6 +6,7 @@ import type {
 	ActiveWorkflowSession,
 	WorkflowBranchTriggerEvent,
 	WorkflowDecisionAction,
+	WorkflowDecisionBranchEvaluationInput,
 	WorkflowDecisionBranchRoute,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
@@ -46,6 +47,65 @@ function createSession(workflowValues: WorkflowValues): ActiveWorkflowSession {
 		branchContext: {
 			activeBranchId: "entry",
 		},
+	}
+}
+
+function createPredicateSession(args: { activeBranchId: string; workflowValues: WorkflowValues }): ActiveWorkflowSession {
+	return {
+		activeStepNumber: 1,
+		workflowValues: args.workflowValues,
+		projectSelection: {
+			projectMode: "existing",
+			projectTitle: "Predicate Test Project",
+			projectFolderName: "predicate-test-project",
+		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
+		entryArtifactResolution: undefined,
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: {
+			activeBranchId: args.activeBranchId,
+		},
+	}
+}
+
+function createSessionPredicateInput(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+	step: WorkflowStepDefinition
+}): WorkflowDecisionBranchEvaluationInput {
+	return {
+		activeBranchId: args.activeBranchId,
+		workflowValues: args.workflowValues,
+		step: args.step,
+		session: createPredicateSession({
+			activeBranchId: args.activeBranchId,
+			workflowValues: args.workflowValues,
+		}),
+	}
+}
+
+function createEventPredicateInput(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+	step: WorkflowStepDefinition
+	triggerEvent: WorkflowBranchTriggerEvent
+}): WorkflowDecisionBranchEvaluationInput & { triggerEvent: WorkflowBranchTriggerEvent } {
+	return {
+		activeBranchId: args.activeBranchId,
+		workflowValues: args.workflowValues,
+		step: args.step,
+		session: createPredicateSession({
+			activeBranchId: args.activeBranchId,
+			workflowValues: args.workflowValues,
+		}),
+		triggerEvent: args.triggerEvent,
 	}
 }
 
@@ -129,12 +189,14 @@ function expectRouteMatchesEntryArtifactResolution(route: WorkflowDecisionBranch
 	}
 
 	expect(
-		route.trigger.matches({
-			activeBranchId: "step-1-resolve-entry-artifact",
-			workflowValues: {},
-			step: brainstormingWorkflowDefinition.steps["step-1"],
-			triggerEvent: buildEntryArtifactResolutionCompletedEvent(creationRequired),
-		}),
+		route.trigger.matches(
+			createEventPredicateInput({
+				activeBranchId: "step-1-resolve-entry-artifact",
+				workflowValues: {},
+				step: brainstormingWorkflowDefinition.steps["step-1"],
+				triggerEvent: buildEntryArtifactResolutionCompletedEvent(creationRequired),
+			}),
+		),
 	).to.equal(true)
 }
 
@@ -149,12 +211,14 @@ function expectRouteMatchesToolBackedOperationEvent(
 	}
 
 	expect(
-		route.trigger.matches({
-			activeBranchId: "step-1-await-allocation",
-			workflowValues: {},
-			step: brainstormingWorkflowDefinition.steps["step-1"],
-			triggerEvent: buildToolBackedOperationEvent(kind, branchId, routeId),
-		}),
+		route.trigger.matches(
+			createEventPredicateInput({
+				activeBranchId: "step-1-await-allocation",
+				workflowValues: {},
+				step: brainstormingWorkflowDefinition.steps["step-1"],
+				triggerEvent: buildToolBackedOperationEvent(kind, branchId, routeId),
+			}),
+		),
 	).to.equal(true)
 }
 
@@ -464,14 +528,16 @@ describe("brainstormingWorkflowDefinition", () => {
 			throw new Error(`Expected event_predicate trigger, received ${chooseContinueRoute.trigger.kind}.`)
 		}
 		expect(
-			chooseContinueRoute.trigger.matches({
-				activeBranchId: "step-2-after-approach-form",
-				workflowValues: {
-					selected_approach: "I want to choose",
-				},
-				step: step2,
-				triggerEvent: buildStep2WorkflowFormPanelSubmittedEvent("step-2-approach-panel", "submit"),
-			}),
+			chooseContinueRoute.trigger.matches(
+				createEventPredicateInput({
+					activeBranchId: "step-2-after-approach-form",
+					workflowValues: {
+						selected_approach: "I want to choose",
+					},
+					step: step2,
+					triggerEvent: buildStep2WorkflowFormPanelSubmittedEvent("step-2-approach-panel", "submit"),
+				}),
+			),
 		).to.equal(true)
 
 		const chooseAction = getAction("step-2", "step-2-after-approach-form", "step-2-persist-chosen-technique")
@@ -525,14 +591,16 @@ describe("brainstormingWorkflowDefinition", () => {
 			throw new Error(`Expected event_predicate trigger, received ${suggestRoute.trigger.kind}.`)
 		}
 		expect(
-			suggestRoute.trigger.matches({
-				activeBranchId: "step-2-after-approach-form",
-				workflowValues: {
-					selected_approach: "I want you to suggest a technique",
-				},
-				step: step2,
-				triggerEvent: buildStep2WorkflowFormPanelSubmittedEvent("step-2-approach-panel", "submit"),
-			}),
+			suggestRoute.trigger.matches(
+				createEventPredicateInput({
+					activeBranchId: "step-2-after-approach-form",
+					workflowValues: {
+						selected_approach: "I want you to suggest a technique",
+					},
+					step: step2,
+					triggerEvent: buildStep2WorkflowFormPanelSubmittedEvent("step-2-approach-panel", "submit"),
+				}),
+			),
 		).to.equal(true)
 		const suggestAction = suggestRoute.action
 		expect(suggestAction.kind).to.equal("build_workflow_document")
@@ -552,14 +620,16 @@ describe("brainstormingWorkflowDefinition", () => {
 			throw new Error(`Expected event_predicate trigger, received ${randomSelectionRoute.trigger.kind}.`)
 		}
 		expect(
-			randomSelectionRoute.trigger.matches({
-				activeBranchId: "step-2-after-approach-form",
-				workflowValues: {
-					selected_approach: "I want a random technique",
-				},
-				step: step2,
-				triggerEvent: buildStep2WorkflowFormPanelSubmittedEvent("step-2-approach-panel", "submit"),
-			}),
+			randomSelectionRoute.trigger.matches(
+				createEventPredicateInput({
+					activeBranchId: "step-2-after-approach-form",
+					workflowValues: {
+						selected_approach: "I want a random technique",
+					},
+					step: step2,
+					triggerEvent: buildStep2WorkflowFormPanelSubmittedEvent("step-2-approach-panel", "submit"),
+				}),
+			),
 		).to.equal(true)
 		const randomSelectionAction = randomSelectionRoute.action
 		expect(randomSelectionAction.kind).to.equal("run_deterministic_procedure")
@@ -593,14 +663,16 @@ describe("brainstormingWorkflowDefinition", () => {
 			throw new Error(`Expected event_predicate trigger, received ${randomConfirmRoute.trigger.kind}.`)
 		}
 		expect(
-			randomConfirmRoute.trigger.matches({
-				activeBranchId: "step-2-after-random-confirmation-form",
-				workflowValues: {
-					random_technique_confirmation: "confirm",
-				},
-				step: step2,
-				triggerEvent: buildStep2WorkflowFormPanelSubmittedEvent("step-2-random-confirmation-panel", "submit"),
-			}),
+			randomConfirmRoute.trigger.matches(
+				createEventPredicateInput({
+					activeBranchId: "step-2-after-random-confirmation-form",
+					workflowValues: {
+						random_technique_confirmation: "confirm",
+					},
+					step: step2,
+					triggerEvent: buildStep2WorkflowFormPanelSubmittedEvent("step-2-random-confirmation-panel", "submit"),
+				}),
+			),
 		).to.equal(true)
 		const randomConfirmAction = randomConfirmRoute.action
 		expect(randomConfirmAction.kind).to.equal("run_deterministic_procedure")
@@ -635,14 +707,16 @@ describe("brainstormingWorkflowDefinition", () => {
 			throw new Error(`Expected event_predicate trigger, received ${randomRetryRoute.trigger.kind}.`)
 		}
 		expect(
-			randomRetryRoute.trigger.matches({
-				activeBranchId: "step-2-after-random-confirmation-form",
-				workflowValues: {
-					random_technique_confirmation: "retry",
-				},
-				step: step2,
-				triggerEvent: buildStep2WorkflowFormPanelSubmittedEvent("step-2-random-confirmation-panel", "submit"),
-			}),
+			randomRetryRoute.trigger.matches(
+				createEventPredicateInput({
+					activeBranchId: "step-2-after-random-confirmation-form",
+					workflowValues: {
+						random_technique_confirmation: "retry",
+					},
+					step: step2,
+					triggerEvent: buildStep2WorkflowFormPanelSubmittedEvent("step-2-random-confirmation-panel", "submit"),
+				}),
+			),
 		).to.equal(true)
 	})
 

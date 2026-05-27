@@ -14,6 +14,7 @@ import type {
 	ActiveWorkflowSession,
 	WorkflowBranchTriggerEvent,
 	WorkflowDecisionAction,
+	WorkflowDecisionBranchEvaluationInput,
 	WorkflowDecisionBranchRoute,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
@@ -79,6 +80,65 @@ function createSession(workflowValues: WorkflowValues): ActiveWorkflowSession {
 		branchContext: {
 			activeBranchId: "step-1-resolve-prerequisites",
 		},
+	}
+}
+
+function createPredicateSession(args: { activeBranchId: string; workflowValues: WorkflowValues }): ActiveWorkflowSession {
+	return {
+		activeStepNumber: 1,
+		workflowValues: args.workflowValues,
+		projectSelection: {
+			projectMode: "existing",
+			projectTitle: "Predicate Test Project",
+			projectFolderName: "predicate-test-project",
+		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
+		entryArtifactResolution: undefined,
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: {
+			activeBranchId: args.activeBranchId,
+		},
+	}
+}
+
+function createSessionPredicateInput(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+	step: WorkflowStepDefinition
+}): WorkflowDecisionBranchEvaluationInput {
+	return {
+		activeBranchId: args.activeBranchId,
+		workflowValues: args.workflowValues,
+		step: args.step,
+		session: createPredicateSession({
+			activeBranchId: args.activeBranchId,
+			workflowValues: args.workflowValues,
+		}),
+	}
+}
+
+function createEventPredicateInput(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+	step: WorkflowStepDefinition
+	triggerEvent: WorkflowBranchTriggerEvent
+}): WorkflowDecisionBranchEvaluationInput & { triggerEvent: WorkflowBranchTriggerEvent } {
+	return {
+		activeBranchId: args.activeBranchId,
+		workflowValues: args.workflowValues,
+		step: args.step,
+		session: createPredicateSession({
+			activeBranchId: args.activeBranchId,
+			workflowValues: args.workflowValues,
+		}),
+		triggerEvent: args.triggerEvent,
 	}
 }
 
@@ -264,12 +324,14 @@ function expectEventPredicateMatches(args: {
 	}
 
 	expect(
-		args.route.trigger.matches({
-			activeBranchId: args.activeBranchId,
-			workflowValues: args.workflowValues,
-			step: args.step,
-			triggerEvent: args.triggerEvent,
-		}),
+		args.route.trigger.matches(
+			createEventPredicateInput({
+				activeBranchId: args.activeBranchId,
+				workflowValues: args.workflowValues,
+				step: args.step,
+				triggerEvent: args.triggerEvent,
+			}),
+		),
 	).to.equal(true)
 }
 
@@ -285,12 +347,14 @@ function expectEventPredicateDoesNotMatch(args: {
 	}
 
 	expect(
-		args.route.trigger.matches({
-			activeBranchId: args.activeBranchId,
-			workflowValues: args.workflowValues,
-			step: args.step,
-			triggerEvent: args.triggerEvent,
-		}),
+		args.route.trigger.matches(
+			createEventPredicateInput({
+				activeBranchId: args.activeBranchId,
+				workflowValues: args.workflowValues,
+				step: args.step,
+				triggerEvent: args.triggerEvent,
+			}),
+		),
 	).to.equal(false)
 }
 
@@ -686,15 +750,17 @@ describe("piPlanningWorkflowDefinition", () => {
 			throw new Error(`Expected session_predicate trigger, received ${existingIndexRoute.trigger.kind}.`)
 		}
 		expect(
-			existingIndexRoute.trigger.matches({
-				activeBranchId: "step-1-route-after-target-epic-panel",
-				workflowValues: {
-					...SAMPLE_WORKFLOW_VALUES,
-					[PiPlanningWorkflowValueKey.StoriesIndex]:
-						"/tmp/pi-planning-project/implementation/epic-1-stories.index.json",
-				},
-				step: step1,
-			}),
+			existingIndexRoute.trigger.matches(
+				createSessionPredicateInput({
+					activeBranchId: "step-1-route-after-target-epic-panel",
+					workflowValues: {
+						...SAMPLE_WORKFLOW_VALUES,
+						[PiPlanningWorkflowValueKey.StoriesIndex]:
+							"/tmp/pi-planning-project/implementation/epic-1-stories.index.json",
+					},
+					step: step1,
+				}),
+			),
 		).to.equal(true)
 		await expectContinueWorkflowFormAction(existingIndexRoute.action, "step-1-edit-intent-panel")
 		expect(existingIndexRoute.followingBranchId).to.equal("step-1-await-edit-intent-panel")
@@ -711,11 +777,13 @@ describe("piPlanningWorkflowDefinition", () => {
 		const workflowValues: WorkflowValues = { ...SAMPLE_WORKFLOW_VALUES }
 		delete workflowValues[PiPlanningWorkflowValueKey.StoriesIndex]
 		expect(
-			missingIndexRoute.trigger.matches({
-				activeBranchId: "step-1-route-after-target-epic-panel",
-				workflowValues,
-				step: step1,
-			}),
+			missingIndexRoute.trigger.matches(
+				createSessionPredicateInput({
+					activeBranchId: "step-1-route-after-target-epic-panel",
+					workflowValues,
+					step: step1,
+				}),
+			),
 		).to.equal(true)
 		await expectContinueWorkflowFormAction(missingIndexRoute.action, "step-1-additional-context-panel")
 		expect(missingIndexRoute.followingBranchId).to.equal("step-1-await-final-form-submit")
@@ -741,14 +809,16 @@ describe("piPlanningWorkflowDefinition", () => {
 			throw new Error(`Expected session_predicate trigger, received ${initialBuildoutRoute.trigger.kind}.`)
 		}
 		expect(
-			initialBuildoutRoute.trigger.matches({
-				activeBranchId: "step-1-route-after-edit-intent-panel",
-				workflowValues: {
-					...SAMPLE_WORKFLOW_VALUES,
-					[PiPlanningWorkflowValueKey.EditIntent]: "Complete initial story buildout",
-				},
-				step: step1,
-			}),
+			initialBuildoutRoute.trigger.matches(
+				createSessionPredicateInput({
+					activeBranchId: "step-1-route-after-edit-intent-panel",
+					workflowValues: {
+						...SAMPLE_WORKFLOW_VALUES,
+						[PiPlanningWorkflowValueKey.EditIntent]: "Complete initial story buildout",
+					},
+					step: step1,
+				}),
+			),
 		).to.equal(true)
 		await expectContinueWorkflowFormAction(initialBuildoutRoute.action, "step-1-additional-context-panel")
 		expect(initialBuildoutRoute.followingBranchId).to.equal("step-1-await-final-form-submit")
@@ -763,14 +833,16 @@ describe("piPlanningWorkflowDefinition", () => {
 			throw new Error(`Expected session_predicate trigger, received ${editExistingStoryRoute.trigger.kind}.`)
 		}
 		expect(
-			editExistingStoryRoute.trigger.matches({
-				activeBranchId: "step-1-route-after-edit-intent-panel",
-				workflowValues: {
-					...SAMPLE_WORKFLOW_VALUES,
-					[PiPlanningWorkflowValueKey.EditIntent]: "edit existing story file",
-				},
-				step: step1,
-			}),
+			editExistingStoryRoute.trigger.matches(
+				createSessionPredicateInput({
+					activeBranchId: "step-1-route-after-edit-intent-panel",
+					workflowValues: {
+						...SAMPLE_WORKFLOW_VALUES,
+						[PiPlanningWorkflowValueKey.EditIntent]: "edit existing story file",
+					},
+					step: step1,
+				}),
+			),
 		).to.equal(true)
 		await expectContinueWorkflowFormAction(editExistingStoryRoute.action, "step-1-select-story-panel")
 		expect(editExistingStoryRoute.followingBranchId).to.equal("step-1-await-select-story-panel")
@@ -959,11 +1031,13 @@ describe("piPlanningWorkflowDefinition", () => {
 			throw new Error(`Expected session_predicate trigger, received ${draftValidationRoute.trigger.kind}.`)
 		}
 		expect(
-			draftValidationRoute.trigger.matches({
-				activeBranchId: "step-1-route-target-story-status",
-				workflowValues: { ...SAMPLE_WORKFLOW_VALUES, [PiPlanningWorkflowValueKey.SelectedStoryStatus]: "draft" },
-				step: step1,
-			}),
+			draftValidationRoute.trigger.matches(
+				createSessionPredicateInput({
+					activeBranchId: "step-1-route-target-story-status",
+					workflowValues: { ...SAMPLE_WORKFLOW_VALUES, [PiPlanningWorkflowValueKey.SelectedStoryStatus]: "draft" },
+					step: step1,
+				}),
+			),
 		).to.equal(true)
 		expect(expectValidateStoryIndexEntryAction(draftValidationRoute.action)).to.deep.equal({
 			kind: "validate_story_index_entry",
@@ -989,11 +1063,13 @@ describe("piPlanningWorkflowDefinition", () => {
 			throw new Error(`Expected session_predicate trigger, received ${backlogValidationRoute.trigger.kind}.`)
 		}
 		expect(
-			backlogValidationRoute.trigger.matches({
-				activeBranchId: "step-1-route-target-story-status",
-				workflowValues: { ...SAMPLE_WORKFLOW_VALUES, [PiPlanningWorkflowValueKey.SelectedStoryStatus]: "backlog" },
-				step: step1,
-			}),
+			backlogValidationRoute.trigger.matches(
+				createSessionPredicateInput({
+					activeBranchId: "step-1-route-target-story-status",
+					workflowValues: { ...SAMPLE_WORKFLOW_VALUES, [PiPlanningWorkflowValueKey.SelectedStoryStatus]: "backlog" },
+					step: step1,
+				}),
+			),
 		).to.equal(true)
 		expect(expectValidateStoryIndexEntryAction(backlogValidationRoute.action)).to.deep.equal({
 			kind: "validate_story_index_entry",
@@ -1019,11 +1095,13 @@ describe("piPlanningWorkflowDefinition", () => {
 			throw new Error(`Expected session_predicate trigger, received ${unsupportedStatusRoute.trigger.kind}.`)
 		}
 		expect(
-			unsupportedStatusRoute.trigger.matches({
-				activeBranchId: "step-1-route-target-story-status",
-				workflowValues: { ...SAMPLE_WORKFLOW_VALUES, [PiPlanningWorkflowValueKey.SelectedStoryStatus]: "review" },
-				step: step1,
-			}),
+			unsupportedStatusRoute.trigger.matches(
+				createSessionPredicateInput({
+					activeBranchId: "step-1-route-target-story-status",
+					workflowValues: { ...SAMPLE_WORKFLOW_VALUES, [PiPlanningWorkflowValueKey.SelectedStoryStatus]: "review" },
+					step: step1,
+				}),
+			),
 		).to.equal(true)
 		expect(unsupportedStatusRoute.action).to.deep.equal({
 			kind: "terminal_error",

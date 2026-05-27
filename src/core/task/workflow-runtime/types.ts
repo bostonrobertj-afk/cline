@@ -93,6 +93,7 @@ export interface WorkflowProjectSelectionState {
 
 export interface WorkflowRuntimeLifecycleState {
 	projectSelectionCompleted: boolean
+	parentWorkflowName?: WorkflowDefinition["name"]
 }
 
 export interface WorkflowUiSessionState {
@@ -229,6 +230,7 @@ export interface WorkflowDecisionBranchEvaluationInput {
 	activeBranchId: WorkflowDecisionBranchId
 	workflowValues: WorkflowValues
 	step: WorkflowStepDefinition
+	session: ActiveWorkflowSession
 }
 
 export type WorkflowDecisionBranchTrigger =

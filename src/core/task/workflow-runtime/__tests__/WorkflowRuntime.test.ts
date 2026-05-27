@@ -67,6 +67,9 @@ type ObservedDecisionPredicateInput = {
 	activeBranchId: string
 	projectTitleValue: unknown
 	stepNumber: number
+	sessionProjectTitleValue: string
+	sessionParentWorkflowName: string | undefined
+	sessionActiveBranchId: string
 	keys: string[]
 	hasSession: boolean
 	hasUi: boolean
@@ -2923,14 +2926,54 @@ describe("WorkflowRuntime", () => {
 			taskState: childState,
 			workflowName: workflow.name,
 			parentSession,
+			parentWorkflowName: "parent-workflow",
 		})
 		const childSession = getActiveWorkflowSession(childState)
 
 		expect(result.kind).to.equal("project_prompt")
 		expect(childSession.projectSelection).to.deep.equal(parentSession.projectSelection)
 		expect(childSession.projectSelection).to.not.equal(parentSession.projectSelection)
+		expect(childSession.lifecycle).to.deep.equal({
+			projectSelectionCompleted: true,
+			parentWorkflowName: "parent-workflow",
+		})
 		childSession.projectSelection.projectTitle = "Child Project"
 		expect(parentSession.projectSelection.projectTitle).to.equal("Parent Project")
+	})
+
+	it("persists and restores child workflow parent workflow identity", async () => {
+		const workflow = createWorkflowDefinition()
+		registerResolvedWorkflow(workflow)
+		const parentSession = createParentWorkflowSession()
+		const childState = new TaskState()
+
+		await runtime.activateWorkflow({
+			taskState: childState,
+			workflowName: workflow.name,
+			parentSession,
+			parentWorkflowName: "parent-workflow",
+		})
+
+		expect(runtime.getPersistedSession({ taskState: childState })?.lifecycle).to.deep.equal({
+			projectSelectionCompleted: true,
+			parentWorkflowName: "parent-workflow",
+		})
+		const persistedSession = runtime.getPersistedSession({ taskState: childState })
+		if (persistedSession === undefined) {
+			throw new Error("Expected a persisted child workflow session.")
+		}
+		const restoredState = new TaskState()
+		restoredState.activeWorkflowName = workflow.name
+
+		await runtime.restorePersistedSession({
+			taskState: restoredState,
+			persistedSession,
+		})
+
+		expect(restoredState.activeWorkflowSession?.lifecycle).to.deep.equal({
+			projectSelectionCompleted: true,
+			parentWorkflowName: "parent-workflow",
+		})
 	})
 
 	it("no-ops child workflow activation without mutating state when parent project selection is incomplete", async () => {
@@ -2948,6 +2991,7 @@ describe("WorkflowRuntime", () => {
 				taskState: childState,
 				workflowName: workflow.name,
 				parentSession,
+				parentWorkflowName: "parent-workflow",
 			})
 
 			expect(result).to.deep.equal({ kind: "no_op" })
@@ -6163,6 +6207,7 @@ describe("WorkflowRuntime", () => {
 			taskState,
 			workflowName: workflow.name,
 			parentSession: createParentWorkflowSession(),
+			parentWorkflowName: "parent-workflow",
 		})
 
 		expect(result.kind).to.equal("render_workflow_form")
@@ -6216,6 +6261,7 @@ describe("WorkflowRuntime", () => {
 			taskState,
 			workflowName: workflow.name,
 			parentSession: createParentWorkflowSession(),
+			parentWorkflowName: "parent-workflow",
 		})
 
 		expect(result.kind).to.equal("render_workflow_form")
@@ -6293,6 +6339,7 @@ describe("WorkflowRuntime", () => {
 			taskState,
 			workflowName: workflow.name,
 			parentSession,
+			parentWorkflowName: "parent-workflow",
 		})
 
 		expect(result.kind).to.equal("render_workflow_form")
@@ -6406,6 +6453,7 @@ describe("WorkflowRuntime", () => {
 			taskState,
 			workflowName: workflow.name,
 			parentSession: createParentWorkflowSession(),
+			parentWorkflowName: "parent-workflow",
 		})
 
 		expect(result.kind).to.equal("render_workflow_form")
@@ -6489,6 +6537,7 @@ describe("WorkflowRuntime", () => {
 			taskState,
 			workflowName: workflow.name,
 			parentSession,
+			parentWorkflowName: "parent-workflow",
 		})
 
 		expect(result.kind).to.equal("render_workflow_form")
@@ -6552,6 +6601,7 @@ describe("WorkflowRuntime", () => {
 			taskState,
 			workflowName: workflow.name,
 			parentSession,
+			parentWorkflowName: "parent-workflow",
 		})
 
 		expect(firstRender.kind).to.equal("render_workflow_form")
@@ -6616,6 +6666,7 @@ describe("WorkflowRuntime", () => {
 				taskState: invalidState,
 				workflowName: workflow.name,
 				parentSession: createParentWorkflowSession(),
+				parentWorkflowName: "parent-workflow",
 			})
 
 			expect(result).to.deep.equal({ kind: "no_op" })
@@ -6671,6 +6722,7 @@ describe("WorkflowRuntime", () => {
 			taskState,
 			workflowName: workflow.name,
 			parentSession: createParentWorkflowSession(),
+			parentWorkflowName: "parent-workflow",
 		})
 
 		expect(result).to.deep.equal({ kind: "no_op" })
@@ -6738,6 +6790,7 @@ describe("WorkflowRuntime", () => {
 				taskState: failureState,
 				workflowName: workflow.name,
 				parentSession: createParentWorkflowSession(),
+				parentWorkflowName: "parent-workflow",
 			})
 
 			expect(result.kind).to.equal("terminal_error")
@@ -7335,6 +7388,7 @@ describe("WorkflowRuntime", () => {
 			taskState,
 			workflowName: workflow.name,
 			parentSession,
+			parentWorkflowName: "parent-workflow",
 		})
 
 		expect(renderFormAction.kind).to.equal("render_workflow_form")
@@ -7647,6 +7701,7 @@ describe("WorkflowRuntime", () => {
 				taskState,
 				workflowName: workflow.name,
 				parentSession,
+				parentWorkflowName: "parent-workflow",
 			})
 		} catch (error) {
 			if (error instanceof Error) {
@@ -7717,6 +7772,7 @@ describe("WorkflowRuntime", () => {
 				taskState,
 				workflowName: workflow.name,
 				parentSession,
+				parentWorkflowName: "parent-workflow",
 			})
 		} catch (error) {
 			if (error instanceof Error) {
@@ -8979,6 +9035,9 @@ describe("WorkflowRuntime", () => {
 													projectTitleValue:
 														input.workflowValues[DEFAULT_ENTRY_PROJECT_VALUE_KEYS.projectTitle],
 													stepNumber: input.step.stepNumber,
+													sessionProjectTitleValue: input.session.projectSelection.projectTitle,
+													sessionParentWorkflowName: input.session.lifecycle.parentWorkflowName,
+													sessionActiveBranchId: input.session.branchContext.activeBranchId,
 													keys: Object.keys(input).sort(),
 													hasSession: Reflect.has(input, "session"),
 													hasUi: Reflect.has(input, "ui"),
@@ -9012,8 +9071,11 @@ describe("WorkflowRuntime", () => {
 			activeBranchId: "session-predicate-entry",
 			projectTitleValue: "Session Predicate Project",
 			stepNumber: 1,
-			keys: ["activeBranchId", "step", "workflowValues"],
-			hasSession: false,
+			sessionProjectTitleValue: "Session Predicate Project",
+			sessionParentWorkflowName: undefined,
+			sessionActiveBranchId: "session-predicate-entry",
+			keys: ["activeBranchId", "session", "step", "workflowValues"],
+			hasSession: true,
 			hasUi: false,
 			hasBranchContext: false,
 			hasSuppressedWorkflowFormIds: false,
@@ -9044,6 +9106,9 @@ describe("WorkflowRuntime", () => {
 													projectTitleValue:
 														input.workflowValues[DEFAULT_ENTRY_PROJECT_VALUE_KEYS.projectTitle],
 													stepNumber: input.step.stepNumber,
+													sessionProjectTitleValue: input.session.projectSelection.projectTitle,
+													sessionParentWorkflowName: input.session.lifecycle.parentWorkflowName,
+													sessionActiveBranchId: input.session.branchContext.activeBranchId,
 													keys: Object.keys(input).sort(),
 													hasSession: Reflect.has(input, "session"),
 													hasUi: Reflect.has(input, "ui"),
@@ -9079,8 +9144,11 @@ describe("WorkflowRuntime", () => {
 			activeBranchId: "event-predicate-entry",
 			projectTitleValue: "Event Predicate Project",
 			stepNumber: 1,
-			keys: ["activeBranchId", "step", "triggerEvent", "workflowValues"],
-			hasSession: false,
+			sessionProjectTitleValue: "Event Predicate Project",
+			sessionParentWorkflowName: undefined,
+			sessionActiveBranchId: "event-predicate-entry",
+			keys: ["activeBranchId", "session", "step", "triggerEvent", "workflowValues"],
+			hasSession: true,
 			hasUi: false,
 			hasBranchContext: false,
 			hasSuppressedWorkflowFormIds: false,
@@ -14309,6 +14377,7 @@ describe("WorkflowRuntime", () => {
 			taskState: sourceState,
 			workflowName: workflow.name,
 			parentSession,
+			parentWorkflowName: "parent-workflow",
 		})
 		expect(initialRender.kind).to.equal("render_workflow_form")
 		if (initialRender.kind !== "render_workflow_form") {

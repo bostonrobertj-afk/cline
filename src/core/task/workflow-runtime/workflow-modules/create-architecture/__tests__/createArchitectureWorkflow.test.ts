@@ -8,6 +8,7 @@ import type {
 	ActiveWorkflowSession,
 	WorkflowBranchTriggerEvent,
 	WorkflowDecisionAction,
+	WorkflowDecisionBranchEvaluationInput,
 	WorkflowDecisionBranchRoute,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
@@ -129,12 +130,14 @@ function expectRouteMatchesEntryArtifactResolution(route: WorkflowDecisionBranch
 	}
 
 	expect(
-		route.trigger.matches({
-			activeBranchId: "step-1-resolve-entry-artifact",
-			workflowValues: {},
-			step: createArchitectureWorkflowDefinition.steps["step-1"],
-			triggerEvent: buildEntryArtifactResolutionCompletedEvent(creationRequired),
-		}),
+		route.trigger.matches(
+			createEventPredicateInput({
+				activeBranchId: "step-1-resolve-entry-artifact",
+				workflowValues: {},
+				step: createArchitectureWorkflowDefinition.steps["step-1"],
+				triggerEvent: buildEntryArtifactResolutionCompletedEvent(creationRequired),
+			}),
+		),
 	).to.equal(true)
 }
 
@@ -149,12 +152,14 @@ function expectRouteMatchesToolBackedOperationEvent(
 	}
 
 	expect(
-		route.trigger.matches({
-			activeBranchId: "step-1-await-allocation",
-			workflowValues: {},
-			step: createArchitectureWorkflowDefinition.steps["step-1"],
-			triggerEvent: buildToolBackedOperationEvent(kind, branchId, routeId),
-		}),
+		route.trigger.matches(
+			createEventPredicateInput({
+				activeBranchId: "step-1-await-allocation",
+				workflowValues: {},
+				step: createArchitectureWorkflowDefinition.steps["step-1"],
+				triggerEvent: buildToolBackedOperationEvent(kind, branchId, routeId),
+			}),
+		),
 	).to.equal(true)
 }
 
@@ -184,6 +189,65 @@ function createSession(workflowValues: WorkflowValues): ActiveWorkflowSession {
 		branchContext: {
 			activeBranchId: "entry",
 		},
+	}
+}
+
+function createPredicateSession(args: { activeBranchId: string; workflowValues: WorkflowValues }): ActiveWorkflowSession {
+	return {
+		activeStepNumber: 1,
+		workflowValues: args.workflowValues,
+		projectSelection: {
+			projectMode: "existing",
+			projectTitle: "Predicate Test Project",
+			projectFolderName: "predicate-test-project",
+		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
+		entryArtifactResolution: undefined,
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: {
+			activeBranchId: args.activeBranchId,
+		},
+	}
+}
+
+function createSessionPredicateInput(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+	step: WorkflowStepDefinition
+}): WorkflowDecisionBranchEvaluationInput {
+	return {
+		activeBranchId: args.activeBranchId,
+		workflowValues: args.workflowValues,
+		step: args.step,
+		session: createPredicateSession({
+			activeBranchId: args.activeBranchId,
+			workflowValues: args.workflowValues,
+		}),
+	}
+}
+
+function createEventPredicateInput(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+	step: WorkflowStepDefinition
+	triggerEvent: WorkflowBranchTriggerEvent
+}): WorkflowDecisionBranchEvaluationInput & { triggerEvent: WorkflowBranchTriggerEvent } {
+	return {
+		activeBranchId: args.activeBranchId,
+		workflowValues: args.workflowValues,
+		step: args.step,
+		session: createPredicateSession({
+			activeBranchId: args.activeBranchId,
+			workflowValues: args.workflowValues,
+		}),
+		triggerEvent: args.triggerEvent,
 	}
 }
 
@@ -604,18 +668,22 @@ describe("createArchitectureWorkflowDefinition", () => {
 			throw new Error(`Expected session_predicate, received ${trigger.kind}.`)
 		}
 		expect(
-			trigger.matches({
-				activeBranchId: "step-2-render-input-form",
-				workflowValues: { creation_required: true },
-				step: createArchitectureWorkflowDefinition.steps["step-2"],
-			}),
+			trigger.matches(
+				createSessionPredicateInput({
+					activeBranchId: "step-2-render-input-form",
+					workflowValues: { creation_required: true },
+					step: createArchitectureWorkflowDefinition.steps["step-2"],
+				}),
+			),
 		).to.equal(true)
 		expect(
-			trigger.matches({
-				activeBranchId: "step-2-render-input-form",
-				workflowValues: { creation_required: false },
-				step: createArchitectureWorkflowDefinition.steps["step-2"],
-			}),
+			trigger.matches(
+				createSessionPredicateInput({
+					activeBranchId: "step-2-render-input-form",
+					workflowValues: { creation_required: false },
+					step: createArchitectureWorkflowDefinition.steps["step-2"],
+				}),
+			),
 		).to.equal(false)
 	})
 
@@ -634,18 +702,22 @@ describe("createArchitectureWorkflowDefinition", () => {
 			throw new Error(`Expected session_predicate, received ${trigger.kind}.`)
 		}
 		expect(
-			trigger.matches({
-				activeBranchId: "step-2-render-input-form",
-				workflowValues: { creation_required: false },
-				step: createArchitectureWorkflowDefinition.steps["step-2"],
-			}),
+			trigger.matches(
+				createSessionPredicateInput({
+					activeBranchId: "step-2-render-input-form",
+					workflowValues: { creation_required: false },
+					step: createArchitectureWorkflowDefinition.steps["step-2"],
+				}),
+			),
 		).to.equal(true)
 		expect(
-			trigger.matches({
-				activeBranchId: "step-2-render-input-form",
-				workflowValues: { creation_required: true },
-				step: createArchitectureWorkflowDefinition.steps["step-2"],
-			}),
+			trigger.matches(
+				createSessionPredicateInput({
+					activeBranchId: "step-2-render-input-form",
+					workflowValues: { creation_required: true },
+					step: createArchitectureWorkflowDefinition.steps["step-2"],
+				}),
+			),
 		).to.equal(false)
 	})
 
@@ -657,20 +729,24 @@ describe("createArchitectureWorkflowDefinition", () => {
 			throw new Error(`Expected event_predicate, received ${trigger.kind}.`)
 		}
 		expect(
-			trigger.matches({
-				activeBranchId: "step-2-await-input-form",
-				workflowValues: { creation_required: true },
-				step: createArchitectureWorkflowDefinition.steps["step-2"],
-				triggerEvent: { kind: "workflow_form_completed", workflowFormId: "step-2-user-input-form" },
-			}),
+			trigger.matches(
+				createEventPredicateInput({
+					activeBranchId: "step-2-await-input-form",
+					workflowValues: { creation_required: true },
+					step: createArchitectureWorkflowDefinition.steps["step-2"],
+					triggerEvent: { kind: "workflow_form_completed", workflowFormId: "step-2-user-input-form" },
+				}),
+			),
 		).to.equal(true)
 		expect(
-			trigger.matches({
-				activeBranchId: "step-2-await-input-form",
-				workflowValues: { creation_required: false },
-				step: createArchitectureWorkflowDefinition.steps["step-2"],
-				triggerEvent: { kind: "workflow_form_completed", workflowFormId: "step-2-user-input-form" },
-			}),
+			trigger.matches(
+				createEventPredicateInput({
+					activeBranchId: "step-2-await-input-form",
+					workflowValues: { creation_required: false },
+					step: createArchitectureWorkflowDefinition.steps["step-2"],
+					triggerEvent: { kind: "workflow_form_completed", workflowFormId: "step-2-user-input-form" },
+				}),
+			),
 		).to.equal(false)
 
 		const action = route.action
@@ -692,20 +768,24 @@ describe("createArchitectureWorkflowDefinition", () => {
 			throw new Error(`Expected event_predicate, received ${trigger.kind}.`)
 		}
 		expect(
-			trigger.matches({
-				activeBranchId: "step-2-await-input-form",
-				workflowValues: { creation_required: false },
-				step: createArchitectureWorkflowDefinition.steps["step-2"],
-				triggerEvent: { kind: "workflow_form_completed", workflowFormId: "step-2-user-input-form" },
-			}),
+			trigger.matches(
+				createEventPredicateInput({
+					activeBranchId: "step-2-await-input-form",
+					workflowValues: { creation_required: false },
+					step: createArchitectureWorkflowDefinition.steps["step-2"],
+					triggerEvent: { kind: "workflow_form_completed", workflowFormId: "step-2-user-input-form" },
+				}),
+			),
 		).to.equal(true)
 		expect(
-			trigger.matches({
-				activeBranchId: "step-2-await-input-form",
-				workflowValues: { creation_required: true },
-				step: createArchitectureWorkflowDefinition.steps["step-2"],
-				triggerEvent: { kind: "workflow_form_completed", workflowFormId: "step-2-user-input-form" },
-			}),
+			trigger.matches(
+				createEventPredicateInput({
+					activeBranchId: "step-2-await-input-form",
+					workflowValues: { creation_required: true },
+					step: createArchitectureWorkflowDefinition.steps["step-2"],
+					triggerEvent: { kind: "workflow_form_completed", workflowFormId: "step-2-user-input-form" },
+				}),
+			),
 		).to.equal(false)
 		expect(route.action).to.deep.equal({
 			kind: "transition_step",

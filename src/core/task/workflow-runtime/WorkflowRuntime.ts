@@ -275,8 +275,9 @@ export class WorkflowRuntime {
 		taskState: TaskState
 		workflowName: WorkflowDefinition["name"]
 		parentSession?: ActiveWorkflowSession
+		parentWorkflowName?: WorkflowDefinition["name"]
 	}): Promise<WorkflowNextAction> {
-		const { taskState, workflowName, parentSession } = args
+		const { taskState, workflowName, parentSession, parentWorkflowName } = args
 		const workflow = resolveWorkflowDefinition(workflowName)
 		if (!workflow) {
 			return { kind: "no_op" }
@@ -328,6 +329,7 @@ export class WorkflowRuntime {
 			projectSelection,
 			lifecycle: {
 				projectSelectionCompleted: parentSession !== undefined,
+				...(parentWorkflowName === undefined ? {} : { parentWorkflowName }),
 			},
 			entryArtifactResolution: undefined,
 			ui: {
@@ -2274,7 +2276,15 @@ export class WorkflowRuntime {
 			return false
 		}
 
-		return typeof value.projectSelectionCompleted === "boolean"
+		if (typeof value.projectSelectionCompleted !== "boolean") {
+			return false
+		}
+
+		if (value.parentWorkflowName === undefined) {
+			return true
+		}
+
+		return typeof value.parentWorkflowName === "string" && value.parentWorkflowName.trim() !== ""
 	}
 
 	private isWorkflowArtifactFamily(value: unknown): value is WorkflowArtifactFamily {
@@ -2905,7 +2915,12 @@ export class WorkflowRuntime {
 			activeStepNumber,
 			workflowValues: persistedSession.workflowValues,
 			projectSelection: persistedSession.projectSelection,
-			lifecycle: persistedSession.lifecycle,
+			lifecycle: {
+				projectSelectionCompleted: persistedSession.lifecycle.projectSelectionCompleted,
+				...(persistedSession.lifecycle.parentWorkflowName === undefined
+					? {}
+					: { parentWorkflowName: persistedSession.lifecycle.parentWorkflowName }),
+			},
 			entryArtifactResolution,
 			ui: {
 				suppressedWorkflowFormIds: [],
@@ -3010,6 +3025,9 @@ export class WorkflowRuntime {
 			},
 			lifecycle: {
 				projectSelectionCompleted: persistedSession.lifecycle.projectSelectionCompleted,
+				...(persistedSession.lifecycle.parentWorkflowName === undefined
+					? {}
+					: { parentWorkflowName: persistedSession.lifecycle.parentWorkflowName }),
 			},
 			entryArtifactResolution,
 			ui: {
@@ -5639,6 +5657,7 @@ export class WorkflowRuntime {
 			activeBranchId: session.branchContext.activeBranchId,
 			workflowValues: session.workflowValues,
 			step,
+			session,
 		}
 	}
 

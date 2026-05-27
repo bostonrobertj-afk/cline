@@ -5,6 +5,7 @@ import { WorkflowArtifactFamily } from "../../../artifactFamilies"
 import type {
 	ActiveWorkflowSession,
 	WorkflowBranchTriggerEvent,
+	WorkflowDecisionBranchEvaluationInput,
 	WorkflowDecisionBranchRoute,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
@@ -86,12 +87,14 @@ function expectRouteMatchesEntryArtifactResolution(route: WorkflowDecisionBranch
 	}
 
 	expect(
-		route.trigger.matches({
-			activeBranchId: "step-1-resolve-entry-artifact",
-			workflowValues: {},
-			step: createEpicsWorkflowDefinition.steps["step-1"],
-			triggerEvent: buildEntryArtifactResolutionCompletedEvent(creationRequired),
-		}),
+		route.trigger.matches(
+			createEventPredicateInput({
+				activeBranchId: "step-1-resolve-entry-artifact",
+				workflowValues: {},
+				step: createEpicsWorkflowDefinition.steps["step-1"],
+				triggerEvent: buildEntryArtifactResolutionCompletedEvent(creationRequired),
+			}),
+		),
 	).to.equal(true)
 }
 
@@ -101,12 +104,14 @@ function expectRouteMatchesWorkflowFormCompleted(route: WorkflowDecisionBranchRo
 	}
 
 	expect(
-		route.trigger.matches({
-			activeBranchId: "step-1-await-context-form",
-			workflowValues: {},
-			step: createEpicsWorkflowDefinition.steps["step-1"],
-			triggerEvent: buildWorkflowFormCompletedEvent(workflowFormId),
-		}),
+		route.trigger.matches(
+			createEventPredicateInput({
+				activeBranchId: "step-1-await-context-form",
+				workflowValues: {},
+				step: createEpicsWorkflowDefinition.steps["step-1"],
+				triggerEvent: buildWorkflowFormCompletedEvent(workflowFormId),
+			}),
+		),
 	).to.equal(true)
 }
 
@@ -121,12 +126,14 @@ function expectRouteMatchesToolBackedOperationEvent(
 	}
 
 	expect(
-		route.trigger.matches({
-			activeBranchId: branchId,
-			workflowValues: {},
-			step: createEpicsWorkflowDefinition.steps["step-1"],
-			triggerEvent: buildToolBackedOperationEvent(kind, branchId, routeId),
-		}),
+		route.trigger.matches(
+			createEventPredicateInput({
+				activeBranchId: branchId,
+				workflowValues: {},
+				step: createEpicsWorkflowDefinition.steps["step-1"],
+				triggerEvent: buildToolBackedOperationEvent(kind, branchId, routeId),
+			}),
+		),
 	).to.equal(true)
 }
 
@@ -139,12 +146,14 @@ function expectStep2RouteMatchesAttemptCompletionSucceeded(
 	}
 
 	expect(
-		route.trigger.matches({
-			activeBranchId: "step-2-await-attempt-completion",
-			workflowValues,
-			step: createEpicsWorkflowDefinition.steps["step-2"],
-			triggerEvent: buildAttemptCompletionSucceededEvent(),
-		}),
+		route.trigger.matches(
+			createEventPredicateInput({
+				activeBranchId: "step-2-await-attempt-completion",
+				workflowValues,
+				step: createEpicsWorkflowDefinition.steps["step-2"],
+				triggerEvent: buildAttemptCompletionSucceededEvent(),
+			}),
+		),
 	).to.equal(true)
 }
 
@@ -159,12 +168,14 @@ function expectStep2RouteMatchesToolBackedOperationEvent(
 	}
 
 	expect(
-		route.trigger.matches({
-			activeBranchId: "step-2-await-index-build",
-			workflowValues: {},
-			step: createEpicsWorkflowDefinition.steps["step-2"],
-			triggerEvent: buildToolBackedOperationEvent(kind, branchId, routeId),
-		}),
+		route.trigger.matches(
+			createEventPredicateInput({
+				activeBranchId: "step-2-await-index-build",
+				workflowValues: {},
+				step: createEpicsWorkflowDefinition.steps["step-2"],
+				triggerEvent: buildToolBackedOperationEvent(kind, branchId, routeId),
+			}),
+		),
 	).to.equal(true)
 }
 
@@ -216,6 +227,65 @@ function createSession(workflowValues: WorkflowValues): ActiveWorkflowSession {
 		branchContext: {
 			activeBranchId: "step-2-project-prompt",
 		},
+	}
+}
+
+function createPredicateSession(args: { activeBranchId: string; workflowValues: WorkflowValues }): ActiveWorkflowSession {
+	return {
+		activeStepNumber: 1,
+		workflowValues: args.workflowValues,
+		projectSelection: {
+			projectMode: "existing",
+			projectTitle: "Predicate Test Project",
+			projectFolderName: "predicate-test-project",
+		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
+		entryArtifactResolution: undefined,
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: {
+			activeBranchId: args.activeBranchId,
+		},
+	}
+}
+
+function createSessionPredicateInput(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+	step: WorkflowStepDefinition
+}): WorkflowDecisionBranchEvaluationInput {
+	return {
+		activeBranchId: args.activeBranchId,
+		workflowValues: args.workflowValues,
+		step: args.step,
+		session: createPredicateSession({
+			activeBranchId: args.activeBranchId,
+			workflowValues: args.workflowValues,
+		}),
+	}
+}
+
+function createEventPredicateInput(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+	step: WorkflowStepDefinition
+	triggerEvent: WorkflowBranchTriggerEvent
+}): WorkflowDecisionBranchEvaluationInput & { triggerEvent: WorkflowBranchTriggerEvent } {
+	return {
+		activeBranchId: args.activeBranchId,
+		workflowValues: args.workflowValues,
+		step: args.step,
+		session: createPredicateSession({
+			activeBranchId: args.activeBranchId,
+			workflowValues: args.workflowValues,
+		}),
+		triggerEvent: args.triggerEvent,
 	}
 }
 

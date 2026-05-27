@@ -13,6 +13,7 @@ import type {
 	ActiveWorkflowSession,
 	WorkflowBranchTriggerEvent,
 	WorkflowDecisionAction,
+	WorkflowDecisionBranchEvaluationInput,
 	WorkflowDecisionBranchRoute,
 	WorkflowDeterministicProcedureResult,
 	WorkflowPromptBuilderInput,
@@ -84,6 +85,65 @@ function createSession(workflowValues: WorkflowValues, projectRoot = "/tmp/creat
 		branchContext: {
 			activeBranchId: "step-1-resolve-prerequisites",
 		},
+	}
+}
+
+function createPredicateSession(args: { activeBranchId: string; workflowValues: WorkflowValues }): ActiveWorkflowSession {
+	return {
+		activeStepNumber: 1,
+		workflowValues: args.workflowValues,
+		projectSelection: {
+			projectMode: "existing",
+			projectTitle: "Predicate Test Project",
+			projectFolderName: "predicate-test-project",
+		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
+		entryArtifactResolution: undefined,
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: {
+			activeBranchId: args.activeBranchId,
+		},
+	}
+}
+
+function createSessionPredicateInput(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+	step: WorkflowStepDefinition
+}): WorkflowDecisionBranchEvaluationInput {
+	return {
+		activeBranchId: args.activeBranchId,
+		workflowValues: args.workflowValues,
+		step: args.step,
+		session: createPredicateSession({
+			activeBranchId: args.activeBranchId,
+			workflowValues: args.workflowValues,
+		}),
+	}
+}
+
+function createEventPredicateInput(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+	step: WorkflowStepDefinition
+	triggerEvent: WorkflowBranchTriggerEvent
+}): WorkflowDecisionBranchEvaluationInput & { triggerEvent: WorkflowBranchTriggerEvent } {
+	return {
+		activeBranchId: args.activeBranchId,
+		workflowValues: args.workflowValues,
+		step: args.step,
+		session: createPredicateSession({
+			activeBranchId: args.activeBranchId,
+			workflowValues: args.workflowValues,
+		}),
+		triggerEvent: args.triggerEvent,
 	}
 }
 
@@ -237,12 +297,14 @@ function expectEventPredicateMatches(args: {
 	}
 
 	expect(
-		args.route.trigger.matches({
-			activeBranchId: "test-branch",
-			workflowValues: args.workflowValues,
-			step: getStep("step-1"),
-			triggerEvent: args.triggerEvent,
-		}),
+		args.route.trigger.matches(
+			createEventPredicateInput({
+				activeBranchId: "test-branch",
+				workflowValues: args.workflowValues,
+				step: getStep("step-1"),
+				triggerEvent: args.triggerEvent,
+			}),
+		),
 	).to.equal(true)
 }
 
@@ -257,12 +319,14 @@ function expectEventPredicateMatchesForStep(args: {
 	}
 
 	expect(
-		args.route.trigger.matches({
-			activeBranchId: "test-branch",
-			workflowValues: args.workflowValues,
-			step: getStep(args.stepId),
-			triggerEvent: args.triggerEvent,
-		}),
+		args.route.trigger.matches(
+			createEventPredicateInput({
+				activeBranchId: "test-branch",
+				workflowValues: args.workflowValues,
+				step: getStep(args.stepId),
+				triggerEvent: args.triggerEvent,
+			}),
+		),
 	).to.equal(true)
 }
 
@@ -272,11 +336,13 @@ function expectSessionPredicateMatches(args: { route: WorkflowDecisionBranchRout
 	}
 
 	expect(
-		args.route.trigger.matches({
-			activeBranchId: "test-branch",
-			workflowValues: args.workflowValues,
-			step: getStep("step-1"),
-		}),
+		args.route.trigger.matches(
+			createSessionPredicateInput({
+				activeBranchId: "test-branch",
+				workflowValues: args.workflowValues,
+				step: getStep("step-1"),
+			}),
+		),
 	).to.equal(true)
 }
 

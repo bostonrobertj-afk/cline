@@ -17,6 +17,7 @@ import type {
 	ActiveWorkflowSession,
 	WorkflowBranchTriggerEvent,
 	WorkflowDecisionAction,
+	WorkflowDecisionBranchEvaluationInput,
 	WorkflowDecisionBranchRoute,
 	WorkflowDeterministicProcedureResult,
 	WorkflowPromptBuilderInput,
@@ -145,6 +146,65 @@ function createSession(
 			suppressedWorkflowStepResolutionRoutes: [],
 		},
 		branchContext,
+	}
+}
+
+function createPredicateSession(args: { activeBranchId: string; workflowValues: WorkflowValues }): ActiveWorkflowSession {
+	return {
+		activeStepNumber: 1,
+		workflowValues: args.workflowValues,
+		projectSelection: {
+			projectMode: "existing",
+			projectTitle: "Predicate Test Project",
+			projectFolderName: "predicate-test-project",
+		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
+		entryArtifactResolution: undefined,
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: {
+			activeBranchId: args.activeBranchId,
+		},
+	}
+}
+
+function createSessionPredicateInput(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+	step: WorkflowStepDefinition
+}): WorkflowDecisionBranchEvaluationInput {
+	return {
+		activeBranchId: args.activeBranchId,
+		workflowValues: args.workflowValues,
+		step: args.step,
+		session: createPredicateSession({
+			activeBranchId: args.activeBranchId,
+			workflowValues: args.workflowValues,
+		}),
+	}
+}
+
+function createEventPredicateInput(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+	step: WorkflowStepDefinition
+	triggerEvent: WorkflowBranchTriggerEvent
+}): WorkflowDecisionBranchEvaluationInput & { triggerEvent: WorkflowBranchTriggerEvent } {
+	return {
+		activeBranchId: args.activeBranchId,
+		workflowValues: args.workflowValues,
+		step: args.step,
+		session: createPredicateSession({
+			activeBranchId: args.activeBranchId,
+			workflowValues: args.workflowValues,
+		}),
+		triggerEvent: args.triggerEvent,
 	}
 }
 
@@ -304,12 +364,14 @@ function expectEventPredicateMatches(args: {
 	}
 
 	expect(
-		args.route.trigger.matches({
-			activeBranchId: "test-branch",
-			workflowValues: args.workflowValues,
-			step: getStep(args.stepId),
-			triggerEvent: args.triggerEvent,
-		}),
+		args.route.trigger.matches(
+			createEventPredicateInput({
+				activeBranchId: "test-branch",
+				workflowValues: args.workflowValues,
+				step: getStep(args.stepId),
+				triggerEvent: args.triggerEvent,
+			}),
+		),
 	).to.equal(true)
 }
 
@@ -323,11 +385,13 @@ function expectSessionPredicateMatches(args: {
 	}
 
 	expect(
-		args.route.trigger.matches({
-			activeBranchId: "test-branch",
-			workflowValues: args.workflowValues,
-			step: getStep(args.stepId),
-		}),
+		args.route.trigger.matches(
+			createSessionPredicateInput({
+				activeBranchId: "test-branch",
+				workflowValues: args.workflowValues,
+				step: getStep(args.stepId),
+			}),
+		),
 	).to.equal(true)
 }
 
@@ -466,6 +530,7 @@ describe("edgeCaseHunterReviewWorkflowDefinition", () => {
 			taskState,
 			workflowName: "edge-case-hunter-review",
 			parentSession,
+			parentWorkflowName: "parent-workflow",
 		})
 
 		expect(result.kind).to.equal("execute_tool_backed_operation")
@@ -483,6 +548,7 @@ describe("edgeCaseHunterReviewWorkflowDefinition", () => {
 		}
 		expect(childSession.projectSelection).to.deep.equal(parentSession.projectSelection)
 		expect(childSession.projectSelection).not.to.equal(parentSession.projectSelection)
+		expect(childSession.lifecycle).to.deep.equal({ projectSelectionCompleted: true, parentWorkflowName: "parent-workflow" })
 		expect(childSession.workflowValues).to.deep.include({
 			[EdgeCaseHunterReviewWorkflowValueKey.TargetStory]:
 				parentSession.workflowValues[EdgeCaseHunterReviewWorkflowValueKey.TargetStory],
@@ -1388,15 +1454,17 @@ describe("edgeCaseHunterReviewWorkflowDefinition", () => {
 
 				if (route.trigger.kind === "event_predicate") {
 					expect(
-						route.trigger.matches({
-							activeBranchId: "test-branch",
-							workflowValues: SAMPLE_WORKFLOW_VALUES,
-							step: getStep("step-1"),
-							triggerEvent: {
-								kind: "entry_artifact_resolution_completed",
-								artifactResolutions: [],
-							},
-						}),
+						route.trigger.matches(
+							createEventPredicateInput({
+								activeBranchId: "test-branch",
+								workflowValues: SAMPLE_WORKFLOW_VALUES,
+								step: getStep("step-1"),
+								triggerEvent: {
+									kind: "entry_artifact_resolution_completed",
+									artifactResolutions: [],
+								},
+							}),
+						),
 					).to.equal(false)
 				}
 			}

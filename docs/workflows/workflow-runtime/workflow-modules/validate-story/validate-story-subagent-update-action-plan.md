@@ -50,22 +50,33 @@ Allowed files:
 - `src/core/task/tools/subagent/SubagentRunner.ts`
 - `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
 - `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+- `src/core/task/workflow-runtime/workflow-modules/acceptance-audit-review/__tests__/acceptanceAuditReviewWorkflow.test.ts`
 - `src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts`
+- `src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts`
+- `src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts`
+- `src/core/task/workflow-runtime/workflow-modules/correct-course/__tests__/correctCourseWorkflow.test.ts`
+- `src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts`
+- `src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+- `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`
+- `src/core/task/workflow-runtime/workflow-modules/dev-story/__tests__/devStoryWorkflow.test.ts`
 - `src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts`
+- `src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
+- `src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts`
+- `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts`
 
 ### Task 1: Extend Workflow Runtime Types
 
-- [ ] 1.1. In `src/core/task/workflow-runtime/types.ts`, update `WorkflowRuntimeLifecycleState` to include the exact optional property `parentWorkflowName?: WorkflowDefinition["name"]` after `projectSelectionCompleted: boolean`.
+- [x] 1.1. In `src/core/task/workflow-runtime/types.ts`, update `WorkflowRuntimeLifecycleState` to include the exact optional property `parentWorkflowName?: WorkflowDefinition["name"]` after `projectSelectionCompleted: boolean`.
 
-- [ ] 1.2. In `src/core/task/workflow-runtime/types.ts`, update `WorkflowDecisionBranchEvaluationInput` to include the exact property `session: ActiveWorkflowSession` after `step: WorkflowStepDefinition`. Do not add `ui`, `branchContext`, `suppressedWorkflowFormIds`, or `suppressedWorkflowStepResolutionRoutes` as top-level predicate input fields.
+- [x] 1.2. In `src/core/task/workflow-runtime/types.ts`, update `WorkflowDecisionBranchEvaluationInput` to include the exact property `session: ActiveWorkflowSession` after `step: WorkflowStepDefinition`. Do not add `ui`, `branchContext`, `suppressedWorkflowFormIds`, or `suppressedWorkflowStepResolutionRoutes` as top-level predicate input fields.
 
 ### Task 2: Persist Runtime Parent Workflow Context
 
-- [ ] 2.1. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update the `activateWorkflow(args: { ... })` parameter type to include `parentWorkflowName?: WorkflowDefinition["name"]` after `parentSession?: ActiveWorkflowSession`.
+- [x] 2.1. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update the `activateWorkflow(args: { ... })` parameter type to include `parentWorkflowName?: WorkflowDefinition["name"]` after `parentSession?: ActiveWorkflowSession`.
 
-- [ ] 2.2. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update the destructuring at the start of `activateWorkflow(...)` from `const { taskState, workflowName, parentSession } = args` to `const { taskState, workflowName, parentSession, parentWorkflowName } = args`.
+- [x] 2.2. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update the destructuring at the start of `activateWorkflow(...)` from `const { taskState, workflowName, parentSession } = args` to `const { taskState, workflowName, parentSession, parentWorkflowName } = args`.
 
-- [ ] 2.3. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update the `lifecycle` object created inside `activateWorkflow(...)` to this exact shape:
+- [x] 2.3. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update the `lifecycle` object created inside `activateWorkflow(...)` to this exact shape:
 
 ```ts
 lifecycle: {
@@ -74,9 +85,9 @@ lifecycle: {
 },
 ```
 
-- [ ] 2.4. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `isWorkflowRuntimeLifecycleState(...)` so it returns `false` unless `projectSelectionCompleted` is a boolean and, when `parentWorkflowName` is present, `parentWorkflowName` is a non-empty string after `trim()`. Preserve acceptance of persisted lifecycle objects that omit `parentWorkflowName`.
+- [x] 2.4. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `isWorkflowRuntimeLifecycleState(...)` so it returns `false` unless `projectSelectionCompleted` is a boolean and, when `parentWorkflowName` is present, `parentWorkflowName` is a non-empty string after `trim()`. Preserve acceptance of persisted lifecycle objects that omit `parentWorkflowName`.
 
-- [ ] 2.5. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update the lifecycle clone built during persisted-session restoration so the restored lifecycle has this exact shape:
+- [x] 2.5. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update the lifecycle clone built during persisted-session restoration so the restored lifecycle has this exact shape:
 
 ```ts
 lifecycle: {
@@ -87,7 +98,7 @@ lifecycle: {
 },
 ```
 
-- [ ] 2.6. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `buildDecisionTreeEvaluationInput(...)` to include `session` in the returned object:
+- [x] 2.6. In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, update `buildDecisionTreeEvaluationInput(...)` to include `session` in the returned object:
 
 ```ts
 return {
@@ -100,15 +111,15 @@ return {
 
 ### Task 3: Pass Parent Workflow Context From Subagent Activation
 
-- [ ] 3.1. In `src/core/task/tools/subagent/SubagentRunner.ts`, update the `this.baseConfig.workflowRuntime.activateWorkflow({ ... })` call in `autoActivateAssignedWorkflow(...)` to include the exact property `parentWorkflowName: this.baseConfig.taskState.activeWorkflowName` immediately after `parentSession: structuredClone(parentSession)`.
+- [x] 3.1. In `src/core/task/tools/subagent/SubagentRunner.ts`, update the `this.baseConfig.workflowRuntime.activateWorkflow({ ... })` call in `autoActivateAssignedWorkflow(...)` to include the exact property `parentWorkflowName: this.baseConfig.taskState.activeWorkflowName` immediately after `parentSession: structuredClone(parentSession)`.
 
-- [ ] 3.2. In `src/core/task/tools/subagent/SubagentRunner.ts`, do not add a new failure message, fallback workflow name, marker parser, or child-visible prompt instruction for missing parent workflow identity. Preserve the existing `nextAction.kind === "no_op"` failure path and error text.
+- [x] 3.2. In `src/core/task/tools/subagent/SubagentRunner.ts`, do not add a new failure message, fallback workflow name, marker parser, or child-visible prompt instruction for missing parent workflow identity. Preserve the existing `nextAction.kind === "no_op"` failure path and error text.
 
 ### Task 4: Update Runtime And Subagent Tests
 
-- [ ] 4.1. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update `ObservedDecisionPredicateInput` to add the exact fields `sessionProjectTitleValue: string`, `sessionParentWorkflowName: string | undefined`, and `sessionActiveBranchId: string` after `stepNumber: number`.
+- [x] 4.1. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update `ObservedDecisionPredicateInput` to add the exact fields `sessionProjectTitleValue: string`, `sessionParentWorkflowName: string | undefined`, and `sessionActiveBranchId: string` after `stepNumber: number`.
 
-- [ ] 4.2. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update the `"passes only documented decision inputs to session predicates"` test so its predicate records:
+- [x] 4.2. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update the `"passes only documented decision inputs to session predicates"` test so its predicate records:
 
 ```ts
 sessionProjectTitleValue: input.session.projectSelection.projectTitle,
@@ -120,9 +131,9 @@ hasSession: Reflect.has(input, "session"),
 
 The expected object must assert `keys: ["activeBranchId", "session", "step", "workflowValues"]`, `hasSession: true`, `sessionProjectTitleValue: "Session Predicate Project"`, `sessionParentWorkflowName: undefined`, and `sessionActiveBranchId: "session-predicate-entry"`.
 
-- [ ] 4.3. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update the `"passes sanitized decision inputs and trigger events to event predicates"` test so its predicate records the same three session fields as Subtask 4.2. The expected object must assert `keys: ["activeBranchId", "session", "step", "triggerEvent", "workflowValues"]`, `hasSession: true`, `sessionProjectTitleValue: "Event Predicate Project"`, `sessionParentWorkflowName: undefined`, `sessionActiveBranchId: "event-predicate-entry"`, and `triggerEventKind: "entry_artifact_resolution_completed"`.
+- [x] 4.3. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update the `"passes sanitized decision inputs and trigger events to event predicates"` test so its predicate records the same three session fields as Subtask 4.2. The expected object must assert `keys: ["activeBranchId", "session", "step", "triggerEvent", "workflowValues"]`, `hasSession: true`, `sessionProjectTitleValue: "Event Predicate Project"`, `sessionParentWorkflowName: undefined`, `sessionActiveBranchId: "event-predicate-entry"`, and `triggerEventKind: "entry_artifact_resolution_completed"`.
 
-- [ ] 4.4. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update the `"copies complete parent project selection into child workflow activation without rendering entry form"` test's `runtime.activateWorkflow(...)` call to include `parentWorkflowName: "parent-workflow"` immediately after `parentSession`. Add an exact assertion after the project-selection assertions:
+- [x] 4.4. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update the `"copies complete parent project selection into child workflow activation without rendering entry form"` test's `runtime.activateWorkflow(...)` call to include `parentWorkflowName: "parent-workflow"` immediately after `parentSession`. Add an exact assertion after the project-selection assertions:
 
 ```ts
 expect(childSession.lifecycle).to.deep.equal({
@@ -131,29 +142,165 @@ expect(childSession.lifecycle).to.deep.equal({
 })
 ```
 
-- [ ] 4.5. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update the `"no-ops child workflow activation without mutating state when parent project selection is incomplete"` test's `runtime.activateWorkflow(...)` call to include `parentWorkflowName: "parent-workflow"` immediately after `parentSession`.
+- [x] 4.5. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update the `"no-ops child workflow activation without mutating state when parent project selection is incomplete"` test's `runtime.activateWorkflow(...)` call to include `parentWorkflowName: "parent-workflow"` immediately after `parentSession`.
 
-- [ ] 4.6. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add a new test named exactly `"persists and restores child workflow parent workflow identity"` after the child project-selection activation test. The test must create a workflow with `createWorkflowDefinition()`, register it, create `parentSession = createParentWorkflowSession()`, activate with `parentSession` and `parentWorkflowName: "parent-workflow"`, assert `runtime.getPersistedSession({ taskState: childState })?.lifecycle` deep-equals `{ projectSelectionCompleted: true, parentWorkflowName: "parent-workflow" }`, restore that persisted session into a fresh `TaskState` with `activeWorkflowName = workflow.name`, and assert `restoredState.activeWorkflowSession?.lifecycle` deep-equals `{ projectSelectionCompleted: true, parentWorkflowName: "parent-workflow" }`.
+- [x] 4.6. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add a new test named exactly `"persists and restores child workflow parent workflow identity"` after the child project-selection activation test. The test must create a workflow with `createWorkflowDefinition()`, register it, create `parentSession = createParentWorkflowSession()`, activate with `parentSession` and `parentWorkflowName: "parent-workflow"`, assert `runtime.getPersistedSession({ taskState: childState })?.lifecycle` deep-equals `{ projectSelectionCompleted: true, parentWorkflowName: "parent-workflow" }`, restore that persisted session into a fresh `TaskState` with `activeWorkflowName = workflow.name`, and assert `restoredState.activeWorkflowSession?.lifecycle` deep-equals `{ projectSelectionCompleted: true, parentWorkflowName: "parent-workflow" }`.
 
-- [ ] 4.7. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update every remaining `runtime.activateWorkflow({ ... parentSession ... })` object in these test cases to include `parentWorkflowName: "parent-workflow"` immediately after the `parentSession` property: `"creates workflow form sessions at a render action startPanelId"`, `"seeds workflow form session data only when creating a new form session"`, `"interpolates workflow values in workflow form and panel text"`, `"interpolates form session data in resolved field, action, and option text"`, `"leaves unresolved placeholders and expression-like placeholder syntax unchanged"`, `"does not write interpolated text back into workflow form session definitions"`, `"rejects render form actions with invalid startPanelId values before activation"`, `"rejects render form actions with non-function buildSessionData before activation"`, `"returns terminal_error when buildSessionData throws or returns invalid data"`, `"renders dropdown options from workflow-value-interpolated selected-project story index"`, `"fails before reading JSON options when dynamic source path placeholders stay unresolved"`, `"fails before reading JSON options when workflow values resolve source path placeholders to unsafe segments"`, and `"restores workflow form sessions with current panel, data, canonical definitions, and interpolated text"`.
+- [x] 4.7. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update every remaining `runtime.activateWorkflow({ ... parentSession ... })` object in these test cases to include `parentWorkflowName: "parent-workflow"` immediately after the `parentSession` property: `"creates workflow form sessions at a render action startPanelId"`, `"seeds workflow form session data only when creating a new form session"`, `"interpolates workflow values in workflow form and panel text"`, `"interpolates form session data in resolved field, action, and option text"`, `"leaves unresolved placeholders and expression-like placeholder syntax unchanged"`, `"does not write interpolated text back into workflow form session definitions"`, `"rejects render form actions with invalid startPanelId values before activation"`, `"rejects render form actions with non-function buildSessionData before activation"`, `"returns terminal_error when buildSessionData throws or returns invalid data"`, `"renders dropdown options from workflow-value-interpolated selected-project story index"`, `"fails before reading JSON options when dynamic source path placeholders stay unresolved"`, `"fails before reading JSON options when workflow values resolve source path placeholders to unsafe segments"`, and `"restores workflow form sessions with current panel, data, canonical definitions, and interpolated text"`.
 
-- [ ] 4.8. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, update the `"auto-activates an explicitly assigned shipped workflow before the first subagent turn"` test to assert `activateWorkflowSpy.firstCall.args[0].parentWorkflowName` equals `"parent-workflow"` immediately after the existing workflow-name assertion.
+- [x] 4.8. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, update the `"auto-activates an explicitly assigned shipped workflow before the first subagent turn"` test to assert `activateWorkflowSpy.firstCall.args[0].parentWorkflowName` equals `"parent-workflow"` immediately after the existing workflow-name assertion.
 
-- [ ] 4.9. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, update the `"leaves the parent workflow state unchanged while inheriting declared values into the child workflow session"` test to assert `state.activeWorkflowSession?.lifecycle` deep-equals `{ projectSelectionCompleted: true, parentWorkflowName: "parent-workflow" }` and to assert `activateWorkflowSpy.firstCall.args[0].parentWorkflowName` equals `"parent-workflow"`.
+- [x] 4.9. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, update the `"leaves the parent workflow state unchanged while inheriting declared values into the child workflow session"` test to assert `state.activeWorkflowSession?.lifecycle` deep-equals `{ projectSelectionCompleted: true, parentWorkflowName: "parent-workflow" }` and to assert `activateWorkflowSpy.firstCall.args[0].parentWorkflowName` equals `"parent-workflow"`.
 
-- [ ] 4.10. In `src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts`, update the `runtime.activateWorkflow({ taskState, workflowName: "blind-review", parentSession })` call to include `parentWorkflowName: "parent-workflow"`. Add an exact assertion after the project-selection assertions that `activeSession.lifecycle` deep-equals `{ projectSelectionCompleted: true, parentWorkflowName: "parent-workflow" }`.
+- [x] 4.10. In `src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts`, update the `runtime.activateWorkflow({ taskState, workflowName: "blind-review", parentSession })` call to include `parentWorkflowName: "parent-workflow"`. Add an exact assertion after the project-selection assertions that `activeSession.lifecycle` deep-equals `{ projectSelectionCompleted: true, parentWorkflowName: "parent-workflow" }`.
 
-- [ ] 4.11. In `src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts`, update the `runtime.activateWorkflow({ taskState, workflowName: "edge-case-hunter-review", parentSession })` call to include `parentWorkflowName: "parent-workflow"`. Add an exact assertion after the project-selection assertions that `childSession.lifecycle` deep-equals `{ projectSelectionCompleted: true, parentWorkflowName: "parent-workflow" }`.
+- [x] 4.11. In `src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts`, update the `runtime.activateWorkflow({ taskState, workflowName: "edge-case-hunter-review", parentSession })` call to include `parentWorkflowName: "parent-workflow"`. Add an exact assertion after the project-selection assertions that `childSession.lifecycle` deep-equals `{ projectSelectionCompleted: true, parentWorkflowName: "parent-workflow" }`.
+
+- [x] 4.12. In every Phase 1 allowed workflow-module test file listed below, update direct `route.trigger.matches({ ... })` predicate fixture objects so they compile against the required `WorkflowDecisionBranchEvaluationInput.session` field:
+
+```text
+src/core/task/workflow-runtime/workflow-modules/acceptance-audit-review/__tests__/acceptanceAuditReviewWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/correct-course/__tests__/correctCourseWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/dev-story/__tests__/devStoryWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts
+```
+
+In each file, add `WorkflowDecisionBranchEvaluationInput` to the existing type-only import from `"../../../types"`, preserving the existing imported type names.
+
+In each file, add these exact helpers after the file's existing `createSession(...)` helper, or after `createSessionWithLastTriggerEvent(...)` in `devStoryWorkflow.test.ts`:
+
+```ts
+function createPredicateSession(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+}): ActiveWorkflowSession {
+	return {
+		activeStepNumber: 1,
+		workflowValues: args.workflowValues,
+		projectSelection: {
+			projectMode: "existing",
+			projectTitle: "Predicate Test Project",
+			projectFolderName: "predicate-test-project",
+		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
+		entryArtifactResolution: undefined,
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: {
+			activeBranchId: args.activeBranchId,
+		},
+	}
+}
+
+function createSessionPredicateInput(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+	step: WorkflowStepDefinition
+}): WorkflowDecisionBranchEvaluationInput {
+	return {
+		activeBranchId: args.activeBranchId,
+		workflowValues: args.workflowValues,
+		step: args.step,
+		session: createPredicateSession({
+			activeBranchId: args.activeBranchId,
+			workflowValues: args.workflowValues,
+		}),
+	}
+}
+
+function createEventPredicateInput(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+	step: WorkflowStepDefinition
+	triggerEvent: WorkflowBranchTriggerEvent
+}): WorkflowDecisionBranchEvaluationInput & { triggerEvent: WorkflowBranchTriggerEvent } {
+	return {
+		activeBranchId: args.activeBranchId,
+		workflowValues: args.workflowValues,
+		step: args.step,
+		session: createPredicateSession({
+			activeBranchId: args.activeBranchId,
+			workflowValues: args.workflowValues,
+		}),
+		triggerEvent: args.triggerEvent,
+	}
+}
+```
+
+For every `*.trigger.matches({ ... })` argument object in those files that includes a `triggerEvent` property and does not already include a `session` property, replace the argument object with a `createEventPredicateInput({ ... })` call using the same `activeBranchId`, `workflowValues`, `step`, and `triggerEvent` properties. For example, this shape:
+
+```ts
+route.trigger.matches({
+	activeBranchId: "test-branch",
+	workflowValues: args.workflowValues,
+	step: getStep(args.stepId),
+	triggerEvent: args.triggerEvent,
+})
+```
+
+must become this shape:
+
+```ts
+route.trigger.matches(
+	createEventPredicateInput({
+		activeBranchId: "test-branch",
+		workflowValues: args.workflowValues,
+		step: getStep(args.stepId),
+		triggerEvent: args.triggerEvent,
+	}),
+)
+```
+
+For every `*.trigger.matches({ ... })` argument object in those files that does not include a `triggerEvent` property and does not already include a `session` property, replace the argument object with a `createSessionPredicateInput({ ... })` call using the same `activeBranchId`, `workflowValues`, and `step` properties. For example, this shape:
+
+```ts
+route.trigger.matches({
+	activeBranchId: "test-branch",
+	workflowValues: args.workflowValues,
+	step: getStep(args.stepId),
+})
+```
+
+must become this shape:
+
+```ts
+route.trigger.matches(
+	createSessionPredicateInput({
+		activeBranchId: "test-branch",
+		workflowValues: args.workflowValues,
+		step: getStep(args.stepId),
+	}),
+)
+```
+
+For one-line `*.trigger.matches({ activeBranchId, workflowValues, step: getStep(stepId), ... })` calls, expand the argument object to multiline and wrap it in the matching helper call above. Do not add casts, do not make `WorkflowDecisionBranchEvaluationInput.session` optional, and do not change route IDs, trigger events, branch IDs, workflow values, step IDs, expectations, or production workflow code.
 
 ### Task 5: Phase 1 Validation
 
-- [ ] 5.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts`.
+- [x] 5.1. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts`.
 
-- [ ] 5.2. Run `npm run check-types` with elevated permissions. If this command fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` with elevated permissions before treating the failure as a code defect.
+- [x] 5.2. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/acceptance-audit-review/__tests__/acceptanceAuditReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/correct-course/__tests__/correctCourseWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/dev-story/__tests__/devStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts`.
 
-- [ ] 5.3. Run `git diff --name-only` and confirm persistent tracked diffs are limited to files listed in the Phase 1 allowed-files set.
+- [x] 5.3. Run `npm run check-types` with elevated permissions. If this command fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` with elevated permissions before treating the failure as a code defect.
 
-- [ ] 5.4. Run `git ls-files --others --exclude-standard` and confirm it returns no output.
+- [x] 5.4. Run `git diff --name-only` and confirm persistent tracked diffs are limited to files listed in the Phase 1 allowed-files set.
+
+- [x] 5.5. Run `git ls-files --others --exclude-standard` and confirm it returns no output.
 
 ## Phase 2: Validate-Story Workflow Module Update
 
@@ -849,7 +996,7 @@ For `quickSpecContext`, iterate `for (const payloadBlock of getValidateStoryPayl
 
 - [ ] 11.2. Run `npm run test:unit -- src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`.
 
-- [ ] 11.3. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts`.
+- [ ] 11.3. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/acceptance-audit-review/__tests__/acceptanceAuditReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/correct-course/__tests__/correctCourseWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/dev-story/__tests__/devStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts`.
 
 - [ ] 11.4. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryToolSchemas.test.ts`.
 
@@ -880,10 +1027,21 @@ src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts
 src/core/task/workflow-runtime/WorkflowRuntime.ts
 src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts
 src/core/task/workflow-runtime/types.ts
+src/core/task/workflow-runtime/workflow-modules/acceptance-audit-review/__tests__/acceptanceAuditReviewWorkflow.test.ts
 src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/correct-course/__tests__/correctCourseWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/dev-story/__tests__/devStoryWorkflow.test.ts
 src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts
+src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts
 src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts
 src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts
+src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts
 src/core/prompts/system-prompt/__tests__/integration.test.ts
 ```
 
@@ -893,14 +1051,14 @@ src/core/prompts/system-prompt/__tests__/integration.test.ts
 
 | Task/Subtask | Requirement Source | Target File | Symbols Verified | Live Contract Verified | Fallout Cleanup Prescribed | Validation Coverage |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1.1 | lines 56-71 | `types.ts` | `WorkflowRuntimeLifecycleState`, `WorkflowDefinition["name"]` | optional `parentWorkflowName` field after `projectSelectionCompleted` | no import cleanup | 5.2, 11.6 |
-| 1.2 | lines 56-71 | `types.ts` | `WorkflowDecisionBranchEvaluationInput`, `ActiveWorkflowSession` | exact `session` field and excluded top-level fields | predicate test fallout prescribed in 4.1-4.3 | 5.1, 11.1 |
+| 1.1 | lines 56-71 | `types.ts` | `WorkflowRuntimeLifecycleState`, `WorkflowDefinition["name"]` | optional `parentWorkflowName` field after `projectSelectionCompleted` | no import cleanup | 5.3, 11.6 |
+| 1.2 | lines 56-71 | `types.ts` | `WorkflowDecisionBranchEvaluationInput`, `ActiveWorkflowSession` | exact `session` field and excluded top-level fields | predicate test fallout prescribed in 4.1-4.3 and 4.12 | 5.1-5.3, 11.1, 11.3 |
 | 2.1 | lines 56-71 | `WorkflowRuntime.ts` | `activateWorkflow` args type | exact optional `parentWorkflowName` arg position | no cleanup | 5.1, 11.1 |
 | 2.2 | lines 56-71 | `WorkflowRuntime.ts` | `activateWorkflow` destructuring | exact destructuring shape | no cleanup | 5.1, 11.1 |
 | 2.3 | lines 56-71 | `WorkflowRuntime.ts` | `activateWorkflow` lifecycle object | exact conditional `parentWorkflowName` spread | no cleanup | 4.4-4.6, 5.1, 11.1 |
 | 2.4 | lines 56-71 | `WorkflowRuntime.ts` | `isWorkflowRuntimeLifecycleState` | boolean project-selection and non-empty string parent-name validation | omitted parent-name compatibility preserved | 4.6, 5.1, 11.1 |
 | 2.5 | lines 56-71 | `WorkflowRuntime.ts` | persisted-session restoration lifecycle clone | exact restored lifecycle object shape | no cleanup | 4.6, 5.1, 11.1 |
-| 2.6 | lines 56-71 | `WorkflowRuntime.ts` | `buildDecisionTreeEvaluationInput` | returned object includes exact `session` field | predicate key assertions updated in 4.2-4.3 | 4.1-4.3, 5.1, 11.1 |
+| 2.6 | lines 56-71 | `WorkflowRuntime.ts` | `buildDecisionTreeEvaluationInput` | returned object includes exact `session` field | predicate key assertions updated in 4.2-4.3 and fixture fallout covered in 4.12 | 4.1-4.3, 4.12, 5.1-5.3, 11.1, 11.3 |
 | 3.1 | lines 18-33, 56-71 | `SubagentRunner.ts` | `autoActivateAssignedWorkflow`, `activateWorkflow` call | exact `parentWorkflowName` argument | no cleanup | 4.8-4.9, 5.1, 11.2 |
 | 3.2 | lines 18-33, 56-71 | `SubagentRunner.ts` | `nextAction.kind === "no_op"` path | existing failure behavior preserved | forbids new failure text, fallback, parser, prompt instruction | 5.1, 11.2 |
 | 4.1 | lines 56-71 | `WorkflowRuntime.test.ts` | `ObservedDecisionPredicateInput` | exact observed session fields | no cleanup | 5.1, 11.1 |
@@ -914,10 +1072,12 @@ src/core/prompts/system-prompt/__tests__/integration.test.ts
 | 4.9 | lines 18-33, 56-71 | `SubagentRunner.test.ts` | inheritance isolation test | exact lifecycle and spy arg assertions | no cleanup | 5.1, 11.2 |
 | 4.10 | lines 18-33, 56-71 | `blindReviewWorkflow.test.ts` | blind-review child activation test | exact activation arg and lifecycle assertion | no cleanup | 5.1, 11.3 |
 | 4.11 | lines 18-33, 56-71 | `edgeCaseHunterReviewWorkflow.test.ts` | edge-case child activation test | exact activation arg and lifecycle assertion | no cleanup | 5.1, 11.3 |
+| 4.12 | lines 56-71 | workflow-module test files | `WorkflowDecisionBranchEvaluationInput`, `createPredicateSession`, `createSessionPredicateInput`, `createEventPredicateInput`, `*.trigger.matches` fixtures | exact required `session` shape matching fixture `activeBranchId` and `workflowValues` | forbids casts, optional `session`, and production workflow changes | 5.2-5.3, 11.3, 11.6 |
 | 5.1 | lines 303-317 | command | focused runtime/subagent/sibling tests | exact `npm run test:unit -- ...` command | no cleanup | direct validation |
-| 5.2 | lines 303-317 | command | typecheck/proto fallback | elevated exact command and fallback condition | no cleanup | direct validation |
-| 5.3 | lines 303-317 | command | tracked scope diff | exact allowed tracked scope | no cleanup | direct validation |
-| 5.4 | lines 303-317 | command | untracked scope diff | exact no-output expectation | no cleanup | direct validation |
+| 5.2 | lines 303-317 | command | predicate-fixture fallout workflow-module tests | exact `npm run test:unit -- ...` command | no cleanup | direct validation |
+| 5.3 | lines 303-317 | command | typecheck/proto fallback | elevated exact command and fallback condition | no cleanup | direct validation |
+| 5.4 | lines 303-317 | command | tracked scope diff | exact allowed tracked scope | no cleanup | direct validation |
+| 5.5 | lines 303-317 | command | untracked scope diff | exact no-output expectation | no cleanup | direct validation |
 | 6.1 | lines 119-230 | `validateStoryWorkflow.ts` | type-only import | exact imports to add and retain | import cleanup constrained | 9.1, 11.4, 11.6 |
 | 6.2 | lines 45-55 | `validateStoryWorkflow.ts` | `ValidateStoryWorkflowValueKey` | exact enum members and placement | no cleanup | 9.1, 11.4 |
 | 6.3 | lines 45-55 | `validateStoryWorkflow.ts` | `VALIDATE_STORY_WORKFLOW_VALUE_KEYS` | exact key additions and placement | no cleanup | 9.1, 11.4 |
@@ -959,7 +1119,7 @@ src/core/prompts/system-prompt/__tests__/integration.test.ts
 | 10.8 | lines 232-260, 282-301 | `integration.test.ts` | tool projection assertions | exact native and non-native schema assertions | no cleanup | 11.5 |
 | 11.1 | lines 303-317 | command | runtime unit tests | exact command | no cleanup | direct validation |
 | 11.2 | lines 303-317 | command | subagent unit tests | exact command | no cleanup | direct validation |
-| 11.3 | lines 303-317 | command | sibling child-workflow unit tests | exact command | no cleanup | direct validation |
+| 11.3 | lines 303-317 | command | sibling child-workflow and predicate-fixture unit tests | exact command | no cleanup | direct validation |
 | 11.4 | lines 303-317 | command | validate-story unit tests | exact command | no cleanup | direct validation |
 | 11.5 | lines 303-317 | command | prompt integration tests | exact command | no cleanup | direct validation |
 | 11.6 | lines 303-317 | command | typecheck/proto fallback | elevated exact command and fallback condition | no cleanup | direct validation |

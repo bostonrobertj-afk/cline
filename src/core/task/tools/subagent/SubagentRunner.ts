@@ -1066,6 +1066,7 @@ export class SubagentRunner {
 			taskState: state,
 			workflowName: resolvedWorkflow.name,
 			parentSession: structuredClone(parentSession),
+			parentWorkflowName: this.baseConfig.taskState.activeWorkflowName,
 		})
 		if (nextAction.kind === "no_op") {
 			state.activeWorkflowName = previousActiveWorkflowName

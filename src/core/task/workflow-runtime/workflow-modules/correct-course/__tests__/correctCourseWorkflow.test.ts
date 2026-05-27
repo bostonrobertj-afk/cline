@@ -13,6 +13,7 @@ import { WorkflowArtifactFamily } from "../../../artifactFamilies"
 import type {
 	ActiveWorkflowSession,
 	WorkflowBranchTriggerEvent,
+	WorkflowDecisionBranchEvaluationInput,
 	WorkflowDecisionBranchRoute,
 	WorkflowPromptBuilderInput,
 	WorkflowStepDefinition,
@@ -140,6 +141,65 @@ function createSession(workflowValues: WorkflowValues = SAMPLE_WORKFLOW_VALUES):
 	}
 }
 
+function createPredicateSession(args: { activeBranchId: string; workflowValues: WorkflowValues }): ActiveWorkflowSession {
+	return {
+		activeStepNumber: 1,
+		workflowValues: args.workflowValues,
+		projectSelection: {
+			projectMode: "existing",
+			projectTitle: "Predicate Test Project",
+			projectFolderName: "predicate-test-project",
+		},
+		lifecycle: {
+			projectSelectionCompleted: true,
+		},
+		entryArtifactResolution: undefined,
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: {
+			activeBranchId: args.activeBranchId,
+		},
+	}
+}
+
+function createSessionPredicateInput(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+	step: WorkflowStepDefinition
+}): WorkflowDecisionBranchEvaluationInput {
+	return {
+		activeBranchId: args.activeBranchId,
+		workflowValues: args.workflowValues,
+		step: args.step,
+		session: createPredicateSession({
+			activeBranchId: args.activeBranchId,
+			workflowValues: args.workflowValues,
+		}),
+	}
+}
+
+function createEventPredicateInput(args: {
+	activeBranchId: string
+	workflowValues: WorkflowValues
+	step: WorkflowStepDefinition
+	triggerEvent: WorkflowBranchTriggerEvent
+}): WorkflowDecisionBranchEvaluationInput & { triggerEvent: WorkflowBranchTriggerEvent } {
+	return {
+		activeBranchId: args.activeBranchId,
+		workflowValues: args.workflowValues,
+		step: args.step,
+		session: createPredicateSession({
+			activeBranchId: args.activeBranchId,
+			workflowValues: args.workflowValues,
+		}),
+		triggerEvent: args.triggerEvent,
+	}
+}
+
 function createWorkflowValuesForFixture(
 	fixture: CorrectCourseTempProjectFixture,
 	overrides: WorkflowValues = {},
@@ -227,7 +287,16 @@ function expectEventPredicateMatch(
 		throw new Error(`Expected event_predicate trigger for ${route.id}.`)
 	}
 
-	expect(route.trigger.matches({ activeBranchId, workflowValues, step: getStep(stepId), triggerEvent })).to.equal(expected)
+	expect(
+		route.trigger.matches(
+			createEventPredicateInput({
+				activeBranchId,
+				workflowValues,
+				step: getStep(stepId),
+				triggerEvent,
+			}),
+		),
+	).to.equal(expected)
 }
 
 function expectSessionPredicateMatch(
@@ -242,7 +311,15 @@ function expectSessionPredicateMatch(
 		throw new Error(`Expected session_predicate trigger for ${route.id}.`)
 	}
 
-	expect(route.trigger.matches({ activeBranchId, workflowValues, step: getStep(stepId) })).to.equal(expected)
+	expect(
+		route.trigger.matches(
+			createSessionPredicateInput({
+				activeBranchId,
+				workflowValues,
+				step: getStep(stepId),
+			}),
+		),
+	).to.equal(expected)
 }
 
 function createPromptInput(stepId: WorkflowStepDefinition["id"], workflowValues: WorkflowValues): WorkflowPromptBuilderInput {
