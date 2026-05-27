@@ -81,6 +81,13 @@ import {
 	piPlanningWorkflowDefinition,
 } from "@/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow"
 import {
+	buildQuickSpecStep2ToolSchemas,
+	buildQuickSpecStep3ToolSchemas,
+	buildQuickSpecStep4ToolSchemas,
+	QuickSpecWorkflowValueKey,
+	quickSpecWorkflowDefinition,
+} from "@/core/task/workflow-runtime/workflow-modules/quick-spec"
+import {
 	VALIDATE_STORY_WORKFLOW_NAME,
 	ValidateStoryWorkflowValueKey,
 } from "@/core/task/workflow-runtime/workflow-modules/validate-story"
@@ -1758,6 +1765,71 @@ const buildPiPlanningPromptContext = async (
 	}
 }
 
+const QUICK_SPEC_OUTPUT_DOCUMENT = "/test/project/docs/projects/quick-spec-project/planning/quick-spec.md"
+const QUICK_SPEC_ADDITIONAL_CONTEXT = "/test/project/docs/context/brief.md"
+const QUICK_SPEC_VISION_STATEMENT = "Add a compact delivery-planning workflow."
+type QuickSpecPromptStepNumber = 2 | 3 | 4
+
+function createQuickSpecWorkflowValues(args?: { additionalContext?: string }): WorkflowValues {
+	return {
+		[QuickSpecWorkflowValueKey.ProjectMode]: "existing",
+		[QuickSpecWorkflowValueKey.ProjectTitle]: "Quick Spec Prompt Project",
+		[QuickSpecWorkflowValueKey.ProjectFolderName]: "quick-spec-project",
+		[QuickSpecWorkflowValueKey.OutputDocument]: QUICK_SPEC_OUTPUT_DOCUMENT,
+		[QuickSpecWorkflowValueKey.VisionStatement]: QUICK_SPEC_VISION_STATEMENT,
+		[QuickSpecWorkflowValueKey.OutputArtifactFamily]: "quick_spec",
+		[QuickSpecWorkflowValueKey.OutputArtifactIdentity]: "quick_spec",
+		[QuickSpecWorkflowValueKey.OutputArtifactFilename]: "quick-spec.md",
+		[QuickSpecWorkflowValueKey.OutputArtifactRelativePath]: "planning/quick-spec.md",
+		[QuickSpecWorkflowValueKey.AdditionalContext]: args?.additionalContext ?? QUICK_SPEC_ADDITIONAL_CONTEXT,
+	}
+}
+
+function createQuickSpecWorkflowSession(
+	activeStepNumber: QuickSpecPromptStepNumber,
+	args?: { additionalContext?: string },
+): ActiveWorkflowSession {
+	return {
+		activeStepNumber,
+		workflowValues: createQuickSpecWorkflowValues(args),
+		projectSelection: {
+			projectMode: "existing",
+			projectTitle: "Quick Spec Prompt Project",
+			projectFolderName: "quick-spec-project",
+		},
+		lifecycle: { projectSelectionCompleted: true },
+		entryArtifactResolution: undefined,
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: { activeBranchId: "project-prompt" },
+	}
+}
+
+const buildQuickSpecPromptContext = async (
+	activeStepNumber: QuickSpecPromptStepNumber,
+	args?: { additionalContext?: string },
+): Promise<SystemPromptContext & WorkflowPromptProjection> => {
+	const workspacePathPolicy: WorkflowWorkspacePathPolicy = { validateAccess: () => true }
+	const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })
+	const taskState = new TaskState()
+	taskState.activeWorkflowName = quickSpecWorkflowDefinition.name
+	taskState.activeWorkflowSession = createQuickSpecWorkflowSession(activeStepNumber, args)
+	taskState.apiRequestCount = 1
+	const workflowProjection = await runtime.buildTurnProjection({ taskState })
+	return {
+		...baseContext,
+		mcpHub: makeMcpHub([]),
+		providerInfo: makeProviderInfo("gpt-5-codex", "openai"),
+		enableNativeToolCalls: true,
+		useMinimalGptPrompt: true,
+		...workflowProjection,
+	}
+}
+
 const isNativeToolsFamily = (family: ModelFamily) =>
 	[ModelFamily.NATIVE_NEXT_GEN, ModelFamily.NATIVE_GPT_5, ModelFamily.NATIVE_GPT_5_1, ModelFamily.GEMINI_3].includes(family)
 
@@ -1794,6 +1866,19 @@ async function expectPiPlanningProjectedToolNames(
 
 	await runPromptTest(testCtx, context, "gpt-5-codex", async ({ tools }) => {
 		expect(getNativeToolNames(tools)).to.deep.equal(expectedToolNames)
+	})
+}
+
+async function expectQuickSpecProjectedToolSurface(
+	testCtx: TestRunner,
+	activeStepNumber: QuickSpecPromptStepNumber,
+	expectedToolSpecs: readonly ClineToolSpec[],
+): Promise<void> {
+	const context = await buildQuickSpecPromptContext(activeStepNumber)
+	expect(context.workflowToolSchemaOverride).to.deep.equal(expectedToolSpecs)
+
+	await runPromptTest(testCtx, context, "gpt-5-codex", async ({ tools }) => {
+		expect(getNativeToolNames(tools)).to.deep.equal(expectedToolSpecs.map((tool) => tool.name))
 	})
 }
 
@@ -2669,6 +2754,132 @@ describe("Prompt System Integration Tests", () => {
 			await runPromptTest(this, context, "gpt-5-codex", async ({ tools }) => {
 				expect(getNativeToolNames(tools)).to.deep.equal(expectedToolNames)
 			})
+		})
+
+		it("projects active quick-spec Step 2 tools into native GPT-5 prompts", async function () {
+			await expectQuickSpecProjectedToolSurface(this, 2, buildQuickSpecStep2ToolSchemas())
+		})
+
+		it("projects active quick-spec Step 3 tools into native GPT-5 prompts", async function () {
+			await expectQuickSpecProjectedToolSurface(this, 3, buildQuickSpecStep3ToolSchemas())
+		})
+
+		it("projects active quick-spec Step 4 tools into native GPT-5 prompts", async function () {
+			await expectQuickSpecProjectedToolSurface(this, 4, buildQuickSpecStep4ToolSchemas())
+		})
+
+		it("projects quick-spec current step details into the workflow input payload only", async function () {
+			const context = await buildQuickSpecPromptContext(2)
+			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+			if (workflowInputPayloadBlock === undefined || workflowInputPayloadBlock === "") {
+				throw new Error("Expected quick-spec Step 2 workflow input payload.")
+			}
+			expect(workflowInputPayloadBlock).to.include("Workflow:\nquick spec")
+			expect(workflowInputPayloadBlock).to.include(
+				"In this workflow, the agent builds a delivery spec for a small enhancement or update. This workflow is intended for limited-scope projects. For larger projects, use the standard workflow process beginning with the Create Architecture workflow.",
+			)
+			expect(workflowInputPayloadBlock).to.include("Name: Bob")
+			expect(workflowInputPayloadBlock).to.include("Role: Scrum Master")
+			expect(workflowInputPayloadBlock).to.include("A pragmatic scrum master with a background in software development")
+			expect(workflowInputPayloadBlock).to.include("1. Gather Context & Generate Spec Document - Complete")
+			expect(workflowInputPayloadBlock).to.include("2. Assess Vision & Develop Solution Foundation - Active")
+			expect(workflowInputPayloadBlock).to.include("4. Generate Implementation Details - Not Started")
+			expect(workflowInputPayloadBlock).to.include("CURRENT STEP DETAILED INSTRUCTIONS")
+			expect(workflowInputPayloadBlock).to.include("Step 2: Assess Vision & Develop Solution Foundation")
+			expect(workflowInputPayloadBlock).to.include(QUICK_SPEC_OUTPUT_DOCUMENT)
+			expect(workflowInputPayloadBlock).to.include(QUICK_SPEC_ADDITIONAL_CONTEXT)
+			expect(workflowInputPayloadBlock).to.include(QUICK_SPEC_VISION_STATEMENT)
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt }) => {
+				expect(systemPrompt).to.not.include("CURRENT STEP DETAILED INSTRUCTIONS")
+			})
+		})
+
+		it("renders quick-spec Step 2 conditional additional context only when non-empty", async () => {
+			const contextWithAdditionalContext = await buildQuickSpecPromptContext(2, {
+				additionalContext: QUICK_SPEC_ADDITIONAL_CONTEXT,
+			})
+			const contextWithoutAdditionalContext = await buildQuickSpecPromptContext(2, { additionalContext: "   " })
+			const fullPayloadWithAdditionalContext = contextWithAdditionalContext.workflowInputPayloadBlock
+			const continuationPayloadWithAdditionalContext = contextWithAdditionalContext.continuationWorkflowInputPayloadBlock
+			const fullPayloadWithoutAdditionalContext = contextWithoutAdditionalContext.workflowInputPayloadBlock
+			const continuationPayloadWithoutAdditionalContext =
+				contextWithoutAdditionalContext.continuationWorkflowInputPayloadBlock
+			if (fullPayloadWithAdditionalContext === undefined || fullPayloadWithAdditionalContext === "") {
+				throw new Error("Expected quick-spec Step 2 full workflow input payload with additional context.")
+			}
+			if (continuationPayloadWithAdditionalContext === undefined || continuationPayloadWithAdditionalContext === "") {
+				throw new Error("Expected quick-spec Step 2 continuation workflow input payload with additional context.")
+			}
+			if (fullPayloadWithoutAdditionalContext === undefined || fullPayloadWithoutAdditionalContext === "") {
+				throw new Error("Expected quick-spec Step 2 full workflow input payload without additional context.")
+			}
+			if (continuationPayloadWithoutAdditionalContext === undefined || continuationPayloadWithoutAdditionalContext === "") {
+				throw new Error("Expected quick-spec Step 2 continuation workflow input payload without additional context.")
+			}
+			for (const payload of [fullPayloadWithAdditionalContext, continuationPayloadWithAdditionalContext]) {
+				expect(payload).to.include(QUICK_SPEC_ADDITIONAL_CONTEXT)
+				expect(payload).to.include(
+					'Add the additional context provided to the spec file under the "User Context" heading.',
+				)
+			}
+			for (const payload of [fullPayloadWithoutAdditionalContext, continuationPayloadWithoutAdditionalContext]) {
+				expect(payload).to.not.include(QUICK_SPEC_ADDITIONAL_CONTEXT)
+				expect(payload).to.not.include(
+					'Add the additional context provided to the spec file under the "User Context" heading.',
+				)
+			}
+			for (const payload of [
+				fullPayloadWithAdditionalContext,
+				continuationPayloadWithAdditionalContext,
+				fullPayloadWithoutAdditionalContext,
+				continuationPayloadWithoutAdditionalContext,
+			]) {
+				expect(payload).to.not.include("{workflow.output_document}")
+				expect(payload).to.not.include("{workflow.additional_context}")
+				expect(payload).to.not.include("{workflow.vision_statement}")
+				expect(payload).to.not.include("*** conditional prompt segment")
+				expect(payload).to.not.include("*** end conditional prompt segment ***")
+			}
+		})
+
+		it("renders quick-spec response-tool guidance for progress and completion steps only", async function () {
+			for (const activeStepNumber of [2, 3] as const) {
+				const context = await buildQuickSpecPromptContext(activeStepNumber)
+				await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt }) => {
+					expectResponseToolNames(systemPrompt, ["`workflow_progress_request`"], ["`attempt_completion`"])
+				})
+			}
+			const completionContext = await buildQuickSpecPromptContext(4)
+			await runPromptTest(this, completionContext, "gpt-5-codex", async ({ systemPrompt }) => {
+				expectResponseToolNames(systemPrompt, ["`attempt_completion`"], ["`workflow_progress_request`"])
+			})
+		})
+
+		it("does not statically expose forbidden runtime or legacy tools in quick-spec prompt projection", async () => {
+			const forbiddenToolNames = [
+				"set_workflow_values",
+				"build_workflow_document",
+				"create_workflow_artifact",
+				"archive_workflow_artifact",
+				"delete_workflow_artifact",
+				"move_workflow_project_file",
+				"write_to_file",
+				"build_tech_spec_document",
+			]
+
+			for (const activeStepNumber of [2, 3, 4] as const) {
+				const context = await buildQuickSpecPromptContext(activeStepNumber)
+				const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
+				for (const forbiddenToolName of forbiddenToolNames) {
+					expect(projectedToolNames).to.not.include(forbiddenToolName)
+				}
+				if (activeStepNumber === 4) {
+					expect(projectedToolNames).to.include("use_subagents")
+				} else {
+					expect(projectedToolNames).to.not.include("use_subagents")
+				}
+			}
 		})
 
 		it("projects active create-story step tools from module-owned builders into native GPT-5 prompts", async function () {

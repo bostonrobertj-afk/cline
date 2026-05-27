@@ -61,6 +61,7 @@ import {
 } from "../workflow-modules/create-architecture/createArchitectureDocument"
 import { createEpicsWorkflowDefinition } from "../workflow-modules/create-epics"
 import { piPlanningWorkflowDefinition } from "../workflow-modules/pi-planning"
+import { quickSpecWorkflowDefinition } from "../workflow-modules/quick-spec"
 
 type ObservedDecisionPredicateInput = {
 	activeBranchId: string
@@ -2185,6 +2186,160 @@ describe("WorkflowRuntime", () => {
 		expect(WorkflowRegistry.resolveWorkflowDefinition("pi-planning.md")).to.equal(undefined)
 		expect(WorkflowRegistry.resolveWorkflowBySlashCommand("pi-planning.md")).to.equal(undefined)
 		expect(WorkflowRegistry.resolveWorkflowByUseSkillName("pi-planning.md")).to.equal(undefined)
+	})
+
+	it("resolves the shipped quick-spec workflow by workflow name, slash command, and use-skill name", () => {
+		resolveWorkflowDefinitionStub.restore()
+
+		expect(WorkflowRegistry.resolveWorkflowDefinition("quick-spec")).to.equal(quickSpecWorkflowDefinition)
+		expect(WorkflowRegistry.resolveWorkflowBySlashCommand("quick-spec")).to.equal(quickSpecWorkflowDefinition)
+		expect(WorkflowRegistry.resolveWorkflowByUseSkillName("quick-spec")).to.equal(quickSpecWorkflowDefinition)
+		expect(WorkflowRegistry.resolveWorkflowDefinition("quick-spec.md")).to.equal(undefined)
+		expect(WorkflowRegistry.resolveWorkflowBySlashCommand("quick-spec.md")).to.equal(undefined)
+		expect(WorkflowRegistry.resolveWorkflowByUseSkillName("quick-spec.md")).to.equal(undefined)
+	})
+
+	it("activates the quick-spec workflow through the shared entry form and resolves its first Step 1 action", async () => {
+		registerResolvedWorkflow(quickSpecWorkflowDefinition)
+
+		const entryFormAction = await runtime.activateWorkflow({
+			taskState,
+			workflowName: quickSpecWorkflowDefinition.name,
+		})
+
+		expect(entryFormAction.kind).to.equal("render_workflow_form")
+		if (entryFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${entryFormAction.kind}.`)
+		}
+		expect(entryFormAction.payload.panel?.promptMarkdown).to.equal(quickSpecWorkflowDefinition.description)
+		expect(taskState.currentFocusChainChecklist).to.equal(
+			"1. Gather Context & Generate Spec Document - Active\n2. Assess Vision & Develop Solution Foundation - Not Started\n3. Finalize Solution & Implementation Spec - Not Started\n4. Generate Implementation Details - Not Started",
+		)
+
+		const stepOneAction = await submitNewProjectSelection(taskState, "Quick Spec Runtime Project")
+
+		expect(stepOneAction.kind).to.equal("execute_tool_backed_operation")
+		if (stepOneAction.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${stepOneAction.kind}.`)
+		}
+		expect(stepOneAction.toolRequest.toolName).to.equal(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
+		expect(stepOneAction.toolRequest.toolParams).to.deep.equal({ artifact_id: "quick_spec" })
+		expect(stepOneAction.runtimeOwnedSourceRoute).to.deep.equal({
+			branchId: "step-1-resolve-entry-artifact",
+			routeId: "step-1-allocate-artifact",
+		})
+		expect(stepOneAction.toolBackedOperationSession).to.equal(undefined)
+		expect(getActiveWorkflowSession(taskState).entryArtifactResolution?.artifactResolutions).to.deep.equal([
+			{
+				artifactId: "quick_spec",
+				artifactFamily: WorkflowArtifactFamily.QuickSpec,
+				artifactIdentity: "quick_spec",
+				artifactFilename: "quick-spec.md",
+				artifactRelativePath: join("planning", "quick-spec.md"),
+				artifactAbsolutePath: join(cwd, "docs", "projects", "quick-spec-runtime-project", "planning", "quick-spec.md"),
+				creationRequired: true,
+				existingArtifactAction: "none",
+			},
+		])
+	})
+
+	it("routes quick-spec allocation success and initial document build success to the Step 1 input form", async () => {
+		registerResolvedWorkflow(quickSpecWorkflowDefinition)
+		await runtime.activateWorkflow({
+			taskState,
+			workflowName: quickSpecWorkflowDefinition.name,
+		})
+
+		const allocationAction = await submitNewProjectSelection(taskState, "Quick Spec Runtime Project")
+
+		expect(allocationAction.kind).to.equal("execute_tool_backed_operation")
+		if (allocationAction.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${allocationAction.kind}.`)
+		}
+
+		const artifactResult = await runtime.createWorkflowArtifact({
+			taskState,
+			artifactId: "quick_spec",
+			expectedArtifactAbsolutePath: undefined,
+		})
+		const documentBuildAction = await runtime.handleToolBackedOperationToolResult({
+			taskState,
+			toolResultText: JSON.stringify({ ok: true }),
+			runtimeOwnedSourceRoute: allocationAction.runtimeOwnedSourceRoute,
+		})
+
+		expect(documentBuildAction.kind).to.equal("execute_tool_backed_operation")
+		if (documentBuildAction.kind !== "execute_tool_backed_operation") {
+			throw new Error(`Expected execute_tool_backed_operation, received ${documentBuildAction.kind}.`)
+		}
+		expect(documentBuildAction.toolRequest.toolName).to.equal(ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT)
+		expect(documentBuildAction.toolRequest.toolParams.artifact_id).to.equal("quick_spec")
+		expect(documentBuildAction.toolRequest.toolParams.destination_path).to.equal(artifactResult.artifactAbsolutePath)
+		expect(documentBuildAction.runtimeOwnedSourceRoute).to.deep.equal({
+			branchId: "step-1-await-allocation",
+			routeId: "step-1-build-initial-shell",
+		})
+
+		const inputFormAction = await runtime.handleToolBackedOperationToolResult({
+			taskState,
+			toolResultText: JSON.stringify({ ok: true }),
+			runtimeOwnedSourceRoute: documentBuildAction.runtimeOwnedSourceRoute,
+		})
+
+		expect(inputFormAction.kind).to.equal("render_workflow_form")
+		if (inputFormAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${inputFormAction.kind}.`)
+		}
+		expect(inputFormAction.formSession.workflowFormId).to.equal("step-1-quick-spec-input-form")
+		expect(inputFormAction.formSession.currentPanelId).to.equal("step-1-existing-documentation-panel")
+	})
+
+	it("continues an existing quick-spec artifact to Step 1 input form without artifact or document tool operations", async () => {
+		const projectName = "Existing Quick Spec"
+		const existingArtifactPath = join(cwd, "docs", "projects", projectName, "planning", "quick-spec.md")
+		await mkdir(dirname(existingArtifactPath), { recursive: true })
+		await writeFile(existingArtifactPath, "# Existing Quick Spec\n", "utf8")
+		registerResolvedWorkflow(quickSpecWorkflowDefinition)
+		setDiscoveredProjects([projectName])
+		await runtime.activateWorkflow({
+			taskState,
+			workflowName: quickSpecWorkflowDefinition.name,
+		})
+		await submitExistingProjectSelectionFromExistingFolder(taskState, projectName)
+
+		const result = await submitEntryArtifactConflictAction(taskState, "continue_existing")
+
+		expect(result.kind).to.equal("render_workflow_form")
+		if (result.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${result.kind}.`)
+		}
+		expect(result.formSession.workflowFormId).to.equal("step-1-quick-spec-input-form")
+		expect(result.formSession.currentPanelId).to.equal("step-1-existing-documentation-panel")
+		const activeSession = getActiveWorkflowSession(taskState)
+		expect(activeSession.activeStepNumber).to.equal(1)
+		expect(activeSession.workflowValues).to.deep.include({
+			projectMode: "existing",
+			projectTitle: "Existing Quick Spec",
+			projectFolderName: "Existing Quick Spec",
+			output_artifact_family: WorkflowArtifactFamily.QuickSpec,
+			output_artifact_identity: "quick_spec",
+			output_artifact_filename: "quick-spec.md",
+			output_artifact_relative_path: join("planning", "quick-spec.md"),
+			output_document: existingArtifactPath,
+		})
+		expect(activeSession.entryArtifactResolution?.artifactResolutions).to.deep.equal([
+			{
+				artifactId: "quick_spec",
+				artifactFamily: WorkflowArtifactFamily.QuickSpec,
+				artifactIdentity: "quick_spec",
+				artifactFilename: "quick-spec.md",
+				artifactRelativePath: join("planning", "quick-spec.md"),
+				artifactAbsolutePath: existingArtifactPath,
+				creationRequired: false,
+				existingArtifactAction: "continue_existing",
+			},
+		])
+		expect(await readFile(existingArtifactPath, "utf8")).to.equal("# Existing Quick Spec\n")
 	})
 
 	it("activates create-architecture through the shared entry form and projects its nine-step checklist", async () => {

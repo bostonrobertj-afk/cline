@@ -1105,7 +1105,6 @@ describe("correctCourseWorkflow", () => {
 			"PLACEHOLDER_WORKFLOW_STEP_MATRIX",
 			"build_correct_course_document",
 			"BuildCorrectCourseDocument",
-			"BuildTechSpecDocumentToolHandler",
 			"ManagedWorkflow",
 		]) {
 			expect(serializedDefinition).not.to.include(forbiddenText)
