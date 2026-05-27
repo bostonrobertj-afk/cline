@@ -76,6 +76,8 @@ The validate-story workflow must declare these exact `childInheritance` rules:
 
 ```ts
 [
+	{ parentKey: "projectTitle", childKey: "projectTitle" },
+	{ parentKey: "projectFolderName", childKey: "projectFolderName" },
 	{ parentKey: "target_story", childKey: "target_story" },
 	{ parentKey: "epics_document", childKey: "epics_document" },
 	{ parentKey: "architecture_document", childKey: "architecture_document" },
@@ -286,7 +288,7 @@ The update must include focused unit tests covering:
 - workflow value inventory including `originating_story` and `code_review_output`
 - exact `childInheritance` rules
 - undefined-parent-value skip behavior during child activation
-- child activation copies project selection, initializes only declared inherited child values, and does not mutate parent workflow values
+- child activation copies project selection, initializes only declared inherited child values including `projectTitle` and `projectFolderName`, and does not mutate parent workflow values
 - runtime-owned `lifecycle.parentWorkflowName` persistence for child activation and absence for main-agent activation
 - decision-tree predicate access to the active session, including `session.lifecycle.parentWorkflowName`
 - main-agent invocation still resolving `target_story`, `epics_document`, and `architecture_document` prerequisites before `project_prompt`

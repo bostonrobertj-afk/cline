@@ -25,14 +25,6 @@ This is a new update action plan. Do not edit [action-plan.md](./action-plan.md)
 - Do not add validate-story workflow artifacts, document builders, workflow-specific forms, AI-writable workflow values, backend tools, or model-facing backend-only runtime tools.
 - Do not add exact full-prompt snapshot assertions for editable prompt prose; use prompt shape, materialized workflow-value, forbidden-marker, non-selected-section, and projected-tool invariants.
 
-## Known Pre-Existing Diffs
-
-The scope-diff validation in this plan must allow these pre-existing documentation diffs to remain present without treating them as implementation scope violations:
-
-- `docs/workflows/workflow-runtime/workflow-modules/validate-story/validate-story.md`
-- `docs/workflows/workflow-runtime/workflow-modules/validate-story/validate-story-subagent-update-requirements.md`
-- `docs/workflows/workflow-runtime/workflow-modules/validate-story/validate-story-subagent-update-action-plan.md`
-
 ## Requirement Trace
 
 | Requirement | Required Behavior | Owning Files |
@@ -143,7 +135,7 @@ expect(childSession.lifecycle).to.deep.equal({
 
 - [ ] 4.6. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, add a new test named exactly `"persists and restores child workflow parent workflow identity"` after the child project-selection activation test. The test must create a workflow with `createWorkflowDefinition()`, register it, create `parentSession = createParentWorkflowSession()`, activate with `parentSession` and `parentWorkflowName: "parent-workflow"`, assert `runtime.getPersistedSession({ taskState: childState })?.lifecycle` deep-equals `{ projectSelectionCompleted: true, parentWorkflowName: "parent-workflow" }`, restore that persisted session into a fresh `TaskState` with `activeWorkflowName = workflow.name`, and assert `restoredState.activeWorkflowSession?.lifecycle` deep-equals `{ projectSelectionCompleted: true, parentWorkflowName: "parent-workflow" }`.
 
-- [ ] 4.7. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update every remaining `runtime.activateWorkflow({ ... parentSession ... })` object in these test cases to include `parentWorkflowName: "parent-workflow"` immediately after the `parentSession` property: `"renders a workflow form from an explicit start panel"`, `"seeds workflow form session data only when creating a new form session"`, `"interpolates workflow values in workflow form and panel text"`, `"leaves unresolved placeholders and expression-like placeholder syntax unchanged"`, `"does not write interpolated text back into workflow form session definitions"`, `"rejects invalid buildSessionData shapes before activation"`, `"rejects render form actions with non-function buildSessionData before activation"`, `"returns terminal error when workflow form rendering fails after validation"`, `"renders dropdown options from workflow-value-interpolated selected-project story index"`, `"fails before reading JSON options when dynamic source path placeholders stay unresolved"`, `"fails before reading JSON options when workflow values resolve source path placeholders to unsafe segments"`, and `"restores workflow form sessions with current panel, data, canonical definitions, and interpolated text"`.
+- [ ] 4.7. In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, update every remaining `runtime.activateWorkflow({ ... parentSession ... })` object in these test cases to include `parentWorkflowName: "parent-workflow"` immediately after the `parentSession` property: `"creates workflow form sessions at a render action startPanelId"`, `"seeds workflow form session data only when creating a new form session"`, `"interpolates workflow values in workflow form and panel text"`, `"interpolates form session data in resolved field, action, and option text"`, `"leaves unresolved placeholders and expression-like placeholder syntax unchanged"`, `"does not write interpolated text back into workflow form session definitions"`, `"rejects render form actions with invalid startPanelId values before activation"`, `"rejects render form actions with non-function buildSessionData before activation"`, `"returns terminal_error when buildSessionData throws or returns invalid data"`, `"renders dropdown options from workflow-value-interpolated selected-project story index"`, `"fails before reading JSON options when dynamic source path placeholders stay unresolved"`, `"fails before reading JSON options when workflow values resolve source path placeholders to unsafe segments"`, and `"restores workflow form sessions with current panel, data, canonical definitions, and interpolated text"`.
 
 - [ ] 4.8. In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, update the `"activates parent-assigned workflow before the first child model request"` test to assert `activateWorkflowSpy.firstCall.args[0].parentWorkflowName` equals `"parent-workflow"` immediately after the existing workflow-name assertion.
 
@@ -159,9 +151,9 @@ expect(childSession.lifecycle).to.deep.equal({
 
 - [ ] 5.2. Run `npm run check-types` with elevated permissions. If this command fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` with elevated permissions before treating the failure as a code defect.
 
-- [ ] 5.3. Run `git diff --name-only` and confirm persistent tracked diffs are limited to files listed in the Phase 1 allowed-files set plus the known pre-existing documentation diffs listed in this plan.
+- [ ] 5.3. Run `git diff --name-only` and confirm persistent tracked diffs are limited to files listed in the Phase 1 allowed-files set.
 
-- [ ] 5.4. Run `git ls-files --others --exclude-standard` and confirm untracked files are limited to `docs/workflows/workflow-runtime/workflow-modules/validate-story/validate-story-subagent-update-requirements.md` and `docs/workflows/workflow-runtime/workflow-modules/validate-story/validate-story-subagent-update-action-plan.md`.
+- [ ] 5.4. Run `git ls-files --others --exclude-standard` and confirm it returns no output.
 
 ## Phase 2: Validate-Story Workflow Module Update
 
@@ -322,50 +314,81 @@ function parentWorkflowInvocation(parentWorkflowName: WorkflowDefinition["name"]
 }
 ```
 
-- [ ] 7.5. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, replace `buildStep1DecisionTree()` with a decision tree whose exact branch keys in insertion order are `step-1-route-by-invocation`, `step-1-start-review`, and `step-1-await-attempt-completion`; whose `entryBranchId` is `step-1-route-by-invocation`; and whose `step-1-route-by-invocation` routes are exactly:
+- [ ] 7.5. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, replace `buildStep1DecisionTree()` with this exact function:
 
 ```ts
-[
-	{
-		id: "step-1-main-agent-resolve-prerequisites",
-		trigger: mainAgentInvocation(),
-		action: {
-			kind: "resolve_prerequisite_files",
-			prerequisiteIds: [
-				VALIDATE_STORY_TARGET_STORY_PREREQUISITE_ID,
-				VALIDATE_STORY_EPICS_DOCUMENT_PREREQUISITE_ID,
-				VALIDATE_STORY_ARCHITECTURE_DOCUMENT_PREREQUISITE_ID,
-			],
+function buildStep1DecisionTree(): WorkflowDecisionTree {
+	return {
+		entryBranchId: "step-1-route-by-invocation",
+		branches: {
+			"step-1-route-by-invocation": {
+				id: "step-1-route-by-invocation",
+				routes: [
+					{
+						id: "step-1-main-agent-resolve-prerequisites",
+						trigger: mainAgentInvocation(),
+						action: {
+							kind: "resolve_prerequisite_files",
+							prerequisiteIds: [
+								VALIDATE_STORY_TARGET_STORY_PREREQUISITE_ID,
+								VALIDATE_STORY_EPICS_DOCUMENT_PREREQUISITE_ID,
+								VALIDATE_STORY_ARCHITECTURE_DOCUMENT_PREREQUISITE_ID,
+							],
+						},
+						followingBranchId: "step-1-start-review",
+					},
+					{
+						id: "step-1-create-story-project-prompt",
+						trigger: parentWorkflowInvocation("create-story"),
+						action: { kind: "project_prompt" },
+						followingBranchId: "step-1-await-attempt-completion",
+					},
+					{
+						id: "step-1-write-remediation-story-project-prompt",
+						trigger: parentWorkflowInvocation("write-remediation-story"),
+						action: { kind: "project_prompt" },
+						followingBranchId: "step-1-await-attempt-completion",
+					},
+					{
+						id: "step-1-quick-spec-project-prompt",
+						trigger: parentWorkflowInvocation("quick-spec"),
+						action: { kind: "project_prompt" },
+						followingBranchId: "step-1-await-attempt-completion",
+					},
+				],
+			},
+			"step-1-start-review": {
+				id: "step-1-start-review",
+				routes: [
+					{
+						id: "step-1-project-prompt",
+						trigger: { kind: "always" },
+						action: { kind: "project_prompt" },
+						followingBranchId: "step-1-await-attempt-completion",
+					},
+				],
+			},
+			"step-1-await-attempt-completion": {
+				id: "step-1-await-attempt-completion",
+				routes: [
+					{
+						id: "step-1-complete-workflow",
+						trigger: { kind: "on_event", eventKind: "attempt_completion_succeeded" },
+						action: { kind: "complete_workflow" },
+					},
+				],
+			},
 		},
-		followingBranchId: "step-1-start-review",
-	},
-	{
-		id: "step-1-create-story-project-prompt",
-		trigger: parentWorkflowInvocation("create-story"),
-		action: { kind: "project_prompt" },
-		followingBranchId: "step-1-await-attempt-completion",
-	},
-	{
-		id: "step-1-write-remediation-story-project-prompt",
-		trigger: parentWorkflowInvocation("write-remediation-story"),
-		action: { kind: "project_prompt" },
-		followingBranchId: "step-1-await-attempt-completion",
-	},
-	{
-		id: "step-1-quick-spec-project-prompt",
-		trigger: parentWorkflowInvocation("quick-spec"),
-		action: { kind: "project_prompt" },
-		followingBranchId: "step-1-await-attempt-completion",
-	},
-]
+	}
+}
 ```
-
-The `step-1-start-review` branch must retain the existing `step-1-project-prompt` route with action `{ kind: "project_prompt" }` and `followingBranchId: "step-1-await-attempt-completion"`. The `step-1-await-attempt-completion` branch must retain the existing `step-1-complete-workflow` route with trigger `{ kind: "on_event", eventKind: "attempt_completion_succeeded" }` and action `{ kind: "complete_workflow" }`.
 
 - [ ] 7.6. In `src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWorkflow.ts`, add this exact `childInheritance` property to `validateStoryWorkflowDefinition` immediately after `prerequisiteFiles: VALIDATE_STORY_PREREQUISITE_FILES`:
 
 ```ts
 childInheritance: [
+	{ parentKey: "projectTitle", childKey: "projectTitle" },
+	{ parentKey: "projectFolderName", childKey: "projectFolderName" },
 	{ parentKey: "target_story", childKey: "target_story" },
 	{ parentKey: "epics_document", childKey: "epics_document" },
 	{ parentKey: "architecture_document", childKey: "architecture_document" },
@@ -431,6 +454,8 @@ function createDecisionEvaluationInput(parentWorkflowName?: string): WorkflowDec
 
 ```ts
 expect(validateStoryWorkflowDefinition.childInheritance).to.deep.equal([
+	{ parentKey: "projectTitle", childKey: "projectTitle" },
+	{ parentKey: "projectFolderName", childKey: "projectFolderName" },
 	{ parentKey: "target_story", childKey: "target_story" },
 	{ parentKey: "epics_document", childKey: "epics_document" },
 	{ parentKey: "architecture_document", childKey: "architecture_document" },
@@ -453,7 +478,7 @@ renders the quick-spec child Step 1 prompt variant with inherited spec path
 
 The main-agent test must assert that the rendered prompt includes `PROJECT_TITLE`, `PROJECT_FOLDER_NAME`, `TARGET_STORY_PATH`, `EPICS_DOCUMENT_PATH`, `ARCHITECTURE_DOCUMENT_PATH`, `You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.`, and `Once you've reviewed the story document, provide a response to the user using attempt_completion.`. It must assert the rendered prompt does not include `You have been called inside a workflow designed to validate a remediation story before implementation.`, `You have been called inside a workflow designed to validate an implementation spec for a small project.`, `Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.`, `{workflow.projectTitle}`, `{workflow.projectFolderName}`, `{workflow.target_story}`, `{workflow.epics_document}`, `{workflow.architecture_document}`, `*** conditional prompt`, and `*** end conditional`.
 
-The create-story child test must use `createPromptBuilderInput({ parentWorkflowName: "create-story" })`, assert the rendered prompt includes `TARGET_STORY_PATH`, `EPICS_DOCUMENT_PATH`, `ARCHITECTURE_DOCUMENT_PATH`, `You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.`, and `Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.`, and assert it does not include `You have been called inside a workflow designed to validate a remediation story before implementation.`, `You have been called inside a workflow designed to validate an implementation spec for a small project.`, `{workflow.target_story}`, `{workflow.epics_document}`, `{workflow.architecture_document}`, `*** conditional prompt`, or `*** end conditional`.
+The create-story child test must use `createPromptBuilderInput({ parentWorkflowName: "create-story" })`, assert the rendered prompt includes `PROJECT_TITLE`, `PROJECT_FOLDER_NAME`, `TARGET_STORY_PATH`, `EPICS_DOCUMENT_PATH`, `ARCHITECTURE_DOCUMENT_PATH`, `You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.`, and `Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.`, and assert it does not include `You have been called inside a workflow designed to validate a remediation story before implementation.`, `You have been called inside a workflow designed to validate an implementation spec for a small project.`, `{workflow.projectTitle}`, `{workflow.projectFolderName}`, `{workflow.target_story}`, `{workflow.epics_document}`, `{workflow.architecture_document}`, `*** conditional prompt`, or `*** end conditional`.
 
 The write-remediation-story child test must use `createPromptBuilderInput({ parentWorkflowName: "write-remediation-story", workflowValues: createWorkflowValues({ [ValidateStoryWorkflowValueKey.OriginatingStory]: ORIGINATING_STORY_PATH, [ValidateStoryWorkflowValueKey.CodeReviewOutput]: CODE_REVIEW_OUTPUT_PATH }) })`, assert the rendered prompt includes `TARGET_STORY_PATH`, `ORIGINATING_STORY_PATH`, `CODE_REVIEW_OUTPUT_PATH`, `You have been called inside a workflow designed to validate a remediation story before implementation.`, and `Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.`, and assert it does not include `- Epics Documentation:`, `- Architecture Document:`, `You have been called inside a workflow designed to validate an implementation spec for a small project.`, `{workflow.target_story}`, `{workflow.originating_story}`, `{workflow.code_review_output}`, `*** conditional prompt`, or `*** end conditional`.
 
@@ -464,6 +489,19 @@ The quick-spec child test must use `createPromptBuilderInput({ parentWorkflowNam
 - [ ] 8.10. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, update the route assertions in the renamed routing test with these exact assertions for the route-by-invocation branch:
 
 ```ts
+const routeByInvocation = getStep("step-1").decisionTree.branches["step-1-route-by-invocation"]
+expect(routeByInvocation).to.not.equal(undefined)
+if (routeByInvocation === undefined) {
+	throw new Error("Missing validate-story route-by-invocation branch")
+}
+expect(routeByInvocation.id).to.equal("step-1-route-by-invocation")
+expect(routeByInvocation.routes.map((route) => route.id)).to.deep.equal([
+	"step-1-main-agent-resolve-prerequisites",
+	"step-1-create-story-project-prompt",
+	"step-1-write-remediation-story-project-prompt",
+	"step-1-quick-spec-project-prompt",
+])
+
 const mainAgentRoute = routeByInvocation.routes.find(
 	(route) => route.id === "step-1-main-agent-resolve-prerequisites",
 )
@@ -534,6 +572,37 @@ expect(quickSpecRoute.trigger.matches(createDecisionEvaluationInput("quick-spec"
 expect(quickSpecRoute.trigger.matches(createDecisionEvaluationInput(undefined))).to.equal(false)
 expect(quickSpecRoute.action).to.deep.equal({ kind: "project_prompt" })
 expect(quickSpecRoute.followingBranchId).to.equal("step-1-await-attempt-completion")
+
+const startReviewBranch = getStep("step-1").decisionTree.branches["step-1-start-review"]
+expect(startReviewBranch).to.not.equal(undefined)
+if (startReviewBranch === undefined) {
+	throw new Error("Missing validate-story start-review branch")
+}
+expect(startReviewBranch.id).to.equal("step-1-start-review")
+expect(startReviewBranch.routes.map((route) => route.id)).to.deep.equal(["step-1-project-prompt"])
+const projectPromptRoute = startReviewBranch.routes[0]
+expect(projectPromptRoute).to.not.equal(undefined)
+if (projectPromptRoute === undefined) {
+	throw new Error("Missing validate-story project-prompt route")
+}
+expect(projectPromptRoute.trigger).to.deep.equal({ kind: "always" })
+expect(projectPromptRoute.action).to.deep.equal({ kind: "project_prompt" })
+expect(projectPromptRoute.followingBranchId).to.equal("step-1-await-attempt-completion")
+
+const completionBranch = getStep("step-1").decisionTree.branches["step-1-await-attempt-completion"]
+expect(completionBranch).to.not.equal(undefined)
+if (completionBranch === undefined) {
+	throw new Error("Missing validate-story completion branch")
+}
+expect(completionBranch.id).to.equal("step-1-await-attempt-completion")
+expect(completionBranch.routes.map((route) => route.id)).to.deep.equal(["step-1-complete-workflow"])
+const completionRoute = completionBranch.routes[0]
+expect(completionRoute).to.not.equal(undefined)
+if (completionRoute === undefined) {
+	throw new Error("Missing validate-story completion route")
+}
+expect(completionRoute.trigger).to.deep.equal({ kind: "on_event", eventKind: "attempt_completion_succeeded" })
+expect(completionRoute.action).to.deep.equal({ kind: "complete_workflow" })
 ```
 
 - [ ] 8.11. In `src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts`, add a new test named exactly `"activates child contexts directly to project prompt with inherited values and no forms"` after the main-agent prerequisite runtime tests. The test must create three exact cases:
@@ -543,12 +612,16 @@ expect(quickSpecRoute.followingBranchId).to.equal("step-1-await-attempt-completi
 	{
 		parentWorkflowName: "create-story",
 		parentValues: {
+			projectTitle: PROJECT_TITLE,
+			projectFolderName: PROJECT_FOLDER_NAME,
 			target_story: TARGET_STORY_PATH,
 			epics_document: EPICS_DOCUMENT_PATH,
 			architecture_document: ARCHITECTURE_DOCUMENT_PATH,
 			ignored_parent: "drop",
 		},
 		expectedChildValues: {
+			projectTitle: PROJECT_TITLE,
+			projectFolderName: PROJECT_FOLDER_NAME,
 			target_story: TARGET_STORY_PATH,
 			epics_document: EPICS_DOCUMENT_PATH,
 			architecture_document: ARCHITECTURE_DOCUMENT_PATH,
@@ -587,9 +660,9 @@ For each case, activate `VALIDATE_STORY_WORKFLOW_NAME` through `WorkflowRuntime.
 
 - [ ] 9.2. Run `npm run check-types` with elevated permissions. If this command fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` with elevated permissions before treating the failure as a code defect.
 
-- [ ] 9.3. Run `git diff --name-only` and confirm persistent tracked diffs are limited to files listed in the Phase 1 and Phase 2 allowed-files sets plus the known pre-existing documentation diffs listed in this plan.
+- [ ] 9.3. Run `git diff --name-only` and confirm persistent tracked diffs are limited to files listed in the Phase 1 and Phase 2 allowed-files sets.
 
-- [ ] 9.4. Run `git ls-files --others --exclude-standard` and confirm untracked files are limited to `docs/workflows/workflow-runtime/workflow-modules/validate-story/validate-story-subagent-update-requirements.md` and `docs/workflows/workflow-runtime/workflow-modules/validate-story/validate-story-subagent-update-action-plan.md`.
+- [ ] 9.4. Run `git ls-files --others --exclude-standard` and confirm it returns no output.
 
 ## Phase 3: Prompt Projection And Final Validation
 
@@ -600,7 +673,18 @@ Allowed files:
 
 ### Task 10: Update Validate-Story Prompt Projection Coverage
 
-- [ ] 10.1. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add these constants after `VALIDATE_STORY_ARCHITECTURE_DOCUMENT`:
+- [ ] 10.1. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add this exact import after the existing `WorkflowRuntime` import:
+
+```ts
+import {
+	resolveWorkflowBySlashCommand,
+	resolveWorkflowByUseSkillName,
+} from "@/core/task/workflow-runtime/WorkflowRegistry"
+```
+
+In the existing import from `"@/core/task/workflow-runtime/workflow-modules/validate-story"`, add `VALIDATE_STORY_WORKFLOW_SLASH_COMMAND_NAME` and `VALIDATE_STORY_WORKFLOW_USE_SKILL_NAME` immediately after `VALIDATE_STORY_WORKFLOW_NAME`. Do not remove `VALIDATE_STORY_WORKFLOW_NAME` or `ValidateStoryWorkflowValueKey`.
+
+- [ ] 10.2. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add these constants after `VALIDATE_STORY_ARCHITECTURE_DOCUMENT`:
 
 ```ts
 const VALIDATE_STORY_ORIGINATING_STORY = `${VALIDATE_STORY_PROJECT_ROOT}/implementation/stories-complete/Story-1-0.md`
@@ -608,7 +692,7 @@ const VALIDATE_STORY_CODE_REVIEW_OUTPUT = `${VALIDATE_STORY_PROJECT_ROOT}/review
 const VALIDATE_STORY_QUICK_SPEC_DOCUMENT = `${VALIDATE_STORY_PROJECT_ROOT}/planning/quick-spec.md`
 ```
 
-- [ ] 10.2. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, update `createValidateStoryWorkflowSession(...)` to accept `parentWorkflowName?: string` as a second parameter and to build lifecycle with this exact shape:
+- [ ] 10.3. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, update `createValidateStoryWorkflowSession(...)` to accept `parentWorkflowName?: string` as a second parameter and to build lifecycle with this exact shape:
 
 ```ts
 lifecycle: {
@@ -617,28 +701,73 @@ lifecycle: {
 },
 ```
 
-- [ ] 10.3. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, update `buildValidateStoryPromptContext(...)` to accept this exact argument object instead of a bare workflow-values parameter:
+- [ ] 10.4. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, replace `buildValidateStoryPromptContext(...)` with this exact helper:
 
 ```ts
 async function buildValidateStoryPromptContext(
 	args: {
 		workflowValues?: WorkflowValues
 		parentWorkflowName?: string
+		activationKind?: "slash_command" | "use_skill"
 	} = {},
-): Promise<SystemPromptContext & WorkflowPromptProjection>
+): Promise<SystemPromptContext & WorkflowPromptProjection> {
+	const workspacePathPolicy: WorkflowWorkspacePathPolicy = {
+		validateAccess: () => true,
+	}
+	const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })
+	const taskState = new TaskState()
+	const workflow =
+		args.activationKind === "use_skill"
+			? resolveWorkflowByUseSkillName(VALIDATE_STORY_WORKFLOW_USE_SKILL_NAME)
+			: resolveWorkflowBySlashCommand(VALIDATE_STORY_WORKFLOW_SLASH_COMMAND_NAME)
+	if (workflow === undefined) {
+		throw new Error("Expected validate-story workflow to resolve for prompt projection.")
+	}
+	const workflowValues = args.workflowValues ?? createValidateStoryWorkflowValues()
+	if (args.parentWorkflowName === undefined) {
+		const activation = await runtime.activateWorkflow({
+			taskState,
+			workflowName: workflow.name,
+		})
+		expect(activation.kind).to.equal("render_workflow_form")
+		taskState.activeWorkflowSession = createValidateStoryWorkflowSession(workflowValues, undefined)
+	} else {
+		const parentSession = createValidateStoryWorkflowSession(workflowValues, undefined)
+		const activation = await runtime.activateWorkflow({
+			taskState,
+			workflowName: workflow.name,
+			parentSession,
+			parentWorkflowName: args.parentWorkflowName,
+		})
+		expect(activation.kind).to.equal("project_prompt")
+	}
+	taskState.apiRequestCount = 1
+	const workflowProjection = await runtime.buildTurnProjection({ taskState })
+
+	return {
+		...baseContext,
+		mcpHub: makeMcpHub([]),
+		providerInfo: makeProviderInfo("gpt-5-codex", "openai"),
+		enableNativeToolCalls: true,
+		useMinimalGptPrompt: true,
+		...workflowProjection,
+	}
+}
 ```
 
-The helper must call `createValidateStoryWorkflowSession(args.workflowValues ?? createValidateStoryWorkflowValues(), args.parentWorkflowName)`.
+- [ ] 10.5. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, update existing zero-argument calls to `buildValidateStoryPromptContext()` so they keep using the new zero-argument default object, which resolves validate-story through `resolveWorkflowBySlashCommand(VALIDATE_STORY_WORKFLOW_SLASH_COMMAND_NAME)`. Do not change prompt context helpers for other workflows.
 
-- [ ] 10.4. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, update existing zero-argument calls to `buildValidateStoryPromptContext()` so they keep using the new zero-argument default object. Do not change prompt context helpers for other workflows.
+- [ ] 10.6. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, replace the existing `"projects validate-story Step 1 materialized values into full-turn and continuation payloads"` test with a test named exactly `"projects validate-story main-agent Step 1 materialized values into full-turn and continuation payloads"`. The test must build its context with `const context = await buildValidateStoryPromptContext({ activationKind: "slash_command" })`. Preserve the existing full-turn and continuation non-empty checks and exact includes for `VALIDATE_STORY_TARGET_STORY`, `VALIDATE_STORY_EPICS_DOCUMENT`, `VALIDATE_STORY_ARCHITECTURE_DOCUMENT`, `"Validate Story Session"`, and `"validate-story-project"`. Preserve exact negative assertions for `{workflow.target_story}`, `{workflow.epics_document}`, `{workflow.architecture_document}`, `{workflow.projectTitle}`, `{workflow.projectFolderName}`, `target_story`, `epics_document`, `architecture_document`, `projectTitle`, and `projectFolderName`. Add exact negative assertions for `"*** conditional prompt"` and `"*** end conditional"`.
 
-- [ ] 10.5. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, replace the existing `"projects validate-story Step 1 materialized values into full-turn and continuation payloads"` test with a test named exactly `"projects validate-story main-agent Step 1 materialized values into full-turn and continuation payloads"`. Preserve the existing full-turn and continuation non-empty checks and exact includes for `VALIDATE_STORY_TARGET_STORY`, `VALIDATE_STORY_EPICS_DOCUMENT`, `VALIDATE_STORY_ARCHITECTURE_DOCUMENT`, `"Validate Story Session"`, and `"validate-story-project"`. Preserve exact negative assertions for `{workflow.target_story}`, `{workflow.epics_document}`, `{workflow.architecture_document}`, `{workflow.projectTitle}`, `{workflow.projectFolderName}`, `target_story`, `epics_document`, `architecture_document`, `projectTitle`, and `projectFolderName`. Add exact negative assertions for `"*** conditional prompt"` and `"*** end conditional"`.
-
-- [ ] 10.6. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add a new test named exactly `"projects validate-story child prompt variants by parent workflow context"` after the renamed main-agent materialized-values test. The test must build three contexts:
+- [ ] 10.7. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add a new test named exactly `"projects validate-story child prompt variants by parent workflow context"` after the renamed main-agent materialized-values test. The test must build three contexts through use-skill activation:
 
 ```ts
-const createStoryContext = await buildValidateStoryPromptContext({ parentWorkflowName: "create-story" })
+const createStoryContext = await buildValidateStoryPromptContext({
+	activationKind: "use_skill",
+	parentWorkflowName: "create-story",
+})
 const remediationContext = await buildValidateStoryPromptContext({
+	activationKind: "use_skill",
 	parentWorkflowName: "write-remediation-story",
 	workflowValues: createValidateStoryWorkflowValues({
 		[ValidateStoryWorkflowValueKey.OriginatingStory]: VALIDATE_STORY_ORIGINATING_STORY,
@@ -646,9 +775,10 @@ const remediationContext = await buildValidateStoryPromptContext({
 	}),
 })
 const quickSpecContext = await buildValidateStoryPromptContext({
+	activationKind: "use_skill",
 	parentWorkflowName: "quick-spec",
 	workflowValues: createValidateStoryWorkflowValues({
-		[ValidateStoryWorkflowValueKey.TargetStory]: VALIDATE_STORY_QUICK_SPEC_DOCUMENT,
+		output_document: VALIDATE_STORY_QUICK_SPEC_DOCUMENT,
 	}),
 })
 ```
@@ -672,13 +802,13 @@ function getValidateStoryPayloadBlocks(
 }
 ```
 
-For `createStoryContext`, iterate `for (const payloadBlock of getValidateStoryPayloadBlocks(createStoryContext, "create-story validate-story"))` and assert each `payloadBlock` includes `You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.`, `VALIDATE_STORY_TARGET_STORY`, `VALIDATE_STORY_EPICS_DOCUMENT`, `VALIDATE_STORY_ARCHITECTURE_DOCUMENT`, and `Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.`; assert each `payloadBlock` excludes `You have been called inside a workflow designed to validate a remediation story before implementation.`, `You have been called inside a workflow designed to validate an implementation spec for a small project.`, `Once you've reviewed the story document, provide a response to the user using attempt_completion.`, `{workflow.target_story}`, `{workflow.epics_document}`, `{workflow.architecture_document}`, `"*** conditional prompt"`, and `"*** end conditional"`.
+For `createStoryContext`, iterate `for (const payloadBlock of getValidateStoryPayloadBlocks(createStoryContext, "create-story validate-story"))` and assert each `payloadBlock` includes `You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.`, `"Validate Story Session"`, `"validate-story-project"`, `VALIDATE_STORY_TARGET_STORY`, `VALIDATE_STORY_EPICS_DOCUMENT`, `VALIDATE_STORY_ARCHITECTURE_DOCUMENT`, and `Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.`; assert each `payloadBlock` excludes `You have been called inside a workflow designed to validate a remediation story before implementation.`, `You have been called inside a workflow designed to validate an implementation spec for a small project.`, `Once you've reviewed the story document, provide a response to the user using attempt_completion.`, `{workflow.projectTitle}`, `{workflow.projectFolderName}`, `{workflow.target_story}`, `{workflow.epics_document}`, `{workflow.architecture_document}`, `"*** conditional prompt"`, and `"*** end conditional"`.
 
-For `remediationContext`, iterate `for (const payloadBlock of getValidateStoryPayloadBlocks(remediationContext, "write-remediation-story validate-story"))` and assert each `payloadBlock` includes `You have been called inside a workflow designed to validate a remediation story before implementation.`, `VALIDATE_STORY_TARGET_STORY`, `VALIDATE_STORY_ORIGINATING_STORY`, `VALIDATE_STORY_CODE_REVIEW_OUTPUT`, and `Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.`; assert each `payloadBlock` excludes `You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.`, `You have been called inside a workflow designed to validate an implementation spec for a small project.`, `"- Epics Documentation:"`, `"- Architecture Document:"`, `{workflow.originating_story}`, `{workflow.code_review_output}`, `"*** conditional prompt"`, and `"*** end conditional"`.
+For `remediationContext`, iterate `for (const payloadBlock of getValidateStoryPayloadBlocks(remediationContext, "write-remediation-story validate-story"))` and assert each `payloadBlock` includes `You have been called inside a workflow designed to validate a remediation story before implementation.`, `VALIDATE_STORY_TARGET_STORY`, `VALIDATE_STORY_ORIGINATING_STORY`, `VALIDATE_STORY_CODE_REVIEW_OUTPUT`, and `Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.`; assert each `payloadBlock` excludes `You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.`, `You have been called inside a workflow designed to validate an implementation spec for a small project.`, `"- Epics Documentation:"`, `"- Architecture Document:"`, `{workflow.target_story}`, `{workflow.originating_story}`, `{workflow.code_review_output}`, `"*** conditional prompt"`, and `"*** end conditional"`.
 
 For `quickSpecContext`, iterate `for (const payloadBlock of getValidateStoryPayloadBlocks(quickSpecContext, "quick-spec validate-story"))` and assert each `payloadBlock` includes `You have been called inside a workflow designed to validate an implementation spec for a small project.`, `Spec for review: ${VALIDATE_STORY_QUICK_SPEC_DOCUMENT}`, and `Once you've performed your review, use attempt_completion to provide detailed findings back to the primary agent.`; assert each `payloadBlock` excludes `You are performing a pre-implementation review of an implementation-story document before it is passed to the developer for implementation.`, `You have been called inside a workflow designed to validate a remediation story before implementation.`, `"- Epics Documentation:"`, `"- Architecture Document:"`, `{workflow.target_story}`, `"*** conditional prompt"`, and `"*** end conditional"`.
 
-- [ ] 10.7. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, keep the validate-story Step 1 native tool projection assertion exactly `expect(context.workflowToolSchemaOverride).to.deep.equal(buildValidateStoryStep1ToolSchemas())` and keep the non-native prompt test's exact approved-tool assertions based on `buildValidateStoryStep1ToolSchemas().map((tool) => tool.name)`.
+- [ ] 10.8. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, keep the validate-story Step 1 native tool projection assertion exactly `expect(context.workflowToolSchemaOverride).to.deep.equal(buildValidateStoryStep1ToolSchemas())` and keep the non-native prompt test's exact approved-tool assertions based on `buildValidateStoryStep1ToolSchemas().map((tool) => tool.name)`.
 
 ### Task 11: Final Validation
 
@@ -711,7 +841,7 @@ For `quickSpecContext`, iterate `for (const payloadBlock of getValidateStoryPayl
 - [ ] 11.14. Run `git diff --name-only` and confirm tracked diffs are limited to this exact set:
 
 ```text
-docs/workflows/workflow-runtime/workflow-modules/validate-story/validate-story.md
+docs/workflows/workflow-runtime/workflow-modules/validate-story/validate-story-subagent-update-action-plan.md
 src/core/task/tools/subagent/SubagentRunner.ts
 src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts
 src/core/task/workflow-runtime/WorkflowRuntime.ts
@@ -724,12 +854,7 @@ src/core/task/workflow-runtime/workflow-modules/validate-story/validateStoryWork
 src/core/prompts/system-prompt/__tests__/integration.test.ts
 ```
 
-- [ ] 11.15. Run `git ls-files --others --exclude-standard` and confirm untracked files are limited to this exact set:
-
-```text
-docs/workflows/workflow-runtime/workflow-modules/validate-story/validate-story-subagent-update-requirements.md
-docs/workflows/workflow-runtime/workflow-modules/validate-story/validate-story-subagent-update-action-plan.md
-```
+- [ ] 11.15. Run `git ls-files --others --exclude-standard` and confirm it returns no output.
 
 ## Authoring Compliance Matrix
 
@@ -759,7 +884,7 @@ docs/workflows/workflow-runtime/workflow-modules/validate-story/validate-story-s
 | 5.1 | lines 303-317 | command | focused runtime/subagent/sibling tests | exact `npm run test:unit -- ...` command | no cleanup | direct validation |
 | 5.2 | lines 303-317 | command | typecheck/proto fallback | elevated exact command and fallback condition | no cleanup | direct validation |
 | 5.3 | lines 303-317 | command | tracked scope diff | exact allowed tracked scope | no cleanup | direct validation |
-| 5.4 | lines 303-317 | command | untracked scope diff | exact allowed untracked scope | no cleanup | direct validation |
+| 5.4 | lines 303-317 | command | untracked scope diff | exact no-output expectation | no cleanup | direct validation |
 | 6.1 | lines 119-230 | `validateStoryWorkflow.ts` | type-only import | exact imports to add and retain | import cleanup constrained | 9.1, 11.4, 11.6 |
 | 6.2 | lines 45-55 | `validateStoryWorkflow.ts` | `ValidateStoryWorkflowValueKey` | exact enum members and placement | no cleanup | 9.1, 11.4 |
 | 6.3 | lines 45-55 | `validateStoryWorkflow.ts` | `VALIDATE_STORY_WORKFLOW_VALUE_KEYS` | exact key additions and placement | no cleanup | 9.1, 11.4 |
@@ -790,14 +915,15 @@ docs/workflows/workflow-runtime/workflow-modules/validate-story/validate-story-s
 | 9.1 | lines 303-317 | command | focused validate-story tests | exact `npm run test:unit -- ...` command | no cleanup | direct validation |
 | 9.2 | lines 303-317 | command | typecheck/proto fallback | elevated exact command and fallback condition | no cleanup | direct validation |
 | 9.3 | lines 303-317 | command | tracked scope diff | exact Phase 1/2 allowed tracked scope | no cleanup | direct validation |
-| 9.4 | lines 303-317 | command | untracked scope diff | exact allowed untracked scope | no cleanup | direct validation |
-| 10.1 | lines 119-230, 282-301 | `integration.test.ts` | prompt path constants | exact constants and values | no cleanup | 11.5 |
-| 10.2 | lines 56-71, 282-301 | `integration.test.ts` | `createValidateStoryWorkflowSession` | exact second parameter and lifecycle shape | no cleanup | 11.5 |
-| 10.3 | lines 119-230, 282-301 | `integration.test.ts` | `buildValidateStoryPromptContext` | exact argument object and return type | old bare-value parameter replaced | 11.5 |
-| 10.4 | lines 282-301 | `integration.test.ts` | zero-argument context calls | exact zero-argument behavior retained | forbids other workflow helper changes | 11.5 |
-| 10.5 | lines 119-230, 282-301 | `integration.test.ts` | main-agent projection test | exact test rename, includes, exclusions | stale prompt projection assertions replaced | 11.5 |
-| 10.6 | lines 119-230, 282-301 | `integration.test.ts` | child prompt projection test | exact contexts, optional block narrowing, includes, exclusions | no cleanup | 11.5 |
-| 10.7 | lines 232-260, 282-301 | `integration.test.ts` | tool projection assertions | exact native and non-native schema assertions | no cleanup | 11.5 |
+| 9.4 | lines 303-317 | command | untracked scope diff | exact no-output expectation | no cleanup | direct validation |
+| 10.1 | lines 303-310 | `integration.test.ts` | `resolveWorkflowBySlashCommand`, `resolveWorkflowByUseSkillName`, validate-story activation constants | exact imports for slash-command and use-skill prompt projection | import additions named exactly | 11.5 |
+| 10.2 | lines 119-230, 282-301 | `integration.test.ts` | prompt path constants | exact constants and values | no cleanup | 11.5 |
+| 10.3 | lines 56-71, 282-301 | `integration.test.ts` | `createValidateStoryWorkflowSession` | exact second parameter and lifecycle shape | no cleanup | 11.5 |
+| 10.4 | lines 119-230, 282-310 | `integration.test.ts` | `buildValidateStoryPromptContext` | exact slash-command/use-skill activation helper body | old bare-value parameter replaced | 11.5 |
+| 10.5 | lines 282-310 | `integration.test.ts` | zero-argument context calls | exact slash-command default behavior retained | forbids other workflow helper changes | 11.5 |
+| 10.6 | lines 119-230, 282-310 | `integration.test.ts` | main-agent projection test | exact slash-command context, test rename, includes, exclusions | main-agent prompt projection assertion replaced | 11.5 |
+| 10.7 | lines 119-230, 282-310 | `integration.test.ts` | child prompt projection test | exact use-skill contexts, optional block narrowing, includes, exclusions | child prompt contexts replaced | 11.5 |
+| 10.8 | lines 232-260, 282-301 | `integration.test.ts` | tool projection assertions | exact native and non-native schema assertions | no cleanup | 11.5 |
 | 11.1 | lines 303-317 | command | runtime unit tests | exact command | no cleanup | direct validation |
 | 11.2 | lines 303-317 | command | subagent unit tests | exact command | no cleanup | direct validation |
 | 11.3 | lines 303-317 | command | sibling child-workflow unit tests | exact command | no cleanup | direct validation |
@@ -812,4 +938,4 @@ docs/workflows/workflow-runtime/workflow-modules/validate-story/validate-story-s
 | 11.12 | lines 232-260, 303-317 | command | forbidden legacy workflow static guard | exact `rg` command and no-match expectation | no cleanup | direct validation |
 | 11.13 | lines 303-317 | command | initial action-plan drift guard | exact `git diff --name-only -- .../action-plan.md` command | no cleanup | direct validation |
 | 11.14 | lines 303-317 | command | tracked scope diff | exact final tracked allowlist | no cleanup | direct validation |
-| 11.15 | lines 303-317 | command | untracked scope diff | exact final untracked allowlist | no cleanup | direct validation |
+| 11.15 | lines 303-317 | command | untracked scope diff | exact final no-output expectation | no cleanup | direct validation |
