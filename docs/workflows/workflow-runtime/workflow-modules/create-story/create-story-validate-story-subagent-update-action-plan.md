@@ -50,13 +50,13 @@ Allowed files:
 
 ### Task 1: Update Create-Story Tool Schema Imports
 
-- [ ] 1.1. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`, add the exact import `import { ClineToolSet } from "@/core/prompts/system-prompt/registry/ClineToolSet"` before the existing `ClineToolSpec` import.
+- [x] 1.1. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`, add the exact import `import { ClineToolSet } from "@/core/prompts/system-prompt/registry/ClineToolSet"` before the existing `ClineToolSpec` import.
 
-- [ ] 1.2. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`, add the exact import `import { registerClineToolSets } from "@/core/prompts/system-prompt/tools/init"` after the existing `ClineToolSpec` import.
+- [x] 1.2. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`, add the exact import `import { registerClineToolSets } from "@/core/prompts/system-prompt/tools/init"` after the existing `ClineToolSpec` import.
 
 ### Task 2: Add Shared Tool Id Arrays And Step Builders
 
-- [ ] 2.1. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`, add this exact exported Step 2 tool id array after `const CREATE_STORY_TOOL_SCHEMA_VARIANT = ModelFamily.NATIVE_GPT_5`:
+- [x] 2.1. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`, add this exact exported Step 2 tool id array after `const CREATE_STORY_TOOL_SCHEMA_VARIANT = ModelFamily.NATIVE_GPT_5`:
 
 ```ts
 export const CREATE_STORY_STEP_2_TOOL_IDS: readonly ClineDefaultTool[] = [
@@ -72,7 +72,7 @@ export const CREATE_STORY_STEP_2_TOOL_IDS: readonly ClineDefaultTool[] = [
 ]
 ```
 
-- [ ] 2.2. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`, add this exact exported Step 3 tool id array immediately after `CREATE_STORY_STEP_2_TOOL_IDS`:
+- [x] 2.2. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`, add this exact exported Step 3 tool id array immediately after `CREATE_STORY_STEP_2_TOOL_IDS`:
 
 ```ts
 export const CREATE_STORY_STEP_3_TOOL_IDS: readonly ClineDefaultTool[] = [
@@ -89,7 +89,7 @@ export const CREATE_STORY_STEP_3_TOOL_IDS: readonly ClineDefaultTool[] = [
 ]
 ```
 
-- [ ] 2.3. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`, add this exact resolver immediately after `CREATE_STORY_STEP_3_TOOL_IDS`:
+- [x] 2.3. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`, add this exact resolver immediately after `CREATE_STORY_STEP_3_TOOL_IDS`:
 
 ```ts
 function resolveCreateStorySharedToolSpec(toolId: ClineDefaultTool): ClineToolSpec {
@@ -103,13 +103,13 @@ function resolveCreateStorySharedToolSpec(toolId: ClineDefaultTool): ClineToolSp
 }
 ```
 
-- [ ] 2.4. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`, replace the entire `buildCreateStoryStep2ToolSchemas` body with this exact body:
+- [x] 2.4. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`, replace the entire `buildCreateStoryStep2ToolSchemas` body with this exact body:
 
 ```ts
 	return CREATE_STORY_STEP_2_TOOL_IDS.map((toolId) => resolveCreateStorySharedToolSpec(toolId))
 ```
 
-- [ ] 2.5. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`, replace the entire `buildCreateStoryStep3ToolSchemas` body with this exact body:
+- [x] 2.5. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`, replace the entire `buildCreateStoryStep3ToolSchemas` body with this exact body:
 
 ```ts
 	return CREATE_STORY_STEP_3_TOOL_IDS.map((toolId) => resolveCreateStorySharedToolSpec(toolId))
@@ -117,25 +117,25 @@ function resolveCreateStorySharedToolSpec(toolId: ClineDefaultTool): ClineToolSp
 
 ### Task 3: Update Tool Schema Unit Tests
 
-- [ ] 3.1. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, add these exact imports after the `ClineToolSpec` import: `import { ClineToolSet } from "@/core/prompts/system-prompt/registry/ClineToolSet"`, `import { registerClineToolSets } from "@/core/prompts/system-prompt/tools/init"`, and `import { ModelFamily } from "@/shared/prompts"`.
+- [x] 3.1. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, add these exact imports after the `ClineToolSpec` import: `import { ClineToolSet } from "@/core/prompts/system-prompt/registry/ClineToolSet"`, `import { registerClineToolSets } from "@/core/prompts/system-prompt/tools/init"`, and `import { ModelFamily } from "@/shared/prompts"`.
 
-- [ ] 3.2. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, update the module import from `../createStoryToolSchemas` so it imports exactly `CREATE_STORY_STEP_2_TOOL_IDS`, `CREATE_STORY_STEP_3_TOOL_IDS`, `buildCreateStoryStep1ToolSchemas`, `buildCreateStoryStep2ToolSchemas`, and `buildCreateStoryStep3ToolSchemas`.
+- [x] 3.2. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, update the module import from `../createStoryToolSchemas` so it imports exactly `CREATE_STORY_STEP_2_TOOL_IDS`, `CREATE_STORY_STEP_3_TOOL_IDS`, `buildCreateStoryStep1ToolSchemas`, `buildCreateStoryStep2ToolSchemas`, and `buildCreateStoryStep3ToolSchemas`.
 
-- [ ] 3.3. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, replace `STEP_3_TOOL_NAMES` with the exact string array `["list_files", "search_files", "list_code_definition_names", "read_file", "read_file_range", "apply_patch", "send_user_message", "ask_followup_question", "use_subagents", "attempt_completion"]`.
+- [x] 3.3. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, replace `STEP_3_TOOL_NAMES` with the exact string array `["list_files", "search_files", "list_code_definition_names", "read_file", "read_file_range", "apply_patch", "send_user_message", "ask_followup_question", "use_subagents", "attempt_completion"]`.
 
-- [ ] 3.4. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, delete the `STEP_4_TOOL_NAMES` constant.
+- [x] 3.4. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, delete the `STEP_4_TOOL_NAMES` constant.
 
-- [ ] 3.5. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, replace `CREATE_STORY_STEP_BUILDERS` with an array containing exactly `buildCreateStoryStep1ToolSchemas`, `buildCreateStoryStep2ToolSchemas`, and `buildCreateStoryStep3ToolSchemas`.
+- [x] 3.5. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, replace `CREATE_STORY_STEP_BUILDERS` with an array containing exactly `buildCreateStoryStep1ToolSchemas`, `buildCreateStoryStep2ToolSchemas`, and `buildCreateStoryStep3ToolSchemas`.
 
-- [ ] 3.6. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, rename the test `"exposes the exact Step 1 through Step 4 tool schema order"` to `"exposes the exact Step 1 through Step 3 tool schema order"`.
+- [x] 3.6. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, rename the test `"exposes the exact Step 1 through Step 4 tool schema order"` to `"exposes the exact Step 1 through Step 3 tool schema order"`.
 
-- [ ] 3.7. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, remove the assertion that calls `buildCreateStoryStep4ToolSchemas()`.
+- [x] 3.7. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, remove the assertion that calls `buildCreateStoryStep4ToolSchemas()`.
 
-- [ ] 3.8. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, add a test named `"resolves create-story shared/default tool schemas through the registered tool set"` that calls `registerClineToolSets()`, defines `const expectedStep2Schemas = CREATE_STORY_STEP_2_TOOL_IDS.map((toolId) => ClineToolSet.getToolByNameWithFallback(toolId, ModelFamily.NATIVE_GPT_5)?.config)`, defines `const expectedStep3Schemas = CREATE_STORY_STEP_3_TOOL_IDS.map((toolId) => ClineToolSet.getToolByNameWithFallback(toolId, ModelFamily.NATIVE_GPT_5)?.config)`, then asserts `expect(buildCreateStoryStep2ToolSchemas()).to.deep.equal(expectedStep2Schemas)` and `expect(buildCreateStoryStep3ToolSchemas()).to.deep.equal(expectedStep3Schemas)`.
+- [x] 3.8. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, add a test named `"resolves create-story shared/default tool schemas through the registered tool set"` that calls `registerClineToolSets()`, defines `const expectedStep2Schemas = CREATE_STORY_STEP_2_TOOL_IDS.map((toolId) => ClineToolSet.getToolByNameWithFallback(toolId, ModelFamily.NATIVE_GPT_5)?.config)`, defines `const expectedStep3Schemas = CREATE_STORY_STEP_3_TOOL_IDS.map((toolId) => ClineToolSet.getToolByNameWithFallback(toolId, ModelFamily.NATIVE_GPT_5)?.config)`, then asserts `expect(buildCreateStoryStep2ToolSchemas()).to.deep.equal(expectedStep2Schemas)` and `expect(buildCreateStoryStep3ToolSchemas()).to.deep.equal(expectedStep3Schemas)`.
 
-- [ ] 3.9. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, add `expect(schemaNames(buildCreateStoryStep3ToolSchemas())).not.to.include("workflow_progress_request")` and `expect(schemaNames(buildCreateStoryStep3ToolSchemas())).to.include("use_subagents")` to the exact Step 1 through Step 3 tool schema order test.
+- [x] 3.9. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, add `expect(schemaNames(buildCreateStoryStep3ToolSchemas())).not.to.include("workflow_progress_request")` and `expect(schemaNames(buildCreateStoryStep3ToolSchemas())).to.include("use_subagents")` to the exact Step 1 through Step 3 tool schema order test.
 
-- [ ] 3.10. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, replace `FORBIDDEN_MODEL_FACING_TOOL_NAMES` with this exact array:
+- [x] 3.10. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, replace `FORBIDDEN_MODEL_FACING_TOOL_NAMES` with this exact array:
 
 ```ts
 const FORBIDDEN_MODEL_FACING_TOOL_NAMES: readonly string[] = [
@@ -153,15 +153,15 @@ const FORBIDDEN_MODEL_FACING_TOOL_NAMES: readonly string[] = [
 
 ### Task 4: Validate Shared Tool Schema Migration
 
-- [ ] 4.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts` and verify the command exits successfully.
+- [x] 4.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts` and verify the command exits successfully.
 
-- [ ] 4.2. Run `npm run check-types` with elevated permissions and verify the command exits successfully. If this command fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` with elevated permissions before treating the failure as a code defect.
+- [x] 4.2. Run `npm run check-types` with elevated permissions and verify the command exits successfully. If this command fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` with elevated permissions before treating the failure as a code defect.
 
-- [ ] 4.3. Run `npm run lint` and verify the command exits successfully.
+- [x] 4.3. Run `npm run lint` and verify the command exits successfully.
 
-- [ ] 4.4. Run `git diff --name-only` and verify tracked diffs are limited to `docs/workflows/workflow-runtime/workflow-modules/create-story/create-story-validate-story-subagent-update-action-plan.md`, `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`, and `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`.
+- [x] 4.4. Run `git diff --name-only` and verify tracked diffs are limited to `docs/workflows/workflow-runtime/workflow-modules/create-story/create-story-validate-story-subagent-update-action-plan.md`, `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`, and `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`.
 
-- [ ] 4.5. Run `git ls-files --others --exclude-standard` and verify untracked files are limited to `docs/workflows/workflow-runtime/workflow-modules/create-story/create-story-validate-story-subagent-update-action-plan.md` and `docs/workflows/workflow-runtime/workflow-modules/create-story/create-story-validate-story-subagent-update-requirements.md`.
+- [x] 4.5. Run `git ls-files --others --exclude-standard` and verify untracked files are limited to `docs/workflows/workflow-runtime/workflow-modules/create-story/create-story-validate-story-subagent-update-action-plan.md` and `docs/workflows/workflow-runtime/workflow-modules/create-story/create-story-validate-story-subagent-update-requirements.md`.
 
 ## Phase 2: Step 3 Prompt And Routing Migration
 

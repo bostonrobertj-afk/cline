@@ -1,11 +1,15 @@
 import { expect } from "chai"
 import { describe, it } from "mocha"
+import { ClineToolSet } from "@/core/prompts/system-prompt/registry/ClineToolSet"
 import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"
+import { registerClineToolSets } from "@/core/prompts/system-prompt/tools/init"
+import { ModelFamily } from "@/shared/prompts"
 import {
 	buildCreateStoryStep1ToolSchemas,
 	buildCreateStoryStep2ToolSchemas,
 	buildCreateStoryStep3ToolSchemas,
-	buildCreateStoryStep4ToolSchemas,
+	CREATE_STORY_STEP_2_TOOL_IDS,
+	CREATE_STORY_STEP_3_TOOL_IDS,
 } from "../createStoryToolSchemas"
 
 type ToolSchemaBuilder = () => readonly ClineToolSpec[]
@@ -33,15 +37,7 @@ const STEP_3_TOOL_NAMES: readonly string[] = [
 	"apply_patch",
 	"send_user_message",
 	"ask_followup_question",
-	"workflow_progress_request",
-]
-
-const STEP_4_TOOL_NAMES: readonly string[] = [
-	"read_file",
-	"read_file_range",
-	"apply_patch",
-	"send_user_message",
-	"ask_followup_question",
+	"use_subagents",
 	"attempt_completion",
 ]
 
@@ -55,15 +51,12 @@ const FORBIDDEN_MODEL_FACING_TOOL_NAMES: readonly string[] = [
 	"archive_workflow_artifact",
 	"delete_workflow_artifact",
 	"move_workflow_project_file",
-	"update_story_index_status",
-	"execute_command",
 ]
 
 const CREATE_STORY_STEP_BUILDERS: readonly ToolSchemaBuilder[] = [
 	buildCreateStoryStep1ToolSchemas,
 	buildCreateStoryStep2ToolSchemas,
 	buildCreateStoryStep3ToolSchemas,
-	buildCreateStoryStep4ToolSchemas,
 ]
 
 function schemaNames(schemas: readonly ClineToolSpec[]): readonly string[] {
@@ -71,11 +64,25 @@ function schemaNames(schemas: readonly ClineToolSpec[]): readonly string[] {
 }
 
 describe("createStoryToolSchemas", () => {
-	it("exposes the exact Step 1 through Step 4 tool schema order", () => {
+	it("exposes the exact Step 1 through Step 3 tool schema order", () => {
 		expect(schemaNames(buildCreateStoryStep1ToolSchemas())).to.deep.equal(STEP_1_TOOL_NAMES)
 		expect(schemaNames(buildCreateStoryStep2ToolSchemas())).to.deep.equal(STEP_2_TOOL_NAMES)
 		expect(schemaNames(buildCreateStoryStep3ToolSchemas())).to.deep.equal(STEP_3_TOOL_NAMES)
-		expect(schemaNames(buildCreateStoryStep4ToolSchemas())).to.deep.equal(STEP_4_TOOL_NAMES)
+		expect(schemaNames(buildCreateStoryStep3ToolSchemas())).not.to.include("workflow_progress_request")
+		expect(schemaNames(buildCreateStoryStep3ToolSchemas())).to.include("use_subagents")
+	})
+
+	it("resolves create-story shared/default tool schemas through the registered tool set", () => {
+		registerClineToolSets()
+		const expectedStep2Schemas = CREATE_STORY_STEP_2_TOOL_IDS.map(
+			(toolId) => ClineToolSet.getToolByNameWithFallback(toolId, ModelFamily.NATIVE_GPT_5)?.config,
+		)
+		const expectedStep3Schemas = CREATE_STORY_STEP_3_TOOL_IDS.map(
+			(toolId) => ClineToolSet.getToolByNameWithFallback(toolId, ModelFamily.NATIVE_GPT_5)?.config,
+		)
+
+		expect(buildCreateStoryStep2ToolSchemas()).to.deep.equal(expectedStep2Schemas)
+		expect(buildCreateStoryStep3ToolSchemas()).to.deep.equal(expectedStep3Schemas)
 	})
 
 	it("does not expose forbidden backend-only or runtime-owned tools in any create-story step schema", () => {
