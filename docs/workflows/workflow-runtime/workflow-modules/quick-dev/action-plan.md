@@ -73,159 +73,159 @@ Allowed files:
 
 Pause for QA after Phase 1 validation passes. Do not start Phase 2 until QA passes.
 
-[ ] Task 1: Add `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts` with Quick Dev shared/default tool schema builders.
+[x] Task 1: Add `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts` with Quick Dev shared/default tool schema builders.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 1.1: Create `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts` with imports exactly: `import { ClineToolSet } from "@/core/prompts/system-prompt/registry/ClineToolSet"`, `import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"`, `import { registerClineToolSets } from "@/core/prompts/system-prompt/tools/init"`, `import { ModelFamily } from "@/shared/prompts"`, and `import { ClineDefaultTool } from "@/shared/tools"`.
+    [x] Subtask 1.1: Create `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts` with imports exactly: `import { ClineToolSet } from "@/core/prompts/system-prompt/registry/ClineToolSet"`, `import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"`, `import { registerClineToolSets } from "@/core/prompts/system-prompt/tools/init"`, `import { ModelFamily } from "@/shared/prompts"`, and `import { ClineDefaultTool } from "@/shared/tools"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 1.2: In `quickDevToolSchemas.ts`, add `const QUICK_DEV_TOOL_SCHEMA_VARIANT = ModelFamily.NATIVE_GPT_5`.
+    [x] Subtask 1.2: In `quickDevToolSchemas.ts`, add `const QUICK_DEV_TOOL_SCHEMA_VARIANT = ModelFamily.NATIVE_GPT_5`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 1.3: In `quickDevToolSchemas.ts`, add `export const QUICK_DEV_STEP_1_TOOL_IDS: readonly ClineDefaultTool[] = [ClineDefaultTool.BASH, ClineDefaultTool.LIST_FILES, ClineDefaultTool.SEARCH, ClineDefaultTool.LIST_CODE_DEF, ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_READ_RANGE, ClineDefaultTool.APPLY_PATCH, ClineDefaultTool.FILE_NEW, ClineDefaultTool.SEND_USER_MESSAGE, ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST]`.
+    [x] Subtask 1.3: In `quickDevToolSchemas.ts`, add `export const QUICK_DEV_STEP_1_TOOL_IDS: readonly ClineDefaultTool[] = [ClineDefaultTool.BASH, ClineDefaultTool.LIST_FILES, ClineDefaultTool.SEARCH, ClineDefaultTool.LIST_CODE_DEF, ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_READ_RANGE, ClineDefaultTool.APPLY_PATCH, ClineDefaultTool.FILE_NEW, ClineDefaultTool.SEND_USER_MESSAGE, ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 1.4: In `quickDevToolSchemas.ts`, add `export const QUICK_DEV_STEP_2_TOOL_IDS: readonly ClineDefaultTool[] = [ClineDefaultTool.BASH, ClineDefaultTool.LIST_FILES, ClineDefaultTool.SEARCH, ClineDefaultTool.LIST_CODE_DEF, ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_READ_RANGE, ClineDefaultTool.APPLY_PATCH, ClineDefaultTool.FILE_NEW, ClineDefaultTool.SEND_USER_MESSAGE, ClineDefaultTool.ATTEMPT]`.
+    [x] Subtask 1.4: In `quickDevToolSchemas.ts`, add `export const QUICK_DEV_STEP_2_TOOL_IDS: readonly ClineDefaultTool[] = [ClineDefaultTool.BASH, ClineDefaultTool.LIST_FILES, ClineDefaultTool.SEARCH, ClineDefaultTool.LIST_CODE_DEF, ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_READ_RANGE, ClineDefaultTool.APPLY_PATCH, ClineDefaultTool.FILE_NEW, ClineDefaultTool.SEND_USER_MESSAGE, ClineDefaultTool.ATTEMPT]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 1.5: In `quickDevToolSchemas.ts`, add `function resolveQuickDevSharedToolSpec(toolId: ClineDefaultTool): ClineToolSpec` that calls `registerClineToolSets()`, assigns `const tool = ClineToolSet.getToolByNameWithFallback(toolId, QUICK_DEV_TOOL_SCHEMA_VARIANT)`, throws `new Error(\`Missing shared/default tool schema for ${toolId}.\`)` when `tool === undefined`, and returns `tool.config`.
+    [x] Subtask 1.5: In `quickDevToolSchemas.ts`, add `function resolveQuickDevSharedToolSpec(toolId: ClineDefaultTool): ClineToolSpec` that calls `registerClineToolSets()`, assigns `const tool = ClineToolSet.getToolByNameWithFallback(toolId, QUICK_DEV_TOOL_SCHEMA_VARIANT)`, throws `new Error(\`Missing shared/default tool schema for ${toolId}.\`)` when `tool === undefined`, and returns `tool.config`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 1.6: In `quickDevToolSchemas.ts`, add `export function buildQuickDevStep1ToolSchemas(): readonly ClineToolSpec[]` returning `QUICK_DEV_STEP_1_TOOL_IDS.map((toolId) => resolveQuickDevSharedToolSpec(toolId))`.
+    [x] Subtask 1.6: In `quickDevToolSchemas.ts`, add `export function buildQuickDevStep1ToolSchemas(): readonly ClineToolSpec[]` returning `QUICK_DEV_STEP_1_TOOL_IDS.map((toolId) => resolveQuickDevSharedToolSpec(toolId))`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 1.7: In `quickDevToolSchemas.ts`, add `export function buildQuickDevStep2ToolSchemas(): readonly ClineToolSpec[]` returning `QUICK_DEV_STEP_2_TOOL_IDS.map((toolId) => resolveQuickDevSharedToolSpec(toolId))`.
+    [x] Subtask 1.7: In `quickDevToolSchemas.ts`, add `export function buildQuickDevStep2ToolSchemas(): readonly ClineToolSpec[]` returning `QUICK_DEV_STEP_2_TOOL_IDS.map((toolId) => resolveQuickDevSharedToolSpec(toolId))`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 1.8: In `quickDevToolSchemas.ts`, add `export function buildQuickDevStep3ToolSchemas(): readonly ClineToolSpec[]` returning `[]`.
+    [x] Subtask 1.8: In `quickDevToolSchemas.ts`, add `export function buildQuickDevStep3ToolSchemas(): readonly ClineToolSpec[]` returning `[]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-[ ] Task 2: Add `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts` with focused tool schema tests.
+[x] Task 2: Add `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts` with focused tool schema tests.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 2.1: Create `quickDevToolSchemas.test.ts` with imports exactly: `import { expect } from "chai"`, `import { describe, it } from "mocha"`, `import { ClineToolSet } from "@/core/prompts/system-prompt/registry/ClineToolSet"`, `import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"`, `import { registerClineToolSets } from "@/core/prompts/system-prompt/tools/init"`, `import { ModelFamily } from "@/shared/prompts"`, `import { ClineDefaultTool } from "@/shared/tools"`, and imports for `buildQuickDevStep1ToolSchemas`, `buildQuickDevStep2ToolSchemas`, `buildQuickDevStep3ToolSchemas`, `QUICK_DEV_STEP_1_TOOL_IDS`, and `QUICK_DEV_STEP_2_TOOL_IDS` from `../quickDevToolSchemas`.
+    [x] Subtask 2.1: Create `quickDevToolSchemas.test.ts` with imports exactly: `import { expect } from "chai"`, `import { describe, it } from "mocha"`, `import { ClineToolSet } from "@/core/prompts/system-prompt/registry/ClineToolSet"`, `import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"`, `import { registerClineToolSets } from "@/core/prompts/system-prompt/tools/init"`, `import { ModelFamily } from "@/shared/prompts"`, `import { ClineDefaultTool } from "@/shared/tools"`, and imports for `buildQuickDevStep1ToolSchemas`, `buildQuickDevStep2ToolSchemas`, `buildQuickDevStep3ToolSchemas`, `QUICK_DEV_STEP_1_TOOL_IDS`, and `QUICK_DEV_STEP_2_TOOL_IDS` from `../quickDevToolSchemas`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 2.2: In `quickDevToolSchemas.test.ts`, add `const STEP_1_TOOL_NAMES: readonly string[] = ["execute_command", "list_files", "search_files", "list_code_definition_names", "read_file", "read_file_range", "apply_patch", "write_to_file", "send_user_message", "workflow_progress_request"]` and `const STEP_2_TOOL_NAMES: readonly string[] = ["execute_command", "list_files", "search_files", "list_code_definition_names", "read_file", "read_file_range", "apply_patch", "write_to_file", "send_user_message", "attempt_completion"]`.
+    [x] Subtask 2.2: In `quickDevToolSchemas.test.ts`, add `const STEP_1_TOOL_NAMES: readonly string[] = ["execute_command", "list_files", "search_files", "list_code_definition_names", "read_file", "read_file_range", "apply_patch", "write_to_file", "send_user_message", "workflow_progress_request"]` and `const STEP_2_TOOL_NAMES: readonly string[] = ["execute_command", "list_files", "search_files", "list_code_definition_names", "read_file", "read_file_range", "apply_patch", "write_to_file", "send_user_message", "attempt_completion"]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 2.3: In `quickDevToolSchemas.test.ts`, add `const FORBIDDEN_MODEL_FACING_TOOL_NAMES: readonly string[] = ["ask_followup_question", "set_workflow_values", "build_workflow_document", "create_workflow_artifact", "archive_workflow_artifact", "delete_workflow_artifact", "move_workflow_project_file", "use_subagents", "use_skill", "web_search", "web_fetch", "browser_action", "use_mcp_tool", "access_mcp_resource", "load_mcp_documentation", "plan_story_artifacts", "plan_remediation_story_artifact", "generate_story_files", "update_story_index_status"]`.
+    [x] Subtask 2.3: In `quickDevToolSchemas.test.ts`, add `const FORBIDDEN_MODEL_FACING_TOOL_NAMES: readonly string[] = ["ask_followup_question", "set_workflow_values", "build_workflow_document", "create_workflow_artifact", "archive_workflow_artifact", "delete_workflow_artifact", "move_workflow_project_file", "use_subagents", "use_skill", "web_search", "web_fetch", "browser_action", "use_mcp_tool", "access_mcp_resource", "load_mcp_documentation", "plan_story_artifacts", "plan_remediation_story_artifact", "generate_story_files", "update_story_index_status"]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 2.4: In `quickDevToolSchemas.test.ts`, add `function schemaNames(schemas: readonly ClineToolSpec[]): readonly string[]` returning `schemas.map((schema) => schema.name)`.
+    [x] Subtask 2.4: In `quickDevToolSchemas.test.ts`, add `function schemaNames(schemas: readonly ClineToolSpec[]): readonly string[]` returning `schemas.map((schema) => schema.name)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 2.5: In `quickDevToolSchemas.test.ts`, add `function expectedSharedToolSpecs(toolIds: readonly ClineDefaultTool[]): readonly ClineToolSpec[]` that calls `registerClineToolSets()`, maps `toolIds`, assigns `const tool = ClineToolSet.getToolByNameWithFallback(toolId, ModelFamily.NATIVE_GPT_5)`, throws `new Error(\`Missing shared/default tool schema for ${toolId}.\`)` when `tool === undefined`, and returns `tool.config`.
+    [x] Subtask 2.5: In `quickDevToolSchemas.test.ts`, add `function expectedSharedToolSpecs(toolIds: readonly ClineDefaultTool[]): readonly ClineToolSpec[]` that calls `registerClineToolSets()`, maps `toolIds`, assigns `const tool = ClineToolSet.getToolByNameWithFallback(toolId, ModelFamily.NATIVE_GPT_5)`, throws `new Error(\`Missing shared/default tool schema for ${toolId}.\`)` when `tool === undefined`, and returns `tool.config`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 2.6: In `quickDevToolSchemas.test.ts`, add top-level `describe("quickDevToolSchemas", () => {` before the first prescribed test and add its closing `})` after the final prescribed test.
+    [x] Subtask 2.6: In `quickDevToolSchemas.test.ts`, add top-level `describe("quickDevToolSchemas", () => {` before the first prescribed test and add its closing `})` after the final prescribed test.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 2.7: In `quickDevToolSchemas.test.ts`, add test `exposes the exact Step 1 shared/default tool schema order` asserting `schemaNames(buildQuickDevStep1ToolSchemas())` deep-equals `STEP_1_TOOL_NAMES`.
+    [x] Subtask 2.7: In `quickDevToolSchemas.test.ts`, add test `exposes the exact Step 1 shared/default tool schema order` asserting `schemaNames(buildQuickDevStep1ToolSchemas())` deep-equals `STEP_1_TOOL_NAMES`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 2.8: In `quickDevToolSchemas.test.ts`, add test `exposes the exact Step 2 shared/default tool schema order` asserting `schemaNames(buildQuickDevStep2ToolSchemas())` deep-equals `STEP_2_TOOL_NAMES`.
+    [x] Subtask 2.8: In `quickDevToolSchemas.test.ts`, add test `exposes the exact Step 2 shared/default tool schema order` asserting `schemaNames(buildQuickDevStep2ToolSchemas())` deep-equals `STEP_2_TOOL_NAMES`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 2.9: In `quickDevToolSchemas.test.ts`, add test `returns an empty model-facing schema for runtime-only Step 3` asserting `buildQuickDevStep3ToolSchemas()` deep-equals `[]`.
+    [x] Subtask 2.9: In `quickDevToolSchemas.test.ts`, add test `returns an empty model-facing schema for runtime-only Step 3` asserting `buildQuickDevStep3ToolSchemas()` deep-equals `[]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 2.10: In `quickDevToolSchemas.test.ts`, add test `uses shared default Step 1 and Step 2 tool specs without module-owned schema prose` asserting `buildQuickDevStep1ToolSchemas()` deep-equals `expectedSharedToolSpecs(QUICK_DEV_STEP_1_TOOL_IDS)` and `buildQuickDevStep2ToolSchemas()` deep-equals `expectedSharedToolSpecs(QUICK_DEV_STEP_2_TOOL_IDS)`.
+    [x] Subtask 2.10: In `quickDevToolSchemas.test.ts`, add test `uses shared default Step 1 and Step 2 tool specs without module-owned schema prose` asserting `buildQuickDevStep1ToolSchemas()` deep-equals `expectedSharedToolSpecs(QUICK_DEV_STEP_1_TOOL_IDS)` and `buildQuickDevStep2ToolSchemas()` deep-equals `expectedSharedToolSpecs(QUICK_DEV_STEP_2_TOOL_IDS)`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 2.11: In `quickDevToolSchemas.test.ts`, add test `uses only approved Cline default tool ids` asserting `QUICK_DEV_STEP_1_TOOL_IDS` deep-equals `[ClineDefaultTool.BASH, ClineDefaultTool.LIST_FILES, ClineDefaultTool.SEARCH, ClineDefaultTool.LIST_CODE_DEF, ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_READ_RANGE, ClineDefaultTool.APPLY_PATCH, ClineDefaultTool.FILE_NEW, ClineDefaultTool.SEND_USER_MESSAGE, ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST]` and `QUICK_DEV_STEP_2_TOOL_IDS` deep-equals `[ClineDefaultTool.BASH, ClineDefaultTool.LIST_FILES, ClineDefaultTool.SEARCH, ClineDefaultTool.LIST_CODE_DEF, ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_READ_RANGE, ClineDefaultTool.APPLY_PATCH, ClineDefaultTool.FILE_NEW, ClineDefaultTool.SEND_USER_MESSAGE, ClineDefaultTool.ATTEMPT]`.
+    [x] Subtask 2.11: In `quickDevToolSchemas.test.ts`, add test `uses only approved Cline default tool ids` asserting `QUICK_DEV_STEP_1_TOOL_IDS` deep-equals `[ClineDefaultTool.BASH, ClineDefaultTool.LIST_FILES, ClineDefaultTool.SEARCH, ClineDefaultTool.LIST_CODE_DEF, ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_READ_RANGE, ClineDefaultTool.APPLY_PATCH, ClineDefaultTool.FILE_NEW, ClineDefaultTool.SEND_USER_MESSAGE, ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST]` and `QUICK_DEV_STEP_2_TOOL_IDS` deep-equals `[ClineDefaultTool.BASH, ClineDefaultTool.LIST_FILES, ClineDefaultTool.SEARCH, ClineDefaultTool.LIST_CODE_DEF, ClineDefaultTool.FILE_READ, ClineDefaultTool.FILE_READ_RANGE, ClineDefaultTool.APPLY_PATCH, ClineDefaultTool.FILE_NEW, ClineDefaultTool.SEND_USER_MESSAGE, ClineDefaultTool.ATTEMPT]`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 2.12: In `quickDevToolSchemas.test.ts`, add test `does not expose forbidden model-facing tools in any quick-dev step` assigning `const exposedNames = [...schemaNames(buildQuickDevStep1ToolSchemas()), ...schemaNames(buildQuickDevStep2ToolSchemas()), ...schemaNames(buildQuickDevStep3ToolSchemas())]` and asserting `expect(exposedNames).not.to.include(forbiddenToolName)` for every `forbiddenToolName` in `FORBIDDEN_MODEL_FACING_TOOL_NAMES`.
+    [x] Subtask 2.12: In `quickDevToolSchemas.test.ts`, add test `does not expose forbidden model-facing tools in any quick-dev step` assigning `const exposedNames = [...schemaNames(buildQuickDevStep1ToolSchemas()), ...schemaNames(buildQuickDevStep2ToolSchemas()), ...schemaNames(buildQuickDevStep3ToolSchemas())]` and asserting `expect(exposedNames).not.to.include(forbiddenToolName)` for every `forbiddenToolName` in `FORBIDDEN_MODEL_FACING_TOOL_NAMES`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-[ ] Task 3: Run Phase 1 validation.
+[x] Task 3: Run Phase 1 validation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 3.1: Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`.
+    [x] Subtask 3.1: Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 3.2: Run `npm run check-types`. If it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` before treating the failure as a code defect.
+    [x] Subtask 3.2: Run `npm run check-types`. If it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` before treating the failure as a code defect.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 3.3: Run `npm run lint`.
+    [x] Subtask 3.3: Run `npm run lint`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 3.4: Run `git diff --name-only` and `git ls-files --others --exclude-standard`; confirm persistent diffs and untracked files are limited to Phase 1 authorized files plus the pre-existing backing requirements document: `src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`, `docs/workflows/workflow-runtime/workflow-modules/quick-dev/quick-dev-requirements.md`, and this action plan.
+    [x] Subtask 3.4: Run `git diff --name-only` and `git ls-files --others --exclude-standard`; confirm persistent diffs and untracked files are limited to Phase 1 authorized files plus the pre-existing backing requirements document: `src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`, `docs/workflows/workflow-runtime/workflow-modules/quick-dev/quick-dev-requirements.md`, and this action plan.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
