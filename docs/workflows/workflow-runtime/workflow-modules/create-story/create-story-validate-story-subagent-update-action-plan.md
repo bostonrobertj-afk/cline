@@ -173,21 +173,21 @@ Allowed files:
 
 ### Task 5: Remove Step 4 Workflow Wiring
 
-- [ ] 5.1. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, update the import from `./createStoryToolSchemas` so it imports exactly `buildCreateStoryStep1ToolSchemas`, `buildCreateStoryStep2ToolSchemas`, and `buildCreateStoryStep3ToolSchemas`.
+- [x] 5.1. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, update the import from `./createStoryToolSchemas` so it imports exactly `buildCreateStoryStep1ToolSchemas`, `buildCreateStoryStep2ToolSchemas`, and `buildCreateStoryStep3ToolSchemas`.
 
-- [ ] 5.2. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, delete the `CREATE_STORY_STEP_4_PROMPT_TEMPLATE` constant.
+- [x] 5.2. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, delete the `CREATE_STORY_STEP_4_PROMPT_TEMPLATE` constant.
 
-- [ ] 5.3. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, delete the `buildStep4PromptSource` function.
+- [x] 5.3. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, delete the `buildStep4PromptSource` function.
 
-- [ ] 5.4. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, delete the `buildStep4DecisionTree` function.
+- [x] 5.4. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, delete the `buildStep4DecisionTree` function.
 
-- [ ] 5.5. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, delete the `"step-4"` entry from `createStoryWorkflowDefinition.steps`.
+- [x] 5.5. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, delete the `"step-4"` entry from `createStoryWorkflowDefinition.steps`.
 
-- [ ] 5.6. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, update the `stepNumber` property inside the `createStepDefinition` argument type from `stepNumber: 1 | 2 | 3 | 4` to exactly `stepNumber: 1 | 2 | 3`.
+- [x] 5.6. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, update the `stepNumber` property inside the `createStepDefinition` argument type from `stepNumber: 1 | 2 | 3 | 4` to exactly `stepNumber: 1 | 2 | 3`.
 
 ### Task 6: Replace Step 3 Shared Prompt Text
 
-- [ ] 6.1. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, replace `STEP_3_SHARED_PROMPT_TEMPLATE` with this exact constant:
+- [x] 6.1. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, replace `STEP_3_SHARED_PROMPT_TEMPLATE` with this exact constant:
 
 ```ts
 const STEP_3_SHARED_PROMPT_TEMPLATE = `You must follow these rules when authoring story tasks & subtasks:
@@ -265,7 +265,7 @@ Once validation passes with no findings, call attempt_completion and include the
 - The user should run the Dev Story workflow next`
 ```
 
-- [ ] 6.2. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, replace `CREATE_STORY_STEP_3_BACKLOG_PROMPT_TEMPLATE` with this exact constant:
+- [x] 6.2. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, replace `CREATE_STORY_STEP_3_BACKLOG_PROMPT_TEMPLATE` with this exact constant:
 
 ```ts
 const CREATE_STORY_STEP_3_BACKLOG_PROMPT_TEMPLATE = `Review the existing tasks and subtasks in {workflow.target_story} and determine whether they meet the following criteria:
@@ -288,7 +288,7 @@ Notify the user that you've reviwed the existing tasks & subtasks for coverage, 
 ${STEP_3_SHARED_PROMPT_TEMPLATE}`
 ```
 
-- [ ] 6.3. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, replace `CREATE_STORY_STEP_3_DRAFT_PROMPT_TEMPLATE` with this exact constant:
+- [x] 6.3. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, replace `CREATE_STORY_STEP_3_DRAFT_PROMPT_TEMPLATE` with this exact constant:
 
 ```ts
 const CREATE_STORY_STEP_3_DRAFT_PROMPT_TEMPLATE = `Review runtime code & tests and identify the full set of in-scope revisions needed to deliver the story's requirements and objective.
@@ -311,9 +311,9 @@ Next, build the story's tasks & subtasks using the identified revision set.
 ${STEP_3_SHARED_PROMPT_TEMPLATE}`
 ```
 
-- [ ] 6.4. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, ensure `STEP_3_SHARED_PROMPT_TEMPLATE`, `CREATE_STORY_STEP_3_BACKLOG_PROMPT_TEMPLATE`, and `CREATE_STORY_STEP_3_DRAFT_PROMPT_TEMPLATE` do not include `*** User Review & Feedback ***`, `Provide the user with the full path for {workflow.target_story}`, `unlock the next step's instructions`, `workflow_progress_request`, `After authoring the tasks & subtasks, reach each line of the story`, or `### Progression Rule: successful use of attempt_completion`.
+- [x] 6.4. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, ensure `STEP_3_SHARED_PROMPT_TEMPLATE`, `CREATE_STORY_STEP_3_BACKLOG_PROMPT_TEMPLATE`, and `CREATE_STORY_STEP_3_DRAFT_PROMPT_TEMPLATE` do not include `*** User Review & Feedback ***`, `Provide the user with the full path for {workflow.target_story}`, `unlock the next step's instructions`, `workflow_progress_request`, `After authoring the tasks & subtasks, reach each line of the story`, or `### Progression Rule: successful use of attempt_completion`.
 
-- [ ] 6.5. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, keep `buildStep3PromptSource(input: WorkflowPromptBuilderInput)` with this exact final body:
+- [x] 6.5. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, keep `buildStep3PromptSource(input: WorkflowPromptBuilderInput)` with this exact final body:
 
 ```ts
 	const selectedStoryStatus = readWorkflowStringValue(
@@ -340,9 +340,9 @@ ${STEP_3_SHARED_PROMPT_TEMPLATE}`
 
 ### Task 7: Move Finalization Routes Into Step 3
 
-- [ ] 7.1. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, replace `buildStep3DecisionTree()` so its `entryBranchId` remains `"step-3-project-prompt"` and its branch keys are exactly `"step-3-project-prompt"`, `"step-3-await-attempt-completion"`, `"step-3-await-draft-status-update"`, `"step-3-await-draft-story-move"`, and `"step-3-await-backlog-status-update"`.
+- [x] 7.1. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, replace `buildStep3DecisionTree()` so its `entryBranchId` remains `"step-3-project-prompt"` and its branch keys are exactly `"step-3-project-prompt"`, `"step-3-await-attempt-completion"`, `"step-3-await-draft-status-update"`, `"step-3-await-draft-story-move"`, and `"step-3-await-backlog-status-update"`.
 
-- [ ] 7.2. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, set the `"step-3-project-prompt"` route to this exact route object:
+- [x] 7.2. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, set the `"step-3-project-prompt"` route to this exact route object:
 
 ```ts
 {
@@ -355,13 +355,13 @@ ${STEP_3_SHARED_PROMPT_TEMPLATE}`
 }
 ```
 
-- [ ] 7.3. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, set the `"step-3-await-attempt-completion"` branch routes to exactly two routes with IDs `"step-3-update-draft-story-status-to-backlog"` and `"step-3-confirm-backlog-story-status"`.
+- [x] 7.3. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, set the `"step-3-await-attempt-completion"` branch routes to exactly two routes with IDs `"step-3-update-draft-story-status-to-backlog"` and `"step-3-confirm-backlog-story-status"`.
 
-- [ ] 7.4. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, set route `"step-3-update-draft-story-status-to-backlog"` to use `trigger: attemptCompletionSucceededForSelectedStoryStatus("draft")`, action `{ kind: "update_story_index_status", storyIndexWorkflowValueKey: CreateStoryWorkflowValueKey.StoriesIndex, storyIdentityWorkflowValueKey: CreateStoryWorkflowValueKey.SelectedStoryIdentity, status: "backlog", expectedCurrentStatus: "draft" }`, and `followingBranchId: "step-3-await-draft-status-update"`.
+- [x] 7.4. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, set route `"step-3-update-draft-story-status-to-backlog"` to use `trigger: attemptCompletionSucceededForSelectedStoryStatus("draft")`, action `{ kind: "update_story_index_status", storyIndexWorkflowValueKey: CreateStoryWorkflowValueKey.StoriesIndex, storyIdentityWorkflowValueKey: CreateStoryWorkflowValueKey.SelectedStoryIdentity, status: "backlog", expectedCurrentStatus: "draft" }`, and `followingBranchId: "step-3-await-draft-status-update"`.
 
-- [ ] 7.5. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, set route `"step-3-confirm-backlog-story-status"` to use `trigger: attemptCompletionSucceededForBacklogRevision()`, action `{ kind: "update_story_index_status", storyIndexWorkflowValueKey: CreateStoryWorkflowValueKey.StoriesIndex, storyIdentityWorkflowValueKey: CreateStoryWorkflowValueKey.SelectedStoryIdentity, status: "backlog", expectedCurrentStatus: "backlog" }`, and `followingBranchId: "step-3-await-backlog-status-update"`.
+- [x] 7.5. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, set route `"step-3-confirm-backlog-story-status"` to use `trigger: attemptCompletionSucceededForBacklogRevision()`, action `{ kind: "update_story_index_status", storyIndexWorkflowValueKey: CreateStoryWorkflowValueKey.StoriesIndex, storyIdentityWorkflowValueKey: CreateStoryWorkflowValueKey.SelectedStoryIdentity, status: "backlog", expectedCurrentStatus: "backlog" }`, and `followingBranchId: "step-3-await-backlog-status-update"`.
 
-- [ ] 7.6. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, set the `"step-3-await-draft-status-update"` branch routes to these exact two route objects:
+- [x] 7.6. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, set the `"step-3-await-draft-status-update"` branch routes to these exact two route objects:
 
 ```ts
 {
@@ -391,7 +391,7 @@ ${STEP_3_SHARED_PROMPT_TEMPLATE}`
 }
 ```
 
-- [ ] 7.7. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, set the `"step-3-await-draft-story-move"` branch routes to these exact two route objects:
+- [x] 7.7. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, set the `"step-3-await-draft-story-move"` branch routes to these exact two route objects:
 
 ```ts
 {
@@ -417,7 +417,7 @@ ${STEP_3_SHARED_PROMPT_TEMPLATE}`
 }
 ```
 
-- [ ] 7.8. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, set the `"step-3-await-backlog-status-update"` branch routes to these exact two route objects:
+- [x] 7.8. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, set the `"step-3-await-backlog-status-update"` branch routes to these exact two route objects:
 
 ```ts
 {
@@ -443,25 +443,25 @@ ${STEP_3_SHARED_PROMPT_TEMPLATE}`
 }
 ```
 
-- [ ] 7.9. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, ensure `buildStep3DecisionTree()` does not call `workflowProgressRequestConfirmed()`, does not call `workflowProgressRequestDenied()`, does not route to `transition_step`, and does not reference step number `4`.
+- [x] 7.9. In `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, ensure `buildStep3DecisionTree()` does not call `workflowProgressRequestConfirmed()`, does not call `workflowProgressRequestDenied()`, does not route to `transition_step`, and does not reference step number `4`.
 
 ### Task 8: Update Workflow Definition Unit Tests
 
-- [ ] 8.1. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, delete the `ProgressionRouteExpectation` interface.
+- [x] 8.1. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, delete the `ProgressionRouteExpectation` interface.
 
-- [ ] 8.2. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, update the test named `"routes progress confirmation forward and denial back to the project prompt"` so it no longer declares a `progressionCases` array and no longer loops over Step 2 and Step 3 cases.
+- [x] 8.2. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, update the test named `"routes progress confirmation forward and denial back to the project prompt"` so it no longer declares a `progressionCases` array and no longer loops over Step 2 and Step 3 cases.
 
-- [ ] 8.3. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, update the workflow definition inventory test so `Object.keys(createStoryWorkflowDefinition.steps)` is asserted to deep equal exactly `["step-1", "step-2", "step-3"]`.
+- [x] 8.3. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, update the workflow definition inventory test so `Object.keys(createStoryWorkflowDefinition.steps)` is asserted to deep equal exactly `["step-1", "step-2", "step-3"]`.
 
-- [ ] 8.4. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, remove the assertion that `getStep("step-4")` includes `id: "step-4"`, `stepNumber: 4`, and `checklistLabel: "Finalize & Validate Story Document"`.
+- [x] 8.4. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, remove the assertion that `getStep("step-4")` includes `id: "step-4"`, `stepNumber: 4`, and `checklistLabel: "Finalize & Validate Story Document"`.
 
-- [ ] 8.5. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, add `const retiredStepId = ["step", "4"].join("-")` immediately after the exact step-key assertion and assert `expect(Reflect.has(createStoryWorkflowDefinition.steps, retiredStepId)).to.equal(false)`.
+- [x] 8.5. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, add `const retiredStepId = ["step", "4"].join("-")` immediately after the exact step-key assertion and assert `expect(Reflect.has(createStoryWorkflowDefinition.steps, retiredStepId)).to.equal(false)`.
 
-- [ ] 8.6. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, update the Step 3 draft prompt test to assert the rendered prompt includes the materialized path `/tmp/create-story-project/implementation/drafts/Story-1-1.md`, includes `Skill: use_skill('validate-story')`, includes `Your task is to validate the story document I've just drafted to ensure that it is implementation-ready.`, includes `Complete the story validation per the instructions, then respond to me using attempt_completion with your findings.`, includes `The story is complete and implementation-ready`, includes `Story validation was completed by a Subagent via the Validate Story workflow and all issues were successfully resolved`, includes `The user should run the Dev Story workflow next`, and does not include `{workflow.target_story}`.
+- [x] 8.6. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, update the Step 3 draft prompt test to remove the assertion that the rendered prompt includes `/tmp/create-story-project/implementation/drafts/Story-1-1.md`; keep assertions that the rendered prompt includes `Skill: use_skill('validate-story')`, includes `Your task is to validate the story document I've just drafted to ensure that it is implementation-ready.`, includes `Complete the story validation per the instructions, then respond to me using attempt_completion with your findings.`, includes `The story is complete and implementation-ready`, includes `Story validation was completed by a Subagent via the Validate Story workflow and all issues were successfully resolved`, includes `The user should run the Dev Story workflow next`, and does not include `{workflow.target_story}`.
 
-- [ ] 8.7. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, update the Step 3 backlog prompt test to assert the rendered prompt includes the materialized path `/tmp/create-story-project/implementation/stories-backlog/Story-1-2.md`, includes `Review the existing tasks and subtasks`, includes `Skill: use_skill('validate-story')`, includes `The story is complete and implementation-ready`, includes `Story validation was completed by a Subagent via the Validate Story workflow and all issues were successfully resolved`, includes `The user should run the Dev Story workflow next`, and does not include `{workflow.target_story}`.
+- [x] 8.7. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, update the Step 3 backlog prompt test to assert the rendered prompt includes the materialized path `/tmp/create-story-project/implementation/stories-backlog/Story-1-2.md`, includes `Review the existing tasks and subtasks`, includes `Skill: use_skill('validate-story')`, includes `The story is complete and implementation-ready`, includes `Story validation was completed by a Subagent via the Validate Story workflow and all issues were successfully resolved`, includes `The user should run the Dev Story workflow next`, and does not include `{workflow.target_story}`.
 
-- [ ] 8.8. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, add a Step 3 prompt test named `"omits retired progress and Step 4 prompt text from Step 3 prompts"` with this exact assertion block:
+- [x] 8.8. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, add a Step 3 prompt test named `"omits retired progress and Step 4 prompt text from Step 3 prompts"` with this exact assertion block:
 
 ```ts
 const draftPrompt = getPromptInstructions("step-3", {
@@ -488,17 +488,17 @@ for (const prompt of [draftPrompt, backlogPrompt]) {
 }
 ```
 
-- [ ] 8.9. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, update the tool exposure test named `"exposes workflow_progress_request only in progress-request steps"` so it asserts Step 1 does not include `"workflow_progress_request"`, Step 2 includes `"workflow_progress_request"`, Step 3 does not include `"workflow_progress_request"`, and no assertion references Step 4.
+- [x] 8.9. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, update the tool exposure test named `"exposes workflow_progress_request only in progress-request steps"` so it asserts Step 1 does not include `"workflow_progress_request"`, Step 2 includes `"workflow_progress_request"`, Step 3 does not include `"workflow_progress_request"`, and no assertion references Step 4.
 
-- [ ] 8.10. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, add a Step 3 tool exposure test named `"exposes use_subagents and attempt_completion in Step 3"` that asserts `getToolNamesForStep("step-3")` deep equals exactly `["list_files", "search_files", "list_code_definition_names", "read_file", "read_file_range", "apply_patch", "send_user_message", "ask_followup_question", "use_subagents", "attempt_completion"]`.
+- [x] 8.10. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, add a Step 3 tool exposure test named `"exposes use_subagents and attempt_completion in Step 3"` that asserts `getToolNamesForStep("step-3")` deep equals exactly `["list_files", "search_files", "list_code_definition_names", "read_file", "read_file_range", "apply_patch", "send_user_message", "ask_followup_question", "use_subagents", "attempt_completion"]`.
 
-- [ ] 8.11. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, update the test named `"routes progress confirmation forward and denial back to the project prompt"` so it asserts these exact Step 2 route contracts and does not reference Step 3: `findStepRoute("step-2", "step-2-project-prompt", "step-2-project-prompt")` has `trigger` deep equal `{ kind: "always" }`, `action` deep equal `{ kind: "project_prompt" }`, and `followingBranchId` equal `"step-2-await-progress-request"`; `findStepRoute("step-2", "step-2-await-progress-request", "step-2-transition-to-step-3")` has `trigger` deep equal `{ kind: "on_event", eventKind: "workflow_progress_request_confirmed" }` and `action` deep equal `{ kind: "transition_step", target: { kind: "entry_branch", stepNumber: 3 } }`; `findStepRoute("step-2", "step-2-await-progress-request", "step-2-return-to-project-prompt")` has `trigger` deep equal `{ kind: "on_event", eventKind: "workflow_progress_request_denied" }` and `action` deep equal `{ kind: "project_prompt" }`.
+- [x] 8.11. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, update the test named `"routes progress confirmation forward and denial back to the project prompt"` so it asserts these exact Step 2 route contracts and does not reference Step 3: `findStepRoute("step-2", "step-2-project-prompt", "step-2-project-prompt")` has `trigger` deep equal `{ kind: "always" }`, `action` deep equal `{ kind: "project_prompt" }`, and `followingBranchId` equal `"step-2-await-progress-request"`; `findStepRoute("step-2", "step-2-await-progress-request", "step-2-transition-to-step-3")` has `trigger` deep equal `{ kind: "on_event", eventKind: "workflow_progress_request_confirmed" }` and `action` deep equal `{ kind: "transition_step", target: { kind: "entry_branch", stepNumber: 3 } }`; `findStepRoute("step-2", "step-2-await-progress-request", "step-2-return-to-project-prompt")` has `trigger` deep equal `{ kind: "on_event", eventKind: "workflow_progress_request_denied" }` and `action` deep equal `{ kind: "project_prompt" }`.
 
-- [ ] 8.12. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, delete the Step 4 prompt test named `"builds a non-empty final validation prompt"`.
+- [x] 8.12. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, delete the Step 4 prompt test named `"builds a non-empty final validation prompt"`.
 
-- [ ] 8.13. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, replace the Step 4 attempt-completion exposure test with a Step 3 test named `"exposes attempt_completion only in Step 3"` that asserts Step 1 and Step 2 do not include `"attempt_completion"`, asserts Step 3 includes `"attempt_completion"`, and does not reference Step 4.
+- [x] 8.13. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, replace the Step 4 attempt-completion exposure test with a Step 3 test named `"exposes attempt_completion only in Step 3"` that asserts Step 1 and Step 2 do not include `"attempt_completion"`, asserts Step 3 includes `"attempt_completion"`, and does not reference Step 4.
 
-- [ ] 8.14. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, replace the Step 4 draft finalization test with a Step 3 test named `"routes draft finalization through status update, file move, completion, and terminal errors"` containing this exact setup and project-prompt/status-update assertions:
+- [x] 8.14. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, replace the Step 4 draft finalization test with a Step 3 test named `"routes draft finalization through status update, file move, completion, and terminal errors"` containing this exact setup and project-prompt/status-update assertions:
 
 ```ts
 const projectPromptRoute = findStepRoute("step-3", "step-3-project-prompt", "step-3-project-prompt")
@@ -525,9 +525,9 @@ expectEventPredicateMatchesForStep({
 })
 ```
 
-- [ ] 8.15. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, in the Step 3 draft finalization test, assert route `"step-3-update-draft-story-status-to-backlog"` action deep equals `{ kind: "update_story_index_status", storyIndexWorkflowValueKey: CreateStoryWorkflowValueKey.StoriesIndex, storyIdentityWorkflowValueKey: CreateStoryWorkflowValueKey.SelectedStoryIdentity, status: "backlog", expectedCurrentStatus: "draft" }` and assert `statusUpdateRoute.followingBranchId` equals `"step-3-await-draft-status-update"`.
+- [x] 8.15. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, in the Step 3 draft finalization test, assert route `"step-3-update-draft-story-status-to-backlog"` action deep equals `{ kind: "update_story_index_status", storyIndexWorkflowValueKey: CreateStoryWorkflowValueKey.StoriesIndex, storyIdentityWorkflowValueKey: CreateStoryWorkflowValueKey.SelectedStoryIdentity, status: "backlog", expectedCurrentStatus: "draft" }` and assert `statusUpdateRoute.followingBranchId` equals `"step-3-await-draft-status-update"`.
 
-- [ ] 8.16. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, in the Step 3 draft finalization test, add this exact move-route action assertion:
+- [x] 8.16. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, in the Step 3 draft finalization test, add this exact move-route action assertion:
 
 ```ts
 const moveRoute = findStepRoute("step-3", "step-3-await-draft-status-update", "step-3-move-draft-story-to-backlog")
@@ -539,7 +539,7 @@ expect(moveRoute.action).to.deep.equal({
 })
 ```
 
-- [ ] 8.17. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, replace the Step 4 backlog finalization test with a Step 3 test named `"routes backlog revision finalization through status confirmation without file movement"` and begin the test with this exact route setup and assertion block:
+- [x] 8.17. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, replace the Step 4 backlog finalization test with a Step 3 test named `"routes backlog revision finalization through status confirmation without file movement"` and begin the test with this exact route setup and assertion block:
 
 ```ts
 const statusConfirmationRoute = findStepRoute(
@@ -577,7 +577,7 @@ expect(backlogStatusBranch.routes.map((route) => route.action.kind)).to.deep.equ
 ])
 ```
 
-- [ ] 8.18. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, in the Step 3 draft finalization test, add these exact route lookup and event predicate assertions:
+- [x] 8.18. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, in the Step 3 draft finalization test, add these exact route lookup and event predicate assertions:
 
 ```ts
 expectEventPredicateMatchesForStep({
@@ -648,9 +648,9 @@ expect(moveFailureRoute.action).to.deep.equal({
 })
 ```
 
-- [ ] 8.19. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, add a Step 3 routing negative assertion that `Object.keys(getStep("step-3").decisionTree.branches)` does not include `"step-3-await-progress-request"` and that `JSON.stringify(getStep("step-3").decisionTree)` does not include `"workflow_progress_request_confirmed"` or `"workflow_progress_request_denied"`.
+- [x] 8.19. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, add a Step 3 routing negative assertion that `Object.keys(getStep("step-3").decisionTree.branches)` does not include `"step-3-await-progress-request"` and that `JSON.stringify(getStep("step-3").decisionTree)` does not include `"workflow_progress_request_confirmed"` or `"workflow_progress_request_denied"`.
 
-- [ ] 8.20. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, in the Step 3 backlog finalization test, narrow `statusConfirmationRoute.trigger` with this exact guard before direct predicate calls:
+- [x] 8.20. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, in the Step 3 backlog finalization test, narrow `statusConfirmationRoute.trigger` with this exact guard before direct predicate calls:
 
 ```ts
 if (statusConfirmationRoute.trigger.kind !== "event_predicate") {
@@ -660,9 +660,9 @@ if (statusConfirmationRoute.trigger.kind !== "event_predicate") {
 
 Then assert `statusConfirmationRoute.trigger.matches(createEventPredicateInput({ activeBranchId: "test-branch", workflowValues: { [CreateStoryWorkflowValueKey.SelectedStoryStatus]: "backlog", [CreateStoryWorkflowValueKey.ReviseBacklogStory]: false }, step: getStep("step-3"), triggerEvent: { kind: "attempt_completion_succeeded" } }))` equals `false`.
 
-- [ ] 8.21. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, rename the describe block `describe("createStoryWorkflowDefinition Step 4", () => {` to exactly `describe("createStoryWorkflowDefinition Step 3 completion", () => {`.
+- [x] 8.21. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, rename the describe block `describe("createStoryWorkflowDefinition Step 4", () => {` to exactly `describe("createStoryWorkflowDefinition Step 3 completion", () => {`.
 
-- [ ] 8.22. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, in the Step 3 backlog finalization test, add these exact route lookup and event predicate assertions:
+- [x] 8.22. In `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`, in the Step 3 backlog finalization test, add these exact route lookup and event predicate assertions:
 
 ```ts
 const completionRoute = findStepRoute(
@@ -705,15 +705,15 @@ expect(statusFailureRoute.action).to.deep.equal({
 
 ### Task 9: Validate Step 3 Migration
 
-- [ ] 9.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts` and verify the command exits successfully.
+- [x] 9.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts` and verify the command exits successfully.
 
-- [ ] 9.2. Run `npm run check-types` with elevated permissions and verify the command exits successfully. If this command fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` with elevated permissions before treating the failure as a code defect.
+- [x] 9.2. Run `npm run check-types` with elevated permissions and verify the command exits successfully. If this command fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` with elevated permissions before treating the failure as a code defect.
 
-- [ ] 9.3. Run `npm run lint` and verify the command exits successfully.
+- [x] 9.3. Run `npm run lint` and verify the command exits successfully.
 
-- [ ] 9.4. Run `git diff --name-only` and verify tracked diffs are limited to `docs/workflows/workflow-runtime/workflow-modules/create-story/create-story-validate-story-subagent-update-action-plan.md`, `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`, `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, and `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`.
+- [x] 9.4. Run `git diff --name-only` and verify tracked diffs are limited to `docs/workflows/workflow-runtime/workflow-modules/create-story/create-story-validate-story-subagent-update-action-plan.md`, `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas.ts`, `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryToolSchemas.test.ts`, `src/core/task/workflow-runtime/workflow-modules/create-story/createStoryWorkflow.ts`, and `src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts`.
 
-- [ ] 9.5. Run `git ls-files --others --exclude-standard` and verify untracked files are limited to `docs/workflows/workflow-runtime/workflow-modules/create-story/create-story-validate-story-subagent-update-action-plan.md` and `docs/workflows/workflow-runtime/workflow-modules/create-story/create-story-validate-story-subagent-update-requirements.md`.
+- [x] 9.5. Run `git ls-files --others --exclude-standard` and verify untracked files are limited to `docs/workflows/workflow-runtime/workflow-modules/create-story/create-story-validate-story-subagent-update-action-plan.md` and `docs/workflows/workflow-runtime/workflow-modules/create-story/create-story-validate-story-subagent-update-requirements.md`.
 
 ## Phase 3: Prompt Projection Integration
 
@@ -754,7 +754,7 @@ if (workflowValues !== undefined) {
 }
 ```
 
-- [ ] 11.7. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add a test named `"projects create-story Step 3 validate-story subagent instructions into the full-turn input payload only"` using `async function ()` instead of an arrow function; inside it call `const context = await buildCreateStoryPromptContext(3)`, narrow `context.workflowInputPayloadBlock` by throwing `new Error("Expected create-story Step 3 workflow input payload.")` when it is `undefined`, and assert the payload includes `"Step 3: Author Tasks & Subtasks"`, `CREATE_STORY_TARGET_STORY`, `"Review runtime code & tests and identify the full set of in-scope revisions needed to deliver the story's requirements and objective."`, `"Skill: use_skill('validate-story')"`, `"Your task is to validate the story document I've just drafted to ensure that it is implementation-ready."`, `"Complete the story validation per the instructions, then respond to me using attempt_completion with your findings."`, `"The story is complete and implementation-ready"`, `"Story validation was completed by a Subagent via the Validate Story workflow and all issues were successfully resolved"`, and `"The user should run the Dev Story workflow next"`.
+- [ ] 11.7. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, add a test named `"projects create-story Step 3 validate-story subagent instructions into the full-turn input payload only"` using `async function ()` instead of an arrow function; inside it call `const context = await buildCreateStoryPromptContext(3)`, narrow `context.workflowInputPayloadBlock` by throwing `new Error("Expected create-story Step 3 workflow input payload.")` when it is `undefined`, and assert the payload includes `"Step 3: Author Tasks & Subtasks"`, includes `"Review runtime code & tests and identify the full set of in-scope revisions needed to deliver the story's requirements and objective."`, includes `"Skill: use_skill('validate-story')"`, includes `"Your task is to validate the story document I've just drafted to ensure that it is implementation-ready."`, includes `"Complete the story validation per the instructions, then respond to me using attempt_completion with your findings."`, includes `"The story is complete and implementation-ready"`, includes `"Story validation was completed by a Subagent via the Validate Story workflow and all issues were successfully resolved"`, and includes `"The user should run the Dev Story workflow next"`.
 
 - [ ] 11.8. In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, in the create-story Step 3 payload projection test, define `const retiredStepChecklistLabel = ["Finalize", " & Validate Story Document"].join("")` and assert the payload does not include `"{workflow.target_story}"`, `"*** User Review & Feedback ***"`, `"unlock the next step's instructions"`, `"workflow_progress_request"`, `"### Progression Rule: successful use of attempt_completion"`, `"Verify that {workflow.target_story} is complete, correctly formatted, internally consistent, and safe to hand off for implementation."`, `retiredStepChecklistLabel`, `"*** Shown only if"`, or `"*** end conditional prompt block ***"`.
 

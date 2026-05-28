@@ -20,7 +20,6 @@ import {
 	buildCreateStoryStep1ToolSchemas,
 	buildCreateStoryStep2ToolSchemas,
 	buildCreateStoryStep3ToolSchemas,
-	buildCreateStoryStep4ToolSchemas,
 } from "./createStoryToolSchemas"
 
 export const CREATE_STORY_WORKFLOW_NAME = "create-story"
@@ -153,7 +152,7 @@ function createEmptyPromptSource(): WorkflowStepPromptSource {
 }
 
 function createStepDefinition(args: {
-	stepNumber: 1 | 2 | 3 | 4
+	stepNumber: 1 | 2 | 3
 	checklistLabel: string
 	decisionTree: WorkflowDecisionTree
 	buildPromptSource?: WorkflowStepDefinition["buildPromptSource"]
@@ -340,10 +339,16 @@ If at any point you cannot satisfy one or more of these rules (for example, due 
 - Explicitly state which rule(s) you cannot fully satisfy, and why.
 - Propose the best available compromise, and outline what a more ideal long-term fix would look like.
 
-After authoring the tasks & subtasks, reach each line of the story and seek out any inconsistencies or conflicts. During this review, assess each task and subtask for internal dependencies, and ensure that no task or subtask is dependent upon a task or subtask which is sequenced after it in the story. Resolve them appropriately, asking the user for input if necessary, before indicating that the tasks & subtasks are complete.
+After authoring the tasks & subtasks, dispatch a subagent to validate that the story is fully compliant and implementation-ready.
+You must provide the subagent with this exact prompt (no paraphrasing or alterations of any kind):
+Skill: use_skill('validate-story') Your task is to validate the story document I've just drafted to ensure that it is implementation-ready. You will receive separate workflow instructions which provide exact guidance regarding story validation. Complete the story validation per the instructions, then respond to me using attempt_completion with your findings. In your response, you must include the exact task and/or subtask numbers for any items which have issues that I need to address.
 
-*** User Review & Feedback ***
-Provide the user with the full path for {workflow.target_story} and ask them to review the tasks / subtasks section and provide feedback. Refine based on the user's feedback as needed. Once the user is satisfied with the tasks / subtasks section, unlock the next step's instructions by calling workflow_progress_request.`
+Once the subagent completes their validation & provides you with their findings, address any issues they've identified. If the subagent identified issues, correct them in the story document, shut down the subagent, and repeat the subagent validation process with a fresh subagent. Repeat this process until a subagent completes validation with no findings.
+
+Once validation passes with no findings, call attempt_completion and include the following information:
+- The story is complete and implementation-ready
+- Story validation was completed by a Subagent via the Validate Story workflow and all issues were successfully resolved
+- The user should run the Dev Story workflow next`
 
 const CREATE_STORY_STEP_3_BACKLOG_PROMPT_TEMPLATE = `Review the existing tasks and subtasks in {workflow.target_story} and determine whether they meet the following criteria:
 - They fully satisfy the story's requirements
@@ -382,27 +387,6 @@ Provide the user with the identified revision set and tell them your next step i
 Next, build the story's tasks & subtasks using the identified revision set.
 
 ${STEP_3_SHARED_PROMPT_TEMPLATE}`
-
-const CREATE_STORY_STEP_4_PROMPT_TEMPLATE = `Verify that {workflow.target_story} is complete, correctly formatted, internally consistent, and safe to hand off for implementation.
-
-Validate the story as a complete implementation handoff:
-- every acceptance criterion is covered by one or more tasks
-- every task maps to a real part of the approved story scope
-- task order is executable and non-conflicting
-- no two tasks prescribe contradictory file changes or incompatible invariants
-- every planned code change has corresponding test-maintenance coverage where needed
-- stale assertions, mocks, snapshots, validators, and type contracts are accounted for when affected
-
-If you detect ambiguity, contradiction, or missing coverage, correct it. If correction requires a new decision, stop and ask the user.
-
-When validation passes, use attempt_completion to notify the user that the story is complete and ready for implementation.`
-
-function buildStep4PromptSource(): WorkflowStepPromptSource {
-	return {
-		kind: "current_step_instruction_template",
-		currentStepInstructionTemplate: CREATE_STORY_STEP_4_PROMPT_TEMPLATE,
-	}
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && Array.isArray(value) === false
@@ -1392,59 +1376,15 @@ function buildStep3DecisionTree(): WorkflowDecisionTree {
 						action: {
 							kind: "project_prompt",
 						},
-						followingBranchId: "step-3-await-progress-request",
+						followingBranchId: "step-3-await-attempt-completion",
 					},
 				],
 			},
-			"step-3-await-progress-request": {
-				id: "step-3-await-progress-request",
+			"step-3-await-attempt-completion": {
+				id: "step-3-await-attempt-completion",
 				routes: [
 					{
-						id: "step-3-transition-to-step-4",
-						trigger: workflowProgressRequestConfirmed(),
-						action: {
-							kind: "transition_step",
-							target: {
-								kind: "entry_branch",
-								stepNumber: 4,
-							},
-						},
-					},
-					{
-						id: "step-3-return-to-project-prompt",
-						trigger: workflowProgressRequestDenied(),
-						action: {
-							kind: "project_prompt",
-						},
-					},
-				],
-			},
-		},
-	}
-}
-
-function buildStep4DecisionTree(): WorkflowDecisionTree {
-	return {
-		entryBranchId: "step-4-project-prompt",
-		branches: {
-			"step-4-project-prompt": {
-				id: "step-4-project-prompt",
-				routes: [
-					{
-						id: "step-4-project-prompt",
-						trigger: { kind: "always" },
-						action: {
-							kind: "project_prompt",
-						},
-						followingBranchId: "step-4-await-attempt-completion",
-					},
-				],
-			},
-			"step-4-await-attempt-completion": {
-				id: "step-4-await-attempt-completion",
-				routes: [
-					{
-						id: "step-4-update-draft-story-status-to-backlog",
+						id: "step-3-update-draft-story-status-to-backlog",
 						trigger: attemptCompletionSucceededForSelectedStoryStatus("draft"),
 						action: {
 							kind: "update_story_index_status",
@@ -1453,10 +1393,10 @@ function buildStep4DecisionTree(): WorkflowDecisionTree {
 							status: "backlog",
 							expectedCurrentStatus: "draft",
 						},
-						followingBranchId: "step-4-await-draft-status-update",
+						followingBranchId: "step-3-await-draft-status-update",
 					},
 					{
-						id: "step-4-confirm-backlog-story-status",
+						id: "step-3-confirm-backlog-story-status",
 						trigger: attemptCompletionSucceededForBacklogRevision(),
 						action: {
 							kind: "update_story_index_status",
@@ -1465,18 +1405,18 @@ function buildStep4DecisionTree(): WorkflowDecisionTree {
 							status: "backlog",
 							expectedCurrentStatus: "backlog",
 						},
-						followingBranchId: "step-4-await-backlog-status-update",
+						followingBranchId: "step-3-await-backlog-status-update",
 					},
 				],
 			},
-			"step-4-await-draft-status-update": {
-				id: "step-4-await-draft-status-update",
+			"step-3-await-draft-status-update": {
+				id: "step-3-await-draft-status-update",
 				routes: [
 					{
-						id: "step-4-move-draft-story-to-backlog",
+						id: "step-3-move-draft-story-to-backlog",
 						trigger: toolBackedOperationSucceeded(
-							"step-4-await-attempt-completion",
-							"step-4-update-draft-story-status-to-backlog",
+							"step-3-await-attempt-completion",
+							"step-3-update-draft-story-status-to-backlog",
 						),
 						action: {
 							kind: "move_project_file",
@@ -1484,13 +1424,13 @@ function buildStep4DecisionTree(): WorkflowDecisionTree {
 							destinationFolderSegments: ["implementation", "stories-backlog"],
 							filenameWorkflowValueKey: CreateStoryWorkflowValueKey.TargetStoryFilenameForMove,
 						},
-						followingBranchId: "step-4-await-draft-story-move",
+						followingBranchId: "step-3-await-draft-story-move",
 					},
 					{
-						id: "step-4-terminal-error-after-draft-status-update",
+						id: "step-3-terminal-error-after-draft-status-update",
 						trigger: toolBackedOperationFailed(
-							"step-4-await-attempt-completion",
-							"step-4-update-draft-story-status-to-backlog",
+							"step-3-await-attempt-completion",
+							"step-3-update-draft-story-status-to-backlog",
 						),
 						action: {
 							kind: "terminal_error",
@@ -1499,24 +1439,24 @@ function buildStep4DecisionTree(): WorkflowDecisionTree {
 					},
 				],
 			},
-			"step-4-await-draft-story-move": {
-				id: "step-4-await-draft-story-move",
+			"step-3-await-draft-story-move": {
+				id: "step-3-await-draft-story-move",
 				routes: [
 					{
-						id: "step-4-complete-workflow-after-draft-story-move",
+						id: "step-3-complete-workflow-after-draft-story-move",
 						trigger: toolBackedOperationSucceeded(
-							"step-4-await-draft-status-update",
-							"step-4-move-draft-story-to-backlog",
+							"step-3-await-draft-status-update",
+							"step-3-move-draft-story-to-backlog",
 						),
 						action: {
 							kind: "complete_workflow",
 						},
 					},
 					{
-						id: "step-4-terminal-error-after-draft-story-move",
+						id: "step-3-terminal-error-after-draft-story-move",
 						trigger: toolBackedOperationFailed(
-							"step-4-await-draft-status-update",
-							"step-4-move-draft-story-to-backlog",
+							"step-3-await-draft-status-update",
+							"step-3-move-draft-story-to-backlog",
 						),
 						action: {
 							kind: "terminal_error",
@@ -1525,24 +1465,24 @@ function buildStep4DecisionTree(): WorkflowDecisionTree {
 					},
 				],
 			},
-			"step-4-await-backlog-status-update": {
-				id: "step-4-await-backlog-status-update",
+			"step-3-await-backlog-status-update": {
+				id: "step-3-await-backlog-status-update",
 				routes: [
 					{
-						id: "step-4-complete-workflow-after-backlog-status-confirmation",
+						id: "step-3-complete-workflow-after-backlog-status-confirmation",
 						trigger: toolBackedOperationSucceeded(
-							"step-4-await-attempt-completion",
-							"step-4-confirm-backlog-story-status",
+							"step-3-await-attempt-completion",
+							"step-3-confirm-backlog-story-status",
 						),
 						action: {
 							kind: "complete_workflow",
 						},
 					},
 					{
-						id: "step-4-terminal-error-after-backlog-status-confirmation",
+						id: "step-3-terminal-error-after-backlog-status-confirmation",
 						trigger: toolBackedOperationFailed(
-							"step-4-await-attempt-completion",
-							"step-4-confirm-backlog-story-status",
+							"step-3-await-attempt-completion",
+							"step-3-confirm-backlog-story-status",
 						),
 						action: {
 							kind: "terminal_error",
@@ -1598,14 +1538,6 @@ export const createStoryWorkflowDefinition: WorkflowDefinition = {
 			buildPromptSource: buildStep3PromptSource,
 			promptTemplates: [CREATE_STORY_STEP_3_BACKLOG_PROMPT_TEMPLATE, CREATE_STORY_STEP_3_DRAFT_PROMPT_TEMPLATE],
 			buildToolSchema: buildCreateStoryStep3ToolSchemas,
-		}),
-		"step-4": createStepDefinition({
-			stepNumber: 4,
-			checklistLabel: "Finalize & Validate Story Document",
-			decisionTree: buildStep4DecisionTree(),
-			buildPromptSource: buildStep4PromptSource,
-			promptTemplates: [CREATE_STORY_STEP_4_PROMPT_TEMPLATE],
-			buildToolSchema: buildCreateStoryStep4ToolSchemas,
 		}),
 	},
 }

@@ -53,16 +53,6 @@ interface ProjectPaths {
 	storiesIndex: string
 }
 
-interface ProgressionRouteExpectation {
-	stepId: WorkflowStepDefinition["id"]
-	projectPromptBranchId: string
-	projectPromptRouteId: string
-	awaitBranchId: string
-	confirmedRouteId: string
-	deniedRouteId: string
-	nextStepNumber: number
-}
-
 function createSession(workflowValues: WorkflowValues, projectRoot = "/tmp/create-story-project"): ActiveWorkflowSession {
 	return {
 		activeStepNumber: 1,
@@ -542,7 +532,9 @@ describe("createStoryWorkflowDefinition", () => {
 			projectFolderName: CreateStoryWorkflowValueKey.ProjectFolderName,
 		})
 		expect(createStoryWorkflowDefinition.artifacts).to.equal(undefined)
-		expect(Object.keys(createStoryWorkflowDefinition.steps)).to.deep.equal(["step-1", "step-2", "step-3", "step-4"])
+		expect(Object.keys(createStoryWorkflowDefinition.steps)).to.deep.equal(["step-1", "step-2", "step-3"])
+		const retiredStepId = ["step", "4"].join("-")
+		expect(Reflect.has(createStoryWorkflowDefinition.steps, retiredStepId)).to.equal(false)
 		expect(getStep("step-1")).to.deep.include({
 			id: "step-1",
 			stepNumber: 1,
@@ -557,11 +549,6 @@ describe("createStoryWorkflowDefinition", () => {
 			id: "step-3",
 			stepNumber: 3,
 			checklistLabel: "Author Tasks & Subtasks",
-		})
-		expect(getStep("step-4")).to.deep.include({
-			id: "step-4",
-			stepNumber: 4,
-			checklistLabel: "Finalize & Validate Story Document",
 		})
 	})
 
@@ -1209,6 +1196,19 @@ describe("createStoryWorkflowDefinition Step 3", () => {
 		})
 
 		expect(prompt).to.be.a("string").and.not.empty
+		expect(prompt).to.include("Skill: use_skill('validate-story')")
+		expect(prompt).to.include(
+			"Your task is to validate the story document I've just drafted to ensure that it is implementation-ready.",
+		)
+		expect(prompt).to.include(
+			"Complete the story validation per the instructions, then respond to me using attempt_completion with your findings.",
+		)
+		expect(prompt).to.include("The story is complete and implementation-ready")
+		expect(prompt).to.include(
+			"Story validation was completed by a Subagent via the Validate Story workflow and all issues were successfully resolved",
+		)
+		expect(prompt).to.include("The user should run the Dev Story workflow next")
+		expect(prompt).not.to.include("{workflow.target_story}")
 		expectNoCreateStoryWorkflowPromptTokens(prompt)
 	})
 
@@ -1219,7 +1219,41 @@ describe("createStoryWorkflowDefinition Step 3", () => {
 		})
 
 		expect(prompt).to.be.a("string").and.not.empty
+		expect(prompt).to.include("/tmp/create-story-project/implementation/stories-backlog/Story-1-2.md")
+		expect(prompt).to.include("Review the existing tasks and subtasks")
+		expect(prompt).to.include("Skill: use_skill('validate-story')")
+		expect(prompt).to.include("The story is complete and implementation-ready")
+		expect(prompt).to.include(
+			"Story validation was completed by a Subagent via the Validate Story workflow and all issues were successfully resolved",
+		)
+		expect(prompt).to.include("The user should run the Dev Story workflow next")
+		expect(prompt).not.to.include("{workflow.target_story}")
 		expectNoCreateStoryWorkflowPromptTokens(prompt)
+	})
+
+	it("omits retired progress and Step 4 prompt text from Step 3 prompts", () => {
+		const draftPrompt = getPromptInstructions("step-3", {
+			[CreateStoryWorkflowValueKey.TargetStory]: "/tmp/create-story-project/implementation/drafts/Story-1-1.md",
+			[CreateStoryWorkflowValueKey.SelectedStoryStatus]: "draft",
+		})
+		const backlogPrompt = getPromptInstructions("step-3", {
+			[CreateStoryWorkflowValueKey.TargetStory]: "/tmp/create-story-project/implementation/stories-backlog/Story-1-2.md",
+			[CreateStoryWorkflowValueKey.SelectedStoryStatus]: "backlog",
+		})
+		const retiredStepChecklistLabel = ["Finalize", " & Validate Story Document"].join("")
+
+		for (const prompt of [draftPrompt, backlogPrompt]) {
+			expect(prompt).not.to.include("*** User Review & Feedback ***")
+			expect(prompt).not.to.include("unlock the next step's instructions")
+			expect(prompt).not.to.include("workflow_progress_request")
+			expect(prompt).not.to.include("### Progression Rule: successful use of attempt_completion")
+			expect(prompt).not.to.include(
+				"Verify that {workflow.target_story} is complete, correctly formatted, internally consistent, and safe to hand off for implementation.",
+			)
+			expect(prompt).not.to.include(retiredStepChecklistLabel)
+			expect(prompt).not.to.include("*** Shown only if")
+			expect(prompt).not.to.include("*** end conditional prompt block ***")
+		}
 	})
 
 	it("fails clearly for unsupported Step 3 prompt state", () => {
@@ -1235,115 +1269,82 @@ describe("createStoryWorkflowDefinition Step 2 and Step 3 progression", () => {
 	it("exposes workflow_progress_request only in progress-request steps", () => {
 		expect(getToolNamesForStep("step-1")).not.to.include("workflow_progress_request")
 		expect(getToolNamesForStep("step-2")).to.include("workflow_progress_request")
-		expect(getToolNamesForStep("step-3")).to.include("workflow_progress_request")
-		expect(getToolNamesForStep("step-4")).not.to.include("workflow_progress_request")
+		expect(getToolNamesForStep("step-3")).not.to.include("workflow_progress_request")
 	})
 
-	it("routes progress confirmation forward and denial back to the project prompt", () => {
-		const progressionCases: readonly ProgressionRouteExpectation[] = [
-			{
-				stepId: "step-2",
-				projectPromptBranchId: "step-2-project-prompt",
-				projectPromptRouteId: "step-2-project-prompt",
-				awaitBranchId: "step-2-await-progress-request",
-				confirmedRouteId: "step-2-transition-to-step-3",
-				deniedRouteId: "step-2-return-to-project-prompt",
-				nextStepNumber: 3,
-			},
-			{
-				stepId: "step-3",
-				projectPromptBranchId: "step-3-project-prompt",
-				projectPromptRouteId: "step-3-project-prompt",
-				awaitBranchId: "step-3-await-progress-request",
-				confirmedRouteId: "step-3-transition-to-step-4",
-				deniedRouteId: "step-3-return-to-project-prompt",
-				nextStepNumber: 4,
-			},
-		]
-
-		for (const progressionCase of progressionCases) {
-			const projectPromptRoute = findStepRoute(
-				progressionCase.stepId,
-				progressionCase.projectPromptBranchId,
-				progressionCase.projectPromptRouteId,
-			)
-			expect(projectPromptRoute.trigger).to.deep.equal({ kind: "always" })
-			expect(projectPromptRoute.action).to.deep.equal({
-				kind: "project_prompt",
-			})
-			expect(projectPromptRoute.followingBranchId).to.equal(progressionCase.awaitBranchId)
-
-			const confirmedRoute = findStepRoute(
-				progressionCase.stepId,
-				progressionCase.awaitBranchId,
-				progressionCase.confirmedRouteId,
-			)
-			expect(confirmedRoute.trigger).to.deep.equal({
-				kind: "on_event",
-				eventKind: "workflow_progress_request_confirmed",
-			})
-			expectTransitionStepAction(confirmedRoute.action, progressionCase.nextStepNumber)
-
-			const deniedRoute = findStepRoute(
-				progressionCase.stepId,
-				progressionCase.awaitBranchId,
-				progressionCase.deniedRouteId,
-			)
-			expect(deniedRoute.trigger).to.deep.equal({
-				kind: "on_event",
-				eventKind: "workflow_progress_request_denied",
-			})
-			expect(deniedRoute.action).to.deep.equal({
-				kind: "project_prompt",
-			})
-		}
-	})
-})
-
-describe("createStoryWorkflowDefinition Step 4", () => {
-	it("builds a non-empty final validation prompt", () => {
-		const prompt = getPromptInstructions("step-4", {
-			[CreateStoryWorkflowValueKey.TargetStory]: "/tmp/create-story-project/implementation/drafts/Story-1-1.md",
-		})
-
-		expect(prompt).to.be.a("string").and.not.empty
-		expectNoCreateStoryWorkflowPromptTokens(prompt)
-	})
-
-	it("exposes attempt_completion only in Step 4", () => {
-		expect(getToolNamesForStep("step-1")).not.to.include("attempt_completion")
-		expect(getToolNamesForStep("step-2")).not.to.include("attempt_completion")
-		expect(getToolNamesForStep("step-3")).not.to.include("attempt_completion")
-
-		const step4ToolNames = getToolNamesForStep("step-4")
-		expect(step4ToolNames).to.deep.equal([
+	it("exposes use_subagents and attempt_completion in Step 3", () => {
+		expect(getToolNamesForStep("step-3")).to.deep.equal([
+			"list_files",
+			"search_files",
+			"list_code_definition_names",
 			"read_file",
 			"read_file_range",
 			"apply_patch",
 			"send_user_message",
 			"ask_followup_question",
+			"use_subagents",
 			"attempt_completion",
 		])
-		expect(step4ToolNames).not.to.include("workflow_progress_request")
-		expect(step4ToolNames).not.to.include("move_workflow_project_file")
-		expect(step4ToolNames).not.to.include("update_story_index_status")
 	})
 
-	it("routes draft finalization through status update, file move, completion, and terminal errors", () => {
-		const projectPromptRoute = findStepRoute("step-4", "step-4-project-prompt", "step-4-project-prompt")
+	it("routes progress confirmation forward and denial back to the project prompt", () => {
+		const projectPromptRoute = findStepRoute("step-2", "step-2-project-prompt", "step-2-project-prompt")
 		expect(projectPromptRoute.trigger).to.deep.equal({ kind: "always" })
 		expect(projectPromptRoute.action).to.deep.equal({
 			kind: "project_prompt",
 		})
-		expect(projectPromptRoute.followingBranchId).to.equal("step-4-await-attempt-completion")
+		expect(projectPromptRoute.followingBranchId).to.equal("step-2-await-progress-request")
+
+		const confirmedRoute = findStepRoute("step-2", "step-2-await-progress-request", "step-2-transition-to-step-3")
+		expect(confirmedRoute.trigger).to.deep.equal({
+			kind: "on_event",
+			eventKind: "workflow_progress_request_confirmed",
+		})
+		expect(confirmedRoute.action).to.deep.equal({
+			kind: "transition_step",
+			target: { kind: "entry_branch", stepNumber: 3 },
+		})
+
+		const deniedRoute = findStepRoute("step-2", "step-2-await-progress-request", "step-2-return-to-project-prompt")
+		expect(deniedRoute.trigger).to.deep.equal({
+			kind: "on_event",
+			eventKind: "workflow_progress_request_denied",
+		})
+		expect(deniedRoute.action).to.deep.equal({
+			kind: "project_prompt",
+		})
+	})
+})
+
+describe("createStoryWorkflowDefinition Step 3 completion", () => {
+	it("exposes attempt_completion only in Step 3", () => {
+		expect(getToolNamesForStep("step-1")).not.to.include("attempt_completion")
+		expect(getToolNamesForStep("step-2")).not.to.include("attempt_completion")
+		expect(getToolNamesForStep("step-3")).to.include("attempt_completion")
+	})
+
+	it("does not route Step 3 through progress-request events", () => {
+		expect(Object.keys(getStep("step-3").decisionTree.branches)).not.to.include("step-3-await-progress-request")
+		const serializedDecisionTree = JSON.stringify(getStep("step-3").decisionTree)
+		expect(serializedDecisionTree).not.to.include("workflow_progress_request_confirmed")
+		expect(serializedDecisionTree).not.to.include("workflow_progress_request_denied")
+	})
+
+	it("routes draft finalization through status update, file move, completion, and terminal errors", () => {
+		const projectPromptRoute = findStepRoute("step-3", "step-3-project-prompt", "step-3-project-prompt")
+		expect(projectPromptRoute.trigger).to.deep.equal({ kind: "always" })
+		expect(projectPromptRoute.action).to.deep.equal({
+			kind: "project_prompt",
+		})
+		expect(projectPromptRoute.followingBranchId).to.equal("step-3-await-attempt-completion")
 
 		const statusUpdateRoute = findStepRoute(
-			"step-4",
-			"step-4-await-attempt-completion",
-			"step-4-update-draft-story-status-to-backlog",
+			"step-3",
+			"step-3-await-attempt-completion",
+			"step-3-update-draft-story-status-to-backlog",
 		)
 		expectEventPredicateMatchesForStep({
-			stepId: "step-4",
+			stepId: "step-3",
 			route: statusUpdateRoute,
 			workflowValues: {
 				[CreateStoryWorkflowValueKey.SelectedStoryStatus]: "draft",
@@ -1359,54 +1360,57 @@ describe("createStoryWorkflowDefinition Step 4", () => {
 			status: "backlog",
 			expectedCurrentStatus: "draft",
 		})
-		expect(statusUpdateRoute.followingBranchId).to.equal("step-4-await-draft-status-update")
+		expect(statusUpdateRoute.followingBranchId).to.equal("step-3-await-draft-status-update")
 
-		const moveRoute = findStepRoute("step-4", "step-4-await-draft-status-update", "step-4-move-draft-story-to-backlog")
-		expectEventPredicateMatchesForStep({
-			stepId: "step-4",
-			route: moveRoute,
-			workflowValues: {},
-			triggerEvent: buildToolBackedOperationSucceededEvent(
-				"step-4-await-attempt-completion",
-				"step-4-update-draft-story-status-to-backlog",
-			),
-		})
+		const moveRoute = findStepRoute("step-3", "step-3-await-draft-status-update", "step-3-move-draft-story-to-backlog")
 		expect(moveRoute.action).to.deep.equal({
 			kind: "move_project_file",
 			sourceFolderSegments: ["implementation", "drafts"],
 			destinationFolderSegments: ["implementation", "stories-backlog"],
 			filenameWorkflowValueKey: CreateStoryWorkflowValueKey.TargetStoryFilenameForMove,
 		})
-		expect(moveRoute.followingBranchId).to.equal("step-4-await-draft-story-move")
+		expectEventPredicateMatchesForStep({
+			stepId: "step-3",
+			route: moveRoute,
+			workflowValues: {},
+			triggerEvent: buildToolBackedOperationSucceededEvent(
+				"step-3-await-attempt-completion",
+				"step-3-update-draft-story-status-to-backlog",
+			),
+		})
+		expect(moveRoute.followingBranchId).to.equal("step-3-await-draft-story-move")
 
 		const statusFailureRoute = findStepRoute(
-			"step-4",
-			"step-4-await-draft-status-update",
-			"step-4-terminal-error-after-draft-status-update",
+			"step-3",
+			"step-3-await-draft-status-update",
+			"step-3-terminal-error-after-draft-status-update",
 		)
 		expectEventPredicateMatchesForStep({
-			stepId: "step-4",
+			stepId: "step-3",
 			route: statusFailureRoute,
 			workflowValues: {},
 			triggerEvent: buildToolBackedOperationFailedEvent(
-				"step-4-await-attempt-completion",
-				"step-4-update-draft-story-status-to-backlog",
+				"step-3-await-attempt-completion",
+				"step-3-update-draft-story-status-to-backlog",
 			),
 		})
-		expect(statusFailureRoute.action.kind).to.equal("terminal_error")
+		expect(statusFailureRoute.action).to.deep.equal({
+			kind: "terminal_error",
+			errorMessage: "Unable to update selected draft story status to backlog.",
+		})
 
 		const completionRoute = findStepRoute(
-			"step-4",
-			"step-4-await-draft-story-move",
-			"step-4-complete-workflow-after-draft-story-move",
+			"step-3",
+			"step-3-await-draft-story-move",
+			"step-3-complete-workflow-after-draft-story-move",
 		)
 		expectEventPredicateMatchesForStep({
-			stepId: "step-4",
+			stepId: "step-3",
 			route: completionRoute,
 			workflowValues: {},
 			triggerEvent: buildToolBackedOperationSucceededEvent(
-				"step-4-await-draft-status-update",
-				"step-4-move-draft-story-to-backlog",
+				"step-3-await-draft-status-update",
+				"step-3-move-draft-story-to-backlog",
 			),
 		})
 		expect(completionRoute.action).to.deep.equal({
@@ -1414,30 +1418,33 @@ describe("createStoryWorkflowDefinition Step 4", () => {
 		})
 
 		const moveFailureRoute = findStepRoute(
-			"step-4",
-			"step-4-await-draft-story-move",
-			"step-4-terminal-error-after-draft-story-move",
+			"step-3",
+			"step-3-await-draft-story-move",
+			"step-3-terminal-error-after-draft-story-move",
 		)
 		expectEventPredicateMatchesForStep({
-			stepId: "step-4",
+			stepId: "step-3",
 			route: moveFailureRoute,
 			workflowValues: {},
 			triggerEvent: buildToolBackedOperationFailedEvent(
-				"step-4-await-draft-status-update",
-				"step-4-move-draft-story-to-backlog",
+				"step-3-await-draft-status-update",
+				"step-3-move-draft-story-to-backlog",
 			),
 		})
-		expect(moveFailureRoute.action.kind).to.equal("terminal_error")
+		expect(moveFailureRoute.action).to.deep.equal({
+			kind: "terminal_error",
+			errorMessage: "Unable to move selected draft story to the implementation backlog.",
+		})
 	})
 
 	it("routes backlog revision finalization through status confirmation without file movement", () => {
 		const statusConfirmationRoute = findStepRoute(
-			"step-4",
-			"step-4-await-attempt-completion",
-			"step-4-confirm-backlog-story-status",
+			"step-3",
+			"step-3-await-attempt-completion",
+			"step-3-confirm-backlog-story-status",
 		)
 		expectEventPredicateMatchesForStep({
-			stepId: "step-4",
+			stepId: "step-3",
 			route: statusConfirmationRoute,
 			workflowValues: {
 				[CreateStoryWorkflowValueKey.SelectedStoryStatus]: "backlog",
@@ -1454,9 +1461,9 @@ describe("createStoryWorkflowDefinition Step 4", () => {
 			status: "backlog",
 			expectedCurrentStatus: "backlog",
 		})
-		expect(statusConfirmationRoute.followingBranchId).to.equal("step-4-await-backlog-status-update")
+		expect(statusConfirmationRoute.followingBranchId).to.equal("step-3-await-backlog-status-update")
 
-		const backlogStatusBranch = getStep("step-4").decisionTree.branches["step-4-await-backlog-status-update"]
+		const backlogStatusBranch = getStep("step-3").decisionTree.branches["step-3-await-backlog-status-update"]
 		if (backlogStatusBranch === undefined) {
 			throw new Error("Missing backlog status update branch.")
 		}
@@ -1465,22 +1472,58 @@ describe("createStoryWorkflowDefinition Step 4", () => {
 			"terminal_error",
 		])
 
+		if (statusConfirmationRoute.trigger.kind !== "event_predicate") {
+			throw new Error(`Expected event_predicate trigger, received ${statusConfirmationRoute.trigger.kind}.`)
+		}
+		expect(
+			statusConfirmationRoute.trigger.matches(
+				createEventPredicateInput({
+					activeBranchId: "test-branch",
+					workflowValues: {
+						[CreateStoryWorkflowValueKey.SelectedStoryStatus]: "backlog",
+						[CreateStoryWorkflowValueKey.ReviseBacklogStory]: false,
+					},
+					step: getStep("step-3"),
+					triggerEvent: { kind: "attempt_completion_succeeded" },
+				}),
+			),
+		).to.equal(false)
+
 		const completionRoute = findStepRoute(
-			"step-4",
-			"step-4-await-backlog-status-update",
-			"step-4-complete-workflow-after-backlog-status-confirmation",
+			"step-3",
+			"step-3-await-backlog-status-update",
+			"step-3-complete-workflow-after-backlog-status-confirmation",
 		)
 		expectEventPredicateMatchesForStep({
-			stepId: "step-4",
+			stepId: "step-3",
 			route: completionRoute,
 			workflowValues: {},
 			triggerEvent: buildToolBackedOperationSucceededEvent(
-				"step-4-await-attempt-completion",
-				"step-4-confirm-backlog-story-status",
+				"step-3-await-attempt-completion",
+				"step-3-confirm-backlog-story-status",
 			),
 		})
 		expect(completionRoute.action).to.deep.equal({
 			kind: "complete_workflow",
+		})
+
+		const statusFailureRoute = findStepRoute(
+			"step-3",
+			"step-3-await-backlog-status-update",
+			"step-3-terminal-error-after-backlog-status-confirmation",
+		)
+		expectEventPredicateMatchesForStep({
+			stepId: "step-3",
+			route: statusFailureRoute,
+			workflowValues: {},
+			triggerEvent: buildToolBackedOperationFailedEvent(
+				"step-3-await-attempt-completion",
+				"step-3-confirm-backlog-story-status",
+			),
+		})
+		expect(statusFailureRoute.action).to.deep.equal({
+			kind: "terminal_error",
+			errorMessage: "Unable to confirm selected backlog story status.",
 		})
 	})
 })
