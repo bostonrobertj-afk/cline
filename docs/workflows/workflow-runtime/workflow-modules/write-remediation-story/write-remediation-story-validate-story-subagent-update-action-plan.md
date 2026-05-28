@@ -275,11 +275,11 @@ Allowed files for Phase 3 tasks and subtasks:
 - `docs/workflows/workflow-runtime/workflow-modules/write-remediation-story/write-remediation-story-validate-story-subagent-update-action-plan.md`
 - `src/core/prompts/system-prompt/__tests__/integration.test.ts`
 
-- [ ] Task 7: Update Prompt Projection Tests
+- [x] Task 7: Update Prompt Projection Tests
 
-  - [ ] Subtask 7.1: In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, remove the exact string entry `"use_subagents",` from `WRITE_REMEDIATION_STORY_FORBIDDEN_PROMPT_TOOL_NAMES`.
+  - [x] Subtask 7.1: In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, remove the exact string entry `"use_subagents",` from `WRITE_REMEDIATION_STORY_FORBIDDEN_PROMPT_TOOL_NAMES`.
 
-  - [ ] Subtask 7.2: In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, in test `"projects active write-remediation-story Step 3 tools from module-owned builders into native GPT-5 prompts"`, add this exact assertion block immediately after `expect(context.workflowToolSchemaOverride).to.deep.equal(buildWriteRemediationStoryStep3ToolSchemas())`:
+  - [x] Subtask 7.2: In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, in test `"projects active write-remediation-story Step 3 tools from module-owned builders into native GPT-5 prompts"`, add this exact assertion block immediately after `expect(context.workflowToolSchemaOverride).to.deep.equal(buildWriteRemediationStoryStep3ToolSchemas())`:
 
 ```ts
 const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
@@ -288,7 +288,7 @@ expect(projectedToolNames).to.include("attempt_completion")
 expect(projectedToolNames).to.not.include("workflow_progress_request")
 ```
 
-  - [ ] Subtask 7.3: In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, in test `"projects write-remediation-story Step 3 materialized values into full-turn and continuation payloads"`, add this exact assertion block inside the `for (const payloadBlock of payloadBlocks)` loop immediately after `expect(payloadBlock).to.include(WRITE_REMEDIATION_STORY_TARGET_STORY)` and immediately before `expect(payloadBlock).to.not.include("originating_story")`:
+  - [x] Subtask 7.3: In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, in test `"projects write-remediation-story Step 3 materialized values into full-turn and continuation payloads"`, add this exact assertion block inside the `for (const payloadBlock of payloadBlocks)` loop immediately after `expect(payloadBlock).to.include(WRITE_REMEDIATION_STORY_TARGET_STORY)` and immediately before `expect(payloadBlock).to.not.include("originating_story")`:
 
 ```ts
 expect(payloadBlock).to.include("Skill: use_skill('validate-story')")
@@ -303,7 +303,7 @@ expect(payloadBlock).to.include(
 )
 ```
 
-  - [ ] Subtask 7.4: In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, in test `"projects write-remediation-story Step 3 materialized values into full-turn and continuation payloads"`, add this exact assertion block inside the `for (const payloadBlock of payloadBlocks)` loop immediately after `expect(payloadBlock).to.not.include("target_story")`:
+  - [x] Subtask 7.4: In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, in test `"projects write-remediation-story Step 3 materialized values into full-turn and continuation payloads"`, add this exact assertion block inside the `for (const payloadBlock of payloadBlocks)` loop immediately after `expect(payloadBlock).to.not.include("target_story")`:
 
 ```ts
 expect(payloadBlock).to.not.include("### Progression Rule: agent successfully uses attempt_completion")
@@ -314,7 +314,7 @@ expect(payloadBlock).to.not.include(
 )
 ```
 
-  - [ ] Subtask 7.5: In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, in test `"does not expose forbidden tools in write-remediation-story Step 3 prompt projection"`, add this exact assertion block immediately after the closing brace of the loop that starts `for (const forbiddenToolName of WRITE_REMEDIATION_STORY_FORBIDDEN_PROMPT_TOOL_NAMES)`:
+  - [x] Subtask 7.5: In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, in test `"does not expose forbidden tools in write-remediation-story Step 3 prompt projection"`, add this exact assertion block immediately after the closing brace of the loop that starts `for (const forbiddenToolName of WRITE_REMEDIATION_STORY_FORBIDDEN_PROMPT_TOOL_NAMES)`:
 
 ```ts
 expect(projectedToolNames).to.include("use_subagents")
@@ -322,7 +322,7 @@ expect(projectedToolNames).to.include("attempt_completion")
 expect(projectedToolNames).to.not.include("workflow_progress_request")
 ```
 
-  - [ ] Subtask 7.6: In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, in test `"renders write-remediation-story Step 3 tools through non-native prompt text without forbidden tools"`, add this exact assertion block immediately after the closing brace of the loop that starts `for (const approvedToolName of approvedToolNames)` and immediately before the loop that starts `for (const forbiddenToolName of WRITE_REMEDIATION_STORY_FORBIDDEN_PROMPT_TOOL_NAMES)`:
+  - [x] Subtask 7.6: In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, in test `"renders write-remediation-story Step 3 tools through non-native prompt text without forbidden tools"`, add this exact assertion block immediately after the closing brace of the loop that starts `for (const approvedToolName of approvedToolNames)` and immediately before the loop that starts `for (const forbiddenToolName of WRITE_REMEDIATION_STORY_FORBIDDEN_PROMPT_TOOL_NAMES)`:
 
 ```ts
 expect(systemPrompt).to.include("use_subagents")
@@ -330,17 +330,17 @@ expect(systemPrompt).to.include("attempt_completion")
 expect(systemPrompt).to.not.include("workflow_progress_request")
 ```
 
-- [ ] Task 8: Validate Prompt Projection Update
+- [x] Task 8: Validate Prompt Projection Update
 
-  - [ ] Subtask 8.1: Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts` and verify the command exits successfully.
+  - [x] Subtask 8.1: Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts` and verify the command exits successfully.
 
-  - [ ] Subtask 8.2: Run `npm run check-types` with elevated permissions and verify the command exits successfully. If this command fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` with elevated permissions before treating the failure as a code defect.
+  - [x] Subtask 8.2: Run `npm run check-types` with elevated permissions and verify the command exits successfully. If this command fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` with elevated permissions before treating the failure as a code defect.
 
-  - [ ] Subtask 8.3: Run `npm run lint` and verify the command exits successfully.
+  - [x] Subtask 8.3: Run `npm run lint` and verify the command exits successfully.
 
-  - [ ] Subtask 8.4: Run `git diff --name-only` and verify tracked diffs are limited to `docs/workflows/workflow-runtime/workflow-modules/write-remediation-story/write-remediation-story-validate-story-subagent-update-action-plan.md`, `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/writeRemediationStoryToolSchemas.ts`, `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryToolSchemas.test.ts`, `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/writeRemediationStoryWorkflow.ts`, `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts`, and `src/core/prompts/system-prompt/__tests__/integration.test.ts`.
+  - [x] Subtask 8.4: Run `git diff --name-only` and verify tracked diffs are limited to `docs/workflows/workflow-runtime/workflow-modules/write-remediation-story/write-remediation-story-validate-story-subagent-update-action-plan.md`, `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/writeRemediationStoryToolSchemas.ts`, `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryToolSchemas.test.ts`, `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/writeRemediationStoryWorkflow.ts`, `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts`, and `src/core/prompts/system-prompt/__tests__/integration.test.ts`.
 
-  - [ ] Subtask 8.5: Run `git ls-files --others --exclude-standard` and verify untracked files are absent or limited to `docs/workflows/workflow-runtime/workflow-modules/write-remediation-story/write-remediation-story-validate-story-subagent-update-action-plan.md` and `docs/workflows/workflow-runtime/workflow-modules/write-remediation-story/write-remediation-story-validate-story-subagent-update-requirements.md`.
+  - [x] Subtask 8.5: Run `git ls-files --others --exclude-standard` and verify untracked files are absent or limited to `docs/workflows/workflow-runtime/workflow-modules/write-remediation-story/write-remediation-story-validate-story-subagent-update-action-plan.md` and `docs/workflows/workflow-runtime/workflow-modules/write-remediation-story/write-remediation-story-validate-story-subagent-update-requirements.md`.
 
 ## Phase 4: Final Validation
 

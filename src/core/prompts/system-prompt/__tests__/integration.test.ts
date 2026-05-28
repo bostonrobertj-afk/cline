@@ -1538,7 +1538,6 @@ const WRITE_REMEDIATION_STORY_FORBIDDEN_PROMPT_TOOL_NAMES: readonly string[] = [
 	"web_fetch",
 	"browser_action",
 	"ask_followup_question",
-	"use_subagents",
 	"use_skill",
 	"set_workflow_values",
 	"build_workflow_document",
@@ -3632,6 +3631,10 @@ describe("Prompt System Integration Tests", () => {
 		it("projects active write-remediation-story Step 3 tools from module-owned builders into native GPT-5 prompts", async function () {
 			const context = await buildWriteRemediationStoryPromptContext()
 			expect(context.workflowToolSchemaOverride).to.deep.equal(buildWriteRemediationStoryStep3ToolSchemas())
+			const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
+			expect(projectedToolNames).to.include("use_subagents")
+			expect(projectedToolNames).to.include("attempt_completion")
+			expect(projectedToolNames).to.not.include("workflow_progress_request")
 
 			await runPromptTest(this, context, "gpt-5-codex", async ({ tools }) => {
 				expect(getNativeToolNames(tools)).to.deep.equal(
@@ -3657,9 +3660,27 @@ describe("Prompt System Integration Tests", () => {
 				expect(payloadBlock).to.include(WRITE_REMEDIATION_STORY_ORIGINATING_STORY)
 				expect(payloadBlock).to.include(WRITE_REMEDIATION_STORY_CODE_REVIEW_OUTPUT)
 				expect(payloadBlock).to.include(WRITE_REMEDIATION_STORY_TARGET_STORY)
+				expect(payloadBlock).to.include("Skill: use_skill('validate-story')")
+				expect(payloadBlock).to.include(
+					"Your task is to validate the story document I've just drafted to ensure that it is implementation-ready.",
+				)
+				expect(payloadBlock).to.include(
+					"Complete the story validation per the instructions, then respond to me using attempt_completion with your findings.",
+				)
+				expect(payloadBlock).to.include(
+					"the remediation story is ready for implementation, and that story validation was conducted by a subagent using the Validate Story workflow.",
+				)
 				expect(payloadBlock).to.not.include("originating_story")
 				expect(payloadBlock).to.not.include("code_review_output")
 				expect(payloadBlock).to.not.include("target_story")
+				expect(payloadBlock).to.not.include("### Progression Rule: agent successfully uses attempt_completion")
+				expect(payloadBlock).to.not.include(
+					"8. Finalize the tasks & subtasks by reviewing them one-by-one and ensuring that:",
+				)
+				expect(payloadBlock).to.not.include("validated them per step 8 above")
+				expect(payloadBlock).to.not.include(
+					"Once all tasks and subtasks are added to target_story and you've validated them per step 8 above, use attempt_completion to provide a final update to the user notifying them that the remediation story is ready for implementation.",
+				)
 			}
 		})
 
@@ -3669,6 +3690,9 @@ describe("Prompt System Integration Tests", () => {
 			for (const forbiddenToolName of WRITE_REMEDIATION_STORY_FORBIDDEN_PROMPT_TOOL_NAMES) {
 				expect(projectedToolNames).to.not.include(forbiddenToolName)
 			}
+			expect(projectedToolNames).to.include("use_subagents")
+			expect(projectedToolNames).to.include("attempt_completion")
+			expect(projectedToolNames).to.not.include("workflow_progress_request")
 		})
 
 		it("renders write-remediation-story Step 3 tools through non-native prompt text without forbidden tools", async function () {
@@ -3685,6 +3709,9 @@ describe("Prompt System Integration Tests", () => {
 				for (const approvedToolName of approvedToolNames) {
 					expect(systemPrompt).to.include(approvedToolName)
 				}
+				expect(systemPrompt).to.include("use_subagents")
+				expect(systemPrompt).to.include("attempt_completion")
+				expect(systemPrompt).to.not.include("workflow_progress_request")
 				for (const forbiddenToolName of WRITE_REMEDIATION_STORY_FORBIDDEN_PROMPT_TOOL_NAMES) {
 					expect(systemPrompt).to.not.include(forbiddenToolName)
 				}
