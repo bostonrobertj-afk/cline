@@ -586,19 +586,15 @@ When authoring the tasks and subtasks for the remediation story, you must follow
 7. Identify tests relevant to the code touched by the tasks and subtasks, and determine whether any test requires revision to compatibility with the updated code. If tests require revision, include tasks and subtasks to ensure they are updated prior to validation.
   - Include tasks/ subtasks prescribing new tests when existing tests cannot reliably check behavior, contracts, regressions, and material risks for the code that will be in place once the prescribed revisions are in place.
 
-8. Finalize the tasks & subtasks by reviewing them one-by-one and ensuring that:
-  - The story will culminate in a compile-ready state so that system diagnostics/ tests can be run cleanly between stories.
-  - No task or subtask is dependent on another task or subtask which is sequenced after it, or dependent on work that has not been completed and is not within the story's scope.
-  - no subtask prescribes more than one revision in a single target file
-  - no task which is NOT supported by subordinate subtasks prescribes more than one revision in a single target file
-  - every task is clearly aligned with one of the three approved task methods
-  - tasks and subtasks start with "[ ]"
-  - subtasks are nested under their parent tasks with appropriate indentation
-  - tasks and subtasks are numbered sequentially, with subtasks inheriting the parent task ID (e.g. task 1, subtask 1.1)
+8. Author the story's validation section by prescribing the most targeted set of unit tests and validations possible while ensuring that the intended revisions and behavior are in place.
 
-9. Author the story's validation section by prescribing the most targeted set of unit tests and validations possible while ensuring that the intended revisions and behavior are in place.
+9. After authoring the tasks & subtasks, dispatch a subagent to validate that the story is fully compliant and implementation-ready.
+You must provide the subagent with this exact prompt (no paraphrasing or alterations of any kind):
+Skill: use_skill('validate-story') Your task is to validate the story document I've just drafted to ensure that it is implementation-ready. You will receive separate workflow instructions which provide exact guidance regarding story validation. Complete the story validation per the instructions, then respond to me using attempt_completion with your findings. In your response, you must include the exact task and/or subtask numbers for any items which have issues that I need to address.
 
-Once all tasks and subtasks are added to {workflow.target_story} and you've validated them per step 8 above, use attempt_completion to provide a final update to the user notifying them that the remediation story is ready for implementation.`
+Once the subagent completes their validation & provides you with their findings, address any issues they've identified. If the subagent identified issues, correct them in the story document, shut down the subagent, and repeat the subagent validation process with a fresh subagent. Repeat this process until a subagent completes validation with no findings.
+
+Once all tasks and subtasks are added to {workflow.target_story} and you've validated them per step 9 above, use attempt_completion to provide a final update to the user notifying them that the remediation story is ready for implementation, and that story validation was conducted by a subagent using the Validate Story workflow. `
 
 function buildStep3PromptSource(): WorkflowStepPromptSource {
 	return {

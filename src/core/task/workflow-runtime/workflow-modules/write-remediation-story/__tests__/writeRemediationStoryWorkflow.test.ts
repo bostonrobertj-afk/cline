@@ -90,6 +90,7 @@ const STEP_3_TOOL_NAMES: readonly string[] = [
 	"apply_patch",
 	"write_to_file",
 	"send_user_message",
+	"use_subagents",
 	"attempt_completion",
 ]
 
@@ -98,7 +99,6 @@ const FORBIDDEN_MODEL_FACING_TOOL_NAMES: readonly string[] = [
 	"web_fetch",
 	"browser_action",
 	"ask_followup_question",
-	"use_subagents",
 	"use_skill",
 	"set_workflow_values",
 	"build_workflow_document",
@@ -782,9 +782,25 @@ describe("writeRemediationStoryWorkflow", () => {
 		expect(prompt).to.include(ORIGINATING_STORY_PATH)
 		expect(prompt).to.include(CODE_REVIEW_OUTPUT_PATH)
 		expect(prompt).to.include(TARGET_STORY_PATH)
+		expect(prompt).to.include("Skill: use_skill('validate-story')")
+		expect(prompt).to.include(
+			"Your task is to validate the story document I've just drafted to ensure that it is implementation-ready.",
+		)
+		expect(prompt).to.include(
+			"Complete the story validation per the instructions, then respond to me using attempt_completion with your findings.",
+		)
+		expect(prompt).to.include(
+			"the remediation story is ready for implementation, and that story validation was conducted by a subagent using the Validate Story workflow.",
+		)
 		expect(prompt).not.to.include("{workflow.originating_story}")
 		expect(prompt).not.to.include("{workflow.code_review_output}")
 		expect(prompt).not.to.include("{workflow.target_story}")
+		expect(prompt).not.to.include("### Progression Rule: agent successfully uses attempt_completion")
+		expect(prompt).not.to.include("8. Finalize the tasks & subtasks by reviewing them one-by-one and ensuring that:")
+		expect(prompt).not.to.include("validated them per step 8 above")
+		expect(prompt).not.to.include(
+			"Once all tasks and subtasks are added to target_story and you've validated them per step 8 above, use attempt_completion to provide a final update to the user notifying them that the remediation story is ready for implementation.",
+		)
 	})
 
 	it("declares expected tool schemas by step", () => {

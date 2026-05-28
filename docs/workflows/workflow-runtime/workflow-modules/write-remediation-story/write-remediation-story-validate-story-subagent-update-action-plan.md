@@ -101,9 +101,9 @@ Allowed files for Phase 2 tasks and subtasks:
 - `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/writeRemediationStoryWorkflow.ts`
 - `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts`
 
-- [ ] Task 4: Replace Step 3 Prompt Template
+- [x] Task 4: Replace Step 3 Prompt Template
 
-  - [ ] Subtask 4.1: In `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/writeRemediationStoryWorkflow.ts`, replace `WRITE_REMEDIATION_STORY_STEP_3_PROMPT_TEMPLATE` with this exact constant:
+  - [x] Subtask 4.1: In `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/writeRemediationStoryWorkflow.ts`, replace `WRITE_REMEDIATION_STORY_STEP_3_PROMPT_TEMPLATE` with this exact constant:
 
     The fenced constant below contains source-owned example checklist markers. Treat those markers as required runtime prompt text, not as action-plan tasks or subtasks.
 
@@ -208,9 +208,9 @@ Once the subagent completes their validation & provides you with their findings,
 Once all tasks and subtasks are added to {workflow.target_story} and you've validated them per step 9 above, use attempt_completion to provide a final update to the user notifying them that the remediation story is ready for implementation, and that story validation was conducted by a subagent using the Validate Story workflow. `
 ```
 
-- [ ] Task 5: Update Workflow Unit Tests For Revised Step 3 Prompt
+- [x] Task 5: Update Workflow Unit Tests For Revised Step 3 Prompt
 
-  - [ ] Subtask 5.1: In `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts`, replace `STEP_3_TOOL_NAMES` with this exact array:
+  - [x] Subtask 5.1: In `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts`, replace `STEP_3_TOOL_NAMES` with this exact array:
 
 ```ts
 const STEP_3_TOOL_NAMES: readonly string[] = [
@@ -228,9 +228,9 @@ const STEP_3_TOOL_NAMES: readonly string[] = [
 ]
 ```
 
-  - [ ] Subtask 5.2: In `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts`, remove the exact string entry `"use_subagents",` from `FORBIDDEN_MODEL_FACING_TOOL_NAMES`.
+  - [x] Subtask 5.2: In `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts`, remove the exact string entry `"use_subagents",` from `FORBIDDEN_MODEL_FACING_TOOL_NAMES`.
 
-  - [ ] Subtask 5.3: In `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts`, in test `"projects Step 3 prompt with materialized workflow values and no raw placeholders"`, add this exact assertion block immediately after `expect(prompt).to.include(TARGET_STORY_PATH)` and immediately before `expect(prompt).not.to.include("{workflow.originating_story}")`:
+  - [x] Subtask 5.3: In `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts`, in test `"projects Step 3 prompt with materialized workflow values and no raw placeholders"`, add this exact assertion block immediately after `expect(prompt).to.include(TARGET_STORY_PATH)` and immediately before `expect(prompt).not.to.include("{workflow.originating_story}")`:
 
 ```ts
 expect(prompt).to.include("Skill: use_skill('validate-story')")
@@ -245,7 +245,7 @@ expect(prompt).to.include(
 )
 ```
 
-  - [ ] Subtask 5.4: In `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts`, in test `"projects Step 3 prompt with materialized workflow values and no raw placeholders"`, add this exact assertion block immediately after `expect(prompt).not.to.include("{workflow.target_story}")`:
+  - [x] Subtask 5.4: In `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts`, in test `"projects Step 3 prompt with materialized workflow values and no raw placeholders"`, add this exact assertion block immediately after `expect(prompt).not.to.include("{workflow.target_story}")`:
 
 ```ts
 expect(prompt).not.to.include("### Progression Rule: agent successfully uses attempt_completion")
@@ -256,17 +256,17 @@ expect(prompt).not.to.include(
 )
 ```
 
-- [ ] Task 6: Validate Step 3 Prompt Update
+- [x] Task 6: Validate Step 3 Prompt Update
 
-  - [ ] Subtask 6.1: Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryToolSchemas.test.ts` and verify the command exits successfully.
+  - [x] Subtask 6.1: Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryToolSchemas.test.ts` and verify the command exits successfully.
 
-  - [ ] Subtask 6.2: Run `npm run check-types` with elevated permissions and verify the command exits successfully. If this command fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` with elevated permissions before treating the failure as a code defect.
+  - [x] Subtask 6.2: Run `npm run check-types` with elevated permissions and verify the command exits successfully. If this command fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` with elevated permissions before treating the failure as a code defect.
 
-  - [ ] Subtask 6.3: Run `npm run lint` and verify the command exits successfully.
+  - [x] Subtask 6.3: Run `npm run lint` and verify the command exits successfully.
 
-  - [ ] Subtask 6.4: Run `git diff --name-only` and verify tracked diffs are limited to `docs/workflows/workflow-runtime/workflow-modules/write-remediation-story/write-remediation-story-validate-story-subagent-update-action-plan.md`, `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/writeRemediationStoryToolSchemas.ts`, `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryToolSchemas.test.ts`, `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/writeRemediationStoryWorkflow.ts`, and `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts`.
+  - [x] Subtask 6.4: Run `git diff --name-only` and verify tracked diffs are limited to `docs/workflows/workflow-runtime/workflow-modules/write-remediation-story/write-remediation-story-validate-story-subagent-update-action-plan.md`, `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/writeRemediationStoryToolSchemas.ts`, `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryToolSchemas.test.ts`, `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/writeRemediationStoryWorkflow.ts`, and `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts`.
 
-  - [ ] Subtask 6.5: Run `git ls-files --others --exclude-standard` and verify untracked files are absent or limited to `docs/workflows/workflow-runtime/workflow-modules/write-remediation-story/write-remediation-story-validate-story-subagent-update-action-plan.md` and `docs/workflows/workflow-runtime/workflow-modules/write-remediation-story/write-remediation-story-validate-story-subagent-update-requirements.md`.
+  - [x] Subtask 6.5: Run `git ls-files --others --exclude-standard` and verify untracked files are absent or limited to `docs/workflows/workflow-runtime/workflow-modules/write-remediation-story/write-remediation-story-validate-story-subagent-update-action-plan.md` and `docs/workflows/workflow-runtime/workflow-modules/write-remediation-story/write-remediation-story-validate-story-subagent-update-requirements.md`.
 
 ## Phase 3: Prompt Projection Integration
 
