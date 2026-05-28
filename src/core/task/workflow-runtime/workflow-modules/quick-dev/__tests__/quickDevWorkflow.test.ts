@@ -9,6 +9,11 @@ import type {
 	WorkflowStepDefinition,
 	WorkflowValues,
 } from "../../../types"
+import {
+	resolveWorkflowBySlashCommand,
+	resolveWorkflowByUseSkillName,
+	resolveWorkflowDefinition,
+} from "../../../WorkflowRegistry"
 import { renderWorkflowPromptTemplate } from "../../../workflowPromptTemplates"
 import {
 	deriveQuickDevSpecFileFilename,
@@ -209,6 +214,15 @@ describe("quickDevWorkflow", () => {
 			"Update Project Records",
 		])
 		expect(quickDevWorkflowDefinition.prerequisiteFiles).to.deep.equal(QUICK_DEV_PREREQUISITE_FILES)
+	})
+
+	it("resolves from the registry by canonical quick-dev names and rejects .md aliases", () => {
+		expect(resolveWorkflowDefinition("quick-dev")).to.equal(quickDevWorkflowDefinition)
+		expect(resolveWorkflowBySlashCommand("quick-dev")).to.equal(quickDevWorkflowDefinition)
+		expect(resolveWorkflowByUseSkillName("quick-dev")).to.equal(quickDevWorkflowDefinition)
+		expect(resolveWorkflowDefinition("quick-dev.md")).to.equal(undefined)
+		expect(resolveWorkflowBySlashCommand("quick-dev.md")).to.equal(undefined)
+		expect(resolveWorkflowByUseSkillName("quick-dev.md")).to.equal(undefined)
 	})
 
 	it("declares the required quick-spec prerequisite exactly", () => {

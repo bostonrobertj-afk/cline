@@ -81,6 +81,12 @@ import {
 	piPlanningWorkflowDefinition,
 } from "@/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow"
 import {
+	buildQuickDevStep1ToolSchemas,
+	buildQuickDevStep2ToolSchemas,
+	QuickDevWorkflowValueKey,
+	quickDevWorkflowDefinition,
+} from "@/core/task/workflow-runtime/workflow-modules/quick-dev"
+import {
 	buildQuickSpecStep2ToolSchemas,
 	buildQuickSpecStep3ToolSchemas,
 	buildQuickSpecStep4ToolSchemas,
@@ -1802,6 +1808,9 @@ const QUICK_SPEC_OUTPUT_DOCUMENT = "/test/project/docs/projects/quick-spec-proje
 const QUICK_SPEC_ADDITIONAL_CONTEXT = "/test/project/docs/context/brief.md"
 const QUICK_SPEC_VISION_STATEMENT = "Add a compact delivery-planning workflow."
 type QuickSpecPromptStepNumber = 2 | 3 | 4
+const QUICK_DEV_SPEC_FILE = "/test/project/docs/projects/quick-dev-project/planning/quick-spec.md"
+const QUICK_DEV_SPEC_FILE_FILENAME = "quick-spec.md"
+type QuickDevPromptStepNumber = 1 | 2 | 3
 
 function createQuickSpecWorkflowValues(args?: { additionalContext?: string }): WorkflowValues {
 	return {
@@ -1815,6 +1824,16 @@ function createQuickSpecWorkflowValues(args?: { additionalContext?: string }): W
 		[QuickSpecWorkflowValueKey.OutputArtifactFilename]: "quick-spec.md",
 		[QuickSpecWorkflowValueKey.OutputArtifactRelativePath]: "planning/quick-spec.md",
 		[QuickSpecWorkflowValueKey.AdditionalContext]: args?.additionalContext ?? QUICK_SPEC_ADDITIONAL_CONTEXT,
+	}
+}
+
+function createQuickDevWorkflowValues(): WorkflowValues {
+	return {
+		[QuickDevWorkflowValueKey.ProjectMode]: "existing",
+		[QuickDevWorkflowValueKey.ProjectTitle]: "Quick Dev Prompt Project",
+		[QuickDevWorkflowValueKey.ProjectFolderName]: "quick-dev-project",
+		[QuickDevWorkflowValueKey.SpecFile]: QUICK_DEV_SPEC_FILE,
+		[QuickDevWorkflowValueKey.SpecFileFilename]: QUICK_DEV_SPEC_FILE_FILENAME,
 	}
 }
 
@@ -1842,6 +1861,42 @@ function createQuickSpecWorkflowSession(
 	}
 }
 
+function getQuickDevEntryBranchId(activeStepNumber: QuickDevPromptStepNumber): string {
+	switch (activeStepNumber) {
+		case 1:
+			return quickDevWorkflowDefinition.steps["step-1"].decisionTree.entryBranchId
+		case 2:
+			return quickDevWorkflowDefinition.steps["step-2"].decisionTree.entryBranchId
+		case 3:
+			return quickDevWorkflowDefinition.steps["step-3"].decisionTree.entryBranchId
+		default: {
+			const exhaustiveCheck: never = activeStepNumber
+			return exhaustiveCheck
+		}
+	}
+}
+
+function createQuickDevWorkflowSession(activeStepNumber: QuickDevPromptStepNumber): ActiveWorkflowSession {
+	return {
+		activeStepNumber,
+		workflowValues: createQuickDevWorkflowValues(),
+		projectSelection: {
+			projectMode: "existing",
+			projectTitle: "Quick Dev Prompt Project",
+			projectFolderName: "quick-dev-project",
+		},
+		lifecycle: { projectSelectionCompleted: true },
+		entryArtifactResolution: undefined,
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: { activeBranchId: getQuickDevEntryBranchId(activeStepNumber) },
+	}
+}
+
 const buildQuickSpecPromptContext = async (
 	activeStepNumber: QuickSpecPromptStepNumber,
 	args?: { additionalContext?: string },
@@ -1851,6 +1906,26 @@ const buildQuickSpecPromptContext = async (
 	const taskState = new TaskState()
 	taskState.activeWorkflowName = quickSpecWorkflowDefinition.name
 	taskState.activeWorkflowSession = createQuickSpecWorkflowSession(activeStepNumber, args)
+	taskState.apiRequestCount = 1
+	const workflowProjection = await runtime.buildTurnProjection({ taskState })
+	return {
+		...baseContext,
+		mcpHub: makeMcpHub([]),
+		providerInfo: makeProviderInfo("gpt-5-codex", "openai"),
+		enableNativeToolCalls: true,
+		useMinimalGptPrompt: true,
+		...workflowProjection,
+	}
+}
+
+const buildQuickDevPromptContext = async (
+	activeStepNumber: QuickDevPromptStepNumber,
+): Promise<SystemPromptContext & WorkflowPromptProjection> => {
+	const workspacePathPolicy: WorkflowWorkspacePathPolicy = { validateAccess: () => true }
+	const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })
+	const taskState = new TaskState()
+	taskState.activeWorkflowName = quickDevWorkflowDefinition.name
+	taskState.activeWorkflowSession = createQuickDevWorkflowSession(activeStepNumber)
 	taskState.apiRequestCount = 1
 	const workflowProjection = await runtime.buildTurnProjection({ taskState })
 	return {
@@ -1908,6 +1983,19 @@ async function expectQuickSpecProjectedToolSurface(
 	expectedToolSpecs: readonly ClineToolSpec[],
 ): Promise<void> {
 	const context = await buildQuickSpecPromptContext(activeStepNumber)
+	expect(context.workflowToolSchemaOverride).to.deep.equal(expectedToolSpecs)
+
+	await runPromptTest(testCtx, context, "gpt-5-codex", async ({ tools }) => {
+		expect(getNativeToolNames(tools)).to.deep.equal(expectedToolSpecs.map((tool) => tool.name))
+	})
+}
+
+async function expectQuickDevProjectedToolSurface(
+	testCtx: TestRunner,
+	activeStepNumber: QuickDevPromptStepNumber,
+	expectedToolSpecs: readonly ClineToolSpec[],
+): Promise<void> {
+	const context = await buildQuickDevPromptContext(activeStepNumber)
 	expect(context.workflowToolSchemaOverride).to.deep.equal(expectedToolSpecs)
 
 	await runPromptTest(testCtx, context, "gpt-5-codex", async ({ tools }) => {
@@ -2911,6 +2999,97 @@ describe("Prompt System Integration Tests", () => {
 					expect(projectedToolNames).to.include("use_subagents")
 				} else {
 					expect(projectedToolNames).to.not.include("use_subagents")
+				}
+			}
+		})
+
+		it("projects active quick-dev prompt-step tools from module-owned builders into native GPT-5 prompts", async function () {
+			await expectQuickDevProjectedToolSurface(this, 1, buildQuickDevStep1ToolSchemas())
+			await expectQuickDevProjectedToolSurface(this, 2, buildQuickDevStep2ToolSchemas())
+		})
+
+		it("projects quick-dev Step 1 materialized spec path into the workflow input payload only", async function () {
+			const context = await buildQuickDevPromptContext(1)
+			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+			const renderedReadLine = "Read this first: `" + QUICK_DEV_SPEC_FILE + "`"
+			if (workflowInputPayloadBlock === undefined || workflowInputPayloadBlock.length === 0) {
+				throw new Error("Expected quick-dev Step 1 workflow input payload block.")
+			}
+			expect(workflowInputPayloadBlock).to.include("Workflow:\nquick dev")
+			expect(workflowInputPayloadBlock).to.include("Name: Amelia")
+			expect(workflowInputPayloadBlock).to.include("Role: Developer Agent")
+			expect(workflowInputPayloadBlock).to.include("Step 1: Review Assigned Phase")
+			expect(workflowInputPayloadBlock).to.include(renderedReadLine)
+			expect(workflowInputPayloadBlock).to.include("workflow_progress_request")
+			expect(workflowInputPayloadBlock).to.include("Identify the first incomplete phase")
+			expect(workflowInputPayloadBlock).not.to.include("{workflow.spec_file}")
+			expect(workflowInputPayloadBlock).not.to.include("### Prompt")
+			expect(workflowInputPayloadBlock).not.to.include("### Progression Rule")
+			expect(workflowInputPayloadBlock).not.to.include("# Tool Schema Override")
+			expect(workflowInputPayloadBlock).not.to.include("# Focus Chain Tasks")
+			await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt }) => {
+				expect(systemPrompt).not.to.include("CURRENT STEP DETAILED INSTRUCTIONS")
+				expect(systemPrompt).not.to.include(renderedReadLine)
+			})
+		})
+
+		it("projects quick-dev Step 2 implementation prompt into the workflow input payload only", async function () {
+			const context = await buildQuickDevPromptContext(2)
+			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+			if (workflowInputPayloadBlock === undefined || workflowInputPayloadBlock.length === 0) {
+				throw new Error("Expected quick-dev Step 2 workflow input payload block.")
+			}
+			expect(workflowInputPayloadBlock).to.include("Step 2: Implement Assigned Phase")
+			expect(workflowInputPayloadBlock).to.include("Implement the phase confirmed by the user in step 1")
+			expect(workflowInputPayloadBlock).to.include("attempt_completion")
+			expect(workflowInputPayloadBlock).to.include("phase completion status")
+			expect(workflowInputPayloadBlock).to.include("the commit hash from your commit")
+			expect(workflowInputPayloadBlock).not.to.include("workflow_progress_request")
+			expect(workflowInputPayloadBlock).not.to.include("### Prompt")
+			expect(workflowInputPayloadBlock).not.to.include("### Progression Rule")
+			expect(workflowInputPayloadBlock).not.to.include("# Tool Schema Override")
+			expect(workflowInputPayloadBlock).not.to.include("# Focus Chain Tasks")
+			await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt }) => {
+				expect(systemPrompt).not.to.include("CURRENT STEP DETAILED INSTRUCTIONS")
+				expect(systemPrompt).not.to.include("Implement the phase confirmed by the user in step 1")
+			})
+		})
+
+		it("renders quick-dev response-tool guidance only for active response tools", async function () {
+			const step1Context = await buildQuickDevPromptContext(1)
+			await runPromptTest(this, step1Context, "gpt-5-codex", async ({ systemPrompt }) => {
+				expectResponseToolNames(systemPrompt, ["`workflow_progress_request`"], ["`attempt_completion`"])
+			})
+			const step2Context = await buildQuickDevPromptContext(2)
+			await runPromptTest(this, step2Context, "gpt-5-codex", async ({ systemPrompt }) => {
+				expectResponseToolNames(systemPrompt, ["`attempt_completion`"], ["`workflow_progress_request`"])
+			})
+		})
+
+		it("does not expose forbidden runtime or legacy tools in quick-dev prompt projection", async () => {
+			const forbiddenToolNames = [
+				"ask_followup_question",
+				"set_workflow_values",
+				"build_workflow_document",
+				"create_workflow_artifact",
+				"archive_workflow_artifact",
+				"delete_workflow_artifact",
+				"move_workflow_project_file",
+				"use_subagents",
+				"use_skill",
+				"web_search",
+				"web_fetch",
+				"browser_action",
+				"use_mcp_tool",
+				"access_mcp_resource",
+				"load_mcp_documentation",
+			]
+
+			for (const activeStepNumber of [1, 2] as const) {
+				const context = await buildQuickDevPromptContext(activeStepNumber)
+				const projectedToolNames = context.workflowToolSchemaOverride?.map((tool) => tool.name) ?? []
+				for (const forbiddenToolName of forbiddenToolNames) {
+					expect(projectedToolNames).not.to.include(forbiddenToolName)
 				}
 			}
 		})

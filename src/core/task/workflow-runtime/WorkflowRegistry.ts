@@ -10,6 +10,7 @@ import { createStoryWorkflowDefinition } from "@/core/task/workflow-runtime/work
 import { devStoryWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/dev-story"
 import { edgeCaseHunterReviewWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review"
 import { piPlanningWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/pi-planning"
+import { quickDevWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/quick-dev"
 import { quickSpecWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/quick-spec"
 import { validateStoryWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/validate-story"
 import { writeRemediationStoryWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/write-remediation-story"
@@ -22,6 +23,7 @@ const shippedWorkflowDefinitions: WorkflowDefinition[] = [
 	devStoryWorkflowDefinition,
 	piPlanningWorkflowDefinition,
 	quickSpecWorkflowDefinition,
+	quickDevWorkflowDefinition,
 	validateStoryWorkflowDefinition,
 	codeReviewWorkflowDefinition,
 	correctCourseWorkflowDefinition,

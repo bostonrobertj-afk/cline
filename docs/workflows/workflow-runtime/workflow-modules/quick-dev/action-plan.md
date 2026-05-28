@@ -480,7 +480,7 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevWorkflow.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-[ ] Task 7: Run Phase 2 validation.
+[x] Task 7: Run Phase 2 validation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
@@ -523,153 +523,153 @@ Allowed files:
 
 Pause for QA after Phase 3 validation passes. Do not start Phase 4 until QA passes.
 
-[ ] Task 8: Register the Quick Dev workflow in `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`.
+[x] Task 8: Register the Quick Dev workflow in `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 8.1: In `WorkflowRegistry.ts`, add `import { quickDevWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/quick-dev"` immediately after the existing `quickSpecWorkflowDefinition` import.
+    [x] Subtask 8.1: In `WorkflowRegistry.ts`, add `import { quickDevWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/quick-dev"` immediately after the existing `quickSpecWorkflowDefinition` import.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 8.2: In `WorkflowRegistry.ts`, add `quickDevWorkflowDefinition,` to `shippedWorkflowDefinitions` immediately after `quickSpecWorkflowDefinition,`. Do not add `quick-dev.md` or any alias to any registry map.
+    [x] Subtask 8.2: In `WorkflowRegistry.ts`, add `quickDevWorkflowDefinition,` to `shippedWorkflowDefinitions` immediately after `quickSpecWorkflowDefinition,`. Do not add `quick-dev.md` or any alias to any registry map.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRegistry.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-[ ] Task 9: Extend `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevWorkflow.test.ts` with registry lookup coverage.
+[x] Task 9: Extend `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevWorkflow.test.ts` with registry lookup coverage.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevWorkflow.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 9.1: In `quickDevWorkflow.test.ts`, add imports `resolveWorkflowBySlashCommand`, `resolveWorkflowByUseSkillName`, and `resolveWorkflowDefinition` from `../../../WorkflowRegistry`.
+    [x] Subtask 9.1: In `quickDevWorkflow.test.ts`, add imports `resolveWorkflowBySlashCommand`, `resolveWorkflowByUseSkillName`, and `resolveWorkflowDefinition` from `../../../WorkflowRegistry`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevWorkflow.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 9.2: In `quickDevWorkflow.test.ts`, add test `resolves from the registry by canonical quick-dev names and rejects .md aliases` asserting `resolveWorkflowDefinition("quick-dev")`, `resolveWorkflowBySlashCommand("quick-dev")`, and `resolveWorkflowByUseSkillName("quick-dev")` each equal `quickDevWorkflowDefinition`; and asserting `resolveWorkflowDefinition("quick-dev.md")`, `resolveWorkflowBySlashCommand("quick-dev.md")`, and `resolveWorkflowByUseSkillName("quick-dev.md")` each equal `undefined`.
+    [x] Subtask 9.2: In `quickDevWorkflow.test.ts`, add test `resolves from the registry by canonical quick-dev names and rejects .md aliases` asserting `resolveWorkflowDefinition("quick-dev")`, `resolveWorkflowBySlashCommand("quick-dev")`, and `resolveWorkflowByUseSkillName("quick-dev")` each equal `quickDevWorkflowDefinition`; and asserting `resolveWorkflowDefinition("quick-dev.md")`, `resolveWorkflowBySlashCommand("quick-dev.md")`, and `resolveWorkflowByUseSkillName("quick-dev.md")` each equal `undefined`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevWorkflow.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-[ ] Task 10: Extend `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts` with Quick Dev prompt and tool projection coverage.
+[x] Task 10: Extend `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts` with Quick Dev prompt and tool projection coverage.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 10.1: In `integration.test.ts`, add an import block for `buildQuickDevStep1ToolSchemas`, `buildQuickDevStep2ToolSchemas`, `QuickDevWorkflowValueKey`, and `quickDevWorkflowDefinition` from `@/core/task/workflow-runtime/workflow-modules/quick-dev`. Do not import `buildQuickDevStep3ToolSchemas` into `integration.test.ts` because Step 3 is deterministic routing only and Task 10 must not build a Step 3 prompt context.
+    [x] Subtask 10.1: In `integration.test.ts`, add an import block for `buildQuickDevStep1ToolSchemas`, `buildQuickDevStep2ToolSchemas`, `QuickDevWorkflowValueKey`, and `quickDevWorkflowDefinition` from `@/core/task/workflow-runtime/workflow-modules/quick-dev`. Do not import `buildQuickDevStep3ToolSchemas` into `integration.test.ts` because Step 3 is deterministic routing only and Task 10 must not build a Step 3 prompt context.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 10.2: In `integration.test.ts`, add Quick Dev fixture constants near the existing Quick Spec prompt fixtures: `const QUICK_DEV_SPEC_FILE = "/test/project/docs/projects/quick-dev-project/planning/quick-spec.md"`, `const QUICK_DEV_SPEC_FILE_FILENAME = "quick-spec.md"`, and `type QuickDevPromptStepNumber = 1 | 2 | 3`.
+    [x] Subtask 10.2: In `integration.test.ts`, add Quick Dev fixture constants near the existing Quick Spec prompt fixtures: `const QUICK_DEV_SPEC_FILE = "/test/project/docs/projects/quick-dev-project/planning/quick-spec.md"`, `const QUICK_DEV_SPEC_FILE_FILENAME = "quick-spec.md"`, and `type QuickDevPromptStepNumber = 1 | 2 | 3`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 10.3: In `integration.test.ts`, add `function createQuickDevWorkflowValues(): WorkflowValues` returning values for `QuickDevWorkflowValueKey.ProjectMode: "existing"`, `ProjectTitle: "Quick Dev Prompt Project"`, `ProjectFolderName: "quick-dev-project"`, `SpecFile: QUICK_DEV_SPEC_FILE`, and `SpecFileFilename: QUICK_DEV_SPEC_FILE_FILENAME`.
+    [x] Subtask 10.3: In `integration.test.ts`, add `function createQuickDevWorkflowValues(): WorkflowValues` returning values for `QuickDevWorkflowValueKey.ProjectMode: "existing"`, `ProjectTitle: "Quick Dev Prompt Project"`, `ProjectFolderName: "quick-dev-project"`, `SpecFile: QUICK_DEV_SPEC_FILE`, and `SpecFileFilename: QUICK_DEV_SPEC_FILE_FILENAME`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 10.4: In `integration.test.ts`, add `function getQuickDevEntryBranchId(activeStepNumber: QuickDevPromptStepNumber): string` that returns `quickDevWorkflowDefinition.steps["step-1"].decisionTree.entryBranchId` for `1`, `quickDevWorkflowDefinition.steps["step-2"].decisionTree.entryBranchId` for `2`, and `quickDevWorkflowDefinition.steps["step-3"].decisionTree.entryBranchId` for `3`, with a `never` exhaustive check for the default.
+    [x] Subtask 10.4: In `integration.test.ts`, add `function getQuickDevEntryBranchId(activeStepNumber: QuickDevPromptStepNumber): string` that returns `quickDevWorkflowDefinition.steps["step-1"].decisionTree.entryBranchId` for `1`, `quickDevWorkflowDefinition.steps["step-2"].decisionTree.entryBranchId` for `2`, and `quickDevWorkflowDefinition.steps["step-3"].decisionTree.entryBranchId` for `3`, with a `never` exhaustive check for the default.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 10.5: In `integration.test.ts`, add `function createQuickDevWorkflowSession(activeStepNumber: QuickDevPromptStepNumber): ActiveWorkflowSession` returning a session with `activeStepNumber`, `workflowValues: createQuickDevWorkflowValues()`, `projectSelection` values `{ projectMode: "existing", projectTitle: "Quick Dev Prompt Project", projectFolderName: "quick-dev-project" }`, `lifecycle: { projectSelectionCompleted: true }`, `entryArtifactResolution: undefined`, `ui` values `formSession: undefined`, `stepResolutionSession: undefined`, `suppressedWorkflowFormIds: []`, and `suppressedWorkflowStepResolutionRoutes: []`, and `branchContext: { activeBranchId: getQuickDevEntryBranchId(activeStepNumber) }`.
+    [x] Subtask 10.5: In `integration.test.ts`, add `function createQuickDevWorkflowSession(activeStepNumber: QuickDevPromptStepNumber): ActiveWorkflowSession` returning a session with `activeStepNumber`, `workflowValues: createQuickDevWorkflowValues()`, `projectSelection` values `{ projectMode: "existing", projectTitle: "Quick Dev Prompt Project", projectFolderName: "quick-dev-project" }`, `lifecycle: { projectSelectionCompleted: true }`, `entryArtifactResolution: undefined`, `ui` values `formSession: undefined`, `stepResolutionSession: undefined`, `suppressedWorkflowFormIds: []`, and `suppressedWorkflowStepResolutionRoutes: []`, and `branchContext: { activeBranchId: getQuickDevEntryBranchId(activeStepNumber) }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 10.6: In `integration.test.ts`, add `const buildQuickDevPromptContext = async (activeStepNumber: QuickDevPromptStepNumber): Promise<SystemPromptContext & WorkflowPromptProjection>` that creates `const workspacePathPolicy: WorkflowWorkspacePathPolicy = { validateAccess: () => true }`, `const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })`, `const taskState = new TaskState()`, sets `taskState.activeWorkflowName = quickDevWorkflowDefinition.name`, `taskState.activeWorkflowSession = createQuickDevWorkflowSession(activeStepNumber)`, and `taskState.apiRequestCount = 1`, assigns `const workflowProjection = await runtime.buildTurnProjection({ taskState })`, and returns `{ ...baseContext, mcpHub: makeMcpHub([]), providerInfo: makeProviderInfo("gpt-5-codex", "openai"), enableNativeToolCalls: true, useMinimalGptPrompt: true, ...workflowProjection }`.
+    [x] Subtask 10.6: In `integration.test.ts`, add `const buildQuickDevPromptContext = async (activeStepNumber: QuickDevPromptStepNumber): Promise<SystemPromptContext & WorkflowPromptProjection>` that creates `const workspacePathPolicy: WorkflowWorkspacePathPolicy = { validateAccess: () => true }`, `const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })`, `const taskState = new TaskState()`, sets `taskState.activeWorkflowName = quickDevWorkflowDefinition.name`, `taskState.activeWorkflowSession = createQuickDevWorkflowSession(activeStepNumber)`, and `taskState.apiRequestCount = 1`, assigns `const workflowProjection = await runtime.buildTurnProjection({ taskState })`, and returns `{ ...baseContext, mcpHub: makeMcpHub([]), providerInfo: makeProviderInfo("gpt-5-codex", "openai"), enableNativeToolCalls: true, useMinimalGptPrompt: true, ...workflowProjection }`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 10.7: In `integration.test.ts`, add `async function expectQuickDevProjectedToolSurface(testCtx: TestRunner, activeStepNumber: QuickDevPromptStepNumber, expectedToolSpecs: readonly ClineToolSpec[]): Promise<void>` that assigns `const context = await buildQuickDevPromptContext(activeStepNumber)`, asserts `context.workflowToolSchemaOverride` deep-equals `expectedToolSpecs`, and calls `await runPromptTest(testCtx, context, "gpt-5-codex", async ({ tools }) => { expect(getNativeToolNames(tools)).to.deep.equal(expectedToolSpecs.map((tool) => tool.name)) })`.
+    [x] Subtask 10.7: In `integration.test.ts`, add `async function expectQuickDevProjectedToolSurface(testCtx: TestRunner, activeStepNumber: QuickDevPromptStepNumber, expectedToolSpecs: readonly ClineToolSpec[]): Promise<void>` that assigns `const context = await buildQuickDevPromptContext(activeStepNumber)`, asserts `context.workflowToolSchemaOverride` deep-equals `expectedToolSpecs`, and calls `await runPromptTest(testCtx, context, "gpt-5-codex", async ({ tools }) => { expect(getNativeToolNames(tools)).to.deep.equal(expectedToolSpecs.map((tool) => tool.name)) })`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 10.8: In the workflow prompt-projection describe block in `integration.test.ts`, add test `projects active quick-dev prompt-step tools from module-owned builders into native GPT-5 prompts` with callback `async function (this: TestRunner)`. Its body must call `await expectQuickDevProjectedToolSurface(this, 1, buildQuickDevStep1ToolSchemas())` and `await expectQuickDevProjectedToolSurface(this, 2, buildQuickDevStep2ToolSchemas())`. Do not build a Step 3 prompt context in this test because Step 3 is deterministic routing only and must not render a prompt.
+    [x] Subtask 10.8: In the workflow prompt-projection describe block in `integration.test.ts`, add test `projects active quick-dev prompt-step tools from module-owned builders into native GPT-5 prompts` with callback `async function (this: TestRunner)`. Its body must call `await expectQuickDevProjectedToolSurface(this, 1, buildQuickDevStep1ToolSchemas())` and `await expectQuickDevProjectedToolSurface(this, 2, buildQuickDevStep2ToolSchemas())`. Do not build a Step 3 prompt context in this test because Step 3 is deterministic routing only and must not render a prompt.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 10.9: In the workflow prompt-projection describe block in `integration.test.ts`, add test `projects quick-dev Step 1 materialized spec path into the workflow input payload only` with callback `async function (this: TestRunner)`. Its body must assign `const context = await buildQuickDevPromptContext(1)`, `const workflowInputPayloadBlock = context.workflowInputPayloadBlock`, and `const renderedReadLine = "Read this first: `" + QUICK_DEV_SPEC_FILE + "`"`; throw `new Error("Expected quick-dev Step 1 workflow input payload block.")` when `workflowInputPayloadBlock === undefined || workflowInputPayloadBlock.length === 0`; assert `workflowInputPayloadBlock` includes `Workflow:\nquick dev`, `Name: Amelia`, `Role: Developer Agent`, `Step 1: Review Assigned Phase`, `renderedReadLine`, `workflow_progress_request`, and `Identify the first incomplete phase`; assert it does not include `{workflow.spec_file}`, `### Prompt`, `### Progression Rule`, `# Tool Schema Override`, or `# Focus Chain Tasks`; and call `await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt }) => { expect(systemPrompt).not.to.include("CURRENT STEP DETAILED INSTRUCTIONS"); expect(systemPrompt).not.to.include(renderedReadLine) })`.
+    [x] Subtask 10.9: In the workflow prompt-projection describe block in `integration.test.ts`, add test `projects quick-dev Step 1 materialized spec path into the workflow input payload only` with callback `async function (this: TestRunner)`. Its body must assign `const context = await buildQuickDevPromptContext(1)`, `const workflowInputPayloadBlock = context.workflowInputPayloadBlock`, and `const renderedReadLine = "Read this first: `" + QUICK_DEV_SPEC_FILE + "`"`; throw `new Error("Expected quick-dev Step 1 workflow input payload block.")` when `workflowInputPayloadBlock === undefined || workflowInputPayloadBlock.length === 0`; assert `workflowInputPayloadBlock` includes `Workflow:\nquick dev`, `Name: Amelia`, `Role: Developer Agent`, `Step 1: Review Assigned Phase`, `renderedReadLine`, `workflow_progress_request`, and `Identify the first incomplete phase`; assert it does not include `{workflow.spec_file}`, `### Prompt`, `### Progression Rule`, `# Tool Schema Override`, or `# Focus Chain Tasks`; and call `await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt }) => { expect(systemPrompt).not.to.include("CURRENT STEP DETAILED INSTRUCTIONS"); expect(systemPrompt).not.to.include(renderedReadLine) })`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 10.10: In the workflow prompt-projection describe block in `integration.test.ts`, add test `projects quick-dev Step 2 implementation prompt into the workflow input payload only` with callback `async function (this: TestRunner)`. Its body must assign `const context = await buildQuickDevPromptContext(2)`, `const workflowInputPayloadBlock = context.workflowInputPayloadBlock`, throw `new Error("Expected quick-dev Step 2 workflow input payload block.")` when `workflowInputPayloadBlock === undefined || workflowInputPayloadBlock.length === 0`, assert `workflowInputPayloadBlock` includes `Step 2: Implement Assigned Phase`, `Implement the phase confirmed by the user in step 1`, `attempt_completion`, `phase completion status`, and `the commit hash from your commit`; assert it does not include `workflow_progress_request`, `### Prompt`, `### Progression Rule`, `# Tool Schema Override`, or `# Focus Chain Tasks`; and call `await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt }) => { expect(systemPrompt).not.to.include("CURRENT STEP DETAILED INSTRUCTIONS"); expect(systemPrompt).not.to.include("Implement the phase confirmed by the user in step 1") })`.
+    [x] Subtask 10.10: In the workflow prompt-projection describe block in `integration.test.ts`, add test `projects quick-dev Step 2 implementation prompt into the workflow input payload only` with callback `async function (this: TestRunner)`. Its body must assign `const context = await buildQuickDevPromptContext(2)`, `const workflowInputPayloadBlock = context.workflowInputPayloadBlock`, throw `new Error("Expected quick-dev Step 2 workflow input payload block.")` when `workflowInputPayloadBlock === undefined || workflowInputPayloadBlock.length === 0`, assert `workflowInputPayloadBlock` includes `Step 2: Implement Assigned Phase`, `Implement the phase confirmed by the user in step 1`, `attempt_completion`, `phase completion status`, and `the commit hash from your commit`; assert it does not include `workflow_progress_request`, `### Prompt`, `### Progression Rule`, `# Tool Schema Override`, or `# Focus Chain Tasks`; and call `await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt }) => { expect(systemPrompt).not.to.include("CURRENT STEP DETAILED INSTRUCTIONS"); expect(systemPrompt).not.to.include("Implement the phase confirmed by the user in step 1") })`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 10.11: In the workflow prompt-projection describe block in `integration.test.ts`, add test `renders quick-dev response-tool guidance only for active response tools` with callback `async function (this: TestRunner)`. Its body must assign `const step1Context = await buildQuickDevPromptContext(1)`, call `await runPromptTest(this, step1Context, "gpt-5-codex", async ({ systemPrompt }) => { expectResponseToolNames(systemPrompt, ["`workflow_progress_request`"], ["`attempt_completion`"]) })`, assign `const step2Context = await buildQuickDevPromptContext(2)`, and call `await runPromptTest(this, step2Context, "gpt-5-codex", async ({ systemPrompt }) => { expectResponseToolNames(systemPrompt, ["`attempt_completion`"], ["`workflow_progress_request`"]) })`.
+    [x] Subtask 10.11: In the workflow prompt-projection describe block in `integration.test.ts`, add test `renders quick-dev response-tool guidance only for active response tools` with callback `async function (this: TestRunner)`. Its body must assign `const step1Context = await buildQuickDevPromptContext(1)`, call `await runPromptTest(this, step1Context, "gpt-5-codex", async ({ systemPrompt }) => { expectResponseToolNames(systemPrompt, ["`workflow_progress_request`"], ["`attempt_completion`"]) })`, assign `const step2Context = await buildQuickDevPromptContext(2)`, and call `await runPromptTest(this, step2Context, "gpt-5-codex", async ({ systemPrompt }) => { expectResponseToolNames(systemPrompt, ["`attempt_completion`"], ["`workflow_progress_request`"]) })`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 10.12: In the workflow prompt-projection describe block in `integration.test.ts`, add test `does not expose forbidden runtime or legacy tools in quick-dev prompt projection` with callback `async () =>`. Its body must define `const forbiddenToolNames = ["ask_followup_question", "set_workflow_values", "build_workflow_document", "create_workflow_artifact", "archive_workflow_artifact", "delete_workflow_artifact", "move_workflow_project_file", "use_subagents", "use_skill", "web_search", "web_fetch", "browser_action", "use_mcp_tool", "access_mcp_resource", "load_mcp_documentation"]`, loop through `[1, 2] as const`, build each context with `await buildQuickDevPromptContext(activeStepNumber)`, assign `const projectedToolNames = context.workflowToolSchemaOverride?.map((tool) => tool.name) ?? []`, and assert `expect(projectedToolNames).not.to.include(forbiddenToolName)` for every `forbiddenToolName` in `forbiddenToolNames`.
+    [x] Subtask 10.12: In the workflow prompt-projection describe block in `integration.test.ts`, add test `does not expose forbidden runtime or legacy tools in quick-dev prompt projection` with callback `async () =>`. Its body must define `const forbiddenToolNames = ["ask_followup_question", "set_workflow_values", "build_workflow_document", "create_workflow_artifact", "archive_workflow_artifact", "delete_workflow_artifact", "move_workflow_project_file", "use_subagents", "use_skill", "web_search", "web_fetch", "browser_action", "use_mcp_tool", "access_mcp_resource", "load_mcp_documentation"]`, loop through `[1, 2] as const`, build each context with `await buildQuickDevPromptContext(activeStepNumber)`, assign `const projectedToolNames = context.workflowToolSchemaOverride?.map((tool) => tool.name) ?? []`, and assert `expect(projectedToolNames).not.to.include(forbiddenToolName)` for every `forbiddenToolName` in `forbiddenToolNames`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-[ ] Task 11: Extend `/Users/robertboston/Documents/Cline Extension/cline/src/test/slash-commands.test.ts` with Quick Dev shipped slash command coverage.
+[x] Task 11: Extend `/Users/robertboston/Documents/Cline Extension/cline/src/test/slash-commands.test.ts` with Quick Dev shipped slash command coverage.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/test/slash-commands.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 11.1: In `slash-commands.test.ts`, inside `describe("Shipped Workflow Slash Commands", () => { ... })`, add test `includes the registered quick-dev workflow slash command` that calls `getResponse()`, finds `cmd.name === "quick-dev"`, asserts the command is not `undefined`, `section` equals `"custom"`, `cliCompatible` equals `true`, and `description` equals `"Shipped workflow: quick-dev"`.
+    [x] Subtask 11.1: In `slash-commands.test.ts`, inside `describe("Shipped Workflow Slash Commands", () => { ... })`, add test `includes the registered quick-dev workflow slash command` that calls `getResponse()`, finds `cmd.name === "quick-dev"`, asserts the command is not `undefined`, `section` equals `"custom"`, `cliCompatible` equals `true`, and `description` equals `"Shipped workflow: quick-dev"`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/test/slash-commands.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-[ ] Task 12: Run Phase 3 validation.
+[x] Task 12: Run Phase 3 validation.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 12.1: Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevWorkflow.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts src/test/slash-commands.test.ts`.
+    [x] Subtask 12.1: Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevWorkflow.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts src/test/slash-commands.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 12.2: Run `npm run check-types`. If it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` before treating the failure as a code defect.
+    [x] Subtask 12.2: Run `npm run check-types`. If it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` before treating the failure as a code defect.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 12.3: Run `npm run lint`.
+    [x] Subtask 12.3: Run `npm run lint`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 12.4: Run `git diff --name-only` and `git ls-files --others --exclude-standard`; confirm persistent diffs and untracked files are limited to Phase 1, Phase 2, and Phase 3 authorized files plus the pre-existing backing requirements document: `src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevWorkflow.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-dev/index.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevWorkflow.test.ts`, `src/core/task/workflow-runtime/WorkflowRegistry.ts`, `src/core/prompts/system-prompt/__tests__/integration.test.ts`, `src/test/slash-commands.test.ts`, `docs/workflows/workflow-runtime/workflow-modules/quick-dev/quick-dev-requirements.md`, and this action plan.
+    [x] Subtask 12.4: Run `git diff --name-only` and `git ls-files --others --exclude-standard`; confirm persistent diffs and untracked files are limited to Phase 1, Phase 2, and Phase 3 authorized files plus the pre-existing backing requirements document: `src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevWorkflow.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-dev/index.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevWorkflow.test.ts`, `src/core/task/workflow-runtime/WorkflowRegistry.ts`, `src/core/prompts/system-prompt/__tests__/integration.test.ts`, `src/test/slash-commands.test.ts`, `docs/workflows/workflow-runtime/workflow-modules/quick-dev/quick-dev-requirements.md`, and this action plan.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
