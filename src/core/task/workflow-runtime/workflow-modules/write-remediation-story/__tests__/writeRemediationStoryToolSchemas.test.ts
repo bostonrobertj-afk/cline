@@ -23,6 +23,7 @@ const STEP_3_TOOL_NAMES: readonly string[] = [
 	"apply_patch",
 	"write_to_file",
 	"send_user_message",
+	"use_subagents",
 	"attempt_completion",
 ]
 
@@ -31,7 +32,6 @@ const FORBIDDEN_MODEL_FACING_TOOL_NAMES: readonly string[] = [
 	"web_fetch",
 	"browser_action",
 	"ask_followup_question",
-	"use_subagents",
 	"use_skill",
 	"set_workflow_values",
 	"build_workflow_document",
@@ -108,6 +108,7 @@ describe("writeRemediationStoryToolSchemas", () => {
 			ClineDefaultTool.APPLY_PATCH,
 			ClineDefaultTool.FILE_NEW,
 			ClineDefaultTool.SEND_USER_MESSAGE,
+			ClineDefaultTool.USE_SUBAGENTS,
 			ClineDefaultTool.ATTEMPT,
 		])
 	})

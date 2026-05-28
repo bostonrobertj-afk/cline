@@ -16,6 +16,7 @@ export const WRITE_REMEDIATION_STORY_STEP_3_TOOL_IDS: readonly ClineDefaultTool[
 	ClineDefaultTool.APPLY_PATCH,
 	ClineDefaultTool.FILE_NEW,
 	ClineDefaultTool.SEND_USER_MESSAGE,
+	ClineDefaultTool.USE_SUBAGENTS,
 	ClineDefaultTool.ATTEMPT,
 ]
 

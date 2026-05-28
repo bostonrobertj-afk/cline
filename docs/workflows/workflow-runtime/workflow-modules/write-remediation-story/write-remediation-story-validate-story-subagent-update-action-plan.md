@@ -53,13 +53,13 @@ Allowed files for Phase 1 tasks and subtasks:
 - `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/writeRemediationStoryToolSchemas.ts`
 - `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryToolSchemas.test.ts`
 
-- [ ] Task 1: Update Write-Remediation-Story Step 3 Tool IDs
+- [x] Task 1: Update Write-Remediation-Story Step 3 Tool IDs
 
-  - [ ] Subtask 1.1: In `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/writeRemediationStoryToolSchemas.ts`, insert `ClineDefaultTool.USE_SUBAGENTS,` inside `WRITE_REMEDIATION_STORY_STEP_3_TOOL_IDS` immediately after `ClineDefaultTool.SEND_USER_MESSAGE,` and immediately before `ClineDefaultTool.ATTEMPT,`.
+  - [x] Subtask 1.1: In `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/writeRemediationStoryToolSchemas.ts`, insert `ClineDefaultTool.USE_SUBAGENTS,` inside `WRITE_REMEDIATION_STORY_STEP_3_TOOL_IDS` immediately after `ClineDefaultTool.SEND_USER_MESSAGE,` and immediately before `ClineDefaultTool.ATTEMPT,`.
 
-- [ ] Task 2: Update Write-Remediation-Story Tool Schema Unit Tests
+- [x] Task 2: Update Write-Remediation-Story Tool Schema Unit Tests
 
-  - [ ] Subtask 2.1: In `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryToolSchemas.test.ts`, replace `STEP_3_TOOL_NAMES` with this exact array:
+  - [x] Subtask 2.1: In `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryToolSchemas.test.ts`, replace `STEP_3_TOOL_NAMES` with this exact array:
 
 ```ts
 const STEP_3_TOOL_NAMES: readonly string[] = [
@@ -77,21 +77,21 @@ const STEP_3_TOOL_NAMES: readonly string[] = [
 ]
 ```
 
-  - [ ] Subtask 2.2: In `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryToolSchemas.test.ts`, remove the exact string entry `"use_subagents",` from `FORBIDDEN_MODEL_FACING_TOOL_NAMES`.
+  - [x] Subtask 2.2: In `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryToolSchemas.test.ts`, remove the exact string entry `"use_subagents",` from `FORBIDDEN_MODEL_FACING_TOOL_NAMES`.
 
-  - [ ] Subtask 2.3: In `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryToolSchemas.test.ts`, update the `WRITE_REMEDIATION_STORY_STEP_3_TOOL_IDS` expected array in test `"uses only approved Cline default tool ids for Step 3"` by inserting `ClineDefaultTool.USE_SUBAGENTS,` immediately after `ClineDefaultTool.SEND_USER_MESSAGE,` and immediately before `ClineDefaultTool.ATTEMPT,`.
+  - [x] Subtask 2.3: In `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryToolSchemas.test.ts`, update the `WRITE_REMEDIATION_STORY_STEP_3_TOOL_IDS` expected array in test `"uses only approved Cline default tool ids for Step 3"` by inserting `ClineDefaultTool.USE_SUBAGENTS,` immediately after `ClineDefaultTool.SEND_USER_MESSAGE,` and immediately before `ClineDefaultTool.ATTEMPT,`.
 
-- [ ] Task 3: Validate Step 3 Tool Schema Update
+- [x] Task 3: Validate Step 3 Tool Schema Update
 
-  - [ ] Subtask 3.1: Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryToolSchemas.test.ts` and verify the command exits successfully.
+  - [x] Subtask 3.1: Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryToolSchemas.test.ts` and verify the command exits successfully.
 
-  - [ ] Subtask 3.2: Run `npm run check-types` with elevated permissions and verify the command exits successfully. If this command fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` with elevated permissions before treating the failure as a code defect.
+  - [x] Subtask 3.2: Run `npm run check-types` with elevated permissions and verify the command exits successfully. If this command fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` with elevated permissions before treating the failure as a code defect.
 
-  - [ ] Subtask 3.3: Run `npm run lint` and verify the command exits successfully.
+  - [x] Subtask 3.3: Run `npm run lint` and verify the command exits successfully.
 
-  - [ ] Subtask 3.4: Run `git diff --name-only` and verify tracked diffs are limited to `docs/workflows/workflow-runtime/workflow-modules/write-remediation-story/write-remediation-story-validate-story-subagent-update-action-plan.md`, `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/writeRemediationStoryToolSchemas.ts`, and `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryToolSchemas.test.ts`.
+  - [x] Subtask 3.4: Run `git diff --name-only` and verify tracked diffs are limited to `docs/workflows/workflow-runtime/workflow-modules/write-remediation-story/write-remediation-story-validate-story-subagent-update-action-plan.md`, `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/writeRemediationStoryToolSchemas.ts`, and `src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryToolSchemas.test.ts`.
 
-  - [ ] Subtask 3.5: Run `git ls-files --others --exclude-standard` and verify untracked files are absent or limited to `docs/workflows/workflow-runtime/workflow-modules/write-remediation-story/write-remediation-story-validate-story-subagent-update-action-plan.md` and `docs/workflows/workflow-runtime/workflow-modules/write-remediation-story/write-remediation-story-validate-story-subagent-update-requirements.md`.
+  - [x] Subtask 3.5: Run `git ls-files --others --exclude-standard` and verify untracked files are absent or limited to `docs/workflows/workflow-runtime/workflow-modules/write-remediation-story/write-remediation-story-validate-story-subagent-update-action-plan.md` and `docs/workflows/workflow-runtime/workflow-modules/write-remediation-story/write-remediation-story-validate-story-subagent-update-requirements.md`.
 
 ## Phase 2: Step 3 Prompt Update
 
