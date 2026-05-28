@@ -226,18 +226,6 @@ Before reporting completion, audit every task and subtask with this matrix:
 
 Every row must be complete. If any row requires inference by the implementing agent, rewrite the task or subtask.
 
-FINAL LINE-BY-LINE AUDIT:
-Re-read each phase from top to bottom.
-For each task and subtask, confirm:
-- It is backed by the spec file's acceptance criteria, project scope, technical decisions, and/or solution overview
-- It is compile-safe.
-- It has exact imports and cleanup.
-- It has exact fixture/action/session shapes.
-- It has exact assertions where stable contracts are involved.
-- It does not invent prose.
-- It does not preserve unauthorized legacy behavior.
-- It does not require the dev agent to infer implementation details.
-
 DEV AGENT INSTRUCTIONS:
 Add this exact content to the "Dev Agent Instructions" section of {workflow.output_document}. Do not paraphrase or invent additional instructions.
 Required instructions:
@@ -251,8 +239,14 @@ Required instructions:
 - If any ambiguity is discovered, or if any change is needed outside the allowed-files list for the current step, stop and ask the user before proceeding.
 - Implement tasks and subtasks exactly as instructed. If deviation seems necessary, stop, inform the user, and explain why you believe the task or subtask should be carried out differently than prescribed.
 
-Once you've authored the implementation phases, audited and reviewed them, and added the prescribed agent instructions, notify the user that you've completed the implementation document. Provide them with the full file path for the document ({workflow.output_document}), and ask them to review. Adjust as needed based on their feedback. Once the user approves the drafted content, call attempt_completion and provide a final recap before the workflow automatically concludes.`
+FINAL VALIDATION
+After authoring the tasks & subtasks, dispatch a subagent to validate that the spec is fully compliant and implementation-ready.
+You must provide the subagent with this exact prompt (no paraphrasing or alterations of any kind):
+Skill: use_skill('validate-story') Your task is to validate the implementation spec I've just drafted to ensure that it is implementation-ready. You will receive separate workflow instructions which provide exact guidance regarding validation procedure. Complete the validation per the instructions, then respond to me using attempt_completion with your findings. In your response, you must include the exact task and/or subtask numbers for any items which have issues that I need to address.
 
+Once the subagent completes their validation & provides you with their findings, address any issues they've identified. If the subagent identified issues, correct them in the document, shut down the subagent, and repeat the subagent validation process with a fresh subagent. Repeat this process until a subagent completes validation with no findings.
+
+Once you've authored the implementation phases, added the required Dev Instructions, and received a clear validation report from a subagent, call attempt_completion to notify the user that the spec is ready for implementation, and that validation was successfully conducted by a subagent running the Validate Story workflow.`
 function buildTerminalTransition(): WorkflowFormDefinitionPayload["panels"][string]["transition"] {
 	return {
 		type: "conditional",
