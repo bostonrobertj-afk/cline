@@ -63,7 +63,6 @@ import {
 import {
 	buildCreateStoryStep2ToolSchemas,
 	buildCreateStoryStep3ToolSchemas,
-	buildCreateStoryStep4ToolSchemas,
 } from "@/core/task/workflow-runtime/workflow-modules/create-story/createStoryToolSchemas"
 import { DevStoryWorkflowValueKey, devStoryWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/dev-story"
 import {
@@ -676,7 +675,7 @@ const buildCreateEpicsPromptContext = async (): Promise<SystemPromptContext & Wo
 	}
 }
 
-type CreateStoryPromptStepNumber = 2 | 3 | 4
+type CreateStoryPromptStepNumber = 2 | 3
 
 const CREATE_STORY_ARCHITECTURE_DOCUMENT = "/test/project/planning/architecture.md"
 const CREATE_STORY_EPICS_DOCUMENT = "/test/project/planning/Epics.md"
@@ -696,8 +695,6 @@ const getCreateStoryEntryBranchId = (activeStepNumber: CreateStoryPromptStepNumb
 			return createStoryWorkflowDefinition.steps["step-2"].decisionTree.entryBranchId
 		case 3:
 			return createStoryWorkflowDefinition.steps["step-3"].decisionTree.entryBranchId
-		case 4:
-			return createStoryWorkflowDefinition.steps["step-4"].decisionTree.entryBranchId
 	}
 
 	const unreachableActiveStepNumber: never = activeStepNumber
@@ -742,6 +739,7 @@ const createCreateStoryWorkflowSession = (activeStepNumber: CreateStoryPromptSte
 
 const buildCreateStoryPromptContext = async (
 	activeStepNumber: CreateStoryPromptStepNumber,
+	workflowValues?: WorkflowValues,
 ): Promise<SystemPromptContext & WorkflowPromptProjection> => {
 	const workspacePathPolicy: WorkflowWorkspacePathPolicy = {
 		validateAccess: () => true,
@@ -750,6 +748,12 @@ const buildCreateStoryPromptContext = async (
 	const taskState = new TaskState()
 	taskState.activeWorkflowName = "create-story"
 	taskState.activeWorkflowSession = createCreateStoryWorkflowSession(activeStepNumber)
+	if (workflowValues !== undefined) {
+		taskState.activeWorkflowSession.workflowValues = {
+			...taskState.activeWorkflowSession.workflowValues,
+			...workflowValues,
+		}
+	}
 	taskState.apiRequestCount = 1
 	const workflowProjection = await runtime.buildTurnProjection({ taskState })
 
@@ -2925,10 +2929,6 @@ describe("Prompt System Integration Tests", () => {
 					activeStepNumber: 3,
 					expectedToolSpecs: buildCreateStoryStep3ToolSchemas(),
 				},
-				{
-					activeStepNumber: 4,
-					expectedToolSpecs: buildCreateStoryStep4ToolSchemas(),
-				},
 			]
 
 			for (const expectation of expectations) {
@@ -3710,24 +3710,20 @@ describe("Prompt System Integration Tests", () => {
 			}
 		})
 
-		it("renders create-story response-tool guidance for progress steps and completion step only", async function () {
-			const workflowProgressStepNumbers: readonly CreateStoryPromptStepNumber[] = [2, 3]
+		it("renders create-story response-tool guidance for Step 2 progress and Step 3 completion", async function () {
+			const step2Context = await buildCreateStoryPromptContext(2)
+			await runPromptTest(this, step2Context, "gpt-5-codex", async ({ systemPrompt }) => {
+				expectResponseToolNames(systemPrompt, ["`workflow_progress_request`"], ["`attempt_completion`"])
+			})
 
-			for (const activeStepNumber of workflowProgressStepNumbers) {
-				const context = await buildCreateStoryPromptContext(activeStepNumber)
-				await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt }) => {
-					expectResponseToolNames(systemPrompt, ["`workflow_progress_request`"], ["`attempt_completion`"])
-				})
-			}
-
-			const completionContext = await buildCreateStoryPromptContext(4)
-			await runPromptTest(this, completionContext, "gpt-5-codex", async ({ systemPrompt }) => {
+			const step3Context = await buildCreateStoryPromptContext(3)
+			await runPromptTest(this, step3Context, "gpt-5-codex", async ({ systemPrompt }) => {
 				expectResponseToolNames(systemPrompt, ["`attempt_completion`"], ["`workflow_progress_request`"])
 			})
 		})
 
 		it("does not statically expose forbidden runtime or story-planning tools in create-story prompt projection", async function () {
-			const activeStepNumbers: readonly CreateStoryPromptStepNumber[] = [2, 3, 4]
+			const activeStepNumbers: readonly CreateStoryPromptStepNumber[] = [2, 3]
 			const forbiddenToolNames: readonly string[] = [
 				"build_workflow_document",
 				"create_workflow_artifact",
@@ -3747,6 +3743,11 @@ describe("Prompt System Integration Tests", () => {
 				const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
 				for (const forbiddenToolName of forbiddenToolNames) {
 					expect(projectedToolNames).to.not.include(forbiddenToolName)
+				}
+				if (activeStepNumber === 3) {
+					expect(projectedToolNames).to.include("use_subagents")
+					expect(projectedToolNames).to.include("attempt_completion")
+					expect(projectedToolNames).to.not.include("workflow_progress_request")
 				}
 
 				await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt, tools }) => {
@@ -3860,7 +3861,9 @@ describe("Prompt System Integration Tests", () => {
 			expect(workflowInputPayloadBlock).to.include("Role: Scrum Master")
 			expect(workflowInputPayloadBlock).to.include("1. Gather Inputs - Complete")
 			expect(workflowInputPayloadBlock).to.include("2. Review Context & Ensure Project Alignment - Active")
-			expect(workflowInputPayloadBlock).to.include("4. Finalize & Validate Story Document - Not Started")
+			expect(workflowInputPayloadBlock).to.include("3. Author Tasks & Subtasks - Not Started")
+			const retiredStepChecklistLine = ["4. ", "Finalize", " & Validate Story Document", " - Not Started"].join("")
+			expect(workflowInputPayloadBlock).to.not.include(retiredStepChecklistLine)
 			expect(workflowInputPayloadBlock).to.include("CURRENT STEP DETAILED INSTRUCTIONS")
 			expect(workflowInputPayloadBlock).to.include("Step 2: Review Context & Ensure Project Alignment")
 
@@ -3868,6 +3871,91 @@ describe("Prompt System Integration Tests", () => {
 				expect(systemPrompt).to.not.include("CURRENT STEP DETAILED INSTRUCTIONS")
 				expect(systemPrompt).to.not.include("Step 2: Review Context & Ensure Project Alignment")
 			})
+		})
+
+		it("projects create-story Step 3 validate-story subagent instructions into the full-turn input payload only", async function () {
+			const context = await buildCreateStoryPromptContext(3)
+			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+			if (workflowInputPayloadBlock === undefined) {
+				throw new Error("Expected create-story Step 3 workflow input payload.")
+			}
+
+			expect(workflowInputPayloadBlock).to.include("Step 3: Author Tasks & Subtasks")
+			expect(workflowInputPayloadBlock).to.include(
+				"Review runtime code & tests and identify the full set of in-scope revisions needed to deliver the story's requirements and objective.",
+			)
+			expect(workflowInputPayloadBlock).to.include("Skill: use_skill('validate-story')")
+			expect(workflowInputPayloadBlock).to.include(
+				"Your task is to validate the story document I've just drafted to ensure that it is implementation-ready.",
+			)
+			expect(workflowInputPayloadBlock).to.include(
+				"Complete the story validation per the instructions, then respond to me using attempt_completion with your findings.",
+			)
+			expect(workflowInputPayloadBlock).to.include("The story is complete and implementation-ready")
+			expect(workflowInputPayloadBlock).to.include(
+				"Story validation was completed by a Subagent via the Validate Story workflow and all issues were successfully resolved",
+			)
+			expect(workflowInputPayloadBlock).to.include("The user should run the Dev Story workflow next")
+			const retiredStepChecklistLabel = ["Finalize", " & Validate Story Document"].join("")
+			expect(workflowInputPayloadBlock).to.not.include("{workflow.target_story}")
+			expect(workflowInputPayloadBlock).to.not.include("*** User Review & Feedback ***")
+			expect(workflowInputPayloadBlock).to.not.include("unlock the next step's instructions")
+			expect(workflowInputPayloadBlock).to.not.include("workflow_progress_request")
+			expect(workflowInputPayloadBlock).to.not.include("### Progression Rule: successful use of attempt_completion")
+			expect(workflowInputPayloadBlock).to.not.include(
+				"Verify that {workflow.target_story} is complete, correctly formatted, internally consistent, and safe to hand off for implementation.",
+			)
+			expect(workflowInputPayloadBlock).to.not.include(retiredStepChecklistLabel)
+			expect(workflowInputPayloadBlock).to.not.include("*** Shown only if")
+			expect(workflowInputPayloadBlock).to.not.include("*** end conditional prompt block ***")
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt, tools }) => {
+				expect(systemPrompt).to.not.include("CURRENT STEP DETAILED INSTRUCTIONS")
+				expect(systemPrompt).to.not.include("Step 3: Author Tasks & Subtasks")
+				expect(systemPrompt).to.not.include("Skill: use_skill('validate-story')")
+				expect(systemPrompt).to.not.include("The story is complete and implementation-ready")
+				expect(getNativeToolNames(tools)).to.deep.equal(buildCreateStoryStep3ToolSchemas().map((tool) => tool.name))
+			})
+		})
+
+		it("projects create-story Step 3 backlog variant content into the full-turn input payload", async () => {
+			const context = await buildCreateStoryPromptContext(3, {
+				[CreateStoryWorkflowValueKey.SelectedStoryStatus]: "backlog",
+				[CreateStoryWorkflowValueKey.TargetStory]: "/test/project/implementation/stories-backlog/Story-1-2.md",
+			})
+			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+			if (workflowInputPayloadBlock === undefined) {
+				throw new Error("Expected create-story Step 3 backlog workflow input payload.")
+			}
+
+			expect(workflowInputPayloadBlock).to.include(
+				"Review the existing tasks and subtasks in /test/project/implementation/stories-backlog/Story-1-2.md and determine whether they meet the following criteria:",
+			)
+			expect(workflowInputPayloadBlock).to.include("Skill: use_skill('validate-story')")
+			expect(workflowInputPayloadBlock).to.include("The story is complete and implementation-ready")
+			expect(workflowInputPayloadBlock).to.not.include(
+				"Review runtime code & tests and identify the full set of in-scope revisions needed to deliver the story's requirements and objective.",
+			)
+			expect(workflowInputPayloadBlock).to.not.include("{workflow.target_story}")
+			const retiredStepChecklistLabel = ["Finalize", " & Validate Story Document"].join("")
+			expect(workflowInputPayloadBlock).to.include(
+				"Your task is to validate the story document I've just drafted to ensure that it is implementation-ready.",
+			)
+			expect(workflowInputPayloadBlock).to.include(
+				"Complete the story validation per the instructions, then respond to me using attempt_completion with your findings.",
+			)
+			expect(workflowInputPayloadBlock).to.include(
+				"Story validation was completed by a Subagent via the Validate Story workflow and all issues were successfully resolved",
+			)
+			expect(workflowInputPayloadBlock).to.include("The user should run the Dev Story workflow next")
+			expect(workflowInputPayloadBlock).to.not.include("*** User Review & Feedback ***")
+			expect(workflowInputPayloadBlock).to.not.include("*** Shown only if")
+			expect(workflowInputPayloadBlock).to.not.include("*** end conditional prompt block ***")
+			expect(workflowInputPayloadBlock).to.not.include("workflow_progress_request")
+			expect(workflowInputPayloadBlock).to.not.include(
+				"Verify that {workflow.target_story} is complete, correctly formatted, internally consistent, and safe to hand off for implementation.",
+			)
+			expect(workflowInputPayloadBlock).to.not.include(retiredStepChecklistLabel)
 		})
 
 		it("projects dev-story current step details into the full-turn input payload only", async function () {
