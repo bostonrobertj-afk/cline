@@ -681,72 +681,72 @@ Relevant requirements: Scope, Source Wording Preservation, Runtime Artifacts And
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-[ ] Task 13: Run final static guard checks.
+[x] Task 13: Run final static guard checks.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 13.1: Run `rg -n "quick-dev\\.md" src/core/task/workflow-runtime/WorkflowRegistry.ts src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevWorkflow.ts src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts src/core/prompts/system-prompt/__tests__/integration.test.ts src/test/slash-commands.test.ts`; confirm it returns no matches and exit code `1`.
+    [x] Subtask 13.1: Run `rg -n "quick-dev\\.md" src/core/task/workflow-runtime/WorkflowRegistry.ts src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevWorkflow.ts src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts src/core/prompts/system-prompt/__tests__/integration.test.ts src/test/slash-commands.test.ts`; confirm it returns no matches and exit code `1`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 13.2: Run `rg -n "set_workflow_values|ask_followup_question|use_subagents|use_skill|archive_workflow_artifact|delete_workflow_artifact|move_workflow_project_file|build_workflow_document|create_workflow_artifact|web_search|web_fetch|browser_action|use_mcp_tool|access_mcp_resource|load_mcp_documentation|plan_story_artifacts|plan_remediation_story_artifact|generate_story_files|update_story_index_status" src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevWorkflow.ts src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts`; confirm it returns no matches and exit code `1`.
+    [x] Subtask 13.2: Run `rg -n "set_workflow_values|ask_followup_question|use_subagents|use_skill|archive_workflow_artifact|delete_workflow_artifact|move_workflow_project_file|build_workflow_document|create_workflow_artifact|web_search|web_fetch|browser_action|use_mcp_tool|access_mcp_resource|load_mcp_documentation|plan_story_artifacts|plan_remediation_story_artifact|generate_story_files|update_story_index_status" src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevWorkflow.ts src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts`; confirm it returns no matches and exit code `1`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 13.3: Run `rg -n -U "QUICK_DEV_STEP_1_TOOL_IDS: readonly ClineDefaultTool\\[\\] = \\[[^\\]]*ClineDefaultTool\\.ATTEMPT[^\\]]*\\]|QUICK_DEV_STEP_2_TOOL_IDS: readonly ClineDefaultTool\\[\\] = \\[[^\\]]*ClineDefaultTool\\.WORKFLOW_PROGRESS_REQUEST[^\\]]*\\]|buildQuickDevStep3ToolSchemas\\(\\): readonly ClineToolSpec\\[\\] \\{\\s*return QUICK_DEV_STEP|buildQuickDevStep3ToolSchemas\\(\\): readonly ClineToolSpec\\[\\] \\{\\s*return \\[[^\\]]" src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts`; confirm it returns no matches and exit code `1`. This guard verifies Step 1 does not expose `attempt_completion`, Step 2 does not expose `workflow_progress_request`, and Step 3 does not return model-facing schemas even when tool id arrays are formatted across multiple lines.
+    [x] Subtask 13.3: Run `rg -n -U "QUICK_DEV_STEP_1_TOOL_IDS: readonly ClineDefaultTool\\[\\] = \\[[^\\]]*ClineDefaultTool\\.ATTEMPT[^\\]]*\\]|QUICK_DEV_STEP_2_TOOL_IDS: readonly ClineDefaultTool\\[\\] = \\[[^\\]]*ClineDefaultTool\\.WORKFLOW_PROGRESS_REQUEST[^\\]]*\\]|buildQuickDevStep3ToolSchemas\\(\\): readonly ClineToolSpec\\[\\] \\{\\s*return QUICK_DEV_STEP|buildQuickDevStep3ToolSchemas\\(\\): readonly ClineToolSpec\\[\\] \\{\\s*return \\[[^\\]]" src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts`; confirm it returns no matches and exit code `1`. This guard verifies Step 1 does not expose `attempt_completion`, Step 2 does not expose `workflow_progress_request`, and Step 3 does not return model-facing schemas even when tool id arrays are formatted across multiple lines.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 13.4: Run `rg -n "move_project_file|sourceFolderSegments: \\[\"planning\"\\]|destinationFolderSegments: \\[\"review\"\\]|filenameWorkflowValueKey: QuickDevWorkflowValueKey\\.SpecFileFilename" src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevWorkflow.ts`; confirm it returns matches for all four required Step 3 deterministic move concepts: `move_project_file`, `sourceFolderSegments: ["planning"]`, `destinationFolderSegments: ["review"]`, and `filenameWorkflowValueKey: QuickDevWorkflowValueKey.SpecFileFilename`.
+    [x] Subtask 13.4: Run `rg -n "move_project_file|sourceFolderSegments: \\[\"planning\"\\]|destinationFolderSegments: \\[\"review\"\\]|filenameWorkflowValueKey: QuickDevWorkflowValueKey\\.SpecFileFilename" src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevWorkflow.ts`; confirm it returns matches for all four required Step 3 deterministic move concepts: `move_project_file`, `sourceFolderSegments: ["planning"]`, `destinationFolderSegments: ["review"]`, and `filenameWorkflowValueKey: QuickDevWorkflowValueKey.SpecFileFilename`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 13.5: Run `rg -n "/Users/robertboston/Documents/Cline/Workflows/quick-dev.md|\\.cline/workflow-config|bmad|BMAD" src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevWorkflow.ts src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts src/core/task/workflow-runtime/WorkflowRegistry.ts`; confirm it returns no matches and exit code `1`.
+    [x] Subtask 13.5: Run `rg -n "/Users/robertboston/Documents/Cline/Workflows/quick-dev.md|\\.cline/workflow-config|bmad|BMAD" src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevWorkflow.ts src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts src/core/task/workflow-runtime/WorkflowRegistry.ts`; confirm it returns no matches and exit code `1`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 13.6: Run `rg -n "### Prompt|### Progression Rule|# Tool Schema Override|# Focus Chain Tasks" src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevWorkflow.ts`; confirm it returns no matches and exit code `1`.
+    [x] Subtask 13.6: Run `rg -n "### Prompt|### Progression Rule|# Tool Schema Override|# Focus Chain Tasks" src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevWorkflow.ts`; confirm it returns no matches and exit code `1`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-[ ] Task 14: Run final validation commands.
+[x] Task 14: Run final validation commands.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 14.1: Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`.
+    [x] Subtask 14.1: Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 14.2: Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts src/test/slash-commands.test.ts`.
+    [x] Subtask 14.2: Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts src/test/slash-commands.test.ts`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 14.3: Run `npm run check-types`. If it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` before treating the failure as a code defect.
+    [x] Subtask 14.3: Run `npm run check-types`. If it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` before treating the failure as a code defect.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 14.4: Run `npm run lint`.
+    [x] Subtask 14.4: Run `npm run lint`.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 14.5: Run `npm run package`. If it fails before packaging because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run package` before treating the failure as a code defect.
+    [x] Subtask 14.5: Run `npm run package`. If it fails before packaging because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run package` before treating the failure as a code defect.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
 
-    [ ] Subtask 14.6: Run `git diff --name-only` and `git ls-files --others --exclude-standard`; confirm persistent diffs and untracked files are limited to the full authorized implementation file set plus the pre-existing backing requirements document: `src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevWorkflow.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-dev/index.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevWorkflow.test.ts`, `src/core/task/workflow-runtime/WorkflowRegistry.ts`, `src/core/prompts/system-prompt/__tests__/integration.test.ts`, `src/test/slash-commands.test.ts`, `docs/workflows/workflow-runtime/workflow-modules/quick-dev/quick-dev-requirements.md`, and this action plan.
+    [x] Subtask 14.6: Run `git diff --name-only` and `git ls-files --others --exclude-standard`; confirm persistent diffs and untracked files are limited to the full authorized implementation file set plus the pre-existing backing requirements document: `src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevToolSchemas.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-dev/quickDevWorkflow.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-dev/index.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevToolSchemas.test.ts`, `src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevWorkflow.test.ts`, `src/core/task/workflow-runtime/WorkflowRegistry.ts`, `src/core/prompts/system-prompt/__tests__/integration.test.ts`, `src/test/slash-commands.test.ts`, `docs/workflows/workflow-runtime/workflow-modules/quick-dev/quick-dev-requirements.md`, and this action plan.
 
 Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/quick-dev/action-plan.md`
