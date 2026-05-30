@@ -213,16 +213,16 @@ npm run lint
 
 ## Phase 2: Workflow Definition
 
-### [ ] Task 4: Add Quick Review Workflow Definition
+### [x] Task 4: Add Quick Review Workflow Definition
 
 Allowed files for this task and every numbered subtask below:
 
 - `src/core/task/workflow-runtime/workflow-modules/quick-review/quickReviewWorkflow.ts`
 - `docs/workflows/workflow-runtime/workflow-modules/quick-review/action-plan.md`
 
-- [ ] Subtask 4.1: Add `src/core/task/workflow-runtime/workflow-modules/quick-review/quickReviewWorkflow.ts` with imports for `WorkflowFormDefinitionPayload` from `@shared/ExtensionMessage`; `WorkflowDecisionBranchTrigger`, `WorkflowDecisionTree`, `WorkflowDefinition`, `WorkflowPersonaDefinition`, `WorkflowStepDefinition`, and `WorkflowStepPromptSource` from `../../types`; and `buildQuickReviewStep1ToolSchemas` plus `buildQuickReviewStep2ToolSchemas` from `./quickReviewToolSchemas`.
+- [x] Subtask 4.1: Add `src/core/task/workflow-runtime/workflow-modules/quick-review/quickReviewWorkflow.ts` with imports for `WorkflowFormDefinitionPayload` from `@shared/ExtensionMessage`; `WorkflowDecisionBranchTrigger`, `WorkflowDecisionTree`, `WorkflowDefinition`, `WorkflowPersonaDefinition`, `WorkflowStepDefinition`, and `WorkflowStepPromptSource` from `../../types`; and `buildQuickReviewStep1ToolSchemas` plus `buildQuickReviewStep2ToolSchemas` from `./quickReviewToolSchemas`.
 
-- [ ] Subtask 4.2: In `quickReviewWorkflow.ts`, add these exact exported workflow identity constants:
+- [x] Subtask 4.2: In `quickReviewWorkflow.ts`, add these exact exported workflow identity constants:
 
 ```ts
 export const QUICK_REVIEW_WORKFLOW_NAME = "quick-review"
@@ -232,13 +232,13 @@ export const QUICK_REVIEW_WORKFLOW_USE_SKILL_NAME = "quick-review"
 export const QUICK_REVIEW_WORKFLOW_PROJECT_SUBFOLDER = "review"
 ```
 
-- [ ] Subtask 4.3: In `quickReviewWorkflow.ts`, add exported `QUICK_REVIEW_WORKFLOW_DESCRIPTION` with this exact string:
+- [x] Subtask 4.3: In `quickReviewWorkflow.ts`, add exported `QUICK_REVIEW_WORKFLOW_DESCRIPTION` with this exact string:
 
 ```ts
 "This workflow performs a thorough assessment of a completed implementation spec to ensure that the prescribed updates were implemented correctly. You should only run this workflow after a phase within an implementation spec has been implemented via the Quick Dev workflow, and the files touched during implementation have been staged and committed."
 ```
 
-- [ ] Subtask 4.4: In `quickReviewWorkflow.ts`, add exported `QUICK_REVIEW_WORKFLOW_PERSONA: WorkflowPersonaDefinition` with these exact values:
+- [x] Subtask 4.4: In `quickReviewWorkflow.ts`, add exported `QUICK_REVIEW_WORKFLOW_PERSONA: WorkflowPersonaDefinition` with these exact values:
   - `name`: `Fred`
   - `role`: `Quality Control`
   - `identity`: `Coordinates quality review after implementation to ensure that code is functional and compliant before it ships to production.`
@@ -246,7 +246,7 @@ export const QUICK_REVIEW_WORKFLOW_PROJECT_SUBFOLDER = "review"
   - `communicationStyle`: `precise and detailed`
   - `principles`: one-element array containing `lazily formatted and noncompliant code must never hit the production environment.`
 
-- [ ] Subtask 4.5: In `quickReviewWorkflow.ts`, add this exact exported enum:
+- [x] Subtask 4.5: In `quickReviewWorkflow.ts`, add this exact exported enum:
 
 ```ts
 export enum QuickReviewWorkflowValueKey {
@@ -258,7 +258,7 @@ export enum QuickReviewWorkflowValueKey {
 }
 ```
 
-- [ ] Subtask 4.6: In `quickReviewWorkflow.ts`, add exported `QUICK_REVIEW_WORKFLOW_VALUE_KEYS` with exactly this array:
+- [x] Subtask 4.6: In `quickReviewWorkflow.ts`, add exported `QUICK_REVIEW_WORKFLOW_VALUE_KEYS` with exactly this array:
 
 ```ts
 export const QUICK_REVIEW_WORKFLOW_VALUE_KEYS: readonly QuickReviewWorkflowValueKey[] = [
@@ -270,7 +270,7 @@ export const QUICK_REVIEW_WORKFLOW_VALUE_KEYS: readonly QuickReviewWorkflowValue
 ]
 ```
 
-- [ ] Subtask 4.7: In `quickReviewWorkflow.ts`, add exported `QUICK_REVIEW_ENTRY_PROJECT_VALUE_KEYS` with exactly this object:
+- [x] Subtask 4.7: In `quickReviewWorkflow.ts`, add exported `QUICK_REVIEW_ENTRY_PROJECT_VALUE_KEYS` with exactly this object:
 
 ```ts
 export const QUICK_REVIEW_ENTRY_PROJECT_VALUE_KEYS = {
@@ -280,9 +280,9 @@ export const QUICK_REVIEW_ENTRY_PROJECT_VALUE_KEYS = {
 }
 ```
 
-- [ ] Subtask 4.8: In `quickReviewWorkflow.ts`, add exported `QUICK_REVIEW_SPEC_FILE_PREREQUISITE_ID` set to `QuickReviewWorkflowValueKey.SpecFile`.
+- [x] Subtask 4.8: In `quickReviewWorkflow.ts`, add exported `QUICK_REVIEW_SPEC_FILE_PREREQUISITE_ID` set to `QuickReviewWorkflowValueKey.SpecFile`.
 
-- [ ] Subtask 4.9: In `quickReviewWorkflow.ts`, add exported `QUICK_REVIEW_PREREQUISITE_FILES: NonNullable<WorkflowDefinition["prerequisiteFiles"]>` with exactly this object:
+- [x] Subtask 4.9: In `quickReviewWorkflow.ts`, add exported `QUICK_REVIEW_PREREQUISITE_FILES: NonNullable<WorkflowDefinition["prerequisiteFiles"]>` with exactly this object:
 
 ```ts
 {
@@ -298,7 +298,7 @@ export const QUICK_REVIEW_ENTRY_PROJECT_VALUE_KEYS = {
 }
 ```
 
-- [ ] Subtask 4.10: In `quickReviewWorkflow.ts`, add these exact exported form constants:
+- [x] Subtask 4.10: In `quickReviewWorkflow.ts`, add these exact exported form constants:
 
 ```ts
 export const QUICK_REVIEW_STEP_1_FORM_ID = "step-1-quick-review-commit-form"
@@ -306,7 +306,7 @@ export const QUICK_REVIEW_STEP_1_PANEL_A_COMMIT_HASH_ID = "step-1-panel-a-commit
 export const QUICK_REVIEW_COMMIT_HASH_FIELD_KEY = "commit_hash"
 ```
 
-- [ ] Subtask 4.11: In `quickReviewWorkflow.ts`, add `buildTerminalTransition(): WorkflowFormDefinitionPayload["panels"][string]["transition"]` that returns exactly:
+- [x] Subtask 4.11: In `quickReviewWorkflow.ts`, add `buildTerminalTransition(): WorkflowFormDefinitionPayload["panels"][string]["transition"]` that returns exactly:
 
 ```ts
 {
@@ -317,7 +317,7 @@ export const QUICK_REVIEW_COMMIT_HASH_FIELD_KEY = "commit_hash"
 }
 ```
 
-- [ ] Subtask 4.12: In `quickReviewWorkflow.ts`, add exported `buildQuickReviewStep1WorkflowForm(): WorkflowFormDefinitionPayload` that returns a form with:
+- [x] Subtask 4.12: In `quickReviewWorkflow.ts`, add exported `buildQuickReviewStep1WorkflowForm(): WorkflowFormDefinitionPayload` that returns a form with:
   - `definitionVersion: 2`
   - `title: "Quick Review"` using the exact top-level workflow form title approved by the user after action-plan authoring review
   - `toolDictionaryTitle: "Quick Review"`
@@ -343,9 +343,9 @@ export const QUICK_REVIEW_COMMIT_HASH_FIELD_KEY = "commit_hash"
 }
 ```
 
-- [ ] Subtask 4.13: In `quickReviewWorkflow.ts`, add `createEmptyPromptSource(): WorkflowStepPromptSource` that returns `{ kind: "none" }`.
+- [x] Subtask 4.13: In `quickReviewWorkflow.ts`, add `createEmptyPromptSource(): WorkflowStepPromptSource` that returns `{ kind: "none" }`.
 
-- [ ] Subtask 4.14: In `quickReviewWorkflow.ts`, add `createStepDefinition(args: { stepNumber: 1 | 2; checklistLabel: string; decisionTree: WorkflowDecisionTree; buildPromptSource?: WorkflowStepDefinition["buildPromptSource"]; promptTemplates?: WorkflowStepDefinition["promptTemplates"]; buildToolSchema: WorkflowStepDefinition["buildToolSchema"] }): WorkflowStepDefinition` with exactly this body:
+- [x] Subtask 4.14: In `quickReviewWorkflow.ts`, add `createStepDefinition(args: { stepNumber: 1 | 2; checklistLabel: string; decisionTree: WorkflowDecisionTree; buildPromptSource?: WorkflowStepDefinition["buildPromptSource"]; promptTemplates?: WorkflowStepDefinition["promptTemplates"]; buildToolSchema: WorkflowStepDefinition["buildToolSchema"] }): WorkflowStepDefinition` with exactly this body:
 
 ```ts
 function createStepDefinition(args: {
@@ -373,7 +373,7 @@ function createStepDefinition(args: {
 }
 ```
 
-- [ ] Subtask 4.15: In `quickReviewWorkflow.ts`, add exported `QUICK_REVIEW_STEP_2_PROMPT_TEMPLATE` with exactly this template literal:
+- [x] Subtask 4.15: In `quickReviewWorkflow.ts`, add exported `QUICK_REVIEW_STEP_2_PROMPT_TEMPLATE` with exactly this template literal:
 
 ```ts
 export const QUICK_REVIEW_STEP_2_PROMPT_TEMPLATE = `You have been called inside a review workflow to ensure that an implemented project phase meets quality standards, was implemented as prescribed, and meets expectations for performance and functionality.
@@ -432,13 +432,13 @@ Once review is complete, do the following:
  #### workflow must end on successful use of attempt_completion`
 ```
 
-- [ ] Subtask 4.16: In `quickReviewWorkflow.ts`, add `buildStep2PromptSource(): WorkflowStepPromptSource` that returns `{ kind: "current_step_instruction_template", currentStepInstructionTemplate: QUICK_REVIEW_STEP_2_PROMPT_TEMPLATE }`.
+- [x] Subtask 4.16: In `quickReviewWorkflow.ts`, add `buildStep2PromptSource(): WorkflowStepPromptSource` that returns `{ kind: "current_step_instruction_template", currentStepInstructionTemplate: QUICK_REVIEW_STEP_2_PROMPT_TEMPLATE }`.
 
-- [ ] Subtask 4.17: In `quickReviewWorkflow.ts`, add `workflowFormCompleted(workflowFormId: string): WorkflowDecisionBranchTrigger` that returns an `event_predicate` trigger matching only `triggerEvent.kind === "workflow_form_completed"` and `triggerEvent.workflowFormId === workflowFormId`.
+- [x] Subtask 4.17: In `quickReviewWorkflow.ts`, add `workflowFormCompleted(workflowFormId: string): WorkflowDecisionBranchTrigger` that returns an `event_predicate` trigger matching only `triggerEvent.kind === "workflow_form_completed"` and `triggerEvent.workflowFormId === workflowFormId`.
 
-- [ ] Subtask 4.18: In `quickReviewWorkflow.ts`, add `attemptCompletionSucceeded(): WorkflowDecisionBranchTrigger` that returns `{ kind: "on_event", eventKind: "attempt_completion_succeeded" }`.
+- [x] Subtask 4.18: In `quickReviewWorkflow.ts`, add `attemptCompletionSucceeded(): WorkflowDecisionBranchTrigger` that returns `{ kind: "on_event", eventKind: "attempt_completion_succeeded" }`.
 
-- [ ] Subtask 4.19: In `quickReviewWorkflow.ts`, add `buildStep1DecisionTree(): WorkflowDecisionTree` with exactly this decision-tree shape:
+- [x] Subtask 4.19: In `quickReviewWorkflow.ts`, add `buildStep1DecisionTree(): WorkflowDecisionTree` with exactly this decision-tree shape:
 
 ```ts
 function buildStep1DecisionTree(): WorkflowDecisionTree {
@@ -492,7 +492,7 @@ function buildStep1DecisionTree(): WorkflowDecisionTree {
 }
 ```
 
-- [ ] Subtask 4.20: In `quickReviewWorkflow.ts`, add `buildStep2DecisionTree(): WorkflowDecisionTree` with exactly this decision-tree shape:
+- [x] Subtask 4.20: In `quickReviewWorkflow.ts`, add `buildStep2DecisionTree(): WorkflowDecisionTree` with exactly this decision-tree shape:
 
 ```ts
 function buildStep2DecisionTree(): WorkflowDecisionTree {
@@ -525,7 +525,7 @@ function buildStep2DecisionTree(): WorkflowDecisionTree {
 }
 ```
 
-- [ ] Subtask 4.21: In `quickReviewWorkflow.ts`, add exported `quickReviewWorkflowDefinition: WorkflowDefinition` with:
+- [x] Subtask 4.21: In `quickReviewWorkflow.ts`, add exported `quickReviewWorkflowDefinition: WorkflowDefinition` with:
   - `name: QUICK_REVIEW_WORKFLOW_NAME`
   - `displayName: QUICK_REVIEW_WORKFLOW_DISPLAY_NAME`
   - `description: QUICK_REVIEW_WORKFLOW_DESCRIPTION`
@@ -542,20 +542,20 @@ function buildStep2DecisionTree(): WorkflowDecisionTree {
     - `"step-1"` created with `stepNumber: 1`, `checklistLabel: "Gather Commit Info"`, `decisionTree: buildStep1DecisionTree()`, and `buildToolSchema: buildQuickReviewStep1ToolSchemas`
     - `"step-2"` created with `stepNumber: 2`, `checklistLabel: "Perform Quality Review"`, `decisionTree: buildStep2DecisionTree()`, `buildPromptSource: buildStep2PromptSource`, `promptTemplates: [QUICK_REVIEW_STEP_2_PROMPT_TEMPLATE]`, and `buildToolSchema: buildQuickReviewStep2ToolSchemas`.
 
-- [ ] Subtask 4.22: Confirm that `quickReviewWorkflowDefinition` does not define `artifacts` and does not define `childInheritance`.
+- [x] Subtask 4.22: Confirm that `quickReviewWorkflowDefinition` does not define `artifacts` and does not define `childInheritance`.
 
-### [ ] Task 5: Add Quick Review Workflow Definition Tests
+### [x] Task 5: Add Quick Review Workflow Definition Tests
 
 Allowed files for this task and every numbered subtask below:
 
 - `src/core/task/workflow-runtime/workflow-modules/quick-review/__tests__/quickReviewWorkflow.test.ts`
 - `docs/workflows/workflow-runtime/workflow-modules/quick-review/action-plan.md`
 
-- [ ] Subtask 5.1: Add `src/core/task/workflow-runtime/workflow-modules/quick-review/__tests__/quickReviewWorkflow.test.ts` with these exact imports: `import { expect } from "chai"`, `import { describe, it } from "mocha"`, a type-only named import from `../../../types` containing `ActiveWorkflowSession`, `WorkflowBranchTriggerEvent`, `WorkflowDecisionBranchEvaluationInput`, `WorkflowDecisionBranchRoute`, `WorkflowPromptBuilderInput`, `WorkflowStepDefinition`, and `WorkflowValues`; `import { renderWorkflowPromptTemplate } from "../../../workflowPromptTemplates"`; a named import from `../quickReviewWorkflow` containing `QUICK_REVIEW_COMMIT_HASH_FIELD_KEY`, `QUICK_REVIEW_ENTRY_PROJECT_VALUE_KEYS`, `QUICK_REVIEW_PREREQUISITE_FILES`, `QUICK_REVIEW_SPEC_FILE_PREREQUISITE_ID`, `QUICK_REVIEW_STEP_1_FORM_ID`, `QUICK_REVIEW_STEP_1_PANEL_A_COMMIT_HASH_ID`, `QUICK_REVIEW_STEP_2_PROMPT_TEMPLATE`, `QUICK_REVIEW_WORKFLOW_DESCRIPTION`, `QUICK_REVIEW_WORKFLOW_PERSONA`, `QUICK_REVIEW_WORKFLOW_VALUE_KEYS`, `QuickReviewWorkflowValueKey`, `buildQuickReviewStep1WorkflowForm`, and `quickReviewWorkflowDefinition`; and a named import from `../quickReviewToolSchemas` containing `buildQuickReviewStep1ToolSchemas` and `buildQuickReviewStep2ToolSchemas`.
+- [x] Subtask 5.1: Add `src/core/task/workflow-runtime/workflow-modules/quick-review/__tests__/quickReviewWorkflow.test.ts` with these exact imports: `import { expect } from "chai"`, `import { describe, it } from "mocha"`, a type-only named import from `../../../types` containing `ActiveWorkflowSession`, `WorkflowBranchTriggerEvent`, `WorkflowDecisionBranchEvaluationInput`, `WorkflowDecisionBranchRoute`, `WorkflowPromptBuilderInput`, `WorkflowStepDefinition`, and `WorkflowValues`; `import { renderWorkflowPromptTemplate } from "../../../workflowPromptTemplates"`; a named import from `../quickReviewWorkflow` containing `QUICK_REVIEW_COMMIT_HASH_FIELD_KEY`, `QUICK_REVIEW_ENTRY_PROJECT_VALUE_KEYS`, `QUICK_REVIEW_PREREQUISITE_FILES`, `QUICK_REVIEW_SPEC_FILE_PREREQUISITE_ID`, `QUICK_REVIEW_STEP_1_FORM_ID`, `QUICK_REVIEW_STEP_1_PANEL_A_COMMIT_HASH_ID`, `QUICK_REVIEW_STEP_2_PROMPT_TEMPLATE`, `QUICK_REVIEW_WORKFLOW_DESCRIPTION`, `QUICK_REVIEW_WORKFLOW_PERSONA`, `QUICK_REVIEW_WORKFLOW_VALUE_KEYS`, `QuickReviewWorkflowValueKey`, `buildQuickReviewStep1WorkflowForm`, and `quickReviewWorkflowDefinition`; and a named import from `../quickReviewToolSchemas` containing `buildQuickReviewStep1ToolSchemas` and `buildQuickReviewStep2ToolSchemas`.
 
-- [ ] Subtask 5.2: In `quickReviewWorkflow.test.ts`, add constants `TEST_SPEC_FILE = "/tmp/quick-review-project/review/quick-spec.md"` and `TEST_COMMIT_HASH = "abc1234"`.
+- [x] Subtask 5.2: In `quickReviewWorkflow.test.ts`, add constants `TEST_SPEC_FILE = "/tmp/quick-review-project/review/quick-spec.md"` and `TEST_COMMIT_HASH = "abc1234"`.
 
-- [ ] Subtask 5.3: In `quickReviewWorkflow.test.ts`, add these exact helpers:
+- [x] Subtask 5.3: In `quickReviewWorkflow.test.ts`, add these exact helpers:
   - `getStep(stepId: WorkflowStepDefinition["id"]): WorkflowStepDefinition` that assigns `const step = quickReviewWorkflowDefinition.steps[stepId]`, throws `new Error(\`Missing quick-review step ${stepId}.\`)` when `step === undefined`, and returns `step`;
   - `findStepRoute(stepId: WorkflowStepDefinition["id"], branchId: string, routeId: string): WorkflowDecisionBranchRoute` that calls `getStep(stepId)`, assigns `const branch = step.decisionTree.branches[branchId]`, throws `new Error(\`Missing quick-review branch ${branchId}.\`)` when `branch === undefined`, assigns `const route = branch.routes.find((candidate) => candidate.id === routeId)`, throws `new Error(\`Missing quick-review route ${branchId}/${routeId}.\`)` when `route === undefined`, and returns `route`;
   - `createWorkflowValues(): WorkflowValues` with exactly this return object:
@@ -599,15 +599,15 @@ Allowed files for this task and every numbered subtask below:
   - `createPromptInput(stepId: "step-1" | "step-2"): WorkflowPromptBuilderInput` that assigns `const step = getStep(stepId)`, assigns `const activeStepNumber = stepId === "step-1" ? 1 : 2`, and returns `{ step, session: createSession({ activeStepNumber, activeBranchId: step.decisionTree.entryBranchId }) }`;
   - `renderStep2Prompt(): string` that renders `QUICK_REVIEW_STEP_2_PROMPT_TEMPLATE` with `renderWorkflowPromptTemplate`, `QUICK_REVIEW_WORKFLOW_VALUE_KEYS`, `createWorkflowValues()`, and context `"quick-review step-2 test"`.
 
-- [ ] Subtask 5.4: In `quickReviewWorkflow.test.ts`, add a test that asserts workflow identity, description, slash command, skill name, project subfolder, persona, entry panel prompt, value keys, entry project value keys, workflow form keys, step keys, step numbers, and checklist labels exactly match Task 4. In the same test, assert `quickReviewWorkflowDefinition.prerequisiteFiles?.[QUICK_REVIEW_SPEC_FILE_PREREQUISITE_ID]` deeply equals the Task 4 prerequisite object with `requirement: "required"`, `producingWorkflowName: "quick-spec"`, `projectSubfolderSegments: ["review"]`, `match: { kind: "exact_filename", filename: "quick-spec.md" }`, `workflowValueKey: QuickReviewWorkflowValueKey.SpecFile`, and `outputDocumentReference: "none"`.
+- [x] Subtask 5.4: In `quickReviewWorkflow.test.ts`, add a test that asserts workflow identity, description, slash command, skill name, project subfolder, persona, entry panel prompt, value keys, entry project value keys, workflow form keys, step keys, step numbers, and checklist labels exactly match Task 4. In the same test, assert `quickReviewWorkflowDefinition.prerequisiteFiles?.[QUICK_REVIEW_SPEC_FILE_PREREQUISITE_ID]` deeply equals the Task 4 prerequisite object with `requirement: "required"`, `producingWorkflowName: "quick-spec"`, `projectSubfolderSegments: ["review"]`, `match: { kind: "exact_filename", filename: "quick-spec.md" }`, `workflowValueKey: QuickReviewWorkflowValueKey.SpecFile`, and `outputDocumentReference: "none"`.
 
-- [ ] Subtask 5.5: In `quickReviewWorkflow.test.ts`, add a test that asserts `quickReviewWorkflowDefinition.artifacts` and `quickReviewWorkflowDefinition.childInheritance` are `undefined`.
+- [x] Subtask 5.5: In `quickReviewWorkflow.test.ts`, add a test that asserts `quickReviewWorkflowDefinition.artifacts` and `quickReviewWorkflowDefinition.childInheritance` are `undefined`.
 
-- [ ] Subtask 5.6: In `quickReviewWorkflow.test.ts`, add a test that asserts `quickReviewWorkflowDefinition.name`, `quickReviewWorkflowDefinition.slashCommandName`, and `quickReviewWorkflowDefinition.useSkillName` each equal `"quick-review"` and none equals `"quick-review.md"`.
+- [x] Subtask 5.6: In `quickReviewWorkflow.test.ts`, add a test that asserts `quickReviewWorkflowDefinition.name`, `quickReviewWorkflowDefinition.slashCommandName`, and `quickReviewWorkflowDefinition.useSkillName` each equal `"quick-review"` and none equals `"quick-review.md"`.
 
-- [ ] Subtask 5.7: In `quickReviewWorkflow.test.ts`, add a test that first assigns `const workflowForms = quickReviewWorkflowDefinition.workflowForms`, asserts `workflowForms` is not `undefined`, throws `new Error("Expected Quick Review workflow forms.")` if `workflowForms === undefined`, and then asserts `buildQuickReviewStep1WorkflowForm()` and `workflowForms[QUICK_REVIEW_STEP_1_FORM_ID]` deeply equal the exact Step 1 form prescribed in Task 4, including `definitionVersion`, `title`, `toolDictionaryTitle`, `toolDictionaryMarkdown`, panel title, panel prompt, allowed actions, action labels, terminal transition, field key, `workflowValueKey`, field kind, label, `required`, and `allowedValueType`.
+- [x] Subtask 5.7: In `quickReviewWorkflow.test.ts`, add a test that first assigns `const workflowForms = quickReviewWorkflowDefinition.workflowForms`, asserts `workflowForms` is not `undefined`, throws `new Error("Expected Quick Review workflow forms.")` if `workflowForms === undefined`, and then asserts `buildQuickReviewStep1WorkflowForm()` and `workflowForms[QUICK_REVIEW_STEP_1_FORM_ID]` deeply equal the exact Step 1 form prescribed in Task 4, including `definitionVersion`, `title`, `toolDictionaryTitle`, `toolDictionaryMarkdown`, panel title, panel prompt, allowed actions, action labels, terminal transition, field key, `workflowValueKey`, field kind, label, `required`, and `allowedValueType`.
 
-- [ ] Subtask 5.8: In `quickReviewWorkflow.test.ts`, add a test that asserts the Step 1 decision tree:
+- [x] Subtask 5.8: In `quickReviewWorkflow.test.ts`, add a test that asserts the Step 1 decision tree:
   - starts at `"step-1-resolve-spec-file"`;
   - resolves `QUICK_REVIEW_SPEC_FILE_PREREQUISITE_ID`;
   - renders `QUICK_REVIEW_STEP_1_FORM_ID` at `QUICK_REVIEW_STEP_1_PANEL_A_COMMIT_HASH_ID`;
@@ -616,16 +616,16 @@ Allowed files for this task and every numbered subtask below:
   - has no route whose action kind is `"project_prompt"`;
   - has no route whose action kind is `"complete_workflow"`.
 
-- [ ] Subtask 5.9: In `quickReviewWorkflow.test.ts`, add a test that asserts the Step 2 decision tree:
+- [x] Subtask 5.9: In `quickReviewWorkflow.test.ts`, add a test that asserts the Step 2 decision tree:
   - starts at `"step-2-project-prompt"`;
   - uses the `project_prompt` action in branch `"step-2-project-prompt"`;
   - waits at `"step-2-await-attempt-completion"`;
   - uses the `complete_workflow` action only for an `attempt_completion_succeeded` event;
   - has no route whose action kind is `"transition_step"`.
 
-- [ ] Subtask 5.10: In `quickReviewWorkflow.test.ts`, add a test that assigns `const promptInput = createPromptInput("step-1")`, asserts `getStep("step-1").buildPromptSource(promptInput)` returns `{ kind: "none" }`, and asserts `getStep("step-1").buildToolSchema(promptInput)` returns `buildQuickReviewStep1ToolSchemas()`.
+- [x] Subtask 5.10: In `quickReviewWorkflow.test.ts`, add a test that assigns `const promptInput = createPromptInput("step-1")`, asserts `getStep("step-1").buildPromptSource(promptInput)` returns `{ kind: "none" }`, and asserts `getStep("step-1").buildToolSchema(promptInput)` returns `buildQuickReviewStep1ToolSchemas()`.
 
-- [ ] Subtask 5.11: In `quickReviewWorkflow.test.ts`, add a test that renders Step 2 instructions and asserts prompt-template invariants without asserting editable prompt prose:
+- [x] Subtask 5.11: In `quickReviewWorkflow.test.ts`, add a test that renders Step 2 instructions and asserts prompt-template invariants without asserting editable prompt prose:
   - `const renderedOutput = renderStep2Prompt()`
   - `expect(renderedOutput.trim()).to.not.equal("")`
   - `expect(renderedOutput).to.include(TEST_SPEC_FILE)`
@@ -633,7 +633,7 @@ Allowed files for this task and every numbered subtask below:
   - `expect(renderedOutput).to.include("attempt_completion")`
   - `expect(renderedOutput).to.not.equal(QUICK_REVIEW_STEP_2_PROMPT_TEMPLATE)`
 
-- [ ] Subtask 5.12: In `quickReviewWorkflow.test.ts`, add a test that renders Step 2 instructions and asserts the rendered output does not include:
+- [x] Subtask 5.12: In `quickReviewWorkflow.test.ts`, add a test that renders Step 2 instructions and asserts the rendered output does not include:
   - `{workflow.spec_file}`
   - `{workflow.commit_hash}`
   - `workflow.spec_file`
@@ -650,9 +650,9 @@ Allowed files for this task and every numbered subtask below:
   - `Field:`
   - `allowedActions/ Labels:`
 
-- [ ] Subtask 5.13: In `quickReviewWorkflow.test.ts`, add a test that assigns `const promptInput = createPromptInput("step-2")`, asserts `getStep("step-2").buildToolSchema(promptInput)` returns `buildQuickReviewStep2ToolSchemas()`, and asserts `getStep("step-2").promptTemplates` exactly equals `[QUICK_REVIEW_STEP_2_PROMPT_TEMPLATE]`.
+- [x] Subtask 5.13: In `quickReviewWorkflow.test.ts`, add a test that assigns `const promptInput = createPromptInput("step-2")`, asserts `getStep("step-2").buildToolSchema(promptInput)` returns `buildQuickReviewStep2ToolSchemas()`, and asserts `getStep("step-2").promptTemplates` exactly equals `[QUICK_REVIEW_STEP_2_PROMPT_TEMPLATE]`.
 
-- [ ] Subtask 5.14: In `quickReviewWorkflow.test.ts`, add a test that serializes `quickReviewWorkflowDefinition` and asserts the serialized definition does not include:
+- [x] Subtask 5.14: In `quickReviewWorkflow.test.ts`, add a test that serializes `quickReviewWorkflowDefinition` and asserts the serialized definition does not include:
   - `artifacts`
   - `childInheritance`
   - `build_workflow_document`
@@ -671,19 +671,19 @@ Allowed files for this task and every numbered subtask below:
   - `bmad`
   - `BMAD`
 
-### [ ] Task 6: Validate Phase 2
+### [x] Task 6: Validate Phase 2
 
 Allowed files for this task and every numbered subtask below:
 
 - `docs/workflows/workflow-runtime/workflow-modules/quick-review/action-plan.md`
 
-- [ ] Subtask 6.1: Run:
+- [x] Subtask 6.1: Run:
 
 ```sh
 npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/quick-review/__tests__/quickReviewToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/quick-review/__tests__/quickReviewWorkflow.test.ts
 ```
 
-- [ ] Subtask 6.2: Run:
+- [x] Subtask 6.2: Run:
 
 ```sh
 npm run check-types
@@ -701,7 +701,7 @@ Then rerun:
 npm run check-types
 ```
 
-- [ ] Subtask 6.3: Run:
+- [x] Subtask 6.3: Run:
 
 ```sh
 npm run lint
