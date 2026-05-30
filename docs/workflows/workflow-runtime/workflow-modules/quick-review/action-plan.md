@@ -46,14 +46,14 @@ Do not modify:
 
 ## Phase 1: Tool Schema Module
 
-### [ ] Task 1: Add Quick Review Tool Schema Builders
+### [x] Task 1: Add Quick Review Tool Schema Builders
 
 Allowed files for this task and every numbered subtask below:
 
 - `src/core/task/workflow-runtime/workflow-modules/quick-review/quickReviewToolSchemas.ts`
 - `docs/workflows/workflow-runtime/workflow-modules/quick-review/action-plan.md`
 
-- [ ] Subtask 1.1: Add `src/core/task/workflow-runtime/workflow-modules/quick-review/quickReviewToolSchemas.ts` with these exact imports:
+- [x] Subtask 1.1: Add `src/core/task/workflow-runtime/workflow-modules/quick-review/quickReviewToolSchemas.ts` with these exact imports:
 
 ```ts
 import { ClineToolSet } from "@/core/prompts/system-prompt/registry/ClineToolSet"
@@ -63,9 +63,9 @@ import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 ```
 
-- [ ] Subtask 1.2: In `quickReviewToolSchemas.ts`, add `QUICK_REVIEW_TOOL_SCHEMA_VARIANT` set to `ModelFamily.NATIVE_GPT_5`.
+- [x] Subtask 1.2: In `quickReviewToolSchemas.ts`, add `QUICK_REVIEW_TOOL_SCHEMA_VARIANT` set to `ModelFamily.NATIVE_GPT_5`.
 
-- [ ] Subtask 1.3: In `quickReviewToolSchemas.ts`, add this exact exported Step 2 tool-id list in this order:
+- [x] Subtask 1.3: In `quickReviewToolSchemas.ts`, add this exact exported Step 2 tool-id list in this order:
 
 ```ts
 export const QUICK_REVIEW_STEP_2_TOOL_IDS: readonly ClineDefaultTool[] = [
@@ -82,13 +82,13 @@ export const QUICK_REVIEW_STEP_2_TOOL_IDS: readonly ClineDefaultTool[] = [
 ]
 ```
 
-- [ ] Subtask 1.4: In `quickReviewToolSchemas.ts`, add `resolveQuickReviewSharedToolSpec(toolId: ClineDefaultTool): ClineToolSpec` that:
+- [x] Subtask 1.4: In `quickReviewToolSchemas.ts`, add `resolveQuickReviewSharedToolSpec(toolId: ClineDefaultTool): ClineToolSpec` that:
   - calls `registerClineToolSets()`;
   - assigns `const tool = ClineToolSet.getToolByNameWithFallback(toolId, QUICK_REVIEW_TOOL_SCHEMA_VARIANT)`;
   - throws `new Error(\`Missing shared/default tool schema for Quick Review tool: ${toolId}\`)` when `tool === undefined`;
   - returns `tool.config`.
 
-- [ ] Subtask 1.5: In `quickReviewToolSchemas.ts`, add `buildQuickReviewStep1ToolSchemas(): readonly ClineToolSpec[]` with exactly this body:
+- [x] Subtask 1.5: In `quickReviewToolSchemas.ts`, add `buildQuickReviewStep1ToolSchemas(): readonly ClineToolSpec[]` with exactly this body:
 
 ```ts
 export function buildQuickReviewStep1ToolSchemas(): readonly ClineToolSpec[] {
@@ -96,7 +96,7 @@ export function buildQuickReviewStep1ToolSchemas(): readonly ClineToolSpec[] {
 }
 ```
 
-- [ ] Subtask 1.6: In `quickReviewToolSchemas.ts`, add `buildQuickReviewStep2ToolSchemas(): readonly ClineToolSpec[]` with exactly this body:
+- [x] Subtask 1.6: In `quickReviewToolSchemas.ts`, add `buildQuickReviewStep2ToolSchemas(): readonly ClineToolSpec[]` with exactly this body:
 
 ```ts
 export function buildQuickReviewStep2ToolSchemas(): readonly ClineToolSpec[] {
@@ -104,16 +104,16 @@ export function buildQuickReviewStep2ToolSchemas(): readonly ClineToolSpec[] {
 }
 ```
 
-### [ ] Task 2: Add Quick Review Tool Schema Tests
+### [x] Task 2: Add Quick Review Tool Schema Tests
 
 Allowed files for this task and every numbered subtask below:
 
 - `src/core/task/workflow-runtime/workflow-modules/quick-review/__tests__/quickReviewToolSchemas.test.ts`
 - `docs/workflows/workflow-runtime/workflow-modules/quick-review/action-plan.md`
 
-- [ ] Subtask 2.1: Add `src/core/task/workflow-runtime/workflow-modules/quick-review/__tests__/quickReviewToolSchemas.test.ts` with these exact imports: `import { expect } from "chai"`, `import { describe, it } from "mocha"`, `import { ClineToolSet } from "@/core/prompts/system-prompt/registry/ClineToolSet"`, `import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"`, `import { registerClineToolSets } from "@/core/prompts/system-prompt/tools/init"`, `import { ModelFamily } from "@/shared/prompts"`, `import { ClineDefaultTool } from "@/shared/tools"`, and a named import from `../quickReviewToolSchemas` containing `buildQuickReviewStep1ToolSchemas`, `buildQuickReviewStep2ToolSchemas`, and `QUICK_REVIEW_STEP_2_TOOL_IDS`.
+- [x] Subtask 2.1: Add `src/core/task/workflow-runtime/workflow-modules/quick-review/__tests__/quickReviewToolSchemas.test.ts` with these exact imports: `import { expect } from "chai"`, `import { describe, it } from "mocha"`, `import { ClineToolSet } from "@/core/prompts/system-prompt/registry/ClineToolSet"`, `import type { ClineToolSpec } from "@/core/prompts/system-prompt/spec"`, `import { registerClineToolSets } from "@/core/prompts/system-prompt/tools/init"`, `import { ModelFamily } from "@/shared/prompts"`, `import { ClineDefaultTool } from "@/shared/tools"`, and a named import from `../quickReviewToolSchemas` containing `buildQuickReviewStep1ToolSchemas`, `buildQuickReviewStep2ToolSchemas`, and `QUICK_REVIEW_STEP_2_TOOL_IDS`.
 
-- [ ] Subtask 2.2: In `quickReviewToolSchemas.test.ts`, define `EXPECTED_STEP_2_TOOL_NAMES` with these exact model-facing tool names in this order:
+- [x] Subtask 2.2: In `quickReviewToolSchemas.test.ts`, define `EXPECTED_STEP_2_TOOL_NAMES` with these exact model-facing tool names in this order:
 
 ```ts
 [
@@ -130,7 +130,7 @@ Allowed files for this task and every numbered subtask below:
 ]
 ```
 
-- [ ] Subtask 2.3: In `quickReviewToolSchemas.test.ts`, define `FORBIDDEN_MODEL_FACING_TOOL_NAMES` with these exact strings:
+- [x] Subtask 2.3: In `quickReviewToolSchemas.test.ts`, define `FORBIDDEN_MODEL_FACING_TOOL_NAMES` with these exact strings:
 
 ```ts
 [
@@ -163,31 +163,31 @@ Allowed files for this task and every numbered subtask below:
 ]
 ```
 
-- [ ] Subtask 2.4: In `quickReviewToolSchemas.test.ts`, add `expectedSharedToolSpecs(toolIds: readonly ClineDefaultTool[]): readonly ClineToolSpec[]` that calls `registerClineToolSets()`, resolves each expected tool with `ClineToolSet.getToolByNameWithFallback(toolId, ModelFamily.NATIVE_GPT_5)`, throws `new Error(\`Missing expected shared/default tool schema for ${toolId}\`)` when the shared/default spec is missing, and returns each resolved tool's `config`.
+- [x] Subtask 2.4: In `quickReviewToolSchemas.test.ts`, add `expectedSharedToolSpecs(toolIds: readonly ClineDefaultTool[]): readonly ClineToolSpec[]` that calls `registerClineToolSets()`, resolves each expected tool with `ClineToolSet.getToolByNameWithFallback(toolId, ModelFamily.NATIVE_GPT_5)`, throws `new Error(\`Missing expected shared/default tool schema for ${toolId}\`)` when the shared/default spec is missing, and returns each resolved tool's `config`.
 
-- [ ] Subtask 2.5: In `quickReviewToolSchemas.test.ts`, add a test that asserts `buildQuickReviewStep1ToolSchemas()` returns `[]`.
+- [x] Subtask 2.5: In `quickReviewToolSchemas.test.ts`, add a test that asserts `buildQuickReviewStep1ToolSchemas()` returns `[]`.
 
-- [ ] Subtask 2.6: In `quickReviewToolSchemas.test.ts`, add a test that asserts `buildQuickReviewStep2ToolSchemas().map((spec) => spec.name)` exactly equals `EXPECTED_STEP_2_TOOL_NAMES`.
+- [x] Subtask 2.6: In `quickReviewToolSchemas.test.ts`, add a test that asserts `buildQuickReviewStep2ToolSchemas().map((spec) => spec.name)` exactly equals `EXPECTED_STEP_2_TOOL_NAMES`.
 
-- [ ] Subtask 2.7: In `quickReviewToolSchemas.test.ts`, add a test that asserts `buildQuickReviewStep2ToolSchemas()` deeply equals `expectedSharedToolSpecs(QUICK_REVIEW_STEP_2_TOOL_IDS)`.
+- [x] Subtask 2.7: In `quickReviewToolSchemas.test.ts`, add a test that asserts `buildQuickReviewStep2ToolSchemas()` deeply equals `expectedSharedToolSpecs(QUICK_REVIEW_STEP_2_TOOL_IDS)`.
 
-- [ ] Subtask 2.8: In `quickReviewToolSchemas.test.ts`, add a test that asserts `QUICK_REVIEW_STEP_2_TOOL_IDS` exactly equals the Step 2 `ClineDefaultTool` list prescribed in Task 1.
+- [x] Subtask 2.8: In `quickReviewToolSchemas.test.ts`, add a test that asserts `QUICK_REVIEW_STEP_2_TOOL_IDS` exactly equals the Step 2 `ClineDefaultTool` list prescribed in Task 1.
 
-- [ ] Subtask 2.9: In `quickReviewToolSchemas.test.ts`, add a test that combines Step 1 and Step 2 schema names and asserts every name in `FORBIDDEN_MODEL_FACING_TOOL_NAMES` is absent.
+- [x] Subtask 2.9: In `quickReviewToolSchemas.test.ts`, add a test that combines Step 1 and Step 2 schema names and asserts every name in `FORBIDDEN_MODEL_FACING_TOOL_NAMES` is absent.
 
-### [ ] Task 3: Validate Phase 1
+### [x] Task 3: Validate Phase 1
 
 Allowed files for this task and every numbered subtask below:
 
 - `docs/workflows/workflow-runtime/workflow-modules/quick-review/action-plan.md`
 
-- [ ] Subtask 3.1: Run:
+- [x] Subtask 3.1: Run:
 
 ```sh
 npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/quick-review/__tests__/quickReviewToolSchemas.test.ts
 ```
 
-- [ ] Subtask 3.2: Run:
+- [x] Subtask 3.2: Run:
 
 ```sh
 npm run check-types
@@ -205,7 +205,7 @@ Then rerun:
 npm run check-types
 ```
 
-- [ ] Subtask 3.3: Run:
+- [x] Subtask 3.3: Run:
 
 ```sh
 npm run lint
