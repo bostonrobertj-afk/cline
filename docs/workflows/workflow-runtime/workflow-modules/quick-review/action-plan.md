@@ -964,67 +964,67 @@ npm run lint
 
 ## Phase 4: Final Validation And Scope Review
 
-### [ ] Task 12: Run Static Guard Checks
+### [x] Task 12: Run Static Guard Checks
 
 Allowed files for this task and every numbered subtask below:
 
 - `docs/workflows/workflow-runtime/workflow-modules/quick-review/action-plan.md`
 
-- [ ] Subtask 12.1: Run this static guard and confirm it returns no matches:
+- [x] Subtask 12.1: Run this static guard and confirm it returns no matches:
 
 ```sh
 rg -n "quick-review\\.md|/Users/robertboston/Documents/Cline/Workflows/quick-review\\.md|\\.cline/workflow-config\\.yaml|bmad|BMAD" src/core/task/workflow-runtime/workflow-modules/quick-review/quickReviewWorkflow.ts src/core/task/workflow-runtime/workflow-modules/quick-review/quickReviewToolSchemas.ts src/core/task/workflow-runtime/workflow-modules/quick-review/index.ts src/core/task/workflow-runtime/WorkflowRegistry.ts
 ```
 
-- [ ] Subtask 12.2: Run this static guard and confirm it returns no matches:
+- [x] Subtask 12.2: Run this static guard and confirm it returns no matches:
 
 ```sh
 rg -n "set_workflow_values|ask_followup_question|workflow_progress_request|build_workflow_document|create_workflow_artifact|archive_workflow_artifact|delete_workflow_artifact|move_workflow_project_file|use_subagents|use_skill|web_search|web_fetch|browser_action|use_mcp_tool|access_mcp_resource|load_mcp_documentation|record_findings|plan_story_artifacts|plan_remediation_story_artifact|generate_story_files|update_story_index_status" src/core/task/workflow-runtime/workflow-modules/quick-review/quickReviewToolSchemas.ts
 ```
 
-- [ ] Subtask 12.3: Run this static guard and confirm it returns no matches:
+- [x] Subtask 12.3: Run this static guard and confirm it returns no matches:
 
 ```sh
 rg -n "artifacts:|childInheritance:|build_workflow_document|create_workflow_artifact" src/core/task/workflow-runtime/workflow-modules/quick-review/quickReviewWorkflow.ts
 ```
 
-- [ ] Subtask 12.4: Run this static guard and confirm it returns no matches:
+- [x] Subtask 12.4: Run this static guard and confirm it returns no matches:
 
 ```sh
 rg -n "# Module metadata:|# Persona|# Prerequisite Files|# Tool Schema Override|# Focus Chain Tasks|# Workflow Steps|### Prompt|Workflow Form 1:|Panel A:|Field:|allowedActions/ Labels:" src/core/task/workflow-runtime/workflow-modules/quick-review/quickReviewWorkflow.ts
 ```
 
-- [ ] Subtask 12.5: Run this static guard and confirm the output only shows the two named Quick Review schema builders, Step 1's `return []`, `QUICK_REVIEW_STEP_2_TOOL_IDS`, the `return QUICK_REVIEW_STEP_2_TOOL_IDS.map((toolId) => resolveQuickReviewSharedToolSpec(toolId))` line, and the ten prescribed Step 2 `ClineDefaultTool` entries from Task 1:
+- [x] Subtask 12.5: Run this static guard and confirm the output only shows the two named Quick Review schema builders, Step 1's `return []`, `QUICK_REVIEW_STEP_2_TOOL_IDS`, the `return QUICK_REVIEW_STEP_2_TOOL_IDS.map((toolId) => resolveQuickReviewSharedToolSpec(toolId))` line, and the ten prescribed Step 2 `ClineDefaultTool` entries from Task 1:
 
 ```sh
 rg -n "buildQuickReviewStep1ToolSchemas|buildQuickReviewStep2ToolSchemas|return \\[\\]|QUICK_REVIEW_STEP_2_TOOL_IDS|ClineDefaultTool\\." src/core/task/workflow-runtime/workflow-modules/quick-review/quickReviewToolSchemas.ts
 ```
 
-### [ ] Task 13: Run Final Validation Commands
+### [x] Task 13: Run Final Validation Commands
 
 Allowed files for this task and every numbered subtask below:
 
 - `docs/workflows/workflow-runtime/workflow-modules/quick-review/action-plan.md`
 
-- [ ] Subtask 13.1: Run:
+- [x] Subtask 13.1: Run:
 
 ```sh
 npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/quick-review/__tests__/quickReviewToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/quick-review/__tests__/quickReviewWorkflow.test.ts
 ```
 
-- [ ] Subtask 13.2: Run:
+- [x] Subtask 13.2: Run:
 
 ```sh
 npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts
 ```
 
-- [ ] Subtask 13.3: Run:
+- [x] Subtask 13.3: Run:
 
 ```sh
 npm run test:unit -- src/test/slash-commands.test.ts
 ```
 
-- [ ] Subtask 13.4: Run:
+- [x] Subtask 13.4: Run:
 
 ```sh
 npm run check-types
@@ -1042,13 +1042,13 @@ Then rerun:
 npm run check-types
 ```
 
-- [ ] Subtask 13.5: Run:
+- [x] Subtask 13.5: Run:
 
 ```sh
 npm run lint
 ```
 
-- [ ] Subtask 13.6: Run:
+- [x] Subtask 13.6: Run:
 
 ```sh
 npm run package
@@ -1066,25 +1066,25 @@ Then rerun:
 npm run package
 ```
 
-### [ ] Task 14: Run Scope-Diff Review
+### [x] Task 14: Run Scope-Diff Review
 
 Allowed files for this task and every numbered subtask below:
 
 - `docs/workflows/workflow-runtime/workflow-modules/quick-review/action-plan.md`
 
-- [ ] Subtask 14.1: Run:
+- [x] Subtask 14.1: Run:
 
 ```sh
 git diff --name-only
 ```
 
-- [ ] Subtask 14.2: Run:
+- [x] Subtask 14.2: Run:
 
 ```sh
 git ls-files --others --exclude-standard
 ```
 
-- [ ] Subtask 14.3: Confirm persistent diffs are limited to:
+- [x] Subtask 14.3: Confirm persistent diffs are limited to:
   - `src/core/task/workflow-runtime/workflow-modules/quick-review/quickReviewToolSchemas.ts`
   - `src/core/task/workflow-runtime/workflow-modules/quick-review/__tests__/quickReviewToolSchemas.test.ts`
   - `src/core/task/workflow-runtime/workflow-modules/quick-review/quickReviewWorkflow.ts`
@@ -1095,26 +1095,26 @@ git ls-files --others --exclude-standard
   - `src/test/slash-commands.test.ts`
   - `docs/workflows/workflow-runtime/workflow-modules/quick-review/action-plan.md`
 
-- [ ] Subtask 14.4: If `docs/workflows/workflow-runtime/workflow-modules/quick-review/quick-review-requirements.md` or `docs/workflows/workflow-runtime/workflow-modules/quick-review/quick-review.md` appear as pre-existing untracked or modified files, do not edit them and report them as pre-existing source/requirements diffs in the final implementation response.
+- [x] Subtask 14.4: If `docs/workflows/workflow-runtime/workflow-modules/quick-review/quick-review-requirements.md` or `docs/workflows/workflow-runtime/workflow-modules/quick-review/quick-review.md` appear as pre-existing untracked or modified files, do not edit them and report them as pre-existing source/requirements diffs in the final implementation response.
 
-### [ ] Task 15: Final Action-Plan Compliance Review
+### [x] Task 15: Final Action-Plan Compliance Review
 
 Allowed files for this task and every numbered subtask below:
 
 - `docs/workflows/workflow-runtime/workflow-modules/quick-review/action-plan.md`
 
-- [ ] Subtask 15.1: Reread `docs/action-plan-guide.md`.
+- [x] Subtask 15.1: Reread `docs/action-plan-guide.md`.
 
-- [ ] Subtask 15.2: Perform a line-by-line review of this action plan against `docs/action-plan-guide.md` before reporting completion.
+- [x] Subtask 15.2: Perform a line-by-line review of this action plan against `docs/action-plan-guide.md` before reporting completion.
 
-- [ ] Subtask 15.3: Confirm that every task and subtask in this action plan has:
+- [x] Subtask 15.3: Confirm that every task and subtask in this action plan has:
   - a checkbox;
   - a current-phase allowed-files list;
   - exact file paths;
   - exact symbols, strings, prompts, form labels, route ids, tool names, or commands where implementation depends on them;
   - verification instructions tied to the specific behavior being changed.
 
-- [ ] Subtask 15.4: Confirm that no subtask asks the implementer to infer implementation details from requirements, update files outside its allowed-files list, create broad compatibility aliases, or make opportunistic refactors.
+- [x] Subtask 15.4: Confirm that no subtask asks the implementer to infer implementation details from requirements, update files outside its allowed-files list, create broad compatibility aliases, or make opportunistic refactors.
 
 ## Compliance Matrix
 
