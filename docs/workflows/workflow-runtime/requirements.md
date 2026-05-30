@@ -183,6 +183,7 @@ The canonical in-scope workflow mapping for this requirements set is:
 | `document-project` | `analyst` | `implementation` |
 | `pi-planning` | `product-manager` | `planning` |
 | `quick-dev` | `quick-flow-solo-dev` | `implementation` |
+| `quick-review` | `quality-control` | `review` |
 | `problem-solving` | `analyst` | `discovery` |
 | `quick-spec` | `scrum-master` | `planning` |
 | `review-adversarial-general` | `quality-control` | `review` |
