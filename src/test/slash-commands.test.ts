@@ -109,5 +109,15 @@ describe("getAvailableSlashCommands", () => {
 			quickDev!.cliCompatible.should.equal(true)
 			quickDev!.description.should.equal("Shipped workflow: quick-dev")
 		})
+
+		it("includes the registered quick-review workflow slash command", async () => {
+			const response = await getResponse()
+			const quickReview = response.commands.find((cmd) => cmd.name === "quick-review")
+
+			quickReview!.should.not.be.undefined()
+			quickReview!.section.should.equal("custom")
+			quickReview!.cliCompatible.should.equal(true)
+			quickReview!.description.should.equal("Shipped workflow: quick-review")
+		})
 	})
 })

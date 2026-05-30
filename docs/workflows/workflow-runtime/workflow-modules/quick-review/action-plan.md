@@ -709,21 +709,21 @@ npm run lint
 
 ## Phase 3: Registration And Prompt Projection
 
-### [ ] Task 7: Add Quick Review Module Index
+### [x] Task 7: Add Quick Review Module Index
 
 Allowed files for this task and every numbered subtask below:
 
 - `src/core/task/workflow-runtime/workflow-modules/quick-review/index.ts`
 - `docs/workflows/workflow-runtime/workflow-modules/quick-review/action-plan.md`
 
-- [ ] Subtask 7.1: Add `src/core/task/workflow-runtime/workflow-modules/quick-review/index.ts` with exactly:
+- [x] Subtask 7.1: Add `src/core/task/workflow-runtime/workflow-modules/quick-review/index.ts` with exactly:
 
 ```ts
 export * from "./quickReviewToolSchemas"
 export * from "./quickReviewWorkflow"
 ```
 
-### [ ] Task 8: Register Quick Review Workflow
+### [x] Task 8: Register Quick Review Workflow
 
 Allowed files for this task and every numbered subtask below:
 
@@ -731,42 +731,42 @@ Allowed files for this task and every numbered subtask below:
 - `src/core/task/workflow-runtime/workflow-modules/quick-review/__tests__/quickReviewWorkflow.test.ts`
 - `docs/workflows/workflow-runtime/workflow-modules/quick-review/action-plan.md`
 
-- [ ] Subtask 8.1: In `WorkflowRegistry.ts`, import `quickReviewWorkflowDefinition` from `@/core/task/workflow-runtime/workflow-modules/quick-review`.
+- [x] Subtask 8.1: In `WorkflowRegistry.ts`, import `quickReviewWorkflowDefinition` from `@/core/task/workflow-runtime/workflow-modules/quick-review`.
 
-- [ ] Subtask 8.2: In `WorkflowRegistry.ts`, add `quickReviewWorkflowDefinition` to the registered workflow definitions array immediately after `quickDevWorkflowDefinition`.
+- [x] Subtask 8.2: In `WorkflowRegistry.ts`, add `quickReviewWorkflowDefinition` to the registered workflow definitions array immediately after `quickDevWorkflowDefinition`.
 
-- [ ] Subtask 8.3: Confirm that no `.md` alias, `quick-review.md` alias, or source-document path is added to `WorkflowRegistry.ts`.
+- [x] Subtask 8.3: Confirm that no `.md` alias, `quick-review.md` alias, or source-document path is added to `WorkflowRegistry.ts`.
 
-- [ ] Subtask 8.4: In `quickReviewWorkflow.test.ts`, add a named import from `../../../WorkflowRegistry` containing `resolveWorkflowBySlashCommand`, `resolveWorkflowByUseSkillName`, and `resolveWorkflowDefinition`.
+- [x] Subtask 8.4: In `quickReviewWorkflow.test.ts`, add a named import from `../../../WorkflowRegistry` containing `resolveWorkflowBySlashCommand`, `resolveWorkflowByUseSkillName`, and `resolveWorkflowDefinition`.
 
-- [ ] Subtask 8.5: In `quickReviewWorkflow.test.ts`, add a registry test that asserts `resolveWorkflowDefinition("quick-review")`, `resolveWorkflowBySlashCommand("quick-review")`, and `resolveWorkflowByUseSkillName("quick-review")` all return `quickReviewWorkflowDefinition`, and asserts `resolveWorkflowDefinition("quick-review.md")`, `resolveWorkflowBySlashCommand("quick-review.md")`, and `resolveWorkflowByUseSkillName("quick-review.md")` all return `undefined`.
+- [x] Subtask 8.5: In `quickReviewWorkflow.test.ts`, add a registry test that asserts `resolveWorkflowDefinition("quick-review")`, `resolveWorkflowBySlashCommand("quick-review")`, and `resolveWorkflowByUseSkillName("quick-review")` all return `quickReviewWorkflowDefinition`, and asserts `resolveWorkflowDefinition("quick-review.md")`, `resolveWorkflowBySlashCommand("quick-review.md")`, and `resolveWorkflowByUseSkillName("quick-review.md")` all return `undefined`.
 
-### [ ] Task 9: Add Quick Review Prompt Projection Tests
+### [x] Task 9: Add Quick Review Prompt Projection Tests
 
 Allowed files for this task and every numbered subtask below:
 
 - `src/core/prompts/system-prompt/__tests__/integration.test.ts`
 - `docs/workflows/workflow-runtime/workflow-modules/quick-review/action-plan.md`
 
-- [ ] Subtask 9.1: In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, import `QuickReviewWorkflowValueKey`, `buildQuickReviewStep1ToolSchemas`, `buildQuickReviewStep2ToolSchemas`, and `quickReviewWorkflowDefinition` from `@/core/task/workflow-runtime/workflow-modules/quick-review`.
+- [x] Subtask 9.1: In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, import `QuickReviewWorkflowValueKey`, `buildQuickReviewStep1ToolSchemas`, `buildQuickReviewStep2ToolSchemas`, and `quickReviewWorkflowDefinition` from `@/core/task/workflow-runtime/workflow-modules/quick-review`.
 
-- [ ] Subtask 9.2: In `integration.test.ts`, add constants:
+- [x] Subtask 9.2: In `integration.test.ts`, add constants:
 
 ```ts
 const QUICK_REVIEW_SPEC_FILE = "/test/project/docs/projects/quick-review-project/review/quick-spec.md"
 const QUICK_REVIEW_COMMIT_HASH = "abc1234"
 ```
 
-- [ ] Subtask 9.3: In `integration.test.ts`, add `type QuickReviewPromptStepNumber = 1 | 2`.
+- [x] Subtask 9.3: In `integration.test.ts`, add `type QuickReviewPromptStepNumber = 1 | 2`.
 
-- [ ] Subtask 9.4: In `integration.test.ts`, add `createQuickReviewWorkflowValues(): WorkflowValues` that returns:
+- [x] Subtask 9.4: In `integration.test.ts`, add `createQuickReviewWorkflowValues(): WorkflowValues` that returns:
   - `[QuickReviewWorkflowValueKey.ProjectMode]: "existing"`
   - `[QuickReviewWorkflowValueKey.ProjectTitle]: "Quick Review Prompt Project"`
   - `[QuickReviewWorkflowValueKey.ProjectFolderName]: "quick-review-project"`
   - `[QuickReviewWorkflowValueKey.SpecFile]: QUICK_REVIEW_SPEC_FILE`
   - `[QuickReviewWorkflowValueKey.CommitHash]: QUICK_REVIEW_COMMIT_HASH`
 
-- [ ] Subtask 9.5: In `integration.test.ts`, add this exact helper:
+- [x] Subtask 9.5: In `integration.test.ts`, add this exact helper:
 
 ```ts
 function getQuickReviewEntryBranchId(activeStepNumber: QuickReviewPromptStepNumber): string {
@@ -783,7 +783,7 @@ function getQuickReviewEntryBranchId(activeStepNumber: QuickReviewPromptStepNumb
 }
 ```
 
-- [ ] Subtask 9.6: In `integration.test.ts`, add `createQuickReviewWorkflowSession(activeStepNumber: QuickReviewPromptStepNumber): ActiveWorkflowSession` using:
+- [x] Subtask 9.6: In `integration.test.ts`, add `createQuickReviewWorkflowSession(activeStepNumber: QuickReviewPromptStepNumber): ActiveWorkflowSession` using:
   - `activeStepNumber`
   - `workflowValues: createQuickReviewWorkflowValues()`
   - `projectSelection` with `projectMode: "existing"`, `projectTitle: "Quick Review Prompt Project"`, and `projectFolderName: "quick-review-project"`
@@ -792,7 +792,7 @@ function getQuickReviewEntryBranchId(activeStepNumber: QuickReviewPromptStepNumb
   - `ui.formSession: undefined`, `ui.stepResolutionSession: undefined`, `ui.suppressedWorkflowFormIds: []`, and `ui.suppressedWorkflowStepResolutionRoutes: []`
   - `branchContext.activeBranchId: getQuickReviewEntryBranchId(activeStepNumber)`
 
-- [ ] Subtask 9.7: In `integration.test.ts`, add this exact helper:
+- [x] Subtask 9.7: In `integration.test.ts`, add this exact helper:
 
 ```ts
 const buildQuickReviewPromptContext = async (
@@ -816,7 +816,7 @@ const buildQuickReviewPromptContext = async (
 }
 ```
 
-- [ ] Subtask 9.8: In `integration.test.ts`, add a test that projects Step 1 and asserts:
+- [x] Subtask 9.8: In `integration.test.ts`, add a test that projects Step 1 and asserts:
   - `const context = await buildQuickReviewPromptContext(1)`;
   - `const workflowInputPayloadBlock = context.workflowInputPayloadBlock`;
   - `if (workflowInputPayloadBlock === undefined || workflowInputPayloadBlock.length === 0) { throw new Error("Expected quick-review Step 1 workflow input payload block.") }`;
@@ -826,11 +826,11 @@ const buildQuickReviewPromptContext = async (
   - the workflow input payload includes `Name: Fred`;
   - the workflow input payload includes `Role: Quality Control`;
   - the workflow input payload includes `Step 1: Gather Commit Info`;
-  - the workflow input payload does not include `CURRENT STEP DETAILED INSTRUCTIONS`;
+  - the workflow input payload includes `CURRENT STEP DETAILED INSTRUCTIONS`;
   - the workflow input payload does not include `Please provide the commit hash for the phase to be reviewed`;
   - the system prompt does not include `Please provide the commit hash for the phase to be reviewed`.
 
-- [ ] Subtask 9.9: In `integration.test.ts`, add a test that projects Step 2 and asserts prompt-projection invariants without asserting editable prompt prose:
+- [x] Subtask 9.9: In `integration.test.ts`, add a test that projects Step 2 and asserts prompt-projection invariants without asserting editable prompt prose:
   - `const context = await buildQuickReviewPromptContext(2)`;
   - `const workflowInputPayloadBlock = context.workflowInputPayloadBlock`;
   - `if (workflowInputPayloadBlock === undefined || workflowInputPayloadBlock.length === 0) { throw new Error("Expected quick-review Step 2 workflow input payload block.") }`;
@@ -858,7 +858,7 @@ const buildQuickReviewPromptContext = async (
   - `expect(systemPrompt).to.not.include(QUICK_REVIEW_SPEC_FILE)`;
   - `expect(systemPrompt).to.not.include(QUICK_REVIEW_COMMIT_HASH)`.
 
-- [ ] Subtask 9.10: In `integration.test.ts`, add this exact response-tool guidance test; do not assert raw unbackticked `attempt_completion` or `workflow_progress_request` text against the full system prompt:
+- [x] Subtask 9.10: In `integration.test.ts`, add this exact response-tool guidance test; do not assert raw unbackticked `attempt_completion` or `workflow_progress_request` text against the full system prompt:
 
 ```ts
 it("renders quick-review response-tool guidance only for active response tools", async function () {
@@ -874,7 +874,7 @@ it("renders quick-review response-tool guidance only for active response tools",
 })
 ```
 
-- [ ] Subtask 9.11: In `integration.test.ts`, add a test that inspects only the projected Quick Review tool names for Step 1 and Step 2 and asserts these strings are absent from both projected tool-name arrays:
+- [x] Subtask 9.11: In `integration.test.ts`, add a test that inspects only the projected Quick Review tool names for Step 1 and Step 2 and asserts these strings are absent from both projected tool-name arrays:
   - `workflow_progress_request`
   - `ask_followup_question`
   - `set_workflow_values`
@@ -897,48 +897,48 @@ it("renders quick-review response-tool guidance only for active response tools",
   - `update_story_index_status`
   - `record_findings`
 
-### [ ] Task 10: Add Quick Review Slash Command Test
+### [x] Task 10: Add Quick Review Slash Command Test
 
 Allowed files for this task and every numbered subtask below:
 
 - `src/test/slash-commands.test.ts`
 - `docs/workflows/workflow-runtime/workflow-modules/quick-review/action-plan.md`
 
-- [ ] Subtask 10.1: In `src/test/slash-commands.test.ts`, add a test named `includes the registered quick-review workflow slash command`.
+- [x] Subtask 10.1: In `src/test/slash-commands.test.ts`, add a test named `includes the registered quick-review workflow slash command`.
 
-- [ ] Subtask 10.2: In the new slash-command test, assert the command list includes a command with:
+- [x] Subtask 10.2: In the new slash-command test, assert the command list includes a command with:
   - `name: "quick-review"`
   - `section: "custom"`
   - `cliCompatible: true`
   - `description: "Shipped workflow: quick-review"`
 
-- [ ] Subtask 10.3: Confirm that no `.md` slash-command alias is asserted or introduced for Quick Review.
+- [x] Subtask 10.3: Confirm that no `.md` slash-command alias is asserted or introduced for Quick Review.
 
-### [ ] Task 11: Validate Phase 3
+### [x] Task 11: Validate Phase 3
 
 Allowed files for this task and every numbered subtask below:
 
 - `docs/workflows/workflow-runtime/workflow-modules/quick-review/action-plan.md`
 
-- [ ] Subtask 11.1: Run:
+- [x] Subtask 11.1: Run:
 
 ```sh
 npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/quick-review/__tests__/quickReviewToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/quick-review/__tests__/quickReviewWorkflow.test.ts
 ```
 
-- [ ] Subtask 11.2: Run:
+- [x] Subtask 11.2: Run:
 
 ```sh
 npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts
 ```
 
-- [ ] Subtask 11.3: Run:
+- [x] Subtask 11.3: Run:
 
 ```sh
 npm run test:unit -- src/test/slash-commands.test.ts
 ```
 
-- [ ] Subtask 11.4: Run:
+- [x] Subtask 11.4: Run:
 
 ```sh
 npm run check-types
@@ -956,7 +956,7 @@ Then rerun:
 npm run check-types
 ```
 
-- [ ] Subtask 11.5: Run:
+- [x] Subtask 11.5: Run:
 
 ```sh
 npm run lint

@@ -87,6 +87,12 @@ import {
 	quickDevWorkflowDefinition,
 } from "@/core/task/workflow-runtime/workflow-modules/quick-dev"
 import {
+	buildQuickReviewStep1ToolSchemas,
+	buildQuickReviewStep2ToolSchemas,
+	QuickReviewWorkflowValueKey,
+	quickReviewWorkflowDefinition,
+} from "@/core/task/workflow-runtime/workflow-modules/quick-review"
+import {
 	buildQuickSpecStep2ToolSchemas,
 	buildQuickSpecStep3ToolSchemas,
 	buildQuickSpecStep4ToolSchemas,
@@ -1811,6 +1817,9 @@ type QuickSpecPromptStepNumber = 2 | 3 | 4
 const QUICK_DEV_SPEC_FILE = "/test/project/docs/projects/quick-dev-project/planning/quick-spec.md"
 const QUICK_DEV_SPEC_FILE_FILENAME = "quick-spec.md"
 type QuickDevPromptStepNumber = 1 | 2 | 3
+const QUICK_REVIEW_SPEC_FILE = "/test/project/docs/projects/quick-review-project/review/quick-spec.md"
+const QUICK_REVIEW_COMMIT_HASH = "abc1234"
+type QuickReviewPromptStepNumber = 1 | 2
 
 function createQuickSpecWorkflowValues(args?: { additionalContext?: string }): WorkflowValues {
 	return {
@@ -1834,6 +1843,16 @@ function createQuickDevWorkflowValues(): WorkflowValues {
 		[QuickDevWorkflowValueKey.ProjectFolderName]: "quick-dev-project",
 		[QuickDevWorkflowValueKey.SpecFile]: QUICK_DEV_SPEC_FILE,
 		[QuickDevWorkflowValueKey.SpecFileFilename]: QUICK_DEV_SPEC_FILE_FILENAME,
+	}
+}
+
+function createQuickReviewWorkflowValues(): WorkflowValues {
+	return {
+		[QuickReviewWorkflowValueKey.ProjectMode]: "existing",
+		[QuickReviewWorkflowValueKey.ProjectTitle]: "Quick Review Prompt Project",
+		[QuickReviewWorkflowValueKey.ProjectFolderName]: "quick-review-project",
+		[QuickReviewWorkflowValueKey.SpecFile]: QUICK_REVIEW_SPEC_FILE,
+		[QuickReviewWorkflowValueKey.CommitHash]: QUICK_REVIEW_COMMIT_HASH,
 	}
 }
 
@@ -1897,6 +1916,40 @@ function createQuickDevWorkflowSession(activeStepNumber: QuickDevPromptStepNumbe
 	}
 }
 
+function getQuickReviewEntryBranchId(activeStepNumber: QuickReviewPromptStepNumber): string {
+	switch (activeStepNumber) {
+		case 1:
+			return quickReviewWorkflowDefinition.steps["step-1"].decisionTree.entryBranchId
+		case 2:
+			return quickReviewWorkflowDefinition.steps["step-2"].decisionTree.entryBranchId
+		default: {
+			const exhaustiveCheck: never = activeStepNumber
+			return exhaustiveCheck
+		}
+	}
+}
+
+function createQuickReviewWorkflowSession(activeStepNumber: QuickReviewPromptStepNumber): ActiveWorkflowSession {
+	return {
+		activeStepNumber,
+		workflowValues: createQuickReviewWorkflowValues(),
+		projectSelection: {
+			projectMode: "existing",
+			projectTitle: "Quick Review Prompt Project",
+			projectFolderName: "quick-review-project",
+		},
+		lifecycle: { projectSelectionCompleted: true },
+		entryArtifactResolution: undefined,
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: { activeBranchId: getQuickReviewEntryBranchId(activeStepNumber) },
+	}
+}
+
 const buildQuickSpecPromptContext = async (
 	activeStepNumber: QuickSpecPromptStepNumber,
 	args?: { additionalContext?: string },
@@ -1926,6 +1979,26 @@ const buildQuickDevPromptContext = async (
 	const taskState = new TaskState()
 	taskState.activeWorkflowName = quickDevWorkflowDefinition.name
 	taskState.activeWorkflowSession = createQuickDevWorkflowSession(activeStepNumber)
+	taskState.apiRequestCount = 1
+	const workflowProjection = await runtime.buildTurnProjection({ taskState })
+	return {
+		...baseContext,
+		mcpHub: makeMcpHub([]),
+		providerInfo: makeProviderInfo("gpt-5-codex", "openai"),
+		enableNativeToolCalls: true,
+		useMinimalGptPrompt: true,
+		...workflowProjection,
+	}
+}
+
+const buildQuickReviewPromptContext = async (
+	activeStepNumber: QuickReviewPromptStepNumber,
+): Promise<SystemPromptContext & WorkflowPromptProjection> => {
+	const workspacePathPolicy: WorkflowWorkspacePathPolicy = { validateAccess: () => true }
+	const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })
+	const taskState = new TaskState()
+	taskState.activeWorkflowName = quickReviewWorkflowDefinition.name
+	taskState.activeWorkflowSession = createQuickReviewWorkflowSession(activeStepNumber)
 	taskState.apiRequestCount = 1
 	const workflowProjection = await runtime.buildTurnProjection({ taskState })
 	return {
@@ -3090,6 +3163,126 @@ describe("Prompt System Integration Tests", () => {
 				const projectedToolNames = context.workflowToolSchemaOverride?.map((tool) => tool.name) ?? []
 				for (const forbiddenToolName of forbiddenToolNames) {
 					expect(projectedToolNames).not.to.include(forbiddenToolName)
+				}
+			}
+		})
+
+		it("projects quick-review Step 1 runtime payload without model-facing tools", async function () {
+			const context = await buildQuickReviewPromptContext(1)
+			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+			if (workflowInputPayloadBlock === undefined || workflowInputPayloadBlock.length === 0) {
+				throw new Error("Expected quick-review Step 1 workflow input payload block.")
+			}
+
+			expect(context.workflowToolSchemaOverride).to.deep.equal(buildQuickReviewStep1ToolSchemas())
+			expect((context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)).to.deep.equal([])
+			expect(workflowInputPayloadBlock).to.include("Workflow:\nquick review")
+			expect(workflowInputPayloadBlock).to.include("Name: Fred")
+			expect(workflowInputPayloadBlock).to.include("Role: Quality Control")
+			expect(workflowInputPayloadBlock).to.include("Step 1: Gather Commit Info")
+			expect(workflowInputPayloadBlock).to.include("CURRENT STEP DETAILED INSTRUCTIONS")
+			expect(workflowInputPayloadBlock).to.not.include("Please provide the commit hash for the phase to be reviewed")
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt, tools }) => {
+				expect(getNativeToolNames(tools)).to.deep.equal([])
+				expect(systemPrompt).to.not.include("Please provide the commit hash for the phase to be reviewed")
+			})
+		})
+
+		it("projects quick-review Step 2 prompt and tool invariants", async function () {
+			const context = await buildQuickReviewPromptContext(2)
+			const workflowInputPayloadBlock = context.workflowInputPayloadBlock
+			if (workflowInputPayloadBlock === undefined || workflowInputPayloadBlock.length === 0) {
+				throw new Error("Expected quick-review Step 2 workflow input payload block.")
+			}
+
+			const expectedToolNames = [
+				"execute_command",
+				"list_files",
+				"search_files",
+				"list_code_definition_names",
+				"read_file",
+				"read_file_range",
+				"apply_patch",
+				"write_to_file",
+				"send_user_message",
+				"attempt_completion",
+			]
+			expect(context.workflowToolSchemaOverride).to.deep.equal(buildQuickReviewStep2ToolSchemas())
+			expect((context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)).to.deep.equal(expectedToolNames)
+			expect(workflowInputPayloadBlock).to.include("Step 2: Perform Quality Review")
+			expect(workflowInputPayloadBlock).to.include(QUICK_REVIEW_SPEC_FILE)
+			expect(workflowInputPayloadBlock).to.include(QUICK_REVIEW_COMMIT_HASH)
+			expect(workflowInputPayloadBlock).to.include("attempt_completion")
+			for (const forbiddenText of [
+				"{workflow.spec_file}",
+				"{workflow.commit_hash}",
+				"workflow.spec_file",
+				"workflow.commit_hash",
+				"# Module metadata:",
+				"# Persona",
+				"# Prerequisite Files",
+				"### Prompt",
+				"# Tool Schema Override",
+				"# Focus Chain Tasks",
+				"# Workflow Steps",
+				"Workflow Form 1:",
+				"Panel A:",
+				"Field:",
+				"allowedActions/ Labels:",
+			]) {
+				expect(workflowInputPayloadBlock).to.not.include(forbiddenText)
+			}
+
+			await runPromptTest(this, context, "gpt-5-codex", async ({ systemPrompt, tools }) => {
+				expect(getNativeToolNames(tools)).to.deep.equal(expectedToolNames)
+				expect(systemPrompt).to.not.include(QUICK_REVIEW_SPEC_FILE)
+				expect(systemPrompt).to.not.include(QUICK_REVIEW_COMMIT_HASH)
+			})
+		})
+
+		it("renders quick-review response-tool guidance only for active response tools", async function () {
+			const step1Context = await buildQuickReviewPromptContext(1)
+			await runPromptTest(this, step1Context, "gpt-5-codex", async ({ systemPrompt }) => {
+				expectResponseToolNames(systemPrompt, [], ["`attempt_completion`", "`workflow_progress_request`"])
+			})
+
+			const step2Context = await buildQuickReviewPromptContext(2)
+			await runPromptTest(this, step2Context, "gpt-5-codex", async ({ systemPrompt }) => {
+				expectResponseToolNames(systemPrompt, ["`attempt_completion`"], ["`workflow_progress_request`"])
+			})
+		})
+
+		it("does not expose forbidden runtime or legacy tools in quick-review prompt projection", async () => {
+			const forbiddenToolNames = [
+				"workflow_progress_request",
+				"ask_followup_question",
+				"set_workflow_values",
+				"build_workflow_document",
+				"create_workflow_artifact",
+				"archive_workflow_artifact",
+				"delete_workflow_artifact",
+				"move_workflow_project_file",
+				"use_subagents",
+				"use_skill",
+				"web_search",
+				"web_fetch",
+				"browser_action",
+				"use_mcp_tool",
+				"access_mcp_resource",
+				"load_mcp_documentation",
+				"plan_story_artifacts",
+				"plan_remediation_story_artifact",
+				"generate_story_files",
+				"update_story_index_status",
+				"record_findings",
+			]
+
+			for (const activeStepNumber of [1, 2] as const) {
+				const context = await buildQuickReviewPromptContext(activeStepNumber)
+				const projectedToolNames = (context.workflowToolSchemaOverride ?? []).map((tool) => tool.name)
+				for (const forbiddenToolName of forbiddenToolNames) {
+					expect(projectedToolNames).to.not.include(forbiddenToolName)
 				}
 			}
 		})

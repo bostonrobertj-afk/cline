@@ -9,6 +9,11 @@ import type {
 	WorkflowStepDefinition,
 	WorkflowValues,
 } from "../../../types"
+import {
+	resolveWorkflowBySlashCommand,
+	resolveWorkflowByUseSkillName,
+	resolveWorkflowDefinition,
+} from "../../../WorkflowRegistry"
 import { renderWorkflowPromptTemplate } from "../../../workflowPromptTemplates"
 import { buildQuickReviewStep1ToolSchemas, buildQuickReviewStep2ToolSchemas } from "../quickReviewToolSchemas"
 import {
@@ -177,6 +182,15 @@ describe("quickReviewWorkflow", () => {
 		expect(quickReviewWorkflowDefinition.name).to.not.equal("quick-review.md")
 		expect(quickReviewWorkflowDefinition.slashCommandName).to.not.equal("quick-review.md")
 		expect(quickReviewWorkflowDefinition.useSkillName).to.not.equal("quick-review.md")
+	})
+
+	it("registers quick-review without markdown aliases", () => {
+		expect(resolveWorkflowDefinition("quick-review")).to.equal(quickReviewWorkflowDefinition)
+		expect(resolveWorkflowBySlashCommand("quick-review")).to.equal(quickReviewWorkflowDefinition)
+		expect(resolveWorkflowByUseSkillName("quick-review")).to.equal(quickReviewWorkflowDefinition)
+		expect(resolveWorkflowDefinition("quick-review.md")).to.equal(undefined)
+		expect(resolveWorkflowBySlashCommand("quick-review.md")).to.equal(undefined)
+		expect(resolveWorkflowByUseSkillName("quick-review.md")).to.equal(undefined)
 	})
 
 	it("builds the exact Step 1 commit-hash workflow form", () => {
