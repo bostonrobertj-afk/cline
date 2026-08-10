@@ -14,6 +14,8 @@ Reference implementation:
 - Module registry/data: `src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingTechniqueRegistry.ts`
 - Module exports: `src/core/task/workflow-runtime/workflow-modules/brainstorming/index.ts`
 
+The checked-in brainstorming module remains the reference for overall module composition, but it predates the target `projectOutputPlacement` migration and still uses the former `projectSubfolder` field. New requirements and action plans must follow the target contract in this guide and must include migration of affected workflow definitions, `ShippedWorkflowMetadata`, runtime path resolution, and tests rather than copying that legacy field.
+
 ## Build Order
 
 Build a workflow module in this order:
@@ -40,15 +42,28 @@ Every module requirements document should explicitly govern these areas.
 
 ### Identity And User-Facing Metadata
 
-Define:
+For every module, define:
 
 - canonical workflow `name`
 - `slashCommandName`
 - `useSkillName`
 - `displayName`
 - `description`
-- `projectSubfolder`
 - persona fields
+
+For every module, define `projectSelection: WorkflowProjectSelectionDefinition`, where the shared type is exactly `{ kind: "interactive" } | { kind: "automatic_fixed"; projectTitle: string; projectFolderName: string }`.
+
+Also define `projectOutputPlacement: WorkflowProjectOutputPlacement`, where the shared type is exactly `{ kind: "selected_project_root" } | { kind: "selected_project_subfolder"; subfolder: WorkflowProjectSubfolder }`.
+
+Root placement resolves to zero segments beneath the selected project root, so an artifact's project-relative path is its registered filename alone. Subfolder placement prefixes that filename with exactly the declared canonical subfolder. `WorkflowDefinition` and `ShippedWorkflowMetadata` must expose only `projectOutputPlacement`; do not retain `projectSubfolder` as an alias.
+
+Interactive and automatic fixed-project selection use the same runtime-owned project-candidate discovery and selection-finalization methodology. Runtime calls the existing `discoverWorkflowCandidates(...)` seam with `rootDirectory` obtained from `resolveWorkflowProjectOutputRoot()`, the existing workspace path policy, `entryType: "directory"`, `immediateChildrenOnly: true`, `buildLabel: (entryName) => entryName`, `sort: "alpha_asc"`, and no target segments or naming pattern.
+
+For interactive selection, the user supplies the selected existing-project candidate through the shared entry form or provides a new-project title. For a user-facing main-agent automatic fixed-project selection, successful submission of the informational entry panel triggers discovery, the workflow definition supplies the fixed folder name as the candidate, and the shared entry form omits the project-selection panel. An exact candidate match sets `projectMode` to `existing`; absence sets it to `new`. Main-agent automatic discovery and finalization must not run before the informational panel is submitted. Child automatic fixed-project activation follows the shared child-activation contract without rendering or requiring that form.
+
+Extract the existing project-selection finalization sequence into one runtime-owned `finalizeWorkflowProjectSelection(...)` helper that receives the task state, active workflow definition, and resolved `WorkflowProjectSelectionState`. Interactive form handling and automatic fixed-project resolution must invoke that helper exactly once after resolving their candidate source. The helper assigns session project-selection state, clears the completed entry form session, persists the three declared `entryProjectValueKeys`, ensures the project and canonical project folders exist, records project-selection lifecycle completion, and continues through the existing `new` or `existing` entry-artifact-resolution path. Do not synthesize a project-selection form submission for automatic selection.
+
+Do not add a selected-project-root workflow value for automatic selection. Runtime resolves that root through `resolveWorkflowProjectOutputFolder(session)`, which derives it from `resolveWorkflowProjectOutputRoot()` and `session.projectSelection.projectFolderName`.
 
 The user-provided workflow instructions file contains the persona designation and supporting information, which must be exactly translated into requirements, then prescribed for implementation in the action plan, including:
 - name
@@ -82,9 +97,9 @@ When AI writes workflow values, the active step tool schema must explicitly expo
 
 Decide whether the workflow needs a runtime-owned artifact.
 
-If it needs a new artifact family, the requirements must clearly indicate as much, and the action plan must prescribe the exact steps necesesary to register the artifact.
+If it needs a new artifact family, the requirements must clearly indicate as much, and the action plan must prescribe the exact steps necessary to register the artifact. The module requirements must specify the family's canonical enum member and string id plus every applicable artifact-family registry field: `allocationMode`, `identityRequirement`, `filenamePattern`, `fileExtension`, `contentKind`, `numberingScope`, `discoveryPattern`, `singletonIdentity` when applicable, and any required structured sidecar/index behavior. For a project-numbered family, the filename pattern must contain `{C}` exactly once and the discovery pattern must capture that positive-integer component.
 
-Module artifact definitions should reference runtime-owned artifact families and map `outputValueKeys` into module workflow values. The module should not invent filename rules, numbering rules, path construction, or discovery rules that belong to the runtime artifact-family registry.
+Module artifact definitions should reference runtime-owned artifact families and map `outputValueKeys` into module workflow values. The module should not invent allocation modes, identity requirements, filename rules, extensions, content kinds, numbering rules, singleton identities, path construction, or discovery rules that belong to the runtime artifact-family registry.
 
 For model-facing steps, persist the resolved artifact path into a workflow value such as `output_file`, then render that value into prompts. The AI should not recompute the artifact path.
 
@@ -92,16 +107,25 @@ Use `project_numbered` artifact families when a workflow must create a new artif
 
 A workflow module using a project-numbered family declares a standalone `WorkflowArtifactDefinition` with `intentMode: "new"`, `parentIdentitySource: undefined`, `targetIdentitySource: undefined`, and standalone `outputValueKeys`. The module must route through `allocate_artifact`; it must not compute `{C}`, scan files, parse filenames, or construct artifact paths.
 
-Project-numbered artifacts use the workflow's `projectSubfolder` as the numbering and destination folder. Runtime discovers existing filenames matching the family discovery pattern in that folder, allocates the highest existing `{C}` plus one, creates the empty artifact, and persists the same standalone artifact metadata keys as singleton project artifacts.
+Project-numbered artifacts use the workflow's `projectOutputPlacement` as the numbering and destination location. Runtime discovers existing filenames matching the family discovery pattern at that location, allocates the highest existing `{C}` plus one, creates the empty artifact, and persists the same standalone artifact metadata keys as singleton project artifacts.
 
 For singleton artifacts with `intentMode: "new"`, existing-project conflict handling is runtime-owned. The module must not inspect the filesystem, compute whether the artifact already exists, archive files, delete files, or expose archive/delete tools to the model.
 
-Project selection completion is runtime lifecycle state only; workflow modules must not branch on `project_selection_completed`. After project selection and any runtime-owned entry singleton artifact resolution, runtime emits `entry_artifact_resolution_completed`. The module decision tree must branch on that event:
+The exception is a registered singleton artifact that the same workflow also links to an optional prerequisite with `resolutionMode: "deterministic_exact_filename"`. That linked prerequisite is the sole existing-file resolution route for the artifact. Runtime must bypass the shared singleton conflict/replacement UI, adopt and preserve a found file while persisting the same complete artifact metadata as allocation, and record a completed no-match without allocating the artifact. The workflow may call `allocate_artifact` only after that no-match result has been persisted; allocation for an unresolved or found linked prerequisite must fail closed without mutating the file.
+
+Project selection completion is runtime lifecycle state only; workflow modules must not branch on `project_selection_completed`. For singleton artifacts governed by the ordinary shared entry singleton-resolution flow, runtime emits `entry_artifact_resolution_completed` after project selection and entry resolution. The module decision tree must branch on that event:
 
 - `creationRequired: true`: run the normal `allocate_artifact` and initial `build_workflow_document` setup route.
 - `creationRequired: false`: skip `allocate_artifact` and skip the initial document build for that artifact, then continue through the post-artifact-ready route.
 
 The runtime persists artifact output values for continued existing artifacts, so prompts should read the same workflow values they would read after allocation.
+
+For artifact-linked deterministic prerequisites, do not branch on `entry_artifact_resolution_completed`. Begin the workflow-owned generation step with a runtime-owned deterministic procedure that requires the persisted prerequisite resolution result, reads the source-prescribed prerequisite-resolution-time state, and writes any required declared creation-state workflow value:
+
+- `outcome: "found"`: persist the non-creation state, preserve the existing artifact, and skip allocation and initial document building.
+- `outcome: "not_found"`: persist the creation-required state before running `allocate_artifact`, then run the initial `build_workflow_document` route.
+
+When the workflow source defines creation state by whether the prerequisite path was set, the procedure must derive that state from path presence before allocation and verify that it agrees with the persisted outcome. Subsequent decision-tree routes branch on the declared workflow value. Do not recompute whether the artifact was created in the current workflow from path presence after allocation.
 
 ### Runtime Writes Versus AI Writes
 
@@ -131,7 +155,7 @@ Choose one of these step modes:
 
 | Step mode | Decision action pattern | Tool schema |
 | --- | --- | --- |
-| Runtime-driven | `allocate_artifact`, `render_workflow_form`, `run_deterministic_procedure`, `build_workflow_document`, `transition_step`, `terminal_error` | empty exported builder |
+| Runtime-driven | `allocate_artifact`, `resolve_prerequisite_files`, `render_workflow_form`, `run_deterministic_procedure`, `build_workflow_document`, `transition_step`, `terminal_error` | empty exported builder |
 | Model-driven | `project_prompt`, then event routes such as `workflow_progress_request_confirmed` or `attempt_completion_succeeded` | non-empty exported builder |
 
 Do not let a step route to `project_prompt` while exposing an empty schema.
@@ -165,7 +189,7 @@ For a confirmation-only panel that displays prescribed text and advances through
 
 ### Prerequisite Files
 
-If a module requires prerequisite files from the selected project before model-driven work can begin, declare them in `WorkflowDefinition.prerequisiteFiles` and invoke them with the runtime-owned `resolve_prerequisite_files` decision action.
+If a module requires prerequisite files from the selected project before model-driven work can begin, declare them in `WorkflowDefinition.prerequisiteFiles` and invoke every resolution mode with the runtime-owned `resolve_prerequisite_files` decision action from an active workflow step. Place that action before any workflow form, artifact operation, or model-driven work that depends on the prerequisite. `resolutionMode` changes matching and user-interaction behavior; it does not create a separate activation-time or pre-step lifecycle.
 
 Prerequisite-file selection must not be implemented as a module-owned `selectorDiscovery` workflow form, and it must not mutate shared project-selection behavior. Shared project selection still chooses only the project folder; prerequisite resolution happens afterward inside `WorkflowRuntime`.
 
@@ -173,15 +197,18 @@ Each prerequisite declaration must include:
 
 - `id`: the canonical prerequisite id, matching the `prerequisiteFiles` record key.
 - `requirement`: `required` or `optional`.
+- `resolutionMode`: `interactive` or `deterministic_exact_filename`.
 - `projectSubfolderSegments`: the selected-project subfolder segments to scan.
 - `match`: either an exact filename or a naming pattern.
 - `producingWorkflowName`: the workflow that produces the prerequisite file.
 - `workflowValueKey`: the declared workflow value key that receives the selected absolute path.
 - `outputDocumentReference`: `none` or `module_document_builder`, depending on whether the module-owned document builder must render the persisted path into an output document.
 
-When a user selects a prerequisite file, `resolve_prerequisite_files` persists the selected full absolute path to the declaration's `workflowValueKey`. If the workflow output document must reference that path, render the persisted workflow value through the module-owned document builder; do not recompute or rediscover the path in module prompt code.
+A prerequisite may also include `artifactId` to link it to a registered artifact declared by the same workflow. Such a link is valid only when the prerequisite is optional, uses `resolutionMode: "deterministic_exact_filename"`, uses an exact filename, and points to an `intentMode: "new"` singleton artifact. The registry-owned artifact filename, the prerequisite filename, and the artifact absolute-path output key must describe the same file. Placement equivalence is exact: root placement matches empty `projectSubfolderSegments`, while subfolder placement for `X` matches exactly `[X]`.
 
-Required prerequisite behavior is runtime-owned:
+When a user selects an interactive prerequisite file, `resolve_prerequisite_files` persists the selected full absolute path to the declaration's `workflowValueKey`. If the workflow output document must reference that path, render the persisted workflow value through the module-owned document builder; do not recompute or rediscover the path in module prompt code.
+
+Required interactive prerequisite behavior is runtime-owned:
 
 - No match: render a cannot-continue panel naming the producing workflow; do not proceed.
 - One match: render a confirmation panel showing the file name and full absolute path; yes persists the path and continues.
@@ -189,13 +216,28 @@ Required prerequisite behavior is runtime-owned:
 - User rejection: persist no path and render the cannot-continue panel.
 - Cancel: persist no path and render the cannot-continue panel.
 
-Optional prerequisite behavior is runtime-owned:
+Optional interactive prerequisite behavior is runtime-owned:
 
 - No match: skip the prerequisite and continue without a cannot-continue panel.
 - One match: render a non-required confirmation panel; yes persists the path, while no or no selection continues without persisting a path.
 - Multiple matches: render a non-required dropdown whose option values are full absolute paths and whose labels identify file names.
 - User rejection: persist no path and continue.
 - Cancel: persist no path and continue.
+
+Deterministic exact-filename prerequisite behavior is runtime-owned:
+
+- Runtime resolves the declared exact filename without rendering prerequisite-choice, confirmation, rejection, cancel, or cannot-continue UI.
+- A found file produces and persists `{ prerequisiteId, outcome: "found", resolvedAbsolutePath }` and persists the declared path workflow value.
+- No match produces and persists `{ prerequisiteId, outcome: "not_found" }`, leaves the prerequisite path unset, and does not create a file during prerequisite resolution.
+- Both outcomes use the shared exact `WorkflowPrerequisiteFileResolution` union and are persisted in `ActiveWorkflowSession.prerequisiteFileResolutions: readonly WorkflowPrerequisiteFileResolution[]`; they distinguish completed resolution from resolution that has not run and must survive normal workflow resume.
+- The array contains at most one current result for each declared prerequisite id and preserves declaration order. Runtime commits each deterministic result and its companion path set/clear as one workflow-session mutation; an artifact link adds adopted metadata or artifact-specific output clearing to that same mutation. Runtime reuses a complete result on resume, reruns an uncommitted resolution, and fails closed on duplicate, contradictory, undeclared, or metadata-inconsistent persisted results.
+
+When a deterministic exact-filename prerequisite declares `artifactId`, these additional rules apply:
+
+- Runtime bypasses singleton-conflict, replacement, archive, and delete UI for the linked artifact.
+- A found file is adopted and preserved, and runtime derives the same complete registered artifact output metadata that allocation would produce without allocating or building an initial scaffold.
+- No match leaves the linked artifact-specific family, identity, filename, relative-path, and absolute-path outputs unset while retaining shared entry-project values.
+- Workflow logic that needs a creation flag must derive and persist it from the source-prescribed prerequisite-resolution-time state before allocation. When the source defines that flag by whether the prerequisite path was set, derive it from that path state before allocation and verify that it agrees with the persisted outcome. Never infer whether creation was originally required from path presence after allocation, because successful allocation populates that same path.
 
 Use the module decision action `move_project_file` for deterministic file lifecycle moves between folders under the selected project. The action should provide source and destination folder segments plus a `filenameWorkflowValueKey`; the runtime resolves the selected project root and performs the governed move.
 
@@ -431,7 +473,13 @@ export const exampleWorkflowDefinition: WorkflowDefinition = {
   slashCommandName: "example",
   useSkillName: "example",
   persona: EXAMPLE_WORKFLOW_PERSONA,
-  projectSubfolder: "discovery",
+  projectSelection: {
+    kind: "interactive",
+  },
+  projectOutputPlacement: {
+    kind: "selected_project_subfolder",
+    subfolder: "discovery",
+  },
   workflowValueKeys: EXAMPLE_WORKFLOW_VALUE_KEYS,
   entryProjectValueKeys: {
     projectMode: ExampleWorkflowValueKey.ProjectMode,
@@ -546,7 +594,7 @@ Document builders should:
 
 ### Runtime-Driven Setup
 
-Typical singleton artifact startup flow:
+Typical ordinary entry-resolved singleton artifact startup flow:
 
 1. Wait for `entry_artifact_resolution_completed`.
 2. If the active artifact resolution has `creationRequired: true`, run `allocate_artifact`.
@@ -556,6 +604,16 @@ Typical singleton artifact startup flow:
 6. Continue with setup forms, deterministic document updates, `transition_step`, or `project_prompt`.
 
 Each tool-backed operation should have explicit success and failure routes. Failure routes should go to retry or `terminal_error`; they should not silently no-op.
+
+For an artifact-linked deterministic exact-filename prerequisite, use this flow instead:
+
+1. The active step invokes `resolve_prerequisite_files` and runtime completes and persists prerequisite resolution before any dependent workflow form, artifact operation, or model-driven work.
+2. A `found` result adopts the existing artifact with complete output metadata and skips allocation and initial scaffold building.
+3. A `not_found` result leaves artifact-specific family, identity, filename, relative-path, and absolute-path outputs unset while shared entry-project values remain populated.
+4. Before allocation, a deterministic procedure persists any downstream creation-required workflow value from the source-prescribed prerequisite-resolution-time state and verifies it against the persisted result.
+5. The module allocates only the missing registered artifact, then builds its initial scaffold.
+6. The module requirements must prescribe the exact retry cardinality and terminal route for each allocation and initial scaffold-build failure. Do not infer a retry policy from another workflow. For `document-project`, the main requirements prescribe exactly one retry after an initial allocation failure, a `terminal_error` route after the retry fails, and a direct `terminal_error` route after an initial scaffold-build failure without retrying the full-document write.
+7. Multiple missing artifacts use an explicitly prescribed, failure-routed order and resume from persisted results and completed operations.
 
 ### Deterministic State Mutation
 
@@ -589,6 +647,8 @@ Dedicated workflow events take precedence over generic model-tool lifecycle even
 
 ## Registration
 
+When a module introduces an artifact family, first add its enum member and complete typed definition to `WORKFLOW_ARTIFACT_FAMILY_REGISTRY`. Register every field prescribed under Artifact Strategy, update the registry's discriminated artifact-family types as required, and add focused registry validation and discovery/allocation tests. Do not place registry-owned filename, identity, numbering, discovery, or sidecar behavior in the workflow module.
+
 Export the workflow module from its local `index.ts`, then register it in `WorkflowRegistry.ts`.
 
 The shipped workflow registry is keyed by:
@@ -606,6 +666,7 @@ Do not preserve markdown filename identities such as `brainstorming.md` as activ
 Add tests for:
 
 - workflow identity and metadata
+- exact `projectOutputPlacement`, including root placement when prescribed
 - persona fields
 - workflow value inventory
 - entry project value keys
@@ -613,8 +674,13 @@ Add tests for:
 - workflow forms, panels, transitions, and stale clearing
 - deterministic procedures
 - decision-tree route structure
-- singleton artifact route for `entry_artifact_resolution_completed` with `creationRequired: true`
-- singleton artifact route for `entry_artifact_resolution_completed` with `creationRequired: false`
+- ordinary entry-resolved singleton artifact route for `entry_artifact_resolution_completed` with `creationRequired: true`
+- ordinary entry-resolved singleton artifact route for `entry_artifact_resolution_completed` with `creationRequired: false`
+- artifact-linked deterministic prerequisite declarations and definition-validation failures for mismatched artifact id, filename, exact root/empty-segment or subfolder/single-segment placement equivalence, or absolute-path output key
+- persisted `found` and `not_found` prerequisite results, including resume behavior and the absence of prerequisite-choice and singleton-conflict UI
+- active-step decision-action resolution for interactive and deterministic exact-filename prerequisites, one declaration-ordered result per prerequisite, atomic companion path/metadata mutation, failed-mutation rerun, complete-result reuse, and fail-closed invalid persisted result state
+- complete and equivalent artifact metadata for adopted existing files and newly allocated files
+- missing-only allocation, fail-closed allocation for unresolved or found linked prerequisites, initial scaffold behavior, prescribed multi-artifact ordering, partial-success resume, collision failure, and exact terminal-error routing
 - prompt source shape and non-empty required rendering
 - exact tool-schema outputs
 - absence of archive/delete workflow artifact tools from model-facing schemas
@@ -661,6 +727,7 @@ Add runtime coverage when the module depends on runtime behavior:
 - focus-chain/checklist projection
 - first next action after project selection
 - artifact allocation and output value mapping
+- deterministic prerequisite resolution as the first runtime-owned Step 1 action when prescribed, including every material found/missing combination for linked artifacts
 - runtime-owned document build actions
 - workflow completion through explicit `attempt_completion_succeeded` routing
 
@@ -736,6 +803,9 @@ Avoid these patterns:
 - Creating separate forms for panels that belong to one logical form flow.
 - Preserving markdown filename activation aliases after moving to canonical workflow names.
 - Copying the legacy contextual tool matrix literally instead of translating its tool-category intent into explicit module-owned schemas.
-- Starting singleton artifact workflows with `allocate_artifact` before handling `entry_artifact_resolution_completed`.
+- Starting an ordinary entry-resolved singleton artifact workflow with `allocate_artifact` before handling `entry_artifact_resolution_completed`.
 - Rebuilding an existing singleton artifact after the user chose to continue the existing document.
+- Routing an artifact-linked deterministic prerequisite through the generic singleton conflict/replacement flow.
+- Allocating a linked artifact during prerequisite resolution instead of persisting a completed `not_found` result.
+- Inferring whether an artifact was missing from path presence after allocation instead of persisting the prerequisite-derived state first.
 - Exposing `archive_workflow_artifact` or `delete_workflow_artifact` to the AI agent.

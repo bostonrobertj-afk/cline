@@ -202,13 +202,14 @@ Responsibilities:
 Responsibilities:
 
 - run the mandatory shared pre-workflow entry workflow form before workflow-specific step orchestration begins for user-facing main-agent workflow invocations
-- obtain or resolve project identity for the active main-agent workflow session through that shared entry workflow form
-- drive the shared two-panel pre-workflow entry flow before workflow-specific step orchestration begins for main-agent workflow invocations:
+- obtain or resolve project identity for the active main-agent workflow session through either interactive project selection or module-declared automatic fixed-project resolution
+- discover available project-folder candidates for both selection modes through the existing runtime-owned `discoverWorkflowCandidates(...)` seam using `resolveWorkflowProjectOutputRoot()`, directory-only immediate-child discovery, workspace path policy, and deterministic alphabetical sorting
+- drive the shared pre-workflow entry flow before workflow-specific step orchestration begins for main-agent workflow invocations:
   - the first panel is informational only and carries the workflow-specific informational content that legacy workflow start cards used to carry
-  - the second panel presents a `new` versus `existing` project choice
-  - if `existing` is chosen, project choices are derived from the per-project folder names beneath the visible project output root
-  - if `new` is chosen, collect a user-provided project title
-- ensure the per-project folder exists and that these canonical project subfolders exist within that project folder before workflow-specific artifact-producing steps can run:
+  - for workflows that require user project choice, the second panel presents a `new` versus `existing` project choice; existing choices are derived from the per-project folder names beneath the visible project output root, while `new` collects a user-provided project title
+  - for workflows with automatic fixed-project resolution, omit the project-selection panel and use the module-declared fixed folder name as the project candidate
+- after the candidate source is resolved, route interactive and automatic selection through one runtime-owned `finalizeWorkflowProjectSelection(...)` helper that owns project-selection state, `entryProjectValueKeys`, project-folder creation, lifecycle completion, and subsequent entry-artifact resolution
+- ensure the per-project folder exists and ensure these canonical project subfolders exist within that project folder before workflow-specific artifact-producing steps can run:
   - `discovery`
   - `planning`
   - `implementation`
@@ -216,7 +217,8 @@ Responsibilities:
   - `testing`
 - create and own workflow session state per execution context
 - create and own the canonical workflow value map for each workflow session
-- persist shared entry project selection into workflow-module-declared `entryProjectValueKeys`
+- persist interactive or automatic project selection into workflow-module-declared `entryProjectValueKeys`
+- resolve the absolute selected project root through `resolveWorkflowProjectOutputFolder(session)`, which derives it from `resolveWorkflowProjectOutputRoot()` and `session.projectSelection.projectFolderName`; do not persist a separate selected-project-root workflow value
 - create and own canonical normalization of user-provided project titles into filesystem-safe project identity
 - create and own the canonical artifact identity and numbering chain used across related workflow outputs
 - load workflow definition by `activeWorkflowName`
@@ -246,7 +248,8 @@ Responsibilities:
 Responsibilities:
 
 - declare workflow metadata
-- declare the canonical project subfolder designation for the workflow
+- declare canonical project-relative artifact output placement through `projectOutputPlacement: WorkflowProjectOutputPlacement`, where `WorkflowProjectOutputPlacement` is exactly `{ kind: "selected_project_root" } | { kind: "selected_project_subfolder"; subfolder: WorkflowProjectSubfolder }`; `WorkflowDefinition` and `ShippedWorkflowMetadata` use this field and no legacy `projectSubfolder` alias remains
+- declare whether project identity is selected interactively or resolved automatically from a fixed project title and folder name
 - declare step graph and transition behavior through per-step next-action decision trees whose satisfied routes select exactly one decision action
 - assign stable non-empty route ids that are unique within each decision-tree branch; route ids are structural identifiers for runtime correlation, not user-visible instructions, route priority, or standalone workflow behavior
 - branch only on documented `WorkflowBranchTriggerEvent` variants and payloads; modules must not define custom trigger-event variants or depend on runtime-internal event fields
@@ -258,7 +261,7 @@ Responsibilities:
 - declare deterministic step-resolution rules
 - declare next-action decision actions as self-contained action instructions; when an action invokes a tool-backed operation, that action owns the tool/capability instruction rather than referencing a workflow-level generic operation registry
 - declare workflow-owned artifact/document builders
-- declare expected workflow values, mandatory `entryProjectValueKeys`, and any explicit child-session inheritance rules
+- declare expected workflow values, mandatory `entryProjectValueKeys`, prerequisite files, and any explicit child-session inheritance rules
 - declare completion rules; any workflow-specific follow-up work must be modeled as normal workflow steps, decision actions, document builders, or tool-backed operations before completion
 
 #### Workflow Value Mutation Seam
@@ -312,13 +315,14 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 2. `task/index.ts` detects the invocation and sets `activeWorkflowName`.
 3. `task/index.ts` invokes the workflow runtime activation entrypoint.
 4. Workflow runtime resolves the workflow definition from the shipped workflow registry.
-5. Workflow runtime creates or resumes the workflow session.
+5. Workflow runtime creates or resumes the workflow session. A new session initializes the first active step and its entry branch before shared entry gating begins; a resumed session restores its persisted active-step state.
 6. Workflow runtime runs the mandatory shared pre-workflow entry workflow form before workflow-specific step orchestration begins:
    - the first panel is informational only and carries the workflow-specific informational content that legacy workflow start cards used to carry
-   - the second panel obtains or resolves project identity by presenting a `new` versus `existing` project choice
-   - if `existing` is chosen, populate the selection choices from the per-project folder names beneath the visible project output root
-   - if `new` is chosen, collect a user-provided project title
-7. Workflow runtime normalizes the chosen or provided project identity, ensures the per-project folder exists, and ensures these canonical project subfolders within that project folder are ready:
+   - runtime discovers available project-folder candidates through `discoverWorkflowCandidates(...)` using `rootDirectory: resolveWorkflowProjectOutputRoot()`, the existing workspace path policy, `entryType: "directory"`, `immediateChildrenOnly: true`, `buildLabel: (entryName) => entryName`, `sort: "alpha_asc"`, and no target segments or naming pattern
+   - when the active workflow uses interactive project selection, the second panel presents a `new` versus `existing` project choice; an existing-project candidate comes from the user's submitted selection, while `new` collects a user-provided project title
+   - when the active workflow declares automatic fixed-project resolution, successful submission of the informational panel supplies the trigger for candidate discovery; no project-selection panel or synthetic project-selection submission is rendered, and the module-declared fixed folder name supplies the candidate
+   - for `document-project`, the fixed candidate is `agent-guidance`; runtime sets title `Agent Guidance`, folder name `agent-guidance`, and mode `existing` when the discovered candidates contain the exact value `agent-guidance` or `new` otherwise
+7. After the project identity has been resolved, workflow runtime calls the shared `finalizeWorkflowProjectSelection(...)` helper exactly once. That helper assigns the canonical session project-selection state, clears the completed entry form session, persists the three project values through the active definition's `entryProjectValueKeys`, ensures the per-project folder and these canonical project subfolders are ready, records project-selection lifecycle completion, and then continues the existing `new` or `existing` entry-artifact-resolution path:
    - `discovery`
    - `planning`
    - `implementation`
@@ -329,9 +333,10 @@ Exact filenames beyond this level are deferred to requirements and implementatio
    - `review`
    - `testing`
    - `archive`
-8. Workflow runtime initializes active-step state and marks the workflow as just started.
-9. Workflow runtime projects downstream state for prompts, focus chain, tools, and any active workflow-form UI.
-10. The activation caller routes the returned `WorkflowNextAction` into the shared next-action consumer for the same execution context before workflow execution continues. Tool-based activation paths may record the tool result first, but they must not drop, privately consume, or re-resolve around the returned activation action.
+8. Workflow runtime completes shared entry singleton artifact resolution for artifacts not linked to deterministic exact-filename prerequisites. An artifact linked to deterministic exact-filename prerequisite resolution bypasses this shared singleton conflict/replacement flow. For `document-project`, both registered artifacts bypass shared entry singleton resolution.
+9. After shared entry gating completes, workflow runtime evaluates the active step's decision tree. Every prerequisite resolution mode executes through the runtime-owned `resolve_prerequisite_files` decision action. For `document-project`, the first Step 1 action resolves `project_overview` followed by `developer_guide` before Workflow Form 1 is rendered. It checks each family's exact registered filename at the selected project root, adopts a found file as the registered artifact and persists its full output metadata, leaves the corresponding artifact-specific family, identity, filename, relative-path, and absolute-path outputs unset after a completed no-match while retaining shared entry-project values, and records resolution completion for both prerequisites.
+10. Workflow runtime projects downstream state for prompts, focus chain, tools, and any active workflow-form UI.
+11. The activation caller routes the returned `WorkflowNextAction` into the shared next-action consumer for the same execution context before workflow execution continues. Tool-based activation paths may record the tool result first, but they must not drop, privately consume, or re-resolve around the returned activation action.
 
 ### 6.2 Scenario: Normal Turn Orchestration
 
@@ -411,7 +416,7 @@ If the selected decision action is a step transition, workflow runtime mutates t
 1. A subagent is created.
 2. The subagent runner creates a child execution context but does not become a separate workflow orchestrator.
 3. If the subagent is assigned a workflow through `useSkill`, the shared workflow runtime activates that workflow in the child session only.
-4. The child session copies project selection from the parent workflow session during activation rather than rendering the mandatory shared pre-workflow entry form.
+4. A child workflow that uses interactive project selection copies project selection from the parent workflow session during activation rather than rendering the mandatory shared pre-workflow entry form. A child workflow with automatic fixed-project resolution establishes its own declared project selection during activation, also without rendering the entry form.
 5. The workflow module may declare specific workflow values that should be initialized in the child session from values already present in the parent session.
 6. Workflow runtime copies only those explicitly declared inherited values into the child session during activation.
 7. The child session gets its own workflow identity, session state, workflow values, active step, prompt projection, tool gating, and completion lifecycle.
@@ -573,7 +578,7 @@ Workflow sessions are execution-context-local, but they are all owned by the sam
 - when a workflow assignment marker is present but cannot be honored, the subagent run fails before the first child model request and reports the cause when available
 - failed workflow assignment must not be converted into child-visible fallback instructions, prompt-visible skill assignment conventions, or child-authored `use_skill` behavior
 - assignment marker names do not filter child prompt skills; child prompt skills come from configured subagent skills or normal available-skill discovery, while workflow instructions/tools come only from successful runtime activation
-- child workflow activation copies parent project selection as activation context and does not render the mandatory shared pre-workflow entry form
+- child workflow activation does not render the mandatory shared pre-workflow entry form; interactive-selection child workflows copy parent project selection as activation context, while automatic fixed-project child workflows establish their own declared project selection
 - child-session workflow values may be initialized from parent-session values only through workflow-module-declared inheritance rules
 - parent and child sessions use separate workflow-value maps; inherited object/array values are not for independently mutated parent/child state in the foundational build
 - parent workflow identity and state are not overwritten by child workflow activation
@@ -583,11 +588,20 @@ Workflow sessions are execution-context-local, but they are all owned by the sam
 
 Workflow-emitted text artifacts remain output artifacts, but their template/source ownership moves into runtime code. Workflow modules own artifact intent declarations and content builders rather than markdown template files as runtime dependencies.
 
-Each shipped workflow has one canonical designated project subfolder, and workflow runtime uses that designation when resolving the workflow's artifact destinations inside the selected project folder.
+Each shipped workflow has one canonical project-relative artifact output placement expressed through `projectOutputPlacement: WorkflowProjectOutputPlacement`. The shared type is exactly `{ kind: "selected_project_root" } | { kind: "selected_project_subfolder"; subfolder: WorkflowProjectSubfolder }`. Root placement means zero subfolder segments beneath the selected project root, while subfolder placement means exactly the designated canonical subfolder beneath it. Workflow runtime uses this module-owned declaration when resolving artifact destinations, and `WorkflowDefinition` and `ShippedWorkflowMetadata` retire the former `projectSubfolder` field rather than preserving an alias.
+
+`document-project` declares `project_overview` and `developer_guide` as workflow artifacts and registers both as singleton project artifact families. Its `projectOutputPlacement: { kind: "selected_project_root" }` places them directly in the automatically selected `agent-guidance` project root. Registration supplies their canonical identities, filenames, content kind, numbering scope, and discovery conventions. Deterministic prerequisite resolution determines whether each registered artifact already exists, and normal artifact allocation creates only a missing artifact.
 
 Workflow runtime owns the shared artifact identity and numbering policy used to connect related workflow outputs inside a project.
 
-Workflow runtime also owns the typed artifact-family convention registry used for canonical artifact families. That registry defines allocation mode, parent or target requirements, filename pattern, file extension, numbering scope, and discovery pattern. Workflow modules may reference artifact-family identifiers from that registry, but modules do not own canonical artifact filename patterns, numbering scopes, extensions, or discovery patterns.
+Workflow runtime also owns the typed artifact-family convention registry used for canonical artifact families. That registry defines allocation mode, parent or target requirements, filename pattern, file extension, content kind, numbering scope, singleton identity where applicable, and discovery pattern. Workflow modules may reference artifact-family identifiers from that registry, but modules do not own canonical artifact filename patterns, numbering scopes, extensions, content kinds, singleton identities, or discovery patterns.
+
+The registered guidance-document families use these exact registry properties:
+
+| `family` | `allocationMode` | `identityRequirement` | `numberingScope` | `singletonIdentity` | `filenamePattern` | `fileExtension` | `contentKind` | `discoveryPattern` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `WorkflowArtifactFamily.ProjectOverview = "project_overview"` | `"singleton_project"` | `"none"` | `"project_singleton"` | `"project_overview"` | `"project-overview.md"` | `".md"` | `"markdown"` | `/^project-overview\.md$/` |
+| `WorkflowArtifactFamily.DeveloperGuide = "developer_guide"` | `"singleton_project"` | `"none"` | `"project_singleton"` | `"developer_guide"` | `"developer-guide.md"` | `".md"` | `"markdown"` | `/^developer-guide\.md$/` |
 
 Artifact identity is not always numeric. Numbered lineage artifacts use dotted numeric identities. Singleton project artifacts use stable registry-owned string identities.
 
@@ -616,10 +630,11 @@ That numbering policy must carry forward across related artifact families, for e
 
 Workflow runtime owns artifact allocation and derivation:
 
-- allocated artifact families receive the next canonical number in the correct scope
+- singleton project artifact families use their stable registry-owned identity and exact registered filename rather than allocating a number
+- numbered artifact families receive the next canonical number in the correct scope
 - derived artifact families inherit the selected parent or target identity
 - runtime produces the canonical artifact filename, project-relative path, and absolute path
-- runtime creates the empty artifact file before reporting allocation success
+- runtime creates a missing artifact as an empty file before reporting allocation success and must not overwrite an existing canonical singleton
 - runtime persists project context, artifact family, artifact identity, artifact filename, artifact relative path, artifact absolute path, and parent or target identity into workflow session values where applicable
 - document builders consume runtime-resolved artifact destination paths and remain content builders rather than artifact identity, filename, or project-folder allocators
 
@@ -652,15 +667,23 @@ At the architectural level, that means:
 - if a user renames a project folder or artifact so it no longer matches the expected convention, downstream workflows may no longer recognize it
 - that outcome is acceptable within this architecture and is treated as user-managed document hygiene rather than runtime data corruption
 
-Workflow modules may require prerequisite files before model-driven work begins. Prerequisite-file discovery and selection is a distinct runtime workflow capability. It is not part of shared project selection and must not be implemented by mutating or repurposing project-selection behavior.
+Workflow modules may require prerequisite files before model-driven work begins. Prerequisite-file discovery and selection is a distinct runtime workflow capability that runs after either interactive or automatic project selection. It must not be implemented by mutating or repurposing project-selection behavior.
 
-A workflow module declares each prerequisite file, including whether it is required or optional, the selected-project subfolder to scan, the exact filename or file-naming pattern to match, the workflow that produces the file, the workflow-value destination for the selected full path when persistence is required, and whether the selected path must be added to the workflow's output document by deterministic workflow behavior.
+A workflow module declares each prerequisite file, including whether it is required or optional, `resolutionMode` as `interactive` or `deterministic_exact_filename`, the selected-project-relative subfolder segments to scan, the exact filename or file-naming pattern to match, the workflow that produces the file, the workflow-value destination for the selected full path when persistence is required, and whether the selected path must be added to the workflow's output document by deterministic workflow behavior. A prerequisite may also link to an artifact declared by the same workflow through `artifactId`. Empty subfolder segments designate the selected project root. Definition validation requires an artifact link to resolve to an `intentMode: "new"` singleton declared by the same workflow and requires the registered filename, output placement, prerequisite scan location, and artifact absolute-path output key to describe the same file.
 
 WorkflowRuntime owns prerequisite-file scanning after project selection. It scans only inside the selected project folder and the module-declared subfolder, applies the module-declared filename or naming pattern, validates scan roots and candidate paths through runtime path-boundary and workspace path-policy rules, and produces candidate records containing filename and full absolute path.
 
 For one required match, WorkflowRuntime renders a confirmation panel showing the filename and full path and asks whether to continue with that file selected. For multiple required matches, WorkflowRuntime renders a required dropdown containing every matched file and a cancel option. For no required matches, or for required cancellation/rejection, WorkflowRuntime renders a cannot-continue panel naming the workflow that produces the prerequisite file.
 
-Optional prerequisites use the same discovery and selection behavior, except no-match, cancel, or rejection continues without a cannot-continue panel.
+Optional interactive prerequisites normally use the same discovery and selection behavior, except no-match, cancel, or rejection continues without a cannot-continue panel. A deterministic exact-filename prerequisite must be optional and must use an exact filename. Runtime selects a match without user input and persists exactly `{ prerequisiteId, outcome: "found", resolvedAbsolutePath }`, or persists exactly `{ prerequisiteId, outcome: "not_found" }` while leaving the declared workflow-value destination unset. Interactive and deterministic exact-filename prerequisites both execute through the runtime-owned `resolve_prerequisite_files` decision action invoked by an active workflow step; `resolutionMode` changes matching and user-interaction behavior, not lifecycle timing. The shared `WorkflowPrerequisiteFileResolution` type is that exact union, and `ActiveWorkflowSession.prerequisiteFileResolutions` stores a readonly array of those results so completed no-match is distinguishable from resolution that has not run and participates in workflow resume.
+
+The prerequisite-resolution array contains at most one current result per declared prerequisite id and preserves declaration order. Every deterministic result and its declared path-value set or clear commit as one workflow-session mutation. An artifact link adds complete adopted-artifact metadata to the same `found` mutation or clearing of artifact-specific outputs to the same `not_found` mutation while shared entry-project values remain intact. Resume reuses complete results, reruns an uncommitted resolution, and fails closed on duplicate, contradictory, undeclared, or metadata-inconsistent persisted results.
+
+`document-project` uses artifact-linked deterministic exact-filename prerequisite resolution for the registered `project_overview` and `developer_guide` singleton artifacts directly in the automatically selected `agent-guidance` project root. Its first Step 1 action invokes the shared prerequisite resolver for both artifacts before Workflow Form 1 is rendered.
+
+For `document-project`, prerequisite resolution—not the shared interactive singleton conflict/replacement flow—governs existing-file handling. A found canonical file is adopted and preserved; it is not archived, deleted, recreated, or initialized from the scaffold. Runtime derives and persists the registered singleton's standard artifact metadata without creating or rewriting the file, so pre-existing and newly created instances expose the same artifact identity, filename, relative-path, absolute-path, and project-context contract.
+
+At the start of Step 2, a runtime-owned deterministic procedure requires both persisted prerequisite results and derives the two creation-required workflow values from whether each corresponding path was set during prerequisite resolution, before either artifact is allocated. The persisted outcome and prerequisite-resolution-time path state must agree. Each missing-path/`not_found` result routes through normal artifact allocation/create for the corresponding registered singleton and then through the document builder that writes the prescribed initial scaffold. A first allocation failure retries that artifact exactly once; retry failure is terminal. Initial scaffold-build failure is terminal without retrying the full-document write. When both are missing, Project Overview allocation and scaffold building complete before Developer Guide allocation and scaffold building begin. Runtime persists each successful allocation or scaffold-build operation before reevaluating the next action and restores that state on resume, preventing reallocation or application of an initial scaffold to an existing or already initialized file. Later workflow branches may update either a pre-existing or newly created artifact through normal governed file tools.
 
 The mandatory shared pre-workflow entry form must not own workflow-specific prerequisite selection.
 
@@ -668,7 +691,7 @@ The mandatory shared pre-workflow entry form must not own workflow-specific prer
 
 The canonical in-scope workflow mapping for this architecture is:
 
-| Workflow | Persona | Project Subfolder |
+| Workflow | Persona | Project Output Location |
 | --- | --- | --- |
 | `blind-review` | `quality-control` | `review` |
 | `brainstorming` | `analyst` | `discovery` |
@@ -680,7 +703,7 @@ The canonical in-scope workflow mapping for this architecture is:
 | `create-product-brief` | `analyst` | `planning` |
 | `create-story` | `scrum-master` | `planning` |
 | `dev-story` | `developer` | `implementation` |
-| `document-project` | `analyst` | `implementation` |
+| `document-project` | `Mary` (`Technical Writer`) | automatically selected `agent-guidance` project; registered root-level `project_overview` (`project-overview.md`) and `developer_guide` (`developer-guide.md`) singleton artifacts |
 | `pi-planning` | `product-manager` | `planning` |
 | `quick-dev` | `quick-flow-solo-dev` | `implementation` |
 | `problem-solving` | `analyst` | `discovery` |
@@ -691,6 +714,17 @@ The canonical in-scope workflow mapping for this architecture is:
 | `write-remediation-story` | `developer` | `planning` |
 
 `problem-solving` is the target migrated workflow name for this initiative and replaces the legacy `cis-problem-solving` naming in the in-scope runtime design.
+
+All workflows in this mapping use a selected project. Workflows whose table entry names a canonical subfolder use that subfolder beneath the selected project root. `document-project` automatically resolves the fixed project title `Agent Guidance`, folder name `agent-guidance`, and selected project root `join(cwd, "docs", "projects", "agent-guidance")`. Its `projectOutputPlacement` selects that project root directly, and its two artifact-linked prerequisites use empty subfolder segments. `project_overview` and `developer_guide` are registered singleton artifact families located at that root.
+
+The canonical `document-project` persona uses these exact module-owned fields:
+
+- `name`: `Mary`
+- `role`: `Technical Writer`
+- `identity`: `producing product documentation for developer teams.`
+- `capabilities`: `product analysis, technical documentation`
+- `communicationStyle`: `crisp, checklist-driven, and ambiguity-free.`
+- `principles`: `Developers do their best work when they have comprehenvise product documentation at their disposal.`
 
 ## 9. Architectural Decisions
 
