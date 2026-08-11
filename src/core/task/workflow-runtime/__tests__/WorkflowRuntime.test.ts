@@ -6,7 +6,7 @@ import type {
 } from "@shared/ExtensionMessage"
 import { WorkflowFormAction, WorkflowFormSubmissionRequest, type WorkflowFormValue } from "@shared/proto/cline/task"
 import { expect } from "chai"
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises"
+import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "fs/promises"
 import { afterEach, beforeEach, describe, it } from "mocha"
 import { tmpdir } from "os"
 import { dirname, join } from "path"
@@ -20,8 +20,9 @@ import type {
 } from "@/core/task/workflow-step-resolution/types"
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
-import { WorkflowArtifactFamily } from "../artifactFamilies"
+import { WORKFLOW_ARTIFACT_FAMILY_REGISTRY, WorkflowArtifactFamily } from "../artifactFamilies"
 import * as WorkflowDiscovery from "../discovery"
+import * as WorkflowPrerequisiteFiles from "../prerequisiteFiles"
 import {
 	parseWorkflowStoryIndexJson,
 	stringifyWorkflowStoryIndex,
@@ -60,6 +61,38 @@ import {
 	buildInitialCreateArchitectureDocument,
 } from "../workflow-modules/create-architecture/createArchitectureDocument"
 import { createEpicsWorkflowDefinition } from "../workflow-modules/create-epics"
+import {
+	buildInitialDeveloperGuideDocument,
+	buildInitialProjectOverviewDocument,
+	DOCUMENT_PROJECT_BASELINE_DATA_TERMINAL_ERROR,
+	DOCUMENT_PROJECT_DEVELOPER_GUIDE_ALLOCATION_TERMINAL_ERROR,
+	DOCUMENT_PROJECT_DEVELOPER_GUIDE_ARTIFACT_ID,
+	DOCUMENT_PROJECT_DEVELOPER_GUIDE_BUILD_TERMINAL_ERROR,
+	DOCUMENT_PROJECT_DOCUMENTATION_TASK_TERMINAL_ERROR,
+	DOCUMENT_PROJECT_PROJECT_OVERVIEW_ALLOCATION_TERMINAL_ERROR,
+	DOCUMENT_PROJECT_PROJECT_OVERVIEW_ARTIFACT_ID,
+	DOCUMENT_PROJECT_PROJECT_OVERVIEW_BUILD_TERMINAL_ERROR,
+	DOCUMENT_PROJECT_REFERENCE_DOCUMENT_STATE_TERMINAL_ERROR,
+	DOCUMENT_PROJECT_STEP_1_FORM_ID,
+	DOCUMENT_PROJECT_STEP_1_PANEL_A_ID,
+	DOCUMENT_PROJECT_STEP_1_PANEL_B_ID,
+	DOCUMENT_PROJECT_STEP_1_PANEL_C_ID,
+	DOCUMENT_PROJECT_STEP_1_PANEL_D_ID,
+	DOCUMENT_PROJECT_STEP_3_FORM_ID,
+	DOCUMENT_PROJECT_STEP_3_PANEL_A_ID,
+	DOCUMENT_PROJECT_STEP_3_PANEL_B_ID,
+	DOCUMENT_PROJECT_STEP_3_PANEL_C_ID,
+	DOCUMENT_PROJECT_STEP_3_PANEL_D_ID,
+	DOCUMENT_PROJECT_STEP_3_PANEL_E_ID,
+	DOCUMENT_PROJECT_STEP_3_PANEL_F_ID,
+	DOCUMENT_PROJECT_STEP_3_PANEL_G_ID,
+	DOCUMENT_PROJECT_STEP_3_PANEL_H_ID,
+	DOCUMENT_PROJECT_STEP_3_PANEL_I_ID,
+	DOCUMENT_PROJECT_STEP_3_PANEL_J_ID,
+	DOCUMENT_PROJECT_STEP_3_PANEL_K_ID,
+	DOCUMENT_PROJECT_STEP_3_PANEL_L_ID,
+	documentProjectWorkflowDefinition,
+} from "../workflow-modules/document-project"
 import { piPlanningWorkflowDefinition } from "../workflow-modules/pi-planning"
 import { quickSpecWorkflowDefinition } from "../workflow-modules/quick-spec"
 
@@ -959,6 +992,7 @@ describe("WorkflowRuntime", () => {
 		return {
 			id: args?.id ?? "requirements",
 			requirement: args?.requirement ?? "required",
+			resolutionMode: args?.resolutionMode ?? "interactive",
 			projectSubfolderSegments: args?.projectSubfolderSegments ?? ["planning"],
 			match: args?.match ?? {
 				kind: "exact_filename",
@@ -967,6 +1001,7 @@ describe("WorkflowRuntime", () => {
 			producingWorkflowName: args?.producingWorkflowName ?? "create-prd",
 			workflowValueKey: args?.workflowValueKey ?? "requirements_path",
 			outputDocumentReference: args?.outputDocumentReference ?? "none",
+			...(args?.artifactId === undefined ? {} : { artifactId: args.artifactId }),
 		}
 	}
 
@@ -1025,7 +1060,8 @@ describe("WorkflowRuntime", () => {
 		childInheritance?: WorkflowDefinition["childInheritance"]
 		artifacts?: WorkflowDefinition["artifacts"]
 		prerequisiteFiles?: WorkflowDefinition["prerequisiteFiles"]
-		projectSubfolder?: WorkflowDefinition["projectSubfolder"]
+		projectSelection?: WorkflowDefinition["projectSelection"]
+		projectOutputPlacement?: WorkflowDefinition["projectOutputPlacement"]
 		displayName?: string
 		description?: string
 		persona?: WorkflowPersonaDefinition
@@ -1047,7 +1083,8 @@ describe("WorkflowRuntime", () => {
 			slashCommandName: "workflow-runtime-test",
 			useSkillName: "workflow-runtime-test",
 			persona: args?.persona ?? DEFAULT_WORKFLOW_PERSONA,
-			projectSubfolder: args?.projectSubfolder ?? "planning",
+			projectSelection: args?.projectSelection ?? { kind: "interactive" },
+			projectOutputPlacement: args?.projectOutputPlacement ?? { kind: "selected_project_subfolder", subfolder: "planning" },
 			workflowValueKeys,
 			entryProjectValueKeys,
 			entryPanel: {
@@ -1071,6 +1108,309 @@ describe("WorkflowRuntime", () => {
 			taskState: state,
 			workflowName: workflow.name,
 		})
+	}
+
+	async function expectDefinitionRejected(workflow: WorkflowDefinition, label: string): Promise<void> {
+		const result = await activateWorkflow(taskState, workflow)
+		expect(result, label).to.deep.equal({ kind: "no_op" })
+		expect(taskState.activeWorkflowName, label).to.equal(undefined)
+		expect(taskState.activeWorkflowSession, label).to.equal(undefined)
+	}
+
+	function createDocumentProjectArtifactFixtureVocabulary() {
+		const selectedProjectRoot = join(cwd, "docs", "projects", "agent-guidance")
+		const projectOverviewAbsolutePath = join(selectedProjectRoot, "project-overview.md")
+		const developerGuideAbsolutePath = join(selectedProjectRoot, "developer-guide.md")
+
+		return {
+			selectedProjectRoot,
+			projectOverviewAbsolutePath,
+			developerGuideAbsolutePath,
+			projectOverviewMetadata: {
+				projectTitle: "Agent Guidance",
+				projectFolderName: "agent-guidance",
+				project_overview_artifact_family: WorkflowArtifactFamily.ProjectOverview,
+				project_overview_artifact_identity: "project_overview",
+				project_overview_artifact_filename: "project-overview.md",
+				project_overview_artifact_relative_path: "project-overview.md",
+				project_overview: projectOverviewAbsolutePath,
+			},
+			developerGuideMetadata: {
+				projectTitle: "Agent Guidance",
+				projectFolderName: "agent-guidance",
+				developer_guide_artifact_family: WorkflowArtifactFamily.DeveloperGuide,
+				developer_guide_artifact_identity: "developer_guide",
+				developer_guide_artifact_filename: "developer-guide.md",
+				developer_guide_artifact_relative_path: "developer-guide.md",
+				developer_guide: developerGuideAbsolutePath,
+			},
+		}
+	}
+
+	const documentProjectArtifactFilenameCases = [
+		{
+			family: WorkflowArtifactFamily.ProjectOverview,
+			artifactId: "project_overview",
+			canonicalFilename: "project-overview.md",
+			rejectedFilenames: [
+				"Project-overview.md",
+				"project-Overview.md",
+				"project-overview.MD",
+				"project_overview.md",
+				"project overview.md",
+				"project-overview-1.md",
+				"copy-project-overview.md",
+				"project-overview.md.bak",
+			],
+		},
+		{
+			family: WorkflowArtifactFamily.DeveloperGuide,
+			artifactId: "developer_guide",
+			canonicalFilename: "developer-guide.md",
+			rejectedFilenames: [
+				"Developer-guide.md",
+				"developer-Guide.md",
+				"developer-guide.MD",
+				"developer_guide.md",
+				"developer guide.md",
+				"developer-guide-1.md",
+				"copy-developer-guide.md",
+				"developer-guide.md.bak",
+			],
+		},
+	] as const
+
+	function createValidDocumentProjectLinkedFixture(args?: {
+		projectSelection?: WorkflowDefinition["projectSelection"]
+		projectOutputPlacement?: WorkflowDefinition["projectOutputPlacement"]
+		projectSubfolderSegments?: string[]
+	}): WorkflowDefinition {
+		return createWorkflowDefinition({
+			entryProjectValueKeys: {
+				projectMode: "projectMode",
+				projectTitle: "projectTitle",
+				projectFolderName: "projectFolderName",
+			},
+			projectSelection: args?.projectSelection ?? {
+				kind: "automatic_fixed",
+				projectTitle: "Agent Guidance",
+				projectFolderName: "agent-guidance",
+			},
+			projectOutputPlacement: args?.projectOutputPlacement ?? { kind: "selected_project_root" },
+			workflowValueKeys: [
+				"project_overview_artifact_family",
+				"project_overview_artifact_identity",
+				"project_overview_artifact_filename",
+				"project_overview_artifact_relative_path",
+				"project_overview",
+			],
+			artifacts: {
+				project_overview: {
+					id: "project_overview",
+					family: WorkflowArtifactFamily.ProjectOverview,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys: {
+						projectTitle: "projectTitle",
+						projectFolderName: "projectFolderName",
+						artifactFamily: "project_overview_artifact_family",
+						artifactIdentity: "project_overview_artifact_identity",
+						artifactFilename: "project_overview_artifact_filename",
+						artifactRelativePath: "project_overview_artifact_relative_path",
+						artifactAbsolutePath: "project_overview",
+						parentIdentity: undefined,
+						targetIdentity: undefined,
+					},
+				},
+			},
+			prerequisiteFiles: {
+				project_overview: {
+					id: "project_overview",
+					requirement: "optional",
+					resolutionMode: "deterministic_exact_filename",
+					projectSubfolderSegments: args?.projectSubfolderSegments ?? [],
+					match: { kind: "exact_filename", filename: "project-overview.md" },
+					producingWorkflowName: "workflow-runtime-test",
+					workflowValueKey: "project_overview",
+					outputDocumentReference: "none",
+					artifactId: "project_overview",
+				},
+			},
+		})
+	}
+
+	function createDeterministicPrerequisiteContinuationDecisionTree(): WorkflowDecisionTree {
+		return {
+			entryBranchId: "resolve-prerequisites",
+			branches: {
+				"resolve-prerequisites": {
+					id: "resolve-prerequisites",
+					routes: [
+						{
+							id: "resolve-prerequisites-route",
+							trigger: { kind: "always" },
+							action: {
+								kind: "resolve_prerequisite_files",
+								prerequisiteIds: ["project_overview", "developer_guide"],
+							},
+							followingBranchId: "after-prerequisites",
+						},
+					],
+				},
+				"after-prerequisites": {
+					id: "after-prerequisites",
+					routes: [
+						{
+							id: "consume-persisted-values",
+							trigger: { kind: "on_event", eventKind: "workflow_values_persisted" },
+							action: { kind: "no_op" },
+							followingBranchId: "trigger-consumed",
+						},
+					],
+				},
+				"trigger-consumed": {
+					id: "trigger-consumed",
+					routes: [
+						{
+							id: "trigger-consumed-no-op",
+							trigger: { kind: "always" },
+							action: { kind: "no_op" },
+						},
+					],
+				},
+			},
+		}
+	}
+
+	function createDeterministicPrerequisiteContinuationWorkflow(): WorkflowDefinition {
+		return createWorkflowDefinition({
+			name: "workflow-runtime-deterministic-prerequisite-continuation-test",
+			entryProjectValueKeys: {
+				projectMode: "projectMode",
+				projectTitle: "projectTitle",
+				projectFolderName: "projectFolderName",
+			},
+			projectSelection: {
+				kind: "automatic_fixed",
+				projectTitle: "Agent Guidance",
+				projectFolderName: "agent-guidance",
+			},
+			projectOutputPlacement: { kind: "selected_project_root" },
+			workflowValueKeys: [
+				"project_overview_artifact_family",
+				"project_overview_artifact_identity",
+				"project_overview_artifact_filename",
+				"project_overview_artifact_relative_path",
+				"project_overview",
+				"developer_guide_artifact_family",
+				"developer_guide_artifact_identity",
+				"developer_guide_artifact_filename",
+				"developer_guide_artifact_relative_path",
+				"developer_guide",
+			],
+			artifacts: {
+				project_overview: {
+					id: "project_overview",
+					family: WorkflowArtifactFamily.ProjectOverview,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys: {
+						projectTitle: "projectTitle",
+						projectFolderName: "projectFolderName",
+						artifactFamily: "project_overview_artifact_family",
+						artifactIdentity: "project_overview_artifact_identity",
+						artifactFilename: "project_overview_artifact_filename",
+						artifactRelativePath: "project_overview_artifact_relative_path",
+						artifactAbsolutePath: "project_overview",
+						parentIdentity: undefined,
+						targetIdentity: undefined,
+					},
+				},
+				developer_guide: {
+					id: "developer_guide",
+					family: WorkflowArtifactFamily.DeveloperGuide,
+					intentMode: "new",
+					parentIdentitySource: undefined,
+					targetIdentitySource: undefined,
+					outputValueKeys: {
+						projectTitle: "projectTitle",
+						projectFolderName: "projectFolderName",
+						artifactFamily: "developer_guide_artifact_family",
+						artifactIdentity: "developer_guide_artifact_identity",
+						artifactFilename: "developer_guide_artifact_filename",
+						artifactRelativePath: "developer_guide_artifact_relative_path",
+						artifactAbsolutePath: "developer_guide",
+						parentIdentity: undefined,
+						targetIdentity: undefined,
+					},
+				},
+			},
+			prerequisiteFiles: {
+				project_overview: {
+					id: "project_overview",
+					requirement: "optional",
+					resolutionMode: "deterministic_exact_filename",
+					projectSubfolderSegments: [],
+					match: { kind: "exact_filename", filename: "project-overview.md" },
+					producingWorkflowName: "workflow-runtime-test",
+					workflowValueKey: "project_overview",
+					outputDocumentReference: "none",
+					artifactId: "project_overview",
+				},
+				developer_guide: {
+					id: "developer_guide",
+					requirement: "optional",
+					resolutionMode: "deterministic_exact_filename",
+					projectSubfolderSegments: [],
+					match: { kind: "exact_filename", filename: "developer-guide.md" },
+					producingWorkflowName: "workflow-runtime-test",
+					workflowValueKey: "developer_guide",
+					outputDocumentReference: "none",
+					artifactId: "developer_guide",
+				},
+			},
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createDeterministicPrerequisiteContinuationDecisionTree(),
+				}),
+			},
+		})
+	}
+
+	async function createDeterministicPrerequisiteContinuationState(workflow: WorkflowDefinition): Promise<TaskState> {
+		const state = new TaskState()
+		await activateWorkflow(state, workflow)
+		const session = getActiveWorkflowSession(state)
+		session.projectSelection = {
+			projectMode: "existing",
+			projectTitle: "Agent Guidance",
+			projectFolderName: "agent-guidance",
+		}
+		session.workflowValues = {
+			projectMode: "existing",
+			projectTitle: "Agent Guidance",
+			projectFolderName: "agent-guidance",
+		}
+		session.lifecycle.projectSelectionCompleted = true
+		session.ui.formSession = undefined
+		return state
+	}
+
+	async function createDeterministicPrerequisitePersistedSession(
+		workflow: WorkflowDefinition,
+	): Promise<PersistedWorkflowSession> {
+		const state = await createDeterministicPrerequisiteContinuationState(workflow)
+		const session = getActiveWorkflowSession(state)
+		session.branchContext.activeBranchId = "after-prerequisites"
+		const persistedSession = runtime.getPersistedSession({ taskState: state })
+		if (persistedSession === undefined) {
+			throw new Error("Expected a deterministic prerequisite persisted session.")
+		}
+
+		return persistedSession
 	}
 
 	function createFormSubmitRequest(args: {
@@ -1271,6 +1611,7 @@ describe("WorkflowRuntime", () => {
 				projectSelectionCompleted: true,
 			},
 			entryArtifactResolution: undefined,
+			prerequisiteFileResolutions: [],
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -1490,7 +1831,7 @@ describe("WorkflowRuntime", () => {
 
 	function createPrerequisiteResolutionWorkflow(args?: {
 		prerequisite?: WorkflowPrerequisiteFileDefinition
-		projectSubfolder?: WorkflowDefinition["projectSubfolder"]
+		projectOutputPlacement?: WorkflowDefinition["projectOutputPlacement"]
 	}): {
 		workflow: WorkflowDefinition
 		artifactId: string
@@ -1501,7 +1842,7 @@ describe("WorkflowRuntime", () => {
 		const outputValueKeys = createStandaloneArtifactOutputValueKeys("prerequisite_output")
 		const prerequisite = args?.prerequisite ?? createPrerequisiteFileDefinition()
 		const workflow = createWorkflowDefinition({
-			projectSubfolder: args?.projectSubfolder,
+			projectOutputPlacement: args?.projectOutputPlacement,
 			workflowValueKeys: [prerequisite.workflowValueKey, ...collectArtifactOutputWorkflowValueKeys(outputValueKeys)],
 			prerequisiteFiles: {
 				[prerequisite.id]: prerequisite,
@@ -1532,7 +1873,7 @@ describe("WorkflowRuntime", () => {
 
 	function createMultiPrerequisiteResolutionWorkflow(args: {
 		prerequisites: readonly WorkflowPrerequisiteFileDefinition[]
-		projectSubfolder?: WorkflowDefinition["projectSubfolder"]
+		projectOutputPlacement?: WorkflowDefinition["projectOutputPlacement"]
 	}): {
 		workflow: WorkflowDefinition
 		artifactId: string
@@ -1546,7 +1887,7 @@ describe("WorkflowRuntime", () => {
 			prerequisiteFiles[prerequisite.id] = prerequisite
 		}
 		const workflow = createWorkflowDefinition({
-			projectSubfolder: args.projectSubfolder,
+			projectOutputPlacement: args.projectOutputPlacement,
 			workflowValueKeys: [
 				...args.prerequisites.map((prerequisite) => prerequisite.workflowValueKey),
 				...collectArtifactOutputWorkflowValueKeys(outputValueKeys),
@@ -1789,6 +2130,137 @@ describe("WorkflowRuntime", () => {
 		})
 	}
 
+	async function completeSuccessfulDocumentProjectAllocation(
+		state: TaskState,
+		artifactId: string,
+		allocationAction: WorkflowExecuteToolBackedOperationNextAction,
+	): Promise<WorkflowNextAction> {
+		const artifactResult = await runtime.createWorkflowArtifact({
+			taskState: state,
+			artifactId,
+			expectedArtifactAbsolutePath: undefined,
+		})
+		const expectedDestinationPath =
+			artifactId === DOCUMENT_PROJECT_PROJECT_OVERVIEW_ARTIFACT_ID
+				? join(cwd, "docs", "projects", "agent-guidance", "project-overview.md")
+				: join(cwd, "docs", "projects", "agent-guidance", "developer-guide.md")
+		expect(artifactResult.artifactAbsolutePath).to.equal(expectedDestinationPath)
+		expect(await readFile(expectedDestinationPath, "utf8")).to.equal("")
+
+		return runtime.handleToolBackedOperationToolResult({
+			taskState: state,
+			toolResultText: JSON.stringify({ ok: true }),
+			runtimeOwnedSourceRoute: allocationAction.runtimeOwnedSourceRoute,
+		})
+	}
+
+	async function completeSuccessfulDocumentProjectBuild(
+		state: TaskState,
+		buildAction: WorkflowExecuteToolBackedOperationNextAction,
+	): Promise<WorkflowNextAction> {
+		return runtime.handleToolBackedOperationToolResult({
+			taskState: state,
+			toolResultText: JSON.stringify({ ok: true }),
+			runtimeOwnedSourceRoute: buildAction.runtimeOwnedSourceRoute,
+		})
+	}
+
+	async function startDocumentProjectReferenceFileState(args: {
+		prerequisiteDiscoveryStub: sinon.SinonStub
+		projectOverviewFound: boolean
+		developerGuideFound: boolean
+		projectOverviewSentinel?: string
+		developerGuideSentinel?: string
+	}): Promise<{ state: TaskState; step1Action: WorkflowNextAction }> {
+		const { selectedProjectRoot, projectOverviewAbsolutePath, developerGuideAbsolutePath } =
+			createDocumentProjectArtifactFixtureVocabulary()
+		await rm(selectedProjectRoot, { recursive: true, force: true })
+		if (args.projectOverviewFound || args.developerGuideFound) {
+			await mkdir(selectedProjectRoot, { recursive: true })
+		}
+		if (args.projectOverviewFound) {
+			await writeFile(projectOverviewAbsolutePath, args.projectOverviewSentinel ?? "# project overview sentinel\n", "utf8")
+		}
+		if (args.developerGuideFound) {
+			await writeFile(developerGuideAbsolutePath, args.developerGuideSentinel ?? "# developer guide sentinel\n", "utf8")
+		}
+
+		args.prerequisiteDiscoveryStub.resetHistory()
+		args.prerequisiteDiscoveryStub.callsFake(async (request) => {
+			if (request.prerequisite.id === "project_overview") {
+				return args.projectOverviewFound
+					? [
+							{
+								filename: "project-overview.md",
+								absolutePath: projectOverviewAbsolutePath,
+								projectRelativePath: "project-overview.md",
+							},
+						]
+					: []
+			}
+
+			return args.developerGuideFound
+				? [
+						{
+							filename: "developer-guide.md",
+							absolutePath: developerGuideAbsolutePath,
+							projectRelativePath: "developer-guide.md",
+						},
+					]
+				: []
+		})
+		const state = new TaskState()
+		registerResolvedWorkflow(documentProjectWorkflowDefinition)
+		await runtime.activateWorkflow({
+			taskState: state,
+			workflowName: documentProjectWorkflowDefinition.name,
+		})
+		const step1Action = await submitActiveWorkflowFormPanel(state)
+		return { state, step1Action }
+	}
+
+	async function submitDocumentProjectStep1Form(state: TaskState): Promise<WorkflowNextAction> {
+		const formSession = getActiveFormSession(state)
+		return formSession.currentPanelId === DOCUMENT_PROJECT_STEP_1_PANEL_D_ID
+			? submitActiveWorkflowFormPanelFields(state, [
+					{ key: "session_objective", value: { stringValue: "Update existing documents" } },
+				])
+			: submitActiveWorkflowFormPanel(state)
+	}
+
+	async function createDocumentProjectRuntimeState(args: {
+		activeStepNumber: 1 | 2 | 3 | 4
+		activeBranchId: string
+		workflowValues: WorkflowValues
+		prerequisiteFileResolutions?: ActiveWorkflowSession["prerequisiteFileResolutions"]
+	}): Promise<TaskState> {
+		const state = new TaskState()
+		registerResolvedWorkflow(documentProjectWorkflowDefinition)
+		await runtime.activateWorkflow({
+			taskState: state,
+			workflowName: documentProjectWorkflowDefinition.name,
+		})
+		const session = getActiveWorkflowSession(state)
+		session.activeStepNumber = args.activeStepNumber
+		session.projectSelection = {
+			projectMode: "existing",
+			projectTitle: "Agent Guidance",
+			projectFolderName: "agent-guidance",
+		}
+		session.lifecycle.projectSelectionCompleted = true
+		session.workflowValues = {
+			projectMode: "existing",
+			projectTitle: "Agent Guidance",
+			projectFolderName: "agent-guidance",
+			...args.workflowValues,
+		}
+		session.prerequisiteFileResolutions = args.prerequisiteFileResolutions ?? []
+		session.ui.formSession = undefined
+		session.ui.stepResolutionSession = undefined
+		session.branchContext = { activeBranchId: args.activeBranchId }
+		return state
+	}
+
 	async function startCreateArchitectureInitialDocumentBuild(
 		state: TaskState,
 		projectTitle: string,
@@ -1938,6 +2410,7 @@ describe("WorkflowRuntime", () => {
 				projectSelectionCompleted: true,
 			},
 			entryArtifactResolution: undefined,
+			prerequisiteFileResolutions: [],
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -2937,6 +3410,8 @@ describe("WorkflowRuntime", () => {
 			projectSelectionCompleted: true,
 			parentWorkflowName: "parent-workflow",
 		})
+		expect(discoverWorkflowCandidatesStub.callCount).to.equal(0)
+		expect(childSession.ui.formSession).to.equal(undefined)
 		childSession.projectSelection.projectTitle = "Child Project"
 		expect(parentSession.projectSelection.projectTitle).to.equal("Parent Project")
 	})
@@ -2976,7 +3451,7 @@ describe("WorkflowRuntime", () => {
 		})
 	})
 
-	it("no-ops child workflow activation without mutating state when parent project selection is incomplete", async () => {
+	it("no-ops interactive child workflow activation without mutating state when parent project selection is incomplete", async () => {
 		const workflow = createWorkflowDefinition()
 		registerResolvedWorkflow(workflow)
 		const incompleteParentSessions = [
@@ -3000,6 +3475,87 @@ describe("WorkflowRuntime", () => {
 		}
 	})
 
+	it("finalizes automatic-fixed child project selection without reading or mutating incomplete parent project state", async () => {
+		const workflow = createWorkflowDefinition({
+			projectSelection: {
+				kind: "automatic_fixed",
+				projectTitle: "Agent Guidance",
+				projectFolderName: "agent-guidance",
+			},
+		})
+		registerResolvedWorkflow(workflow)
+		const finalizeWorkflowProjectSelectionSpy = sandbox.spy(
+			runtime as unknown as { finalizeWorkflowProjectSelection: (...args: unknown[]) => unknown },
+			"finalizeWorkflowProjectSelection",
+		)
+		const cases = [
+			{
+				projectTitle: "",
+				projectFolderName: "unrelated-parent",
+				candidates: [{ value: "agent-guidance", label: "agent-guidance" }],
+				expectedMode: "existing" as const,
+			},
+			{
+				projectTitle: "Unrelated Parent",
+				projectFolderName: "",
+				candidates: [],
+				expectedMode: "new" as const,
+			},
+		]
+
+		for (const testCase of cases) {
+			discoverWorkflowCandidatesStub.resetHistory()
+			finalizeWorkflowProjectSelectionSpy.resetHistory()
+			discoverWorkflowCandidatesStub.resolves(testCase.candidates)
+			const parentSession = createParentWorkflowSession({
+				projectTitle: testCase.projectTitle,
+				projectFolderName: testCase.projectFolderName,
+			})
+			parentSession.lifecycle.projectSelectionCompleted = false
+			parentSession.workflowValues = {
+				parent_only_value: "parent sentinel",
+			}
+			const parentProjectSelectionReference = parentSession.projectSelection
+			const parentWorkflowValuesReference = parentSession.workflowValues
+			const parentProjectSelectionSnapshot = structuredClone(parentSession.projectSelection)
+			const parentWorkflowValuesSnapshot = structuredClone(parentSession.workflowValues)
+			const childState = new TaskState()
+
+			const result = await runtime.activateWorkflow({
+				taskState: childState,
+				workflowName: workflow.name,
+				parentSession,
+				parentWorkflowName: "parent-workflow",
+			})
+			const childSession = getActiveWorkflowSession(childState)
+
+			expect(result.kind).to.equal("project_prompt")
+			expect(childSession.projectSelection).to.deep.equal({
+				projectMode: testCase.expectedMode,
+				projectTitle: "Agent Guidance",
+				projectFolderName: "agent-guidance",
+			})
+			expect(childSession.workflowValues).to.deep.equal({
+				[DEFAULT_ENTRY_PROJECT_VALUE_KEYS.projectMode]: testCase.expectedMode,
+				[DEFAULT_ENTRY_PROJECT_VALUE_KEYS.projectTitle]: "Agent Guidance",
+				[DEFAULT_ENTRY_PROJECT_VALUE_KEYS.projectFolderName]: "agent-guidance",
+			})
+			expect(childSession.lifecycle).to.deep.equal({
+				projectSelectionCompleted: true,
+				parentWorkflowName: "parent-workflow",
+			})
+			expect(childSession.ui.formSession).to.equal(undefined)
+			expect(discoverWorkflowCandidatesStub.callCount).to.equal(1)
+			expect(finalizeWorkflowProjectSelectionSpy.callCount).to.equal(1)
+			expect(parentSession.projectSelection).to.equal(parentProjectSelectionReference)
+			expect(parentSession.workflowValues).to.equal(parentWorkflowValuesReference)
+			expect(parentSession.projectSelection).to.deep.equal(parentProjectSelectionSnapshot)
+			expect(parentSession.workflowValues).to.deep.equal(parentWorkflowValuesSnapshot)
+			expect(childSession.projectSelection).to.not.equal(parentSession.projectSelection)
+			expect(childSession.workflowValues).to.not.equal(parentSession.workflowValues)
+		}
+	})
+
 	it("returns no_op and leaves task state unchanged for workflows with no steps", async () => {
 		const invalidWorkflow = createWorkflowDefinition({
 			steps: {} as WorkflowDefinition["steps"],
@@ -3016,6 +3572,7 @@ describe("WorkflowRuntime", () => {
 				projectSelectionCompleted: true,
 			},
 			entryArtifactResolution: undefined,
+			prerequisiteFileResolutions: [],
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -3040,6 +3597,289 @@ describe("WorkflowRuntime", () => {
 		expect(taskState.activeWorkflowSession).to.equal(existingSession)
 		expectNoLegacyWorkflowMirrors(taskState)
 		expect(taskState.currentFocusChainChecklist).to.equal(existingChecklist)
+	})
+
+	it("rejects malformed fixed project selection, placement, and linked deterministic prerequisite definitions", async () => {
+		const invalidCases: Array<{ label: string; mutate: (workflow: WorkflowDefinition) => void }> = [
+			{ label: "missing projectSelection", mutate: (workflow) => Reflect.deleteProperty(workflow, "projectSelection") },
+			{
+				label: "unsupported projectSelection",
+				mutate: (workflow) => Reflect.set(workflow, "projectSelection", { kind: "unsupported" }),
+			},
+			{
+				label: "blank fixed project title",
+				mutate: (workflow) => Reflect.set(workflow.projectSelection, "projectTitle", ""),
+			},
+			{
+				label: "padded fixed project title",
+				mutate: (workflow) => Reflect.set(workflow.projectSelection, "projectTitle", " Agent Guidance "),
+			},
+			{
+				label: "blank fixed folder",
+				mutate: (workflow) => Reflect.set(workflow.projectSelection, "projectFolderName", ""),
+			},
+			{
+				label: "padded fixed folder",
+				mutate: (workflow) => Reflect.set(workflow.projectSelection, "projectFolderName", " agent-guidance "),
+			},
+		]
+		for (const projectFolderName of [
+			".",
+			"..",
+			"agent/guidance",
+			"agent\\guidance",
+			join(cwd, "agent-guidance"),
+			"C:",
+			"Agent Guidance",
+			"agent guidance",
+			"agent--guidance",
+			"Agent-Guidance",
+			"agent_guidance",
+			"agent@guidance",
+		]) {
+			invalidCases.push({
+				label: `invalid fixed folder ${projectFolderName}`,
+				mutate: (workflow) => Reflect.set(workflow.projectSelection, "projectFolderName", projectFolderName),
+			})
+		}
+		invalidCases.push(
+			{ label: "missing placement", mutate: (workflow) => Reflect.deleteProperty(workflow, "projectOutputPlacement") },
+			{
+				label: "unsupported placement",
+				mutate: (workflow) => Reflect.set(workflow, "projectOutputPlacement", { kind: "unsupported" }),
+			},
+			{
+				label: "root placement with subfolder",
+				mutate: (workflow) =>
+					Reflect.set(workflow, "projectOutputPlacement", { kind: "selected_project_root", subfolder: "planning" }),
+			},
+			{
+				label: "subfolder placement without subfolder",
+				mutate: (workflow) => {
+					const placement = { kind: "selected_project_subfolder", subfolder: "planning" }
+					Reflect.deleteProperty(placement, "subfolder")
+					Reflect.set(workflow, "projectOutputPlacement", placement)
+				},
+			},
+			{
+				label: "unsupported selected subfolder",
+				mutate: (workflow) =>
+					Reflect.set(workflow, "projectOutputPlacement", { kind: "selected_project_subfolder", subfolder: "stories" }),
+			},
+			{ label: "missing entry keys", mutate: (workflow) => Reflect.deleteProperty(workflow, "entryProjectValueKeys") },
+			{
+				label: "missing resolution mode",
+				mutate: (workflow) =>
+					Reflect.deleteProperty(workflow.prerequisiteFiles?.project_overview ?? {}, "resolutionMode"),
+			},
+			{
+				label: "unsupported resolution mode",
+				mutate: (workflow) =>
+					Reflect.set(workflow.prerequisiteFiles?.project_overview ?? {}, "resolutionMode", "unsupported"),
+			},
+			{
+				label: "required deterministic prerequisite",
+				mutate: (workflow) => Reflect.set(workflow.prerequisiteFiles?.project_overview ?? {}, "requirement", "required"),
+			},
+			{
+				label: "deterministic naming pattern",
+				mutate: (workflow) =>
+					Reflect.set(workflow.prerequisiteFiles?.project_overview ?? {}, "match", {
+						kind: "naming_pattern",
+						pattern: /^project-overview\.md$/,
+					}),
+			},
+			{
+				label: "interactive linked prerequisite",
+				mutate: (workflow) =>
+					Reflect.set(workflow.prerequisiteFiles?.project_overview ?? {}, "resolutionMode", "interactive"),
+			},
+			{
+				label: "missing linked artifact",
+				mutate: (workflow) =>
+					Reflect.set(workflow.prerequisiteFiles?.project_overview ?? {}, "artifactId", "missing_artifact"),
+			},
+			{
+				label: "mismatched artifact id",
+				mutate: (workflow) =>
+					Reflect.set(workflow.artifacts?.project_overview ?? {}, "id", "mismatched_project_overview"),
+			},
+			{
+				label: "derived linked artifact",
+				mutate: (workflow) => Reflect.set(workflow.artifacts?.project_overview ?? {}, "intentMode", "derived"),
+			},
+			{
+				label: "numbered linked artifact",
+				mutate: (workflow) =>
+					Reflect.set(
+						workflow.artifacts?.project_overview ?? {},
+						"family",
+						WorkflowArtifactFamily.ChangeManagementPlan,
+					),
+			},
+			{
+				label: "linked filename mismatch",
+				mutate: (workflow) =>
+					Reflect.set(workflow.prerequisiteFiles?.project_overview?.match ?? {}, "filename", "project-summary.md"),
+			},
+			{
+				label: "linked output key mismatch",
+				mutate: (workflow) => {
+					Reflect.set(workflow.prerequisiteFiles?.project_overview ?? {}, "workflowValueKey", "project_overview_path")
+					Reflect.set(workflow, "workflowValueKeys", [...workflow.workflowValueKeys, "project_overview_path"])
+				},
+			},
+			{
+				label: "root placement nested prerequisite",
+				mutate: (workflow) =>
+					Reflect.set(workflow.prerequisiteFiles?.project_overview ?? {}, "projectSubfolderSegments", ["planning"]),
+			},
+		)
+
+		for (const projectSubfolderSegments of [[], ["review"], ["planning", "nested"]]) {
+			invalidCases.push({
+				label: `subfolder placement mismatch ${projectSubfolderSegments.join("/")}`,
+				mutate: (workflow) => {
+					Reflect.set(workflow, "projectOutputPlacement", { kind: "selected_project_subfolder", subfolder: "planning" })
+					Reflect.set(
+						workflow.prerequisiteFiles?.project_overview ?? {},
+						"projectSubfolderSegments",
+						projectSubfolderSegments,
+					)
+				},
+			})
+		}
+
+		for (const invalidCase of invalidCases) {
+			const workflow = createValidDocumentProjectLinkedFixture()
+			invalidCase.mutate(workflow)
+			await expectDefinitionRejected(workflow, invalidCase.label)
+		}
+
+		for (const workflow of [
+			createValidDocumentProjectLinkedFixture(),
+			createValidDocumentProjectLinkedFixture({
+				projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "planning" },
+				projectSubfolderSegments: ["planning"],
+			}),
+		]) {
+			const validState = new TaskState()
+			const result = await activateWorkflow(validState, workflow)
+			expect(result.kind).to.equal("render_workflow_form")
+			expect(validState.activeWorkflowName).to.equal(workflow.name)
+		}
+	})
+
+	it("finalizes automatic fixed project selection only after the informational panel is submitted", async () => {
+		const projectRoot = join(cwd, "docs", "projects", "agent-guidance")
+		let discoveryObservedMissingRoot = false
+		discoverWorkflowCandidatesStub.callsFake(async (request: WorkflowDiscoveryRequest) => {
+			try {
+				await access(projectRoot)
+			} catch (error) {
+				expect((error as NodeJS.ErrnoException).code).to.equal("ENOENT")
+				discoveryObservedMissingRoot = true
+			}
+			return []
+		})
+		registerResolvedWorkflow(documentProjectWorkflowDefinition)
+
+		const entryAction = await runtime.activateWorkflow({
+			taskState,
+			workflowName: documentProjectWorkflowDefinition.name,
+		})
+
+		expect(entryAction.kind).to.equal("render_workflow_form")
+		if (entryAction.kind !== "render_workflow_form") {
+			throw new Error(`Expected render_workflow_form, received ${entryAction.kind}.`)
+		}
+		expect(entryAction.payload.panel?.panelId).to.equal(ENTRY_INFO_PANEL_ID)
+		expect(discoverWorkflowCandidatesStub.callCount).to.equal(0)
+		expect(await pathExists(projectRoot)).to.equal(false)
+		expect(getActiveWorkflowSession(taskState).lifecycle.projectSelectionCompleted).to.equal(false)
+
+		const continuation = await submitActiveWorkflowFormPanel(taskState)
+		expect(continuation.kind).to.equal("render_workflow_form")
+		expect(discoveryObservedMissingRoot).to.equal(true)
+		expect(discoverWorkflowCandidatesStub.callCount).to.equal(1)
+		const request = discoverWorkflowCandidatesStub.firstCall.args[0] as WorkflowDiscoveryRequest
+		expect(Object.keys(request).sort()).to.deep.equal([
+			"buildLabel",
+			"entryType",
+			"immediateChildrenOnly",
+			"rootDirectory",
+			"sort",
+			"workspacePathPolicy",
+		])
+		const { buildLabel, ...commonRequest } = request
+		expect(buildLabel).to.be.a("function")
+		if (buildLabel === undefined) {
+			throw new Error("Expected automatic fixed discovery buildLabel.")
+		}
+		expect(buildLabel("agent-guidance")).to.equal("agent-guidance")
+		expect(commonRequest).to.deep.equal({
+			rootDirectory: join(cwd, "docs", "projects"),
+			workspacePathPolicy,
+			entryType: "directory",
+			immediateChildrenOnly: true,
+			sort: "alpha_asc",
+		})
+		const session = getActiveWorkflowSession(taskState)
+		expect(session.projectSelection).to.deep.equal({
+			projectMode: "new",
+			projectTitle: "Agent Guidance",
+			projectFolderName: "agent-guidance",
+		})
+		expect(session.workflowValues).to.deep.include({
+			projectMode: "new",
+			projectTitle: "Agent Guidance",
+			projectFolderName: "agent-guidance",
+		})
+		expect(session.lifecycle.projectSelectionCompleted).to.equal(true)
+		expect(session.ui.formSession?.workflowFormId).to.equal(DOCUMENT_PROJECT_STEP_1_FORM_ID)
+		expect(session.ui.formSession?.currentPanelId).to.equal(DOCUMENT_PROJECT_STEP_1_PANEL_A_ID)
+		expect(session.entryArtifactResolution?.artifactResolutions).to.deep.equal([])
+		expect(Object.hasOwn(session.workflowValues, "projectRoot")).to.equal(false)
+		expect(Object.hasOwn(session.workflowValues, "project_root")).to.equal(false)
+		for (const folder of [
+			"",
+			"discovery",
+			"planning",
+			"implementation",
+			"review",
+			"testing",
+			"archive",
+			join("implementation", "drafts"),
+			join("implementation", "stories-backlog"),
+			join("implementation", "stories-review"),
+			join("implementation", "stories-complete"),
+		]) {
+			expect(await pathExists(join(projectRoot, folder)), folder).to.equal(true)
+		}
+
+		const existingState = new TaskState()
+		const existingRoot = join(cwd, "docs", "projects", "agent-guidance")
+		discoverWorkflowCandidatesStub.resetHistory()
+		discoverWorkflowCandidatesStub.callsFake(async () => [{ value: "agent-guidance", label: "agent-guidance" }])
+		await runtime.activateWorkflow({ taskState: existingState, workflowName: documentProjectWorkflowDefinition.name })
+		await submitActiveWorkflowFormPanel(existingState)
+		const existingSession = getActiveWorkflowSession(existingState)
+		expect(existingSession.projectSelection).to.deep.equal({
+			projectMode: "existing",
+			projectTitle: "Agent Guidance",
+			projectFolderName: "agent-guidance",
+		})
+		expect(existingSession.workflowValues).to.deep.include({
+			projectMode: "existing",
+			projectTitle: "Agent Guidance",
+			projectFolderName: "agent-guidance",
+		})
+		expect(existingSession.lifecycle.projectSelectionCompleted).to.equal(true)
+		expect(existingSession.ui.formSession?.workflowFormId).to.equal(DOCUMENT_PROJECT_STEP_1_FORM_ID)
+		expect(existingSession.entryArtifactResolution?.artifactResolutions).to.deep.equal([])
+		expect(Object.hasOwn(existingSession.workflowValues, "projectRoot")).to.equal(false)
+		expect(Object.hasOwn(existingSession.workflowValues, "project_root")).to.equal(false)
+		expect(await pathExists(existingRoot)).to.equal(true)
 	})
 
 	it("rejects invalid workflow value inventories and references before activation", async () => {
@@ -4415,7 +5255,7 @@ describe("WorkflowRuntime", () => {
 		expect(selected.toolRequest.toolName).to.equal(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
 	})
 
-	it("scans prerequisite files from a project subfolder different from the active workflow projectSubfolder", async () => {
+	it("scans prerequisite files from a project subfolder different from the active workflow output placement", async () => {
 		const projectFolderName = "prerequisite-different-subfolder"
 		const prerequisitePath = await writePrerequisiteProjectFile(projectFolderName, join("review", "requirements.md"))
 		const prerequisite = createPrerequisiteFileDefinition({
@@ -4426,7 +5266,7 @@ describe("WorkflowRuntime", () => {
 			},
 		})
 		const { workflow } = createPrerequisiteResolutionWorkflow({
-			projectSubfolder: "implementation",
+			projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "implementation" },
 			prerequisite,
 		})
 		await activateWorkflow(taskState, workflow)
@@ -5197,18 +6037,39 @@ describe("WorkflowRuntime", () => {
 		}
 		const existingProjectDiscoveryRequest = discoverWorkflowCandidatesStub
 			.getCalls()
-			.map((call) => call.args[0])
+			.map((call) => call.args[0] as WorkflowDiscoveryRequest)
 			.find(
-				(request: WorkflowDiscoveryRequest) =>
+				(request) =>
 					request.rootDirectory === join(cwd, "docs", "projects") &&
 					request.entryType === "directory" &&
-					request.targetPathSegments === undefined,
+					Object.hasOwn(request, "targetPathSegments") === false &&
+					Object.hasOwn(request, "namingPattern") === false,
 			)
 		expect(existingProjectDiscoveryRequest).to.not.equal(undefined)
 		if (existingProjectDiscoveryRequest === undefined) {
 			throw new Error("Expected existing-project discovery to run.")
 		}
-		expect(existingProjectDiscoveryRequest.workspacePathPolicy).to.equal(workspacePathPolicy)
+		expect(Object.keys(existingProjectDiscoveryRequest).sort()).to.deep.equal([
+			"buildLabel",
+			"entryType",
+			"immediateChildrenOnly",
+			"rootDirectory",
+			"sort",
+			"workspacePathPolicy",
+		])
+		const { buildLabel: existingBuildLabel, ...existingCommonRequest } = existingProjectDiscoveryRequest
+		expect(existingBuildLabel).to.be.a("function")
+		if (existingBuildLabel === undefined) {
+			throw new Error("Expected interactive project discovery buildLabel.")
+		}
+		expect(existingBuildLabel("Existing Beta")).to.equal("Existing Beta")
+		expect(existingCommonRequest).to.deep.equal({
+			rootDirectory: join(cwd, "docs", "projects"),
+			workspacePathPolicy,
+			entryType: "directory",
+			immediateChildrenOnly: true,
+			sort: "alpha_asc",
+		})
 
 		const invalidSessionTaskState = new TaskState()
 		await activateWorkflow(invalidSessionTaskState, workflow)
@@ -11071,7 +11932,8 @@ describe("WorkflowRuntime", () => {
 	it("passes constructor workspace path policy into project-numbered artifact discovery", async () => {
 		const changeManagementKeys = createStandaloneArtifactOutputValueKeys("project_numbered_policy")
 		const workflow = createWorkflowDefinition({
-			projectSubfolder: "planning",
+			projectSelection: { kind: "interactive" },
+			projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "planning" },
 			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(changeManagementKeys),
 			artifacts: {
 				change_management_plan: {
@@ -11111,6 +11973,2004 @@ describe("WorkflowRuntime", () => {
 		])
 		expect(artifactDiscoveryRequest.namingPattern?.test("change-management-plan-9.md")).to.equal(true)
 		expect(artifactDiscoveryRequest.namingPattern?.test("Story-1-1.md")).to.equal(false)
+	})
+
+	it("applies root and subfolder output placement to allocation, index loading, and project-wide discovery", async () => {
+		const projectFolderName = "placement-project"
+		for (const placementCase of [
+			{
+				placement: { kind: "selected_project_root" } as const,
+				expectedSegments: [projectFolderName],
+				expectedRelativePath: "change-management-plan-1.md",
+			},
+			{
+				placement: { kind: "selected_project_subfolder", subfolder: "planning" } as const,
+				expectedSegments: [projectFolderName, "planning"],
+				expectedRelativePath: join("planning", "change-management-plan-1.md"),
+			},
+		]) {
+			discoverWorkflowCandidatesStub.resetHistory()
+			discoverWorkflowCandidatesStub.resolves([])
+			const outputValueKeys = createStandaloneArtifactOutputValueKeys("placement_change_management")
+			const workflow = createWorkflowDefinition({
+				projectOutputPlacement: placementCase.placement,
+				workflowValueKeys: collectArtifactOutputWorkflowValueKeys(outputValueKeys),
+				artifacts: {
+					change_management_plan: {
+						id: "change_management_plan",
+						family: WorkflowArtifactFamily.ChangeManagementPlan,
+						intentMode: "new",
+						parentIdentitySource: undefined,
+						targetIdentitySource: undefined,
+						outputValueKeys,
+					},
+				},
+			})
+			const placementState = new TaskState()
+			await activateWorkflow(placementState, workflow)
+			const session = getActiveWorkflowSession(placementState)
+			session.projectSelection = {
+				projectMode: "existing",
+				projectTitle: "Placement Project",
+				projectFolderName,
+			}
+			session.lifecycle.projectSelectionCompleted = true
+
+			const allocation = await runtime.prepareWorkflowArtifactCreation({
+				taskState: placementState,
+				artifactId: "change_management_plan",
+			})
+			expect(allocation.artifactRelativePath).to.equal(placementCase.expectedRelativePath)
+			const targetedRequest = discoverWorkflowCandidatesStub
+				.getCalls()
+				.map((call) => call.args[0] as WorkflowDiscoveryRequest)
+				.find((request) => request.namingPattern?.test("change-management-plan-9.md") === true)
+			expect(targetedRequest?.targetPathSegments).to.deep.equal(placementCase.expectedSegments)
+
+			const placementDirectory = join(cwd, "docs", "projects", ...placementCase.expectedSegments)
+			await mkdir(placementDirectory, { recursive: true })
+			await writeFile(
+				join(placementDirectory, "Epics.index.json"),
+				'{"version":1,"epics":[{"identity":"1","title":"One","story-index-generated":false}]}',
+				"utf8",
+			)
+			const loadedIndex = (await Reflect.apply(Reflect.get(runtime, "loadEpicsIndex"), runtime, [
+				{ workflow, session, artifactId: "change_management_plan" },
+			])) as { epics: Array<{ identity: string }> }
+			expect(loadedIndex.epics.map((epic) => epic.identity)).to.deep.equal(["1"])
+
+			discoverWorkflowCandidatesStub.resetHistory()
+			await Reflect.apply(Reflect.get(runtime, "discoverWorkflowArtifactFilenames"), runtime, [
+				{
+					workflow,
+					session,
+					familyDefinition: WORKFLOW_ARTIFACT_FAMILY_REGISTRY[WorkflowArtifactFamily.Story],
+					searchProjectWide: true,
+				},
+			])
+			const storyPattern = WORKFLOW_ARTIFACT_FAMILY_REGISTRY[WorkflowArtifactFamily.Story].discoveryPattern
+			const projectWideTargets = discoverWorkflowCandidatesStub
+				.getCalls()
+				.map((call) => call.args[0] as WorkflowDiscoveryRequest)
+				.filter((request) => request.namingPattern?.source === storyPattern.source)
+				.map((request) => request.targetPathSegments)
+			expect(projectWideTargets).to.deep.equal([
+				[projectFolderName, "discovery"],
+				[projectFolderName, "planning"],
+				[projectFolderName, "implementation"],
+				[projectFolderName, "review"],
+				[projectFolderName, "testing"],
+				[projectFolderName, "archive"],
+				[projectFolderName, "implementation", "drafts"],
+				[projectFolderName, "implementation", "stories-backlog"],
+				[projectFolderName, "implementation", "stories-review"],
+				[projectFolderName, "implementation", "stories-complete"],
+			])
+			expect(projectWideTargets).to.not.deep.include([projectFolderName])
+		}
+	})
+
+	it("adopts and allocates exact Document Project singleton artifact families without sidecar behavior", async () => {
+		const projectOverview = WORKFLOW_ARTIFACT_FAMILY_REGISTRY[WorkflowArtifactFamily.ProjectOverview]
+		const developerGuide = WORKFLOW_ARTIFACT_FAMILY_REGISTRY[WorkflowArtifactFamily.DeveloperGuide]
+		expect(WorkflowArtifactFamily.ProjectOverview).to.equal("project_overview")
+		expect(WorkflowArtifactFamily.DeveloperGuide).to.equal("developer_guide")
+		expect(projectOverview).to.deep.equal({
+			family: WorkflowArtifactFamily.ProjectOverview,
+			allocationMode: "singleton_project",
+			identityRequirement: "none",
+			filenamePattern: "project-overview.md",
+			fileExtension: ".md",
+			contentKind: "markdown",
+			numberingScope: "project_singleton",
+			singletonIdentity: "project_overview",
+			discoveryPattern: /^project-overview\.md$/,
+		})
+		expect(developerGuide).to.deep.equal({
+			family: WorkflowArtifactFamily.DeveloperGuide,
+			allocationMode: "singleton_project",
+			identityRequirement: "none",
+			filenamePattern: "developer-guide.md",
+			fileExtension: ".md",
+			contentKind: "markdown",
+			numberingScope: "project_singleton",
+			singletonIdentity: "developer_guide",
+			discoveryPattern: /^developer-guide\.md$/,
+		})
+		expect(projectOverview.discoveryPattern.source).to.equal("^project-overview\\.md$")
+		expect(projectOverview.discoveryPattern.flags).to.equal("")
+		expect(developerGuide.discoveryPattern.source).to.equal("^developer-guide\\.md$")
+		expect(developerGuide.discoveryPattern.flags).to.equal("")
+		const expectedKeys = [
+			"allocationMode",
+			"contentKind",
+			"discoveryPattern",
+			"family",
+			"fileExtension",
+			"filenamePattern",
+			"identityRequirement",
+			"numberingScope",
+			"singletonIdentity",
+		]
+		expect(Object.keys(projectOverview).sort()).to.deep.equal(expectedKeys)
+		expect(Object.keys(developerGuide).sort()).to.deep.equal(expectedKeys)
+
+		for (const filenameCase of documentProjectArtifactFilenameCases) {
+			const {
+				selectedProjectRoot,
+				projectOverviewAbsolutePath,
+				developerGuideAbsolutePath,
+				projectOverviewMetadata,
+				developerGuideMetadata,
+			} = createDocumentProjectArtifactFixtureVocabulary()
+			const canonicalPath =
+				filenameCase.artifactId === "project_overview" ? projectOverviewAbsolutePath : developerGuideAbsolutePath
+			const expectedMetadata =
+				filenameCase.artifactId === "project_overview" ? projectOverviewMetadata : developerGuideMetadata
+			const outputValueKeys = {
+				projectTitle: "projectTitle",
+				projectFolderName: "projectFolderName",
+				artifactFamily: `${filenameCase.artifactId}_artifact_family`,
+				artifactIdentity: `${filenameCase.artifactId}_artifact_identity`,
+				artifactFilename: `${filenameCase.artifactId}_artifact_filename`,
+				artifactRelativePath: `${filenameCase.artifactId}_artifact_relative_path`,
+				artifactAbsolutePath: filenameCase.artifactId,
+				parentIdentity: undefined,
+				targetIdentity: undefined,
+			} as const
+			const prerequisite: WorkflowPrerequisiteFileDefinition = {
+				id: filenameCase.artifactId,
+				requirement: "optional",
+				resolutionMode: "deterministic_exact_filename",
+				projectSubfolderSegments: [],
+				match: { kind: "exact_filename", filename: filenameCase.canonicalFilename },
+				producingWorkflowName: "workflow-runtime-test",
+				workflowValueKey: outputValueKeys.artifactAbsolutePath,
+				outputDocumentReference: "none",
+				artifactId: filenameCase.artifactId,
+			}
+			const workflow = createWorkflowDefinition({
+				entryProjectValueKeys: {
+					projectMode: "projectMode",
+					projectTitle: "projectTitle",
+					projectFolderName: "projectFolderName",
+				},
+				includeEntryProjectValueKeysInWorkflowValueKeys: false,
+				projectOutputPlacement: { kind: "selected_project_root" },
+				workflowValueKeys: ["projectMode", ...collectArtifactOutputWorkflowValueKeys(outputValueKeys)],
+				artifacts: {
+					[filenameCase.artifactId]: {
+						id: filenameCase.artifactId,
+						family: filenameCase.family,
+						intentMode: "new",
+						parentIdentitySource: undefined,
+						targetIdentitySource: undefined,
+						outputValueKeys,
+					},
+				},
+				prerequisiteFiles: { [filenameCase.artifactId]: prerequisite },
+				steps: {
+					"step-1": createStepDefinition({
+						stepNumber: 1,
+						decisionTree: createPrerequisiteResolutionDecisionTree({
+							prerequisiteIds: [filenameCase.artifactId],
+							artifactId: filenameCase.artifactId,
+						}),
+					}),
+				},
+			})
+			const artifactDefinition = workflow.artifacts?.[filenameCase.artifactId]
+			expect(artifactDefinition?.outputValueKeys.parentIdentity).to.equal(undefined)
+			expect(artifactDefinition?.outputValueKeys.targetIdentity).to.equal(undefined)
+
+			await mkdir(selectedProjectRoot, { recursive: true })
+			await writeFile(canonicalPath, "# adopted sentinel\n", "utf8")
+			const before = await readFile(canonicalPath, "utf8")
+			const foundState = new TaskState()
+			await activateWorkflow(foundState, workflow)
+			const foundSession = getActiveWorkflowSession(foundState)
+			foundSession.projectSelection = {
+				projectMode: "existing",
+				projectTitle: "Agent Guidance",
+				projectFolderName: "agent-guidance",
+			}
+			foundSession.lifecycle.projectSelectionCompleted = true
+			await runtime.resolveNextAction({ taskState: foundState })
+			expect(getActiveWorkflowSession(foundState).workflowValues).to.deep.include(expectedMetadata)
+			expect(await readFile(canonicalPath, "utf8")).to.equal(before)
+
+			await rm(canonicalPath)
+			const notFoundState = new TaskState()
+			await activateWorkflow(notFoundState, workflow)
+			const notFoundSession = getActiveWorkflowSession(notFoundState)
+			notFoundSession.projectSelection = {
+				projectMode: "existing",
+				projectTitle: "Agent Guidance",
+				projectFolderName: "agent-guidance",
+			}
+			notFoundSession.lifecycle.projectSelectionCompleted = true
+			await runtime.resolveNextAction({ taskState: notFoundState })
+			const allocation = await runtime.createWorkflowArtifact({
+				taskState: notFoundState,
+				artifactId: filenameCase.artifactId,
+				expectedArtifactAbsolutePath: undefined,
+			})
+			expect(allocation.artifactIdentity).to.equal(filenameCase.artifactId)
+			expect(getActiveWorkflowSession(notFoundState).workflowValues).to.deep.include(expectedMetadata)
+			const registry = WORKFLOW_ARTIFACT_FAMILY_REGISTRY[filenameCase.family]
+			expect(registry.discoveryPattern.test(filenameCase.canonicalFilename)).to.equal(true)
+			for (const rejectedFilename of filenameCase.rejectedFilenames) {
+				expect(registry.discoveryPattern.test(rejectedFilename), rejectedFilename).to.equal(false)
+			}
+		}
+	})
+
+	it("resolves Document Project deterministic prerequisites in declaration order", async () => {
+		const {
+			selectedProjectRoot,
+			projectOverviewAbsolutePath,
+			developerGuideAbsolutePath,
+			projectOverviewMetadata,
+			developerGuideMetadata,
+		} = createDocumentProjectArtifactFixtureVocabulary()
+		const projectOverviewCandidate = {
+			filename: "project-overview.md",
+			absolutePath: projectOverviewAbsolutePath,
+			projectRelativePath: "project-overview.md",
+		}
+		const developerGuideCandidate = {
+			filename: "developer-guide.md",
+			absolutePath: developerGuideAbsolutePath,
+			projectRelativePath: "developer-guide.md",
+		}
+		await mkdir(selectedProjectRoot, { recursive: true })
+		await writeFile(projectOverviewAbsolutePath, "# existing project overview\n", "utf8")
+		await writeFile(developerGuideAbsolutePath, "# existing developer guide\n", "utf8")
+		const prerequisiteDiscoveryStub = sandbox.stub(WorkflowPrerequisiteFiles, "discoverWorkflowPrerequisiteFileCandidates")
+		const matrix = [
+			{
+				projectOverviewCandidates: [],
+				developerGuideCandidates: [],
+				expected: [
+					{ prerequisiteId: "project_overview", outcome: "not_found" },
+					{ prerequisiteId: "developer_guide", outcome: "not_found" },
+				],
+				panelId: DOCUMENT_PROJECT_STEP_1_PANEL_A_ID,
+			},
+			{
+				projectOverviewCandidates: [],
+				developerGuideCandidates: [developerGuideCandidate],
+				expected: [
+					{ prerequisiteId: "project_overview", outcome: "not_found" },
+					{ prerequisiteId: "developer_guide", outcome: "found", resolvedAbsolutePath: developerGuideAbsolutePath },
+				],
+				panelId: DOCUMENT_PROJECT_STEP_1_PANEL_B_ID,
+			},
+			{
+				projectOverviewCandidates: [projectOverviewCandidate],
+				developerGuideCandidates: [],
+				expected: [
+					{ prerequisiteId: "project_overview", outcome: "found", resolvedAbsolutePath: projectOverviewAbsolutePath },
+					{ prerequisiteId: "developer_guide", outcome: "not_found" },
+				],
+				panelId: DOCUMENT_PROJECT_STEP_1_PANEL_C_ID,
+			},
+			{
+				projectOverviewCandidates: [projectOverviewCandidate],
+				developerGuideCandidates: [developerGuideCandidate],
+				expected: [
+					{ prerequisiteId: "project_overview", outcome: "found", resolvedAbsolutePath: projectOverviewAbsolutePath },
+					{ prerequisiteId: "developer_guide", outcome: "found", resolvedAbsolutePath: developerGuideAbsolutePath },
+				],
+				panelId: DOCUMENT_PROJECT_STEP_1_PANEL_D_ID,
+			},
+		] as const
+
+		for (const row of matrix) {
+			prerequisiteDiscoveryStub.resetHistory()
+			const state = new TaskState()
+			registerResolvedWorkflow(documentProjectWorkflowDefinition)
+			await runtime.activateWorkflow({ taskState: state, workflowName: documentProjectWorkflowDefinition.name })
+			const initialSession = getActiveWorkflowSession(state)
+			initialSession.projectSelection = {
+				projectMode: "existing",
+				projectTitle: "Agent Guidance",
+				projectFolderName: "agent-guidance",
+			}
+			initialSession.lifecycle.projectSelectionCompleted = true
+			initialSession.ui.formSession = undefined
+			prerequisiteDiscoveryStub.callsFake(async (request) => {
+				expect(request.selectedProjectRoot).to.equal(selectedProjectRoot)
+				if (request.prerequisite.id === "project_overview") {
+					return [...row.projectOverviewCandidates]
+				}
+				const currentSession = getActiveWorkflowSession(state)
+				expect(currentSession.prerequisiteFileResolutions).to.deep.equal([row.expected[0]])
+				expect(currentSession.ui.formSession).to.equal(undefined)
+				return [...row.developerGuideCandidates]
+			})
+
+			const action = await runtime.resolveNextAction({ taskState: state })
+			const session = getActiveWorkflowSession(state)
+			expect(prerequisiteDiscoveryStub.getCalls().map((call) => call.args[0].prerequisite.id)).to.deep.equal([
+				"project_overview",
+				"developer_guide",
+			])
+			expect(session.prerequisiteFileResolutions).to.deep.equal(row.expected)
+			expect(action.kind).to.equal("render_workflow_form")
+			if (action.kind !== "render_workflow_form") {
+				throw new Error(`Expected render_workflow_form, received ${action.kind}.`)
+			}
+			expect(action.formSession.workflowFormId).to.equal(DOCUMENT_PROJECT_STEP_1_FORM_ID)
+			expect(action.formSession.currentPanelId).to.equal(row.panelId)
+			expect(session.entryArtifactResolution?.artifactResolutions ?? []).to.deep.equal([])
+			for (const [artifactId, metadata] of [
+				["project_overview", projectOverviewMetadata],
+				["developer_guide", developerGuideMetadata],
+			] as const) {
+				const found = row.expected.find((result) => result.prerequisiteId === artifactId)?.outcome === "found"
+				if (found) {
+					expect(session.workflowValues).to.deep.include(metadata)
+				} else {
+					for (const key of Object.keys(metadata).filter(
+						(key) => key !== "projectTitle" && key !== "projectFolderName",
+					)) {
+						expect(session.workflowValues[key]).to.equal(undefined)
+					}
+				}
+			}
+			expect(await readFile(projectOverviewAbsolutePath, "utf8")).to.equal("# existing project overview\n")
+			expect(await readFile(developerGuideAbsolutePath, "utf8")).to.equal("# existing developer guide\n")
+		}
+	})
+
+	it("rejects deterministic prerequisite cardinality, containment, and policy failures before commit", async () => {
+		const { selectedProjectRoot, projectOverviewAbsolutePath } = createDocumentProjectArtifactFixtureVocabulary()
+		const projectOverviewCandidate = {
+			filename: "project-overview.md",
+			absolutePath: projectOverviewAbsolutePath,
+			projectRelativePath: "project-overview.md",
+		}
+		const cases = [
+			{
+				expectedError:
+					"Workflow prerequisite file project_overview deterministic exact-filename resolution returned more than one candidate.",
+				candidates: [projectOverviewCandidate, { ...projectOverviewCandidate }],
+			},
+			{
+				expectedError:
+					"Workflow prerequisite file project_overview resolved path does not match linked workflow artifact project_overview.",
+				candidates: [
+					{
+						filename: "project-overview.md",
+						absolutePath: join(cwd, "outside-project", "project-overview.md"),
+						projectRelativePath: "project-overview.md",
+					},
+				],
+			},
+		] as const
+
+		for (const testCase of cases) {
+			const discoveryStub = sandbox
+				.stub(WorkflowPrerequisiteFiles, "discoverWorkflowPrerequisiteFileCandidates")
+				.resolves([...testCase.candidates])
+			const state = new TaskState()
+			registerResolvedWorkflow(documentProjectWorkflowDefinition)
+			await runtime.activateWorkflow({ taskState: state, workflowName: documentProjectWorkflowDefinition.name })
+			const session = getActiveWorkflowSession(state)
+			session.projectSelection = {
+				projectMode: "existing",
+				projectTitle: "Agent Guidance",
+				projectFolderName: "agent-guidance",
+			}
+			session.lifecycle.projectSelectionCompleted = true
+			session.ui.formSession = undefined
+			let capturedError: unknown
+			try {
+				await runtime.resolveNextAction({ taskState: state })
+			} catch (error) {
+				capturedError = error
+			}
+			expect(capturedError).to.be.instanceOf(Error)
+			expect((capturedError as Error).message).to.equal(testCase.expectedError)
+			expect(getActiveWorkflowSession(state).prerequisiteFileResolutions).to.deep.equal([])
+			for (const key of [
+				"project_overview_artifact_family",
+				"project_overview_artifact_identity",
+				"project_overview_artifact_filename",
+				"project_overview_artifact_relative_path",
+				"project_overview",
+			]) {
+				expect(getActiveWorkflowSession(state).workflowValues[key]).to.equal(undefined)
+			}
+			expect(getActiveWorkflowSession(state).ui.formSession).to.equal(undefined)
+			expect(discoveryStub.callCount).to.equal(1)
+			discoveryStub.restore()
+		}
+
+		let permitProjectOverview = false
+		runtime = new WorkflowRuntime({
+			cwd,
+			workspacePathPolicy: {
+				validateAccess: (filePath) => filePath !== projectOverviewAbsolutePath || permitProjectOverview,
+			},
+		})
+		const policyDiscoveryStub = sandbox
+			.stub(WorkflowPrerequisiteFiles, "discoverWorkflowPrerequisiteFileCandidates")
+			.resolves([projectOverviewCandidate])
+		const policyState = new TaskState()
+		registerResolvedWorkflow(documentProjectWorkflowDefinition)
+		await runtime.activateWorkflow({ taskState: policyState, workflowName: documentProjectWorkflowDefinition.name })
+		const policySession = getActiveWorkflowSession(policyState)
+		policySession.projectSelection = {
+			projectMode: "existing",
+			projectTitle: "Agent Guidance",
+			projectFolderName: "agent-guidance",
+		}
+		policySession.lifecycle.projectSelectionCompleted = true
+		policySession.ui.formSession = undefined
+		let policyError: unknown
+		try {
+			await runtime.resolveNextAction({ taskState: policyState })
+		} catch (error) {
+			policyError = error
+		}
+		expect((policyError as Error).message).to.equal(
+			`Workflow runtime path is blocked by workspace path policy: ${projectOverviewAbsolutePath}`,
+		)
+		expect(policyDiscoveryStub.callCount).to.equal(1)
+		expect(selectedProjectRoot).to.equal(join(cwd, "docs", "projects", "agent-guidance"))
+		permitProjectOverview = true
+	})
+
+	it("resolves optional unlinked deterministic prerequisites without artifact metadata", async () => {
+		const { selectedProjectRoot } = createDocumentProjectArtifactFixtureVocabulary()
+		const unlinkedAbsolutePath = join(selectedProjectRoot, "unlinked-reference.md")
+		const prerequisite: WorkflowPrerequisiteFileDefinition = {
+			id: "unlinked_reference",
+			requirement: "optional",
+			resolutionMode: "deterministic_exact_filename",
+			projectSubfolderSegments: [],
+			match: { kind: "exact_filename", filename: "unlinked-reference.md" },
+			producingWorkflowName: "workflow-runtime-test",
+			workflowValueKey: "unlinked_reference",
+			outputDocumentReference: "none",
+		}
+		const workflow = createWorkflowDefinition({
+			projectOutputPlacement: { kind: "selected_project_root" },
+			workflowValueKeys: ["unlinked_reference"],
+			prerequisiteFiles: { unlinked_reference: prerequisite },
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: {
+						entryBranchId: "resolve",
+						branches: {
+							resolve: {
+								id: "resolve",
+								routes: [
+									{
+										id: "resolve-route",
+										trigger: { kind: "always" },
+										action: { kind: "resolve_prerequisite_files", prerequisiteIds: ["unlinked_reference"] },
+										followingBranchId: "done",
+									},
+								],
+							},
+							done: {
+								id: "done",
+								routes: [{ id: "done-route", trigger: { kind: "always" }, action: { kind: "no_op" } }],
+							},
+						},
+					},
+				}),
+			},
+		})
+		const discoveryStub = sandbox.stub(WorkflowPrerequisiteFiles, "discoverWorkflowPrerequisiteFileCandidates")
+		for (const candidates of [
+			[
+				{
+					filename: "unlinked-reference.md",
+					absolutePath: unlinkedAbsolutePath,
+					projectRelativePath: "unlinked-reference.md",
+				},
+			],
+			[],
+		]) {
+			discoveryStub.resetHistory()
+			discoveryStub.resolves(candidates)
+			const state = new TaskState()
+			await activateWorkflow(state, workflow)
+			const session = getActiveWorkflowSession(state)
+			session.projectSelection = {
+				projectMode: "existing",
+				projectTitle: "Agent Guidance",
+				projectFolderName: "agent-guidance",
+			}
+			session.lifecycle.projectSelectionCompleted = true
+			session.ui.formSession = undefined
+			await runtime.resolveNextAction({ taskState: state })
+			const resolvedSession = getActiveWorkflowSession(state)
+			if (candidates.length === 1) {
+				expect(resolvedSession.prerequisiteFileResolutions).to.deep.equal([
+					{ prerequisiteId: "unlinked_reference", outcome: "found", resolvedAbsolutePath: unlinkedAbsolutePath },
+				])
+				expect(resolvedSession.workflowValues).to.deep.equal({ unlinked_reference: unlinkedAbsolutePath })
+			} else {
+				expect(resolvedSession.prerequisiteFileResolutions).to.deep.equal([
+					{ prerequisiteId: "unlinked_reference", outcome: "not_found" },
+				])
+				expect(resolvedSession.workflowValues.unlinked_reference).to.equal(undefined)
+			}
+		}
+	})
+
+	it("commits and resumes deterministic prerequisite resolution atomically", async () => {
+		const { projectOverviewAbsolutePath, developerGuideAbsolutePath, projectOverviewMetadata, developerGuideMetadata } =
+			createDocumentProjectArtifactFixtureVocabulary()
+		const projectOverviewCandidate = {
+			filename: "project-overview.md",
+			absolutePath: projectOverviewAbsolutePath,
+			projectRelativePath: "project-overview.md",
+		}
+		const developerGuideCandidate = {
+			filename: "developer-guide.md",
+			absolutePath: developerGuideAbsolutePath,
+			projectRelativePath: "developer-guide.md",
+		}
+		const projectOverviewChangedKeys = [
+			"project_overview_artifact_family",
+			"project_overview_artifact_identity",
+			"project_overview_artifact_filename",
+			"project_overview_artifact_relative_path",
+			"project_overview",
+		]
+		const developerGuideChangedKeys = [
+			"developer_guide_artifact_family",
+			"developer_guide_artifact_identity",
+			"developer_guide_artifact_filename",
+			"developer_guide_artifact_relative_path",
+			"developer_guide",
+		]
+		const workflow = createDeterministicPrerequisiteContinuationWorkflow()
+		const prerequisiteDiscoveryStub = sandbox.stub(WorkflowPrerequisiteFiles, "discoverWorkflowPrerequisiteFileCandidates")
+
+		let rejectProjectOverviewAtValidation = false
+		let injectProjectOverviewFailure = true
+		const atomicWorkspacePathPolicy: WorkflowWorkspacePathPolicy = {
+			validateAccess: (filePath) => filePath !== projectOverviewAbsolutePath || !rejectProjectOverviewAtValidation,
+		}
+		runtime = new WorkflowRuntime({
+			cwd,
+			workspacePathPolicy: atomicWorkspacePathPolicy,
+		})
+		prerequisiteDiscoveryStub.callsFake(async (request) => {
+			if (request.prerequisite.id !== "project_overview") {
+				return []
+			}
+
+			if (injectProjectOverviewFailure) {
+				expect(atomicWorkspacePathPolicy.validateAccess(projectOverviewAbsolutePath)).to.equal(true)
+				rejectProjectOverviewAtValidation = true
+				injectProjectOverviewFailure = false
+			}
+
+			return [projectOverviewCandidate]
+		})
+		const atomicFailureState = await createDeterministicPrerequisiteContinuationState(workflow)
+		const atomicFailureSession = getActiveWorkflowSession(atomicFailureState)
+		atomicFailureSession.branchContext.activeBranchId = "after-prerequisites"
+		const atomicFailureValues = structuredClone(atomicFailureSession.workflowValues)
+		let atomicFailure: unknown
+		try {
+			await runtime.resolveNextAction({ taskState: atomicFailureState })
+		} catch (error) {
+			atomicFailure = error
+		}
+
+		expect(atomicFailure).to.be.instanceOf(Error)
+		expect((atomicFailure as Error).message).to.equal(
+			`Workflow runtime path is blocked by workspace path policy: ${projectOverviewAbsolutePath}`,
+		)
+		expect(atomicFailureState.activeWorkflowSession).to.equal(atomicFailureSession)
+		expect(atomicFailureSession.prerequisiteFileResolutions).to.deep.equal([])
+		expect(atomicFailureSession.workflowValues).to.deep.equal(atomicFailureValues)
+		expect(atomicFailureSession.branchContext.activeBranchId).to.equal("after-prerequisites")
+		expect(atomicFailureSession.branchContext.lastTriggerEvent).to.equal(undefined)
+		for (const key of Object.keys(projectOverviewMetadata).filter(
+			(key) => key !== "projectTitle" && key !== "projectFolderName",
+		)) {
+			expect(atomicFailureSession.workflowValues[key], key).to.equal(undefined)
+		}
+		expect(Object.keys(atomicFailureSession).filter((key) => /resume|rollback|ledger/i.test(key))).to.deep.equal([])
+		expect(Object.keys(atomicFailureSession).filter((key) => /lifecycle/i.test(key))).to.deep.equal(["lifecycle"])
+		expect(Object.keys(atomicFailureSession.lifecycle)).to.deep.equal(["projectSelectionCompleted"])
+
+		rejectProjectOverviewAtValidation = false
+		await runtime.resolveNextAction({ taskState: atomicFailureState })
+		expect(prerequisiteDiscoveryStub.getCalls().map((call) => call.args[0].prerequisite.id)).to.deep.equal([
+			"project_overview",
+			"project_overview",
+			"developer_guide",
+		])
+
+		runtime = new WorkflowRuntime({ cwd, workspacePathPolicy: createAllowAllWorkspacePathPolicy() })
+		prerequisiteDiscoveryStub.resetHistory()
+		prerequisiteDiscoveryStub.callsFake(async (request) => {
+			expect(request.prerequisite.id).to.equal("developer_guide")
+			return []
+		})
+		const prefixState = await createDeterministicPrerequisiteContinuationState(workflow)
+		const prefixSession = getActiveWorkflowSession(prefixState)
+		prefixSession.branchContext.activeBranchId = "after-prerequisites"
+		prefixSession.prerequisiteFileResolutions = [
+			{ prerequisiteId: "project_overview", outcome: "found", resolvedAbsolutePath: projectOverviewAbsolutePath },
+		]
+		Object.assign(prefixSession.workflowValues, projectOverviewMetadata)
+		await runtime.resolveNextAction({ taskState: prefixState })
+		expect(prerequisiteDiscoveryStub.getCalls().map((call) => call.args[0].prerequisite.id)).to.deep.equal([
+			"developer_guide",
+		])
+
+		let rejectDeveloperGuideAtValidation = false
+		let injectDeveloperGuideFailure = true
+		const partialWorkspacePathPolicy: WorkflowWorkspacePathPolicy = {
+			validateAccess: (filePath) => filePath !== developerGuideAbsolutePath || !rejectDeveloperGuideAtValidation,
+		}
+		runtime = new WorkflowRuntime({
+			cwd,
+			workspacePathPolicy: partialWorkspacePathPolicy,
+		})
+		prerequisiteDiscoveryStub.resetHistory()
+		let developerGuideDiscoveryCount = 0
+		prerequisiteDiscoveryStub.callsFake(async (request) => {
+			if (request.prerequisite.id === "project_overview") {
+				return [projectOverviewCandidate]
+			}
+
+			developerGuideDiscoveryCount += 1
+			if (injectDeveloperGuideFailure) {
+				expect(partialWorkspacePathPolicy.validateAccess(developerGuideAbsolutePath)).to.equal(true)
+				rejectDeveloperGuideAtValidation = true
+				injectDeveloperGuideFailure = false
+			}
+			if (developerGuideDiscoveryCount === 2) {
+				const retrySession = getActiveWorkflowSession(partialFailureState)
+				expect(retrySession.prerequisiteFileResolutions).to.deep.equal([
+					{
+						prerequisiteId: "project_overview",
+						outcome: "found",
+						resolvedAbsolutePath: projectOverviewAbsolutePath,
+					},
+				])
+				expect(retrySession.branchContext.lastTriggerEvent).to.deep.equal({
+					kind: "workflow_values_persisted",
+					changedKeys: projectOverviewChangedKeys,
+				})
+			}
+
+			return [developerGuideCandidate]
+		})
+		const partialFailureState = await createDeterministicPrerequisiteContinuationState(workflow)
+		const oldSession = getActiveWorkflowSession(partialFailureState)
+		oldSession.branchContext.activeBranchId = "after-prerequisites"
+		const oldSessionSnapshot = structuredClone(oldSession)
+		let partialFailure: unknown
+		try {
+			await runtime.resolveNextAction({ taskState: partialFailureState })
+		} catch (error) {
+			partialFailure = error
+		}
+
+		expect((partialFailure as Error).message).to.equal(
+			`Workflow runtime path is blocked by workspace path policy: ${developerGuideAbsolutePath}`,
+		)
+		const survivingPrefixSession = getActiveWorkflowSession(partialFailureState)
+		expect(survivingPrefixSession).to.not.equal(oldSession)
+		expect(oldSession).to.deep.equal(oldSessionSnapshot)
+		expect(survivingPrefixSession.prerequisiteFileResolutions).to.deep.equal([
+			{
+				prerequisiteId: "project_overview",
+				outcome: "found",
+				resolvedAbsolutePath: projectOverviewAbsolutePath,
+			},
+		])
+		expect(survivingPrefixSession.workflowValues).to.deep.include(projectOverviewMetadata)
+		expect(survivingPrefixSession.workflowValues.developer_guide).to.equal(undefined)
+		expect(survivingPrefixSession.branchContext.lastTriggerEvent).to.deep.equal({
+			kind: "workflow_values_persisted",
+			changedKeys: projectOverviewChangedKeys,
+		})
+		expect(projectOverviewChangedKeys).to.not.include("projectTitle")
+		expect(projectOverviewChangedKeys).to.not.include("projectFolderName")
+
+		rejectDeveloperGuideAtValidation = false
+		const retryResult = await runtime.resolveNextAction({ taskState: partialFailureState })
+		expect(retryResult).to.deep.equal({ kind: "no_op" })
+		expect(prerequisiteDiscoveryStub.getCalls().map((call) => call.args[0].prerequisite.id)).to.deep.equal([
+			"project_overview",
+			"developer_guide",
+			"developer_guide",
+		])
+		const completedRetrySession = getActiveWorkflowSession(partialFailureState)
+		expect(completedRetrySession.prerequisiteFileResolutions).to.deep.equal([
+			{
+				prerequisiteId: "project_overview",
+				outcome: "found",
+				resolvedAbsolutePath: projectOverviewAbsolutePath,
+			},
+			{
+				prerequisiteId: "developer_guide",
+				outcome: "found",
+				resolvedAbsolutePath: developerGuideAbsolutePath,
+			},
+		])
+		expect(completedRetrySession.workflowValues).to.deep.include(developerGuideMetadata)
+		expect(completedRetrySession.branchContext.activeBranchId).to.equal("trigger-consumed")
+		expect(completedRetrySession.branchContext.lastTriggerEvent).to.equal(undefined)
+
+		runtime = new WorkflowRuntime({ cwd, workspacePathPolicy: createAllowAllWorkspacePathPolicy() })
+		prerequisiteDiscoveryStub.resetHistory()
+		prerequisiteDiscoveryStub.resolves([])
+		const completeState = await createDeterministicPrerequisiteContinuationState(workflow)
+		const completeSession = getActiveWorkflowSession(completeState)
+		completeSession.branchContext.activeBranchId = "after-prerequisites"
+		completeSession.prerequisiteFileResolutions = [
+			{ prerequisiteId: "project_overview", outcome: "found", resolvedAbsolutePath: projectOverviewAbsolutePath },
+			{ prerequisiteId: "developer_guide", outcome: "found", resolvedAbsolutePath: developerGuideAbsolutePath },
+		]
+		Object.assign(completeSession.workflowValues, projectOverviewMetadata, developerGuideMetadata)
+		completeSession.branchContext.lastTriggerEvent = {
+			kind: "workflow_values_persisted",
+			changedKeys: developerGuideChangedKeys,
+		}
+		const completeResult = await runtime.resolveNextAction({ taskState: completeState })
+		expect(completeResult).to.deep.equal({ kind: "no_op" })
+		expect(prerequisiteDiscoveryStub.callCount).to.equal(0)
+		expect(completeSession.branchContext.activeBranchId).to.equal("trigger-consumed")
+		expect(completeSession.branchContext.lastTriggerEvent).to.equal(undefined)
+
+		prerequisiteDiscoveryStub.resetHistory()
+		prerequisiteDiscoveryStub.callsFake(async (request) => {
+			expect(request.prerequisite.id).to.equal("developer_guide")
+			return [developerGuideCandidate]
+		})
+		const replacementState = await createDeterministicPrerequisiteContinuationState(workflow)
+		const replacementOldSession = getActiveWorkflowSession(replacementState)
+		replacementOldSession.branchContext.activeBranchId = "after-prerequisites"
+		replacementOldSession.prerequisiteFileResolutions = [{ prerequisiteId: "project_overview", outcome: "not_found" }]
+		const replacementOldSessionSnapshot = structuredClone(replacementOldSession)
+		const replacementResult = await runtime.resolveNextAction({ taskState: replacementState })
+		expect(replacementResult).to.deep.equal({ kind: "no_op" })
+		expect(prerequisiteDiscoveryStub.getCalls().map((call) => call.args[0].prerequisite.id)).to.deep.equal([
+			"developer_guide",
+		])
+		const replacementNewSession = getActiveWorkflowSession(replacementState)
+		expect(replacementNewSession).to.not.equal(replacementOldSession)
+		expect(replacementOldSession).to.deep.equal(replacementOldSessionSnapshot)
+		expect(replacementNewSession.prerequisiteFileResolutions).to.deep.equal([
+			{ prerequisiteId: "project_overview", outcome: "not_found" },
+			{
+				prerequisiteId: "developer_guide",
+				outcome: "found",
+				resolvedAbsolutePath: developerGuideAbsolutePath,
+			},
+		])
+		expect(replacementNewSession.workflowValues.developer_guide).to.equal(developerGuideAbsolutePath)
+		expect(replacementNewSession.workflowValues).to.deep.include(developerGuideMetadata)
+	})
+
+	it("rejects every malformed persisted deterministic prerequisite resolution shape", async () => {
+		const { projectOverviewAbsolutePath } = createDocumentProjectArtifactFixtureVocabulary()
+		const workflow = createDeterministicPrerequisiteContinuationWorkflow()
+		const malformedCases: Array<{
+			label: string
+			mutate(session: PersistedWorkflowSession): void
+		}> = [
+			{
+				label: "missing prerequisiteFileResolutions",
+				mutate: (session) => {
+					Reflect.deleteProperty(session, "prerequisiteFileResolutions")
+				},
+			},
+			{
+				label: "non-array prerequisiteFileResolutions",
+				mutate: (session) => {
+					Reflect.set(session, "prerequisiteFileResolutions", "not-an-array")
+				},
+			},
+			{
+				label: "null prerequisite result",
+				mutate: (session) => {
+					Reflect.set(session, "prerequisiteFileResolutions", [null])
+				},
+			},
+			{
+				label: "empty prerequisite id",
+				mutate: (session) => {
+					Reflect.set(session, "prerequisiteFileResolutions", [{ prerequisiteId: "", outcome: "not_found" }])
+				},
+			},
+			{
+				label: "missing outcome",
+				mutate: (session) => {
+					const result = { prerequisiteId: "project_overview", outcome: "not_found" }
+					Reflect.deleteProperty(result, "outcome")
+					Reflect.set(session, "prerequisiteFileResolutions", [result])
+				},
+			},
+			{
+				label: "unsupported outcome",
+				mutate: (session) => {
+					const result = { prerequisiteId: "project_overview", outcome: "not_found" }
+					Reflect.set(result, "outcome", "unsupported")
+					Reflect.set(session, "prerequisiteFileResolutions", [result])
+				},
+			},
+			{
+				label: "found result missing resolved path",
+				mutate: (session) => {
+					const result = {
+						prerequisiteId: "project_overview",
+						outcome: "found",
+						resolvedAbsolutePath: projectOverviewAbsolutePath,
+					}
+					Reflect.deleteProperty(result, "resolvedAbsolutePath")
+					Reflect.set(session, "prerequisiteFileResolutions", [result])
+				},
+			},
+			{
+				label: "found result empty resolved path",
+				mutate: (session) => {
+					const result = {
+						prerequisiteId: "project_overview",
+						outcome: "found",
+						resolvedAbsolutePath: projectOverviewAbsolutePath,
+					}
+					Reflect.set(result, "resolvedAbsolutePath", "")
+					Reflect.set(session, "prerequisiteFileResolutions", [result])
+				},
+			},
+			{
+				label: "found result relative resolved path",
+				mutate: (session) => {
+					const result = {
+						prerequisiteId: "project_overview",
+						outcome: "found",
+						resolvedAbsolutePath: projectOverviewAbsolutePath,
+					}
+					Reflect.set(result, "resolvedAbsolutePath", "project-overview.md")
+					Reflect.set(session, "prerequisiteFileResolutions", [result])
+				},
+			},
+			{
+				label: "not_found result with resolved path",
+				mutate: (session) => {
+					const result = { prerequisiteId: "project_overview", outcome: "not_found" }
+					Reflect.set(result, "resolvedAbsolutePath", projectOverviewAbsolutePath)
+					Reflect.set(session, "prerequisiteFileResolutions", [result])
+				},
+			},
+			{
+				label: "found result with extra property",
+				mutate: (session) => {
+					const result = {
+						prerequisiteId: "project_overview",
+						outcome: "found",
+						resolvedAbsolutePath: projectOverviewAbsolutePath,
+					}
+					Reflect.set(result, "extra", true)
+					Reflect.set(session, "prerequisiteFileResolutions", [result])
+				},
+			},
+		]
+
+		for (const malformedCase of malformedCases) {
+			const persistedSession = await createDeterministicPrerequisitePersistedSession(workflow)
+			malformedCase.mutate(persistedSession)
+			await expectPersistedRestoreFailsClosed(workflow, persistedSession)
+			expect(malformedCase.label).to.be.a("string").and.not.equal("")
+		}
+	})
+
+	it("validates persisted deterministic prerequisite resolution state consistently", async () => {
+		const { selectedProjectRoot, projectOverviewAbsolutePath, developerGuideAbsolutePath, projectOverviewMetadata } =
+			createDocumentProjectArtifactFixtureVocabulary()
+		const workflow = createDeterministicPrerequisiteContinuationWorkflow()
+		const canonicalProjectOverviewFound = () => ({
+			prerequisiteId: "project_overview" as const,
+			outcome: "found" as const,
+			resolvedAbsolutePath: projectOverviewAbsolutePath,
+		})
+		const createProjectOverviewFoundPersistedSession = async () => {
+			const persistedSession = await createDeterministicPrerequisitePersistedSession(workflow)
+			persistedSession.prerequisiteFileResolutions = [canonicalProjectOverviewFound()]
+			Object.assign(persistedSession.workflowValues, projectOverviewMetadata)
+			return persistedSession
+		}
+		const createProjectOverviewNotFoundPersistedSession = async () => {
+			const persistedSession = await createDeterministicPrerequisitePersistedSession(workflow)
+			persistedSession.prerequisiteFileResolutions = [{ prerequisiteId: "project_overview", outcome: "not_found" }]
+			return persistedSession
+		}
+		const createAllocatedProjectOverviewNotFoundPersistedSession = async () => {
+			const persistedSession = await createProjectOverviewNotFoundPersistedSession()
+			Object.assign(persistedSession.workflowValues, projectOverviewMetadata)
+			return persistedSession
+		}
+		const inconsistentCases: Array<{
+			label: string
+			create(): Promise<PersistedWorkflowSession>
+			mutate(session: PersistedWorkflowSession): void
+		}> = [
+			{
+				label: "duplicate canonical found result",
+				create: createProjectOverviewFoundPersistedSession,
+				mutate: (session) => {
+					session.prerequisiteFileResolutions = [canonicalProjectOverviewFound(), canonicalProjectOverviewFound()]
+				},
+			},
+			{
+				label: "found followed by not_found for the same prerequisite",
+				create: createProjectOverviewFoundPersistedSession,
+				mutate: (session) => {
+					session.prerequisiteFileResolutions = [
+						canonicalProjectOverviewFound(),
+						{ prerequisiteId: "project_overview", outcome: "not_found" },
+					]
+				},
+			},
+			{
+				label: "undeclared prerequisite result",
+				create: () => createDeterministicPrerequisitePersistedSession(workflow),
+				mutate: (session) => {
+					session.prerequisiteFileResolutions = [{ prerequisiteId: "undeclared_prerequisite", outcome: "not_found" }]
+				},
+			},
+			{
+				label: "developer guide result before project overview",
+				create: () => createDeterministicPrerequisitePersistedSession(workflow),
+				mutate: (session) => {
+					session.prerequisiteFileResolutions = [{ prerequisiteId: "developer_guide", outcome: "not_found" }]
+				},
+			},
+			{
+				label: "found result with a different populated path",
+				create: createProjectOverviewFoundPersistedSession,
+				mutate: (session) => {
+					session.workflowValues.project_overview = developerGuideAbsolutePath
+				},
+			},
+			{
+				label: "found result at a non-declared placement",
+				create: createProjectOverviewFoundPersistedSession,
+				mutate: (session) => {
+					const planningAbsolutePath = join(selectedProjectRoot, "planning", "project-overview.md")
+					session.prerequisiteFileResolutions = [
+						{
+							prerequisiteId: "project_overview",
+							outcome: "found",
+							resolvedAbsolutePath: planningAbsolutePath,
+						},
+					]
+					session.workflowValues.project_overview = planningAbsolutePath
+					session.workflowValues.project_overview_artifact_relative_path = join("planning", "project-overview.md")
+				},
+			},
+			{
+				label: "unresolved result with a populated path",
+				create: () => createDeterministicPrerequisitePersistedSession(workflow),
+				mutate: (session) => {
+					session.workflowValues.project_overview = projectOverviewAbsolutePath
+				},
+			},
+			{
+				label: "found result with missing artifact identity",
+				create: createProjectOverviewFoundPersistedSession,
+				mutate: (session) => {
+					Reflect.deleteProperty(session.workflowValues, "project_overview_artifact_identity")
+				},
+			},
+			{
+				label: "found result with wrong artifact identity",
+				create: createProjectOverviewFoundPersistedSession,
+				mutate: (session) => {
+					session.workflowValues.project_overview_artifact_identity = "wrong_project_overview"
+				},
+			},
+			{
+				label: "not_found result with one populated artifact output",
+				create: createProjectOverviewNotFoundPersistedSession,
+				mutate: (session) => {
+					session.workflowValues.project_overview_artifact_family = WorkflowArtifactFamily.ProjectOverview
+				},
+			},
+			{
+				label: "historical not_found result with wrong complete metadata",
+				create: createAllocatedProjectOverviewNotFoundPersistedSession,
+				mutate: (session) => {
+					session.workflowValues.project_overview_artifact_identity = "wrong_project_overview"
+				},
+			},
+		]
+
+		for (const inconsistentCase of inconsistentCases) {
+			const persistedSession = await inconsistentCase.create()
+			inconsistentCase.mutate(persistedSession)
+			await expectPersistedRestoreFailsClosed(workflow, persistedSession)
+			expect(inconsistentCase.label).to.be.a("string").and.not.equal("")
+		}
+
+		const policyRejectedSession = await createProjectOverviewFoundPersistedSession()
+		const denyCanonicalPath = sandbox.spy((filePath: string) => filePath !== projectOverviewAbsolutePath)
+		runtime = new WorkflowRuntime({
+			cwd,
+			workspacePathPolicy: { validateAccess: denyCanonicalPath },
+		})
+		await expectPersistedRestoreFailsClosed(workflow, policyRejectedSession)
+		expect(denyCanonicalPath.calledWith(projectOverviewAbsolutePath)).to.equal(true)
+
+		const validateAcceptedPath = sandbox.spy((_filePath: string) => true)
+		runtime = new WorkflowRuntime({
+			cwd,
+			workspacePathPolicy: { validateAccess: validateAcceptedPath },
+		})
+		const prerequisiteDiscoveryStub = sandbox
+			.stub(WorkflowPrerequisiteFiles, "discoverWorkflowPrerequisiteFileCandidates")
+			.resolves([])
+		for (const acceptedCase of [
+			{
+				label: "unallocated historical not_found",
+				create: createProjectOverviewNotFoundPersistedSession,
+				metadataPopulated: false,
+			},
+			{
+				label: "allocated historical not_found",
+				create: createAllocatedProjectOverviewNotFoundPersistedSession,
+				metadataPopulated: true,
+			},
+		]) {
+			prerequisiteDiscoveryStub.resetHistory()
+			validateAcceptedPath.resetHistory()
+			const persistedSession = await acceptedCase.create()
+			const restoredState = new TaskState()
+			restoredState.activeWorkflowName = workflow.name
+			registerResolvedWorkflow(workflow)
+			const result = await runtime.restorePersistedSession({
+				taskState: restoredState,
+				persistedSession,
+			})
+			expect(result, acceptedCase.label).to.deep.equal({ kind: "no_op" })
+			expect(restoredState.activeWorkflowName, acceptedCase.label).to.equal(workflow.name)
+			const restoredSession = getActiveWorkflowSession(restoredState)
+			expect(restoredSession.prerequisiteFileResolutions, acceptedCase.label).to.deep.equal([
+				{ prerequisiteId: "project_overview", outcome: "not_found" },
+				{ prerequisiteId: "developer_guide", outcome: "not_found" },
+			])
+			expect(prerequisiteDiscoveryStub.getCalls().map((call) => call.args[0].prerequisite.id)).to.deep.equal([
+				"developer_guide",
+			])
+			if (acceptedCase.metadataPopulated) {
+				expect(restoredSession.workflowValues).to.deep.include(projectOverviewMetadata)
+				expect(restoredSession.workflowValues.project_overview).to.equal(projectOverviewAbsolutePath)
+				expect(validateAcceptedPath.calledWith(projectOverviewAbsolutePath)).to.equal(true)
+			} else {
+				for (const key of Object.keys(projectOverviewMetadata).filter(
+					(key) => key !== "projectTitle" && key !== "projectFolderName",
+				)) {
+					expect(restoredSession.workflowValues[key], key).to.equal(undefined)
+				}
+			}
+		}
+	})
+
+	it("authorizes Document Project singleton allocation only from an unallocated not_found result", async () => {
+		const { selectedProjectRoot, projectOverviewAbsolutePath, projectOverviewMetadata } =
+			createDocumentProjectArtifactFixtureVocabulary()
+		const workflow = createValidDocumentProjectLinkedFixture()
+		const artifactSpecificOutputKeys = [
+			"project_overview_artifact_family",
+			"project_overview_artifact_identity",
+			"project_overview_artifact_filename",
+			"project_overview_artifact_relative_path",
+			"project_overview",
+		] as const
+		const canonicalProjectOverviewFound = () => ({
+			prerequisiteId: "project_overview" as const,
+			outcome: "found" as const,
+			resolvedAbsolutePath: projectOverviewAbsolutePath,
+		})
+		const createAllocationState = async (args?: {
+			prerequisiteFileResolutions?: ActiveWorkflowSession["prerequisiteFileResolutions"]
+			workflowValues?: WorkflowValues
+		}) => {
+			const state = new TaskState()
+			await activateWorkflow(state, workflow)
+			const session = getActiveWorkflowSession(state)
+			session.projectSelection = {
+				projectMode: "existing",
+				projectTitle: "Agent Guidance",
+				projectFolderName: "agent-guidance",
+			}
+			session.workflowValues = {
+				projectMode: "existing",
+				projectTitle: "Agent Guidance",
+				projectFolderName: "agent-guidance",
+				...(args?.workflowValues ?? {}),
+			}
+			session.lifecycle.projectSelectionCompleted = true
+			session.ui.formSession = undefined
+			session.prerequisiteFileResolutions = args?.prerequisiteFileResolutions ?? []
+			return state
+		}
+		const expectAllocationFailure = async (args: { state: TaskState; expectedMessage: string; label: string }) => {
+			const session = getActiveWorkflowSession(args.state)
+			const workflowValuesSnapshot = structuredClone(session.workflowValues)
+			const resolutionsSnapshot = structuredClone(session.prerequisiteFileResolutions)
+			const selectedProjectRootExisted = await pathExists(selectedProjectRoot)
+			const projectOverviewExisted = await pathExists(projectOverviewAbsolutePath)
+			let capturedError: unknown
+			try {
+				await runtime.createWorkflowArtifact({
+					taskState: args.state,
+					artifactId: "project_overview",
+					expectedArtifactAbsolutePath: undefined,
+				})
+			} catch (error) {
+				capturedError = error
+			}
+
+			expect(capturedError, args.label).to.be.instanceOf(Error)
+			expect((capturedError as Error).message, args.label).to.equal(args.expectedMessage)
+			expect(session.workflowValues, args.label).to.deep.equal(workflowValuesSnapshot)
+			expect(session.prerequisiteFileResolutions, args.label).to.deep.equal(resolutionsSnapshot)
+			expect(await pathExists(selectedProjectRoot), args.label).to.equal(selectedProjectRootExisted)
+			expect(await pathExists(projectOverviewAbsolutePath), args.label).to.equal(projectOverviewExisted)
+		}
+		const authorizationError =
+			"Cannot allocate workflow artifact project_overview because its linked deterministic prerequisite is not a completed not_found result with entirely unset artifact outputs."
+		const validatorError =
+			"Workflow prerequisite file resolution state is inconsistent with the active workflow definition or session."
+
+		for (const authorizationCase of [
+			{
+				label: "unresolved prerequisite",
+				prerequisiteFileResolutions: [],
+				workflowValues: {},
+			},
+			{
+				label: "found prerequisite",
+				prerequisiteFileResolutions: [canonicalProjectOverviewFound()],
+				workflowValues: projectOverviewMetadata,
+			},
+			{
+				label: "already allocated historical not_found prerequisite",
+				prerequisiteFileResolutions: [{ prerequisiteId: "project_overview" as const, outcome: "not_found" as const }],
+				workflowValues: projectOverviewMetadata,
+			},
+		]) {
+			await expectAllocationFailure({
+				state: await createAllocationState(authorizationCase),
+				expectedMessage: authorizationError,
+				label: authorizationCase.label,
+			})
+		}
+
+		const validatorCases: Array<{
+			label: string
+			prerequisiteFileResolutions: ActiveWorkflowSession["prerequisiteFileResolutions"]
+			workflowValues: WorkflowValues
+		}> = [
+			{
+				label: "duplicate not_found results",
+				prerequisiteFileResolutions: [
+					{ prerequisiteId: "project_overview" as const, outcome: "not_found" as const },
+					{ prerequisiteId: "project_overview" as const, outcome: "not_found" as const },
+				],
+				workflowValues: {},
+			},
+			{
+				label: "not_found followed by found",
+				prerequisiteFileResolutions: [
+					{ prerequisiteId: "project_overview" as const, outcome: "not_found" as const },
+					canonicalProjectOverviewFound(),
+				],
+				workflowValues: {},
+			},
+			{
+				label: "partially populated not_found metadata",
+				prerequisiteFileResolutions: [{ prerequisiteId: "project_overview" as const, outcome: "not_found" as const }],
+				workflowValues: {
+					project_overview_artifact_family: WorkflowArtifactFamily.ProjectOverview,
+				},
+			},
+			{
+				label: "unresolved prerequisite with populated path",
+				prerequisiteFileResolutions: [],
+				workflowValues: { project_overview: projectOverviewAbsolutePath },
+			},
+			{
+				label: "found prerequisite with wrong artifact identity",
+				prerequisiteFileResolutions: [canonicalProjectOverviewFound()],
+				workflowValues: {
+					...projectOverviewMetadata,
+					project_overview_artifact_identity: "wrong_project_overview",
+				},
+			},
+		]
+		for (const validatorCase of validatorCases) {
+			await expectAllocationFailure({
+				state: await createAllocationState(validatorCase),
+				expectedMessage: validatorError,
+				label: validatorCase.label,
+			})
+		}
+
+		const deniedFoundState = await createAllocationState({
+			prerequisiteFileResolutions: [canonicalProjectOverviewFound()],
+			workflowValues: projectOverviewMetadata,
+		})
+		runtime = new WorkflowRuntime({
+			cwd,
+			workspacePathPolicy: {
+				validateAccess: (filePath) => filePath !== projectOverviewAbsolutePath,
+			},
+		})
+		await expectAllocationFailure({
+			state: deniedFoundState,
+			expectedMessage: `Workflow runtime path is blocked by workspace path policy: ${projectOverviewAbsolutePath}`,
+			label: "policy-rejected canonical found path",
+		})
+
+		runtime = new WorkflowRuntime({ cwd, workspacePathPolicy: createAllowAllWorkspacePathPolicy() })
+		const validState = await createAllocationState({
+			prerequisiteFileResolutions: [{ prerequisiteId: "project_overview", outcome: "not_found" }],
+		})
+		const allocation = await runtime.createWorkflowArtifact({
+			taskState: validState,
+			artifactId: "project_overview",
+			expectedArtifactAbsolutePath: undefined,
+		})
+		expect(allocation.artifactAbsolutePath).to.equal(projectOverviewAbsolutePath)
+		expect(getActiveWorkflowSession(validState).workflowValues).to.deep.include(projectOverviewMetadata)
+		expect(await readFile(projectOverviewAbsolutePath, "utf8")).to.equal("")
+
+		await rm(projectOverviewAbsolutePath)
+		await writeFile(projectOverviewAbsolutePath, "collision project overview sentinel\n", "utf8")
+		const collisionState = await createAllocationState({
+			prerequisiteFileResolutions: [{ prerequisiteId: "project_overview", outcome: "not_found" }],
+		})
+		const collisionSession = getActiveWorkflowSession(collisionState)
+		const collisionValuesSnapshot = structuredClone(collisionSession.workflowValues)
+		const collisionResultsSnapshot = structuredClone(collisionSession.prerequisiteFileResolutions)
+		let collisionError: unknown
+		try {
+			await runtime.createWorkflowArtifact({
+				taskState: collisionState,
+				artifactId: "project_overview",
+				expectedArtifactAbsolutePath: undefined,
+			})
+		} catch (error) {
+			collisionError = error
+		}
+
+		expect(collisionError).to.be.instanceOf(Error)
+		expect((collisionError as NodeJS.ErrnoException).code).to.equal("EEXIST")
+		expect(await readdir(selectedProjectRoot)).to.deep.equal(["project-overview.md"])
+		expect(await readFile(projectOverviewAbsolutePath, "utf8")).to.equal("collision project overview sentinel\n")
+		expect(collisionSession.workflowValues).to.deep.equal(collisionValuesSnapshot)
+		expect(collisionSession.prerequisiteFileResolutions).to.deep.equal(collisionResultsSnapshot)
+		for (const key of artifactSpecificOutputKeys) {
+			expect(collisionSession.workflowValues[key], key).to.equal(undefined)
+		}
+	})
+
+	it("runs the shipped Document Project generation sequence for all four reference-file states", async () => {
+		const { projectOverviewAbsolutePath, developerGuideAbsolutePath } = createDocumentProjectArtifactFixtureVocabulary()
+		const prerequisiteDiscoveryStub = sandbox.stub(WorkflowPrerequisiteFiles, "discoverWorkflowPrerequisiteFileCandidates")
+		const presenceCases = [
+			{
+				label: "neither reference document found",
+				projectOverviewFound: false,
+				developerGuideFound: false,
+				panelId: DOCUMENT_PROJECT_STEP_1_PANEL_A_ID,
+				flags: [true, true] as const,
+				expectedOrder: [
+					"allocate:project_overview",
+					"build:project_overview",
+					"allocate:developer_guide",
+					"build:developer_guide",
+				],
+			},
+			{
+				label: "only developer guide found",
+				projectOverviewFound: false,
+				developerGuideFound: true,
+				panelId: DOCUMENT_PROJECT_STEP_1_PANEL_B_ID,
+				flags: [true, false] as const,
+				expectedOrder: ["allocate:project_overview", "build:project_overview"],
+			},
+			{
+				label: "only project overview found",
+				projectOverviewFound: true,
+				developerGuideFound: false,
+				panelId: DOCUMENT_PROJECT_STEP_1_PANEL_C_ID,
+				flags: [false, true] as const,
+				expectedOrder: ["allocate:developer_guide", "build:developer_guide"],
+			},
+			{
+				label: "both reference documents found",
+				projectOverviewFound: true,
+				developerGuideFound: true,
+				panelId: DOCUMENT_PROJECT_STEP_1_PANEL_D_ID,
+				flags: [false, false] as const,
+				expectedOrder: [],
+			},
+		] as const
+
+		for (const presenceCase of presenceCases) {
+			const projectOverviewSentinel = `# ${presenceCase.label} project overview sentinel\n`
+			const developerGuideSentinel = `# ${presenceCase.label} developer guide sentinel\n`
+			const { state, step1Action } = await startDocumentProjectReferenceFileState({
+				prerequisiteDiscoveryStub,
+				projectOverviewFound: presenceCase.projectOverviewFound,
+				developerGuideFound: presenceCase.developerGuideFound,
+				projectOverviewSentinel,
+				developerGuideSentinel,
+			})
+			expect(step1Action.kind, presenceCase.label).to.equal("render_workflow_form")
+			if (step1Action.kind !== "render_workflow_form") {
+				throw new Error(`Expected Document Project Step 1 form for ${presenceCase.label}.`)
+			}
+			expect(step1Action.formSession.workflowFormId, presenceCase.label).to.equal(DOCUMENT_PROJECT_STEP_1_FORM_ID)
+			expect(step1Action.formSession.currentPanelId, presenceCase.label).to.equal(presenceCase.panelId)
+
+			let nextAction = await submitDocumentProjectStep1Form(state)
+			const expectedProjectOverviewCreationRequired = presenceCase.flags[0]
+			const expectedDeveloperGuideCreationRequired = presenceCase.flags[1]
+			const expectCreationFlagsUnchanged = () => {
+				const workflowValues = getActiveWorkflowSession(state).workflowValues
+				expect(workflowValues.project_overview_creation_required, presenceCase.label).to.equal(
+					expectedProjectOverviewCreationRequired,
+				)
+				expect(workflowValues.developer_guide_creation_required, presenceCase.label).to.equal(
+					expectedDeveloperGuideCreationRequired,
+				)
+			}
+			expectCreationFlagsUnchanged()
+
+			const operationOrder: string[] = []
+			while (nextAction.kind === "execute_tool_backed_operation") {
+				const operationAction = nextAction
+				if (operationAction.toolRequest.toolName === ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT) {
+					const artifactId = operationAction.toolRequest.toolParams.artifact_id
+					operationOrder.push(`allocate:${artifactId}`)
+					nextAction = await completeSuccessfulDocumentProjectAllocation(state, artifactId, operationAction)
+					expectCreationFlagsUnchanged()
+					continue
+				}
+
+				expect(operationAction.toolRequest.toolName, presenceCase.label).to.equal(
+					ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT,
+				)
+				const artifactId = operationAction.toolRequest.toolParams.artifact_id
+				operationOrder.push(`build:${artifactId}`)
+				if (artifactId === DOCUMENT_PROJECT_PROJECT_OVERVIEW_ARTIFACT_ID) {
+					expect(operationAction.toolRequest.toolParams, presenceCase.label).to.deep.equal({
+						artifact_id: DOCUMENT_PROJECT_PROJECT_OVERVIEW_ARTIFACT_ID,
+						destination_path: projectOverviewAbsolutePath,
+						content: buildInitialProjectOverviewDocument(),
+					})
+				} else {
+					expect(operationAction.toolRequest.toolParams, presenceCase.label).to.deep.equal({
+						artifact_id: DOCUMENT_PROJECT_DEVELOPER_GUIDE_ARTIFACT_ID,
+						destination_path: developerGuideAbsolutePath,
+						content: buildInitialDeveloperGuideDocument(),
+					})
+				}
+				expect(operationAction.toolRequest.toolInput, presenceCase.label).to.deep.equal({})
+				await writeFile(
+					operationAction.toolRequest.toolParams.destination_path,
+					operationAction.toolRequest.toolParams.content,
+					"utf8",
+				)
+				nextAction = await completeSuccessfulDocumentProjectBuild(state, operationAction)
+				expectCreationFlagsUnchanged()
+			}
+
+			expect(operationOrder, presenceCase.label).to.deep.equal(presenceCase.expectedOrder)
+			if (presenceCase.projectOverviewFound) {
+				expect(
+					operationOrder.some((entry) => entry.endsWith(":project_overview")),
+					presenceCase.label,
+				).to.equal(false)
+				expect(await readFile(projectOverviewAbsolutePath, "utf8"), presenceCase.label).to.equal(projectOverviewSentinel)
+			} else {
+				expect(await readFile(projectOverviewAbsolutePath, "utf8"), presenceCase.label).to.equal(
+					buildInitialProjectOverviewDocument(),
+				)
+			}
+			if (presenceCase.developerGuideFound) {
+				expect(
+					operationOrder.some((entry) => entry.endsWith(":developer_guide")),
+					presenceCase.label,
+				).to.equal(false)
+				expect(await readFile(developerGuideAbsolutePath, "utf8"), presenceCase.label).to.equal(developerGuideSentinel)
+			} else {
+				expect(await readFile(developerGuideAbsolutePath, "utf8"), presenceCase.label).to.equal(
+					buildInitialDeveloperGuideDocument(),
+				)
+			}
+			if (presenceCase.flags[0] === false && presenceCase.flags[1] === false) {
+				expect(nextAction.kind, presenceCase.label).to.equal("project_prompt")
+			} else {
+				expect(nextAction.kind, presenceCase.label).to.equal("render_workflow_form")
+				if (nextAction.kind === "render_workflow_form") {
+					expect(nextAction.formSession.workflowFormId, presenceCase.label).to.equal(DOCUMENT_PROJECT_STEP_3_FORM_ID)
+				}
+			}
+		}
+	})
+
+	it("routes every shipped Document Project runtime failure to its module-owned terminal error", async () => {
+		const { projectOverviewAbsolutePath, developerGuideAbsolutePath, projectOverviewMetadata, developerGuideMetadata } =
+			createDocumentProjectArtifactFixtureVocabulary()
+		const prerequisiteDiscoveryStub = sandbox.stub(WorkflowPrerequisiteFiles, "discoverWorkflowPrerequisiteFileCandidates")
+		const requireOperation = (action: WorkflowNextAction, label: string) => {
+			expect(action.kind, label).to.equal("execute_tool_backed_operation")
+			if (action.kind !== "execute_tool_backed_operation") {
+				throw new Error(`Expected Document Project tool-backed operation for ${label}.`)
+			}
+			return action
+		}
+		const expectTerminalFailure = (
+			action: WorkflowNextAction,
+			expectedErrorMessage: string,
+			state: TaskState,
+			label: string,
+		) => {
+			expect(action.kind, label).to.equal("terminal_error")
+			if (action.kind !== "terminal_error") {
+				throw new Error(`Expected Document Project terminal error for ${label}.`)
+			}
+			expect(action.errorMessage, label).to.equal(expectedErrorMessage)
+			expect(state.activeWorkflowName, label).to.equal(undefined)
+			expect(state.activeWorkflowSession, label).to.equal(undefined)
+			expect(state.currentFocusChainChecklist, label).to.equal(null)
+		}
+		const startFirstStep2Action = async (projectOverviewFound: boolean, developerGuideFound: boolean) => {
+			const { state } = await startDocumentProjectReferenceFileState({
+				prerequisiteDiscoveryStub,
+				projectOverviewFound,
+				developerGuideFound,
+				projectOverviewSentinel: "# failure project overview sentinel\n",
+				developerGuideSentinel: "# failure developer guide sentinel\n",
+			})
+			return { state, action: requireOperation(await submitDocumentProjectStep1Form(state), "Step 2 start") }
+		}
+
+		{
+			const { state, action: firstAllocation } = await startFirstStep2Action(false, false)
+			expect(firstAllocation.toolRequest.toolName).to.equal(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
+			expect(firstAllocation.toolRequest.toolParams.artifact_id).to.equal(DOCUMENT_PROJECT_PROJECT_OVERVIEW_ARTIFACT_ID)
+			const retryAllocation = requireOperation(
+				await runtime.handleToolBackedOperationToolResult({
+					taskState: state,
+					toolResultText: formatResponse.toolError("injected"),
+					runtimeOwnedSourceRoute: firstAllocation.runtimeOwnedSourceRoute,
+				}),
+				"Project Overview allocation retry",
+			)
+			expect(retryAllocation.toolRequest.toolName).to.equal(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
+			expect(retryAllocation.toolRequest.toolParams.artifact_id).to.equal(DOCUMENT_PROJECT_PROJECT_OVERVIEW_ARTIFACT_ID)
+			const terminal = await runtime.handleToolBackedOperationToolResult({
+				taskState: state,
+				toolResultText: formatResponse.toolError("injected"),
+				runtimeOwnedSourceRoute: retryAllocation.runtimeOwnedSourceRoute,
+			})
+			expectTerminalFailure(
+				terminal,
+				DOCUMENT_PROJECT_PROJECT_OVERVIEW_ALLOCATION_TERMINAL_ERROR,
+				state,
+				"Project Overview allocation exhaustion",
+			)
+		}
+
+		{
+			const { state, action: allocation } = await startFirstStep2Action(false, false)
+			const buildAction = requireOperation(
+				await completeSuccessfulDocumentProjectAllocation(
+					state,
+					DOCUMENT_PROJECT_PROJECT_OVERVIEW_ARTIFACT_ID,
+					allocation,
+				),
+				"Project Overview build",
+			)
+			expect(buildAction.toolRequest.toolName).to.equal(ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT)
+			const terminal = await runtime.handleToolBackedOperationToolResult({
+				taskState: state,
+				toolResultText: formatResponse.toolError("injected"),
+				runtimeOwnedSourceRoute: buildAction.runtimeOwnedSourceRoute,
+			})
+			expectTerminalFailure(
+				terminal,
+				DOCUMENT_PROJECT_PROJECT_OVERVIEW_BUILD_TERMINAL_ERROR,
+				state,
+				"Project Overview build failure",
+			)
+			expect(await readFile(projectOverviewAbsolutePath, "utf8")).to.equal("")
+		}
+
+		{
+			const { state, action: firstAllocation } = await startFirstStep2Action(true, false)
+			expect(firstAllocation.toolRequest.toolName).to.equal(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
+			expect(firstAllocation.toolRequest.toolParams.artifact_id).to.equal(DOCUMENT_PROJECT_DEVELOPER_GUIDE_ARTIFACT_ID)
+			const retryAllocation = requireOperation(
+				await runtime.handleToolBackedOperationToolResult({
+					taskState: state,
+					toolResultText: formatResponse.toolError("injected"),
+					runtimeOwnedSourceRoute: firstAllocation.runtimeOwnedSourceRoute,
+				}),
+				"Developer Guide allocation retry",
+			)
+			expect(retryAllocation.toolRequest.toolName).to.equal(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
+			expect(retryAllocation.toolRequest.toolParams.artifact_id).to.equal(DOCUMENT_PROJECT_DEVELOPER_GUIDE_ARTIFACT_ID)
+			const terminal = await runtime.handleToolBackedOperationToolResult({
+				taskState: state,
+				toolResultText: formatResponse.toolError("injected"),
+				runtimeOwnedSourceRoute: retryAllocation.runtimeOwnedSourceRoute,
+			})
+			expectTerminalFailure(
+				terminal,
+				DOCUMENT_PROJECT_DEVELOPER_GUIDE_ALLOCATION_TERMINAL_ERROR,
+				state,
+				"Developer Guide allocation exhaustion",
+			)
+			expect(await readFile(projectOverviewAbsolutePath, "utf8")).to.equal("# failure project overview sentinel\n")
+		}
+
+		{
+			const { state, action: allocation } = await startFirstStep2Action(true, false)
+			const buildAction = requireOperation(
+				await completeSuccessfulDocumentProjectAllocation(
+					state,
+					DOCUMENT_PROJECT_DEVELOPER_GUIDE_ARTIFACT_ID,
+					allocation,
+				),
+				"Developer Guide build",
+			)
+			expect(buildAction.toolRequest.toolName).to.equal(ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT)
+			const terminal = await runtime.handleToolBackedOperationToolResult({
+				taskState: state,
+				toolResultText: formatResponse.toolError("injected"),
+				runtimeOwnedSourceRoute: buildAction.runtimeOwnedSourceRoute,
+			})
+			expectTerminalFailure(
+				terminal,
+				DOCUMENT_PROJECT_DEVELOPER_GUIDE_BUILD_TERMINAL_ERROR,
+				state,
+				"Developer Guide build failure",
+			)
+			expect(await readFile(developerGuideAbsolutePath, "utf8")).to.equal("")
+			expect(await readFile(projectOverviewAbsolutePath, "utf8")).to.equal("# failure project overview sentinel\n")
+		}
+
+		const referenceFailureState = await createDocumentProjectRuntimeState({
+			activeStepNumber: 1,
+			activeBranchId: "step-1-validate-branch",
+			workflowValues: {
+				...projectOverviewMetadata,
+				project_overview: developerGuideAbsolutePath,
+			},
+			prerequisiteFileResolutions: [
+				{
+					prerequisiteId: "project_overview",
+					outcome: "found",
+					resolvedAbsolutePath: projectOverviewAbsolutePath,
+				},
+				{ prerequisiteId: "developer_guide", outcome: "not_found" },
+			],
+		})
+		const referenceTerminal = await runtime.resolveNextAction({ taskState: referenceFailureState })
+		expectTerminalFailure(
+			referenceTerminal,
+			DOCUMENT_PROJECT_REFERENCE_DOCUMENT_STATE_TERMINAL_ERROR,
+			referenceFailureState,
+			"invalid reference-document state",
+		)
+
+		const baselineFailureState = await createDocumentProjectRuntimeState({
+			activeStepNumber: 3,
+			activeBranchId: "step-3-route-branch",
+			workflowValues: {
+				...projectOverviewMetadata,
+				...developerGuideMetadata,
+				project_overview_creation_required: true,
+			},
+			prerequisiteFileResolutions: [
+				{ prerequisiteId: "project_overview", outcome: "not_found" },
+				{ prerequisiteId: "developer_guide", outcome: "not_found" },
+			],
+		})
+		const baselineTerminal = await runtime.resolveNextAction({ taskState: baselineFailureState })
+		expectTerminalFailure(
+			baselineTerminal,
+			DOCUMENT_PROJECT_BASELINE_DATA_TERMINAL_ERROR,
+			baselineFailureState,
+			"invalid baseline-data state",
+		)
+
+		const documentationFailureState = await createDocumentProjectRuntimeState({
+			activeStepNumber: 4,
+			activeBranchId: "step-4-prompt-branch",
+			workflowValues: {
+				...projectOverviewMetadata,
+				...developerGuideMetadata,
+				project_overview_creation_required: false,
+				developer_guide_creation_required: false,
+				session_objective: "unsupported",
+			},
+			prerequisiteFileResolutions: [
+				{ prerequisiteId: "project_overview", outcome: "not_found" },
+				{ prerequisiteId: "developer_guide", outcome: "not_found" },
+			],
+		})
+		const documentationTerminal = await runtime.resolveNextAction({ taskState: documentationFailureState })
+		expectTerminalFailure(
+			documentationTerminal,
+			DOCUMENT_PROJECT_DOCUMENTATION_TASK_TERMINAL_ERROR,
+			documentationFailureState,
+			"invalid documentation objective",
+		)
+	})
+
+	it("restores all shared Document Project allocation and build continuation boundaries", async () => {
+		const { projectOverviewAbsolutePath, projectOverviewMetadata } = createDocumentProjectArtifactFixtureVocabulary()
+		const prerequisiteDiscoveryStub = sandbox.stub(WorkflowPrerequisiteFiles, "discoverWorkflowPrerequisiteFileCandidates")
+		const { state } = await startDocumentProjectReferenceFileState({
+			prerequisiteDiscoveryStub,
+			projectOverviewFound: false,
+			developerGuideFound: false,
+		})
+		const initialAllocationAction = await submitDocumentProjectStep1Form(state)
+		expect(initialAllocationAction.kind).to.equal("execute_tool_backed_operation")
+		if (initialAllocationAction.kind !== "execute_tool_backed_operation") {
+			throw new Error("Expected initial Document Project allocation action.")
+		}
+		expect(initialAllocationAction.toolRequest.toolName).to.equal(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
+		expect(initialAllocationAction.toolRequest.toolParams.artifact_id).to.equal(DOCUMENT_PROJECT_PROJECT_OVERVIEW_ARTIFACT_ID)
+
+		const createWorkflowArtifactSpy = sandbox.spy(runtime, "createWorkflowArtifact")
+		await runtime.createWorkflowArtifact({
+			taskState: state,
+			artifactId: DOCUMENT_PROJECT_PROJECT_OVERVIEW_ARTIFACT_ID,
+			expectedArtifactAbsolutePath: undefined,
+		})
+		expect(await readFile(projectOverviewAbsolutePath, "utf8")).to.equal("")
+		expect(createWorkflowArtifactSpy.callCount).to.equal(1)
+		const allocationPersistedSession = runtime.getPersistedSession({ taskState: state })
+		if (allocationPersistedSession === undefined) {
+			throw new Error("Expected persisted Document Project allocation boundary.")
+		}
+
+		const allocationRestoredState = new TaskState()
+		allocationRestoredState.activeWorkflowName = documentProjectWorkflowDefinition.name
+		registerResolvedWorkflow(documentProjectWorkflowDefinition)
+		const restoredAllocationAction = await runtime.restorePersistedSession({
+			taskState: allocationRestoredState,
+			persistedSession: allocationPersistedSession,
+		})
+		expect(restoredAllocationAction?.kind).to.equal("execute_tool_backed_operation")
+		if (restoredAllocationAction?.kind === "execute_tool_backed_operation") {
+			expect(restoredAllocationAction.toolRequest.toolName).to.equal(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
+			expect(restoredAllocationAction.toolRequest.toolParams.artifact_id).to.equal(
+				DOCUMENT_PROJECT_PROJECT_OVERVIEW_ARTIFACT_ID,
+			)
+		}
+		const recoveredBuildAction = await runtime.handleToolBackedOperationToolResult({
+			taskState: allocationRestoredState,
+			toolResultText: JSON.stringify({ ok: true }),
+			runtimeOwnedSourceRoute: undefined,
+		})
+		expect(recoveredBuildAction.kind).to.equal("execute_tool_backed_operation")
+		if (recoveredBuildAction.kind !== "execute_tool_backed_operation") {
+			throw new Error("Expected recovered Document Project build action.")
+		}
+		expect(recoveredBuildAction.toolRequest.toolName).to.equal(ClineDefaultTool.BUILD_WORKFLOW_DOCUMENT)
+		expect(recoveredBuildAction.toolRequest.toolParams).to.deep.equal({
+			artifact_id: DOCUMENT_PROJECT_PROJECT_OVERVIEW_ARTIFACT_ID,
+			destination_path: projectOverviewAbsolutePath,
+			content: buildInitialProjectOverviewDocument(),
+		})
+		expect(createWorkflowArtifactSpy.callCount).to.equal(1)
+
+		await writeFile(projectOverviewAbsolutePath, buildInitialProjectOverviewDocument(), "utf8")
+		const realBuildResult = JSON.stringify({
+			persisted: true,
+			artifact_id: DOCUMENT_PROJECT_PROJECT_OVERVIEW_ARTIFACT_ID,
+			destination_path: projectOverviewAbsolutePath,
+			document_updated: true,
+			workflow_value_writes_applied: false,
+			changed_workflow_value_keys: [],
+			unchanged_workflow_value_keys: [],
+		})
+		const buildPersistedSession = runtime.getPersistedSession({ taskState: allocationRestoredState })
+		if (buildPersistedSession === undefined) {
+			throw new Error("Expected persisted Document Project build boundary.")
+		}
+
+		const buildRestoredState = new TaskState()
+		buildRestoredState.activeWorkflowName = documentProjectWorkflowDefinition.name
+		registerResolvedWorkflow(documentProjectWorkflowDefinition)
+		const restoredBuildAction = await runtime.restorePersistedSession({
+			taskState: buildRestoredState,
+			persistedSession: buildPersistedSession,
+		})
+		expect(restoredBuildAction).to.deep.equal({ kind: "no_op" })
+		const nextArtifactAction = await runtime.handleToolBackedOperationToolResult({
+			taskState: buildRestoredState,
+			toolResultText: realBuildResult,
+			runtimeOwnedSourceRoute: undefined,
+		})
+		expect(nextArtifactAction.kind).to.equal("execute_tool_backed_operation")
+		if (nextArtifactAction.kind !== "execute_tool_backed_operation") {
+			throw new Error("Expected recovered Developer Guide allocation action.")
+		}
+		expect(nextArtifactAction.toolRequest.toolName).to.equal(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
+		expect(nextArtifactAction.toolRequest.toolParams.artifact_id).to.equal(DOCUMENT_PROJECT_DEVELOPER_GUIDE_ARTIFACT_ID)
+		expect(await readFile(projectOverviewAbsolutePath, "utf8")).to.equal(buildInitialProjectOverviewDocument())
+		expect(createWorkflowArtifactSpy.callCount).to.equal(1)
+
+		const initializedFirstArtifactSession = getActiveWorkflowSession(buildRestoredState)
+		expect(initializedFirstArtifactSession.workflowValues).to.deep.include(projectOverviewMetadata)
+		const initializedFirstArtifactPersistedSession = runtime.getPersistedSession({ taskState: buildRestoredState })
+		if (initializedFirstArtifactPersistedSession === undefined) {
+			throw new Error("Expected persisted initialized first Document Project artifact.")
+		}
+		const initializedFirstArtifactRestoredState = new TaskState()
+		initializedFirstArtifactRestoredState.activeWorkflowName = documentProjectWorkflowDefinition.name
+		registerResolvedWorkflow(documentProjectWorkflowDefinition)
+		const restoredNextArtifactAction = await runtime.restorePersistedSession({
+			taskState: initializedFirstArtifactRestoredState,
+			persistedSession: initializedFirstArtifactPersistedSession,
+		})
+		expect(restoredNextArtifactAction?.kind).to.equal("execute_tool_backed_operation")
+		if (restoredNextArtifactAction?.kind !== "execute_tool_backed_operation") {
+			throw new Error("Expected restored Developer Guide allocation continuation.")
+		}
+		expect(restoredNextArtifactAction.toolRequest.toolName).to.equal(ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT)
+		expect(restoredNextArtifactAction.toolRequest.toolParams.artifact_id).to.equal(
+			DOCUMENT_PROJECT_DEVELOPER_GUIDE_ARTIFACT_ID,
+		)
+		expect(await readFile(projectOverviewAbsolutePath, "utf8")).to.equal(buildInitialProjectOverviewDocument())
+		expect(createWorkflowArtifactSpy.callCount).to.equal(1)
+	})
+
+	it("persists every Document Project Step 3 path and tears down cleanly after completion", async () => {
+		const { projectOverviewMetadata, developerGuideMetadata } = createDocumentProjectArtifactFixtureVocabulary()
+		const panelFixtures: Array<{
+			panelId: string
+			workflowValueKey: string
+			submittedValue: WorkflowFormValue
+			durableValue: string | boolean
+		}> = [
+			{
+				panelId: DOCUMENT_PROJECT_STEP_3_PANEL_A_ID,
+				workflowValueKey: "repo_type",
+				submittedValue: { stringValue: "Monolith: Single cohesive codebase" },
+				durableValue: "Monolith: Single cohesive codebase",
+			},
+			{
+				panelId: DOCUMENT_PROJECT_STEP_3_PANEL_B_ID,
+				workflowValueKey: "product_type",
+				submittedValue: { stringValue: "extension" },
+				durableValue: "extension",
+			},
+			{
+				panelId: DOCUMENT_PROJECT_STEP_3_PANEL_C_ID,
+				workflowValueKey: "primary_programming_language",
+				submittedValue: { stringValue: "TypeScript" },
+				durableValue: "TypeScript",
+			},
+			{
+				panelId: DOCUMENT_PROJECT_STEP_3_PANEL_D_ID,
+				workflowValueKey: "repo_status",
+				submittedValue: { stringValue: "Brownfield: Established project with existing architecture" },
+				durableValue: "Brownfield: Established project with existing architecture",
+			},
+			{
+				panelId: DOCUMENT_PROJECT_STEP_3_PANEL_E_ID,
+				workflowValueKey: "api_indicator",
+				submittedValue: { booleanValue: true },
+				durableValue: true,
+			},
+			{
+				panelId: DOCUMENT_PROJECT_STEP_3_PANEL_F_ID,
+				workflowValueKey: "database_indicator",
+				submittedValue: { booleanValue: false },
+				durableValue: false,
+			},
+			{
+				panelId: DOCUMENT_PROJECT_STEP_3_PANEL_G_ID,
+				workflowValueKey: "state_management_indicator",
+				submittedValue: { booleanValue: true },
+				durableValue: true,
+			},
+			{
+				panelId: DOCUMENT_PROJECT_STEP_3_PANEL_H_ID,
+				workflowValueKey: "ui_indicator",
+				submittedValue: { booleanValue: true },
+				durableValue: true,
+			},
+			{
+				panelId: DOCUMENT_PROJECT_STEP_3_PANEL_I_ID,
+				workflowValueKey: "deployment_indicator",
+				submittedValue: { booleanValue: false },
+				durableValue: false,
+			},
+			{
+				panelId: DOCUMENT_PROJECT_STEP_3_PANEL_J_ID,
+				workflowValueKey: "recent_project",
+				submittedValue: { stringValue: "Recent project durable value" },
+				durableValue: "Recent project durable value",
+			},
+			{
+				panelId: DOCUMENT_PROJECT_STEP_3_PANEL_K_ID,
+				workflowValueKey: "planned_enhancements",
+				submittedValue: { stringValue: "Planned enhancements durable value" },
+				durableValue: "Planned enhancements durable value",
+			},
+			{
+				panelId: DOCUMENT_PROJECT_STEP_3_PANEL_L_ID,
+				workflowValueKey: "known_issues",
+				submittedValue: { stringValue: "Known issues durable value" },
+				durableValue: "Known issues durable value",
+			},
+		]
+		const pathCases = [
+			{
+				label: "skip",
+				projectOverviewCreationRequired: false,
+				developerGuideCreationRequired: false,
+				panelIds: [],
+			},
+			{
+				label: "A-I",
+				projectOverviewCreationRequired: true,
+				developerGuideCreationRequired: false,
+				panelIds: panelFixtures.slice(0, 9).map((panel) => panel.panelId),
+			},
+			{
+				label: "J-L",
+				projectOverviewCreationRequired: false,
+				developerGuideCreationRequired: true,
+				panelIds: panelFixtures.slice(9).map((panel) => panel.panelId),
+			},
+			{
+				label: "A-L",
+				projectOverviewCreationRequired: true,
+				developerGuideCreationRequired: true,
+				panelIds: panelFixtures.map((panel) => panel.panelId),
+			},
+		]
+
+		for (const pathCase of pathCases) {
+			const skippedSentinels = Object.fromEntries(
+				panelFixtures.map((panel) => [panel.workflowValueKey, `skipped:${pathCase.label}:${panel.panelId}`]),
+			)
+			const state = await createDocumentProjectRuntimeState({
+				activeStepNumber: 3,
+				activeBranchId: "step-3-route-branch",
+				workflowValues: {
+					...projectOverviewMetadata,
+					...developerGuideMetadata,
+					...skippedSentinels,
+					project_overview_creation_required: pathCase.projectOverviewCreationRequired,
+					developer_guide_creation_required: pathCase.developerGuideCreationRequired,
+					session_objective: "Update existing documents",
+				},
+				prerequisiteFileResolutions: [
+					{ prerequisiteId: "project_overview", outcome: "not_found" },
+					{ prerequisiteId: "developer_guide", outcome: "not_found" },
+				],
+			})
+			let nextAction = await runtime.resolveNextAction({ taskState: state })
+			let finalFormSession: ActiveWorkflowSession["ui"]["formSession"]
+			for (const [panelIndex, panelId] of pathCase.panelIds.entries()) {
+				expect(nextAction.kind, pathCase.label).to.equal("render_workflow_form")
+				if (nextAction.kind !== "render_workflow_form") {
+					throw new Error(`Expected Document Project Step 3 panel ${panelId}.`)
+				}
+				expect(nextAction.formSession.workflowFormId, pathCase.label).to.equal(DOCUMENT_PROJECT_STEP_3_FORM_ID)
+				expect(nextAction.formSession.currentPanelId, pathCase.label).to.equal(panelId)
+				const panelFixture = panelFixtures.find((panel) => panel.panelId === panelId)
+				if (panelFixture === undefined) {
+					throw new Error(`Expected Document Project Step 3 fixture for ${panelId}.`)
+				}
+				if (panelIndex === pathCase.panelIds.length - 1) {
+					finalFormSession = structuredClone(getActiveFormSession(state))
+				}
+				const returnedAction = await submitActiveWorkflowFormPanelFields(state, [
+					{ key: panelFixture.workflowValueKey, value: panelFixture.submittedValue },
+				])
+				expect(getActiveWorkflowSession(state).workflowValues[panelFixture.workflowValueKey], pathCase.label).to.equal(
+					panelFixture.durableValue,
+				)
+				nextAction = returnedAction
+				const nextPanelId = pathCase.panelIds[panelIndex + 1]
+				if (nextPanelId !== undefined) {
+					expect(nextAction.kind, pathCase.label).to.equal("render_workflow_form")
+					if (nextAction.kind === "render_workflow_form") {
+						expect(nextAction.formSession.currentPanelId, pathCase.label).to.equal(nextPanelId)
+					}
+				}
+			}
+
+			expect(nextAction.kind, pathCase.label).to.equal("project_prompt")
+			const displayedPanelIds = new Set(pathCase.panelIds)
+			for (const panelFixture of panelFixtures) {
+				if (!displayedPanelIds.has(panelFixture.panelId)) {
+					expect(
+						getActiveWorkflowSession(state).workflowValues[panelFixture.workflowValueKey],
+						pathCase.label,
+					).to.equal(skippedSentinels[panelFixture.workflowValueKey])
+				}
+			}
+
+			if (pathCase.label === "A-L") {
+				const step4Session = getActiveWorkflowSession(state)
+				step4Session.workflowValues.session_objective = "Update existing documents"
+				step4Session.ui.formSession = finalFormSession
+				step4Session.ui.stepResolutionSession = {
+					sessionId: "document-project-step-4-completion",
+					sourceRoute: {
+						branchId: "step-4-await-completion-branch",
+						routeId: "step-4-complete-workflow",
+					},
+					triggerSource: "execute_tool_backed_operation",
+					owner: {
+						kind: "workflow_step",
+						workflowName: documentProjectWorkflowDefinition.name,
+						stepNumber: 4,
+					},
+					state: "pending",
+				}
+				const projectionBeforeCompletion = await runtime.buildTurnProjection({ taskState: state })
+				expect(projectionBeforeCompletion.workflowInputPayloadBlock).to.be.a("string").and.not.equal("")
+				expect(projectionBeforeCompletion.continuationWorkflowInputPayloadBlock).to.be.a("string").and.not.equal("")
+				expect(projectionBeforeCompletion.workflowToolSchemaOverride).to.be.an("array").and.not.deep.equal([])
+				const completionResult = await runtime.handleAttemptCompletionSucceeded({ taskState: state })
+				expect(completionResult).to.deep.equal({ kind: "complete_workflow" })
+				expect(state.activeWorkflowName).to.equal(undefined)
+				expect(state.activeWorkflowSession).to.equal(undefined)
+				expect(state.currentFocusChainChecklist).to.equal(null)
+				expect(await runtime.buildTurnProjection({ taskState: state })).to.deep.equal({
+					workflowInputPayloadBlock: undefined,
+					continuationWorkflowInputPayloadBlock: undefined,
+					workflowToolSchemaOverride: undefined,
+				})
+			}
+		}
 	})
 
 	it("allocates and creates canonical workflow artifacts with persisted output values", async () => {
@@ -11542,7 +14402,8 @@ describe("WorkflowRuntime", () => {
 			"change-management-plan-1.md",
 		)
 		const workflow = createWorkflowDefinition({
-			projectSubfolder: "planning",
+			projectSelection: { kind: "interactive" },
+			projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "planning" },
 			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(changeManagementKeys),
 			artifacts: {
 				change_management_plan: {
@@ -11592,7 +14453,8 @@ describe("WorkflowRuntime", () => {
 		const planningFolder = join(cwd, "docs", "projects", "project-numbered-next", "planning")
 		const reviewFolder = join(cwd, "docs", "projects", "project-numbered-next", "review")
 		const workflow = createWorkflowDefinition({
-			projectSubfolder: "planning",
+			projectSelection: { kind: "interactive" },
+			projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "planning" },
 			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(changeManagementKeys),
 			artifacts: {
 				change_management_plan: {
@@ -11698,7 +14560,8 @@ describe("WorkflowRuntime", () => {
 		const targetIdentityKey = "selected_review_target"
 		const codeReviewKeys = createTargetedArtifactOutputValueKeys("stories_review_target")
 		const workflow = createWorkflowDefinition({
-			projectSubfolder: "review",
+			projectSelection: { kind: "interactive" },
+			projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "review" },
 			workflowValueKeys: [targetIdentityKey, ...collectArtifactOutputWorkflowValueKeys(codeReviewKeys)],
 			artifacts: {
 				code_review_doc: {
@@ -11781,7 +14644,8 @@ describe("WorkflowRuntime", () => {
 			artifactAbsolutePath: "output_file",
 		}
 		const workflow = createWorkflowDefinition({
-			projectSubfolder: "discovery",
+			projectSelection: { kind: "interactive" },
+			projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "discovery" },
 			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(brainstormingKeys),
 			artifacts: {
 				brainstorming_session: {
@@ -11837,7 +14701,8 @@ describe("WorkflowRuntime", () => {
 			artifactAbsolutePath: "output_file",
 		}
 		const workflow = createWorkflowDefinition({
-			projectSubfolder: "planning",
+			projectSelection: { kind: "interactive" },
+			projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "planning" },
 			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(architectureKeys),
 			artifacts: {
 				architecture_document: {
@@ -11886,7 +14751,8 @@ describe("WorkflowRuntime", () => {
 			artifactAbsolutePath: "output_document",
 		}
 		const workflow = createWorkflowDefinition({
-			projectSubfolder: "planning",
+			projectSelection: { kind: "interactive" },
+			projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "planning" },
 			workflowValueKeys: collectArtifactOutputWorkflowValueKeys(quickSpecKeys),
 			artifacts: {
 				quick_spec: {

@@ -263,7 +263,8 @@ function createRealArtifactWorkflow(): WorkflowDefinition {
 		slashCommandName: "create-workflow-artifact-real-test",
 		useSkillName: "create-workflow-artifact-real-test",
 		persona: WORKFLOW_PERSONA_FIXTURE,
-		projectSubfolder: "planning",
+		projectSelection: { kind: "interactive" },
+		projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "planning" },
 		workflowValueKeys: [
 			...Object.values(ENTRY_PROJECT_VALUE_KEYS),
 			...collectArtifactOutputWorkflowValueKeys(artifactOutputKeys),
@@ -303,7 +304,8 @@ function createRealBrainstormingArtifactWorkflow(): WorkflowDefinition {
 		slashCommandName: "create-workflow-artifact-brainstorming-test",
 		useSkillName: "create-workflow-artifact-brainstorming-test",
 		persona: WORKFLOW_PERSONA_FIXTURE,
-		projectSubfolder: "discovery",
+		projectSelection: { kind: "interactive" },
+		projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "discovery" },
 		workflowValueKeys: [
 			...Object.values(ENTRY_PROJECT_VALUE_KEYS),
 			...collectArtifactOutputWorkflowValueKeys(artifactOutputKeys),
@@ -343,7 +345,8 @@ function createRealArchitectureArtifactWorkflow(): WorkflowDefinition {
 		slashCommandName: "create-workflow-artifact-architecture-test",
 		useSkillName: "create-workflow-artifact-architecture-test",
 		persona: WORKFLOW_PERSONA_FIXTURE,
-		projectSubfolder: "planning",
+		projectSelection: { kind: "interactive" },
+		projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "planning" },
 		workflowValueKeys: [
 			...Object.values(ENTRY_PROJECT_VALUE_KEYS),
 			...collectArtifactOutputWorkflowValueKeys(artifactOutputKeys),
@@ -383,6 +386,7 @@ function createActiveWorkflowSession(workflow: WorkflowDefinition): ActiveWorkfl
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,

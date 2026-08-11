@@ -1040,11 +1040,7 @@ export class SubagentRunner {
 		}
 
 		const parentSession = this.baseConfig.taskState.activeWorkflowSession
-		if (
-			!parentSession ||
-			parentSession.projectSelection.projectTitle.trim() === "" ||
-			parentSession.projectSelection.projectFolderName.trim() === ""
-		) {
+		if (!parentSession) {
 			return {
 				kind: "failed",
 				error: "Subagent workflow assignment failed: parent workflow project selection is required before activating a child workflow.",
@@ -1056,6 +1052,17 @@ export class SubagentRunner {
 			return {
 				kind: "failed",
 				error: `Subagent workflow assignment failed: workflow assignment marker '${assignedSkillName}' could not be resolved.`,
+			}
+		}
+
+		if (
+			resolvedWorkflow.projectSelection.kind === "interactive" &&
+			(parentSession.projectSelection.projectTitle.trim() === "" ||
+				parentSession.projectSelection.projectFolderName.trim() === "")
+		) {
+			return {
+				kind: "failed",
+				error: "Subagent workflow assignment failed: parent workflow project selection is required before activating a child workflow.",
 			}
 		}
 

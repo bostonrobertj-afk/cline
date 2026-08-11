@@ -62,6 +62,7 @@ export const BLIND_REVIEW_PREREQUISITE_FILES: NonNullable<WorkflowDefinition["pr
 	[BLIND_REVIEW_TARGET_STORY_PREREQUISITE_ID]: {
 		id: BLIND_REVIEW_TARGET_STORY_PREREQUISITE_ID,
 		requirement: "required",
+		resolutionMode: "interactive",
 		producingWorkflowName: "dev-story",
 		projectSubfolderSegments: ["implementation", "stories-review"],
 		match: {
@@ -774,7 +775,8 @@ export const blindReviewWorkflowDefinition: WorkflowDefinition = {
 	slashCommandName: BLIND_REVIEW_WORKFLOW_SLASH_COMMAND_NAME,
 	useSkillName: BLIND_REVIEW_WORKFLOW_USE_SKILL_NAME,
 	persona: BLIND_REVIEW_WORKFLOW_PERSONA,
-	projectSubfolder: BLIND_REVIEW_WORKFLOW_PROJECT_SUBFOLDER,
+	projectSelection: { kind: "interactive" },
+	projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: BLIND_REVIEW_WORKFLOW_PROJECT_SUBFOLDER },
 	workflowValueKeys: BLIND_REVIEW_WORKFLOW_VALUE_KEYS,
 	entryProjectValueKeys: BLIND_REVIEW_ENTRY_PROJECT_VALUE_KEYS,
 	entryPanel: {

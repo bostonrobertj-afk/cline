@@ -83,6 +83,7 @@ export const ACCEPTANCE_AUDIT_REVIEW_PREREQUISITE_FILES: NonNullable<WorkflowDef
 	[ACCEPTANCE_AUDIT_REVIEW_TARGET_STORY_PREREQUISITE_ID]: {
 		id: ACCEPTANCE_AUDIT_REVIEW_TARGET_STORY_PREREQUISITE_ID,
 		requirement: "required",
+		resolutionMode: "interactive",
 		producingWorkflowName: "dev-story",
 		projectSubfolderSegments: ["implementation", "stories-review"],
 		match: {
@@ -1105,7 +1106,8 @@ export const acceptanceAuditReviewWorkflowDefinition: WorkflowDefinition = {
 	slashCommandName: ACCEPTANCE_AUDIT_REVIEW_WORKFLOW_SLASH_COMMAND_NAME,
 	useSkillName: ACCEPTANCE_AUDIT_REVIEW_WORKFLOW_USE_SKILL_NAME,
 	persona: ACCEPTANCE_AUDIT_REVIEW_WORKFLOW_PERSONA,
-	projectSubfolder: ACCEPTANCE_AUDIT_REVIEW_WORKFLOW_PROJECT_SUBFOLDER,
+	projectSelection: { kind: "interactive" },
+	projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: ACCEPTANCE_AUDIT_REVIEW_WORKFLOW_PROJECT_SUBFOLDER },
 	workflowValueKeys: ACCEPTANCE_AUDIT_REVIEW_WORKFLOW_VALUE_KEYS,
 	entryProjectValueKeys: ACCEPTANCE_AUDIT_REVIEW_ENTRY_PROJECT_VALUE_KEYS,
 	entryPanel: {

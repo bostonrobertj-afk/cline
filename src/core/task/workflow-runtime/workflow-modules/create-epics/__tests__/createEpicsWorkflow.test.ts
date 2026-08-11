@@ -218,6 +218,7 @@ function createSession(workflowValues: WorkflowValues): ActiveWorkflowSession {
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -243,6 +244,7 @@ function createPredicateSession(args: { activeBranchId: string; workflowValues: 
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -304,7 +306,12 @@ describe("createEpicsWorkflowDefinition", () => {
 		expect(createEpicsWorkflowDefinition.description).to.not.equal("")
 		expect(createEpicsWorkflowDefinition.slashCommandName).to.equal("create-epics")
 		expect(createEpicsWorkflowDefinition.useSkillName).to.equal("create-epics")
-		expect(createEpicsWorkflowDefinition.projectSubfolder).to.equal("planning")
+		expect(createEpicsWorkflowDefinition.projectSelection).to.deep.equal({ kind: "interactive" })
+		expect(createEpicsWorkflowDefinition.projectOutputPlacement).to.deep.equal({
+			kind: "selected_project_subfolder",
+			subfolder: "planning",
+		})
+		expect(Object.hasOwn(createEpicsWorkflowDefinition, "projectSubfolder")).to.equal(false)
 		expect(createEpicsWorkflowDefinition.entryPanel.promptMarkdown).to.equal(createEpicsWorkflowDefinition.description)
 		const retiredFinalizerPropertyName = ["finalDelivery", "Finalizer"].join("")
 		expect(Reflect.has(createEpicsWorkflowDefinition, retiredFinalizerPropertyName)).to.equal(false)
@@ -400,6 +407,7 @@ describe("createEpicsWorkflowDefinition", () => {
 		expect(createEpicsWorkflowDefinition.prerequisiteFiles?.architecture_document).to.deep.equal({
 			id: "architecture_document",
 			requirement: "required",
+			resolutionMode: "interactive",
 			projectSubfolderSegments: ["planning"],
 			match: { kind: "exact_filename", filename: "architecture.md" },
 			producingWorkflowName: "create-architecture",

@@ -35,6 +35,7 @@ function createSession(workflowValues: WorkflowValues): ActiveWorkflowSession {
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			suppressedWorkflowFormIds: [],
 			suppressedWorkflowStepResolutionRoutes: [],

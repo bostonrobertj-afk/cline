@@ -71,6 +71,7 @@ function createSession(workflowValues: WorkflowValues): ActiveWorkflowSession {
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -96,6 +97,7 @@ function createPredicateSession(args: { activeBranchId: string; workflowValues: 
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -394,7 +396,12 @@ describe("piPlanningWorkflowDefinition", () => {
 		expect(piPlanningWorkflowDefinition.description).to.equal(
 			"Break a selected epic into implementation-ready draft story files using architecture, epics, and optional discovery context.",
 		)
-		expect(piPlanningWorkflowDefinition.projectSubfolder).to.equal("planning")
+		expect(piPlanningWorkflowDefinition.projectSelection).to.deep.equal({ kind: "interactive" })
+		expect(piPlanningWorkflowDefinition.projectOutputPlacement).to.deep.equal({
+			kind: "selected_project_subfolder",
+			subfolder: "planning",
+		})
+		expect(Object.hasOwn(piPlanningWorkflowDefinition, "projectSubfolder")).to.equal(false)
 		expect(piPlanningWorkflowDefinition.entryPanel.promptMarkdown).to.equal(piPlanningWorkflowDefinition.description)
 
 		const identityValues: readonly string[] = [
@@ -471,6 +478,7 @@ describe("piPlanningWorkflowDefinition", () => {
 			[PiPlanningWorkflowValueKey.ArchitectureDocument]: {
 				id: PiPlanningWorkflowValueKey.ArchitectureDocument,
 				requirement: "required",
+				resolutionMode: "interactive",
 				producingWorkflowName: "create-architecture",
 				projectSubfolderSegments: ["planning"],
 				match: { kind: "exact_filename", filename: "architecture.md" },
@@ -480,6 +488,7 @@ describe("piPlanningWorkflowDefinition", () => {
 			[PiPlanningWorkflowValueKey.EpicsDocument]: {
 				id: PiPlanningWorkflowValueKey.EpicsDocument,
 				requirement: "required",
+				resolutionMode: "interactive",
 				producingWorkflowName: "create-epics",
 				projectSubfolderSegments: ["planning"],
 				match: { kind: "exact_filename", filename: "Epics.md" },
@@ -489,6 +498,7 @@ describe("piPlanningWorkflowDefinition", () => {
 			[PiPlanningWorkflowValueKey.EpicsIndex]: {
 				id: PiPlanningWorkflowValueKey.EpicsIndex,
 				requirement: "required",
+				resolutionMode: "interactive",
 				producingWorkflowName: "create-epics",
 				projectSubfolderSegments: ["planning"],
 				match: { kind: "exact_filename", filename: "Epics.index.json" },
@@ -498,6 +508,7 @@ describe("piPlanningWorkflowDefinition", () => {
 			[PiPlanningWorkflowValueKey.BrainstormingDocument]: {
 				id: PiPlanningWorkflowValueKey.BrainstormingDocument,
 				requirement: "optional",
+				resolutionMode: "interactive",
 				producingWorkflowName: "brainstorming",
 				projectSubfolderSegments: ["discovery"],
 				match: { kind: "exact_filename", filename: "brainstorming.md" },

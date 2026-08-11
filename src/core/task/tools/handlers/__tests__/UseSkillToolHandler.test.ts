@@ -32,7 +32,8 @@ function createWorkflowDefinition(): WorkflowDefinition {
 		slashCommandName: "workflow-runtime-test",
 		useSkillName: "workflow-runtime-test",
 		persona: WORKFLOW_PERSONA_FIXTURE,
-		projectSubfolder: "planning",
+		projectSelection: { kind: "interactive" },
+		projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "planning" },
 		workflowValueKeys: Object.values(ENTRY_PROJECT_VALUE_KEYS),
 		entryProjectValueKeys: ENTRY_PROJECT_VALUE_KEYS,
 		entryPanel: {

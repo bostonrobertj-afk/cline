@@ -79,6 +79,7 @@ export const CREATE_STORY_PREREQUISITE_FILES: NonNullable<WorkflowDefinition["pr
 	[CREATE_STORY_ARCHITECTURE_PREREQUISITE_ID]: {
 		id: CREATE_STORY_ARCHITECTURE_PREREQUISITE_ID,
 		requirement: "required",
+		resolutionMode: "interactive",
 		producingWorkflowName: "create-architecture",
 		projectSubfolderSegments: ["planning"],
 		match: { kind: "exact_filename", filename: "architecture.md" },
@@ -88,6 +89,7 @@ export const CREATE_STORY_PREREQUISITE_FILES: NonNullable<WorkflowDefinition["pr
 	[CREATE_STORY_EPICS_DOCUMENT_PREREQUISITE_ID]: {
 		id: CREATE_STORY_EPICS_DOCUMENT_PREREQUISITE_ID,
 		requirement: "required",
+		resolutionMode: "interactive",
 		producingWorkflowName: "create-epics",
 		projectSubfolderSegments: ["planning"],
 		match: { kind: "exact_filename", filename: "Epics.md" },
@@ -97,6 +99,7 @@ export const CREATE_STORY_PREREQUISITE_FILES: NonNullable<WorkflowDefinition["pr
 	[CREATE_STORY_EPICS_INDEX_PREREQUISITE_ID]: {
 		id: CREATE_STORY_EPICS_INDEX_PREREQUISITE_ID,
 		requirement: "required",
+		resolutionMode: "interactive",
 		producingWorkflowName: "create-epics",
 		projectSubfolderSegments: ["planning"],
 		match: { kind: "exact_filename", filename: "Epics.index.json" },
@@ -106,6 +109,7 @@ export const CREATE_STORY_PREREQUISITE_FILES: NonNullable<WorkflowDefinition["pr
 	[CREATE_STORY_BRAINSTORMING_PREREQUISITE_ID]: {
 		id: CREATE_STORY_BRAINSTORMING_PREREQUISITE_ID,
 		requirement: "optional",
+		resolutionMode: "interactive",
 		producingWorkflowName: "brainstorming",
 		projectSubfolderSegments: ["discovery"],
 		match: { kind: "exact_filename", filename: "brainstorming.md" },
@@ -1502,7 +1506,8 @@ export const createStoryWorkflowDefinition: WorkflowDefinition = {
 	slashCommandName: CREATE_STORY_WORKFLOW_SLASH_COMMAND_NAME,
 	useSkillName: CREATE_STORY_WORKFLOW_USE_SKILL_NAME,
 	persona: CREATE_STORY_WORKFLOW_PERSONA,
-	projectSubfolder: CREATE_STORY_WORKFLOW_PROJECT_SUBFOLDER,
+	projectSelection: { kind: "interactive" },
+	projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: CREATE_STORY_WORKFLOW_PROJECT_SUBFOLDER },
 	workflowValueKeys: CREATE_STORY_WORKFLOW_VALUE_KEYS,
 	entryProjectValueKeys: CREATE_STORY_ENTRY_PROJECT_VALUE_KEYS,
 	entryPanel: {

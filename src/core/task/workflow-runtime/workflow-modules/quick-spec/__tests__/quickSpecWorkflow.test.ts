@@ -36,6 +36,7 @@ function createSession(workflowValues: WorkflowValues): ActiveWorkflowSession {
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -61,6 +62,7 @@ function createPredicateSession(args: { activeBranchId: string; workflowValues: 
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -232,7 +234,12 @@ describe("quickSpecWorkflowDefinition", () => {
 		expect(quickSpecWorkflowDefinition.description).to.equal(
 			"In this workflow, the agent builds a delivery spec for a small enhancement or update. This workflow is intended for limited-scope projects. For larger projects, use the standard workflow process beginning with the Create Architecture workflow.",
 		)
-		expect(quickSpecWorkflowDefinition.projectSubfolder).to.equal("planning")
+		expect(quickSpecWorkflowDefinition.projectSelection).to.deep.equal({ kind: "interactive" })
+		expect(quickSpecWorkflowDefinition.projectOutputPlacement).to.deep.equal({
+			kind: "selected_project_subfolder",
+			subfolder: "planning",
+		})
+		expect(Object.hasOwn(quickSpecWorkflowDefinition, "projectSubfolder")).to.equal(false)
 		expect(quickSpecWorkflowDefinition.persona).to.deep.equal({
 			name: "Bob",
 			role: "Scrum Master",

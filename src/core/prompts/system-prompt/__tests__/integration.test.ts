@@ -71,6 +71,14 @@ import {
 	buildDevStoryStep4ToolSchemas,
 } from "@/core/task/workflow-runtime/workflow-modules/dev-story/devStoryToolSchemas"
 import {
+	buildDocumentProjectStep1ToolSchemas,
+	buildDocumentProjectStep2ToolSchemas,
+	buildDocumentProjectStep3ToolSchemas,
+	buildDocumentProjectStep4ToolSchemas,
+	DocumentProjectWorkflowValueKey,
+	documentProjectWorkflowDefinition,
+} from "@/core/task/workflow-runtime/workflow-modules/document-project"
+import {
 	buildEdgeCaseHunterReviewStep2ToolSchemas,
 	EdgeCaseHunterReviewWorkflowValueKey,
 	edgeCaseHunterReviewWorkflowDefinition,
@@ -129,6 +137,78 @@ const TEST_TIMEOUT = 30000
 const MAX_DIFF_LINES = 10
 const STALE_AGENT_FEEDBACK_PROMPT_TEXT =
 	"- If you hit a meaningful blocker, material ambiguity, or unstable behavior that affects correctness or progress, include `agent_feedback` on your response tool call with a concise description of the issue."
+const DOCUMENT_PROJECT_FORBIDDEN_MODEL_FACING_TOOL_NAMES: readonly string[] = [
+	"workflow_progress_request",
+	"replace_in_file",
+	"browser_action",
+	"use_mcp_tool",
+	"access_mcp_resource",
+	"load_mcp_documentation",
+	"new_task",
+	"generate_plan_output",
+	"act_mode_respond",
+	"focus_chain",
+	"web_fetch",
+	"web_search",
+	"condense",
+	"summarize_task",
+	"report_bug",
+	"new_rule",
+	"generate_explanation",
+	"use_skill",
+	"set_workflow_values",
+	"build_workflow_document",
+	"create_workflow_artifact",
+	"archive_workflow_artifact",
+	"delete_workflow_artifact",
+	"move_workflow_project_file",
+	"resolve_existing_project_artifact",
+	"validate_story_index_entry",
+	"get_brainstorming_methods",
+	"append_brainstorming_selected_technique",
+	"upsert_epic",
+	"plan_story_artifacts",
+	"plan_remediation_story_artifact",
+	"generate_story_files",
+	"update_story_index_status",
+	"dev_story_git_finalize",
+	"record_findings",
+	"story_task_reminder",
+	"story_task_complete",
+	"request_task_detail",
+	"show_incomplete_tasks",
+	"use_subagents",
+]
+const DOCUMENT_PROJECT_STEP_4_RAW_PLACEHOLDERS = [
+	"{workflow.api_indicator}",
+	"{workflow.database_indicator}",
+	"{workflow.deployment_indicator}",
+	"{workflow.developer_guide}",
+	"{workflow.known_issues}",
+	"{workflow.planned_enhancements}",
+	"{workflow.primary_programming_language}",
+	"{workflow.product_type}",
+	"{workflow.project_overview}",
+	"{workflow.recent_project}",
+	"{workflow.repo_status}",
+	"{workflow.repo_type}",
+	"{workflow.state_management_indicator}",
+	"{workflow.ui_indicator}",
+] as const
+const DOCUMENT_PROJECT_SOURCE_AUTHORING_MARKERS = [
+	"# Module metadata:",
+	"# Persona",
+	"# Tool Schema Override",
+	"# Workflow Steps",
+	"### Prompt:",
+	"*** conditional prompt",
+	"*** conditional prompt segment",
+	"*** end conditional prompt",
+	"*** end conditional prompt segment",
+	"Panel A:",
+	"Field:",
+	"allowedActions/ Labels:",
+] as const
 
 // ============================================================================
 // Snapshot Helpers
@@ -540,6 +620,7 @@ const createBrainstormingWorkflowSession = (input: {
 		projectSelectionCompleted: true,
 	},
 	entryArtifactResolution: undefined,
+	prerequisiteFileResolutions: [],
 	ui: {
 		suppressedWorkflowFormIds: [],
 		suppressedWorkflowStepResolutionRoutes: [],
@@ -603,6 +684,7 @@ const createCreateArchitectureWorkflowSession = (activeStepNumber: 3 | 4 | 9): A
 		projectSelectionCompleted: true,
 	},
 	entryArtifactResolution: undefined,
+	prerequisiteFileResolutions: [],
 	ui: {
 		suppressedWorkflowFormIds: [],
 		suppressedWorkflowStepResolutionRoutes: [],
@@ -657,6 +739,7 @@ const createCreateEpicsWorkflowSession = (): ActiveWorkflowSession => ({
 		projectSelectionCompleted: true,
 	},
 	entryArtifactResolution: undefined,
+	prerequisiteFileResolutions: [],
 	ui: {
 		suppressedWorkflowFormIds: [],
 		suppressedWorkflowStepResolutionRoutes: [],
@@ -740,6 +823,7 @@ const createCreateStoryWorkflowSession = (activeStepNumber: CreateStoryPromptSte
 		projectSelectionCompleted: true,
 	},
 	entryArtifactResolution: undefined,
+	prerequisiteFileResolutions: [],
 	ui: {
 		suppressedWorkflowFormIds: [],
 		suppressedWorkflowStepResolutionRoutes: [],
@@ -851,6 +935,7 @@ const createDevStoryWorkflowSession = (activeStepNumber: DevStoryPromptStepNumbe
 		projectSelectionCompleted: true,
 	},
 	entryArtifactResolution: undefined,
+	prerequisiteFileResolutions: [],
 	ui: {
 		suppressedWorkflowFormIds: [],
 		suppressedWorkflowStepResolutionRoutes: [],
@@ -1017,6 +1102,7 @@ function createAcceptanceAuditReviewWorkflowSession(
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -1137,6 +1223,7 @@ function createBlindReviewWorkflowSession(
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -1231,6 +1318,7 @@ function createEdgeCaseHunterReviewWorkflowSession(
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -1320,6 +1408,7 @@ function createValidateStoryWorkflowSession(
 			...(parentWorkflowName === undefined ? {} : { parentWorkflowName }),
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -1468,6 +1557,7 @@ function createCodeReviewWorkflowSession(
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -1606,6 +1696,7 @@ function createCorrectCourseWorkflowSession(
 		},
 		lifecycle: { projectSelectionCompleted: true },
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: { suppressedWorkflowFormIds: [], suppressedWorkflowStepResolutionRoutes: [] },
 		branchContext: {
 			activeBranchId: correctCourseWorkflowDefinition.steps["step-3"].decisionTree.entryBranchId,
@@ -1668,6 +1759,7 @@ function createWriteRemediationStoryWorkflowSession(
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -1774,6 +1866,7 @@ const createPiPlanningWorkflowSession = (
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -1820,6 +1913,128 @@ type QuickDevPromptStepNumber = 1 | 2 | 3
 const QUICK_REVIEW_SPEC_FILE = "/test/project/docs/projects/quick-review-project/review/quick-spec.md"
 const QUICK_REVIEW_COMMIT_HASH = "abc1234"
 type QuickReviewPromptStepNumber = 1 | 2
+type DocumentProjectPromptStepNumber = 1 | 2 | 3 | 4
+
+interface RequiredDocumentProjectPromptProjection {
+	workflowInputPayloadBlock: string
+	continuationWorkflowInputPayloadBlock: string
+	workflowToolSchemaOverride: readonly ClineToolSpec[]
+}
+
+function createDocumentProjectWorkflowValues(): WorkflowValues {
+	return {
+		[DocumentProjectWorkflowValueKey.ProjectMode]: "existing",
+		[DocumentProjectWorkflowValueKey.ProjectTitle]: "Agent Guidance",
+		[DocumentProjectWorkflowValueKey.ProjectFolderName]: "agent-guidance",
+		[DocumentProjectWorkflowValueKey.ProjectOverviewArtifactFamily]: "project_overview",
+		[DocumentProjectWorkflowValueKey.ProjectOverviewArtifactIdentity]: "project_overview",
+		[DocumentProjectWorkflowValueKey.ProjectOverviewArtifactFilename]: "project-overview.md",
+		[DocumentProjectWorkflowValueKey.ProjectOverviewArtifactRelativePath]: "project-overview.md",
+		[DocumentProjectWorkflowValueKey.ProjectOverview]: "/test/project/docs/projects/agent-guidance/project-overview.md",
+		[DocumentProjectWorkflowValueKey.DeveloperGuideArtifactFamily]: "developer_guide",
+		[DocumentProjectWorkflowValueKey.DeveloperGuideArtifactIdentity]: "developer_guide",
+		[DocumentProjectWorkflowValueKey.DeveloperGuideArtifactFilename]: "developer-guide.md",
+		[DocumentProjectWorkflowValueKey.DeveloperGuideArtifactRelativePath]: "developer-guide.md",
+		[DocumentProjectWorkflowValueKey.DeveloperGuide]: "/test/project/docs/projects/agent-guidance/developer-guide.md",
+		[DocumentProjectWorkflowValueKey.ProjectOverviewCreationRequired]: true,
+		[DocumentProjectWorkflowValueKey.DeveloperGuideCreationRequired]: true,
+		[DocumentProjectWorkflowValueKey.SessionObjective]: "Update existing documents",
+		[DocumentProjectWorkflowValueKey.RepoType]: DocumentProjectWorkflowValueKey.RepoType,
+		[DocumentProjectWorkflowValueKey.ProductType]: DocumentProjectWorkflowValueKey.ProductType,
+		[DocumentProjectWorkflowValueKey.PrimaryProgrammingLanguage]: DocumentProjectWorkflowValueKey.PrimaryProgrammingLanguage,
+		[DocumentProjectWorkflowValueKey.RepoStatus]: DocumentProjectWorkflowValueKey.RepoStatus,
+		[DocumentProjectWorkflowValueKey.ApiIndicator]: true,
+		[DocumentProjectWorkflowValueKey.DatabaseIndicator]: true,
+		[DocumentProjectWorkflowValueKey.StateManagementIndicator]: true,
+		[DocumentProjectWorkflowValueKey.UiIndicator]: true,
+		[DocumentProjectWorkflowValueKey.DeploymentIndicator]: true,
+		[DocumentProjectWorkflowValueKey.RecentProject]: DocumentProjectWorkflowValueKey.RecentProject,
+		[DocumentProjectWorkflowValueKey.PlannedEnhancements]: DocumentProjectWorkflowValueKey.PlannedEnhancements,
+		[DocumentProjectWorkflowValueKey.KnownIssues]: DocumentProjectWorkflowValueKey.KnownIssues,
+	}
+}
+
+function createDocumentProjectWorkflowSession(
+	activeStepNumber: DocumentProjectPromptStepNumber,
+	workflowValues: WorkflowValues,
+): ActiveWorkflowSession {
+	const step = documentProjectWorkflowDefinition.steps[`step-${activeStepNumber}`]
+	if (step === undefined) {
+		throw new Error(`Expected Document Project prompt step ${activeStepNumber}.`)
+	}
+	return {
+		activeStepNumber,
+		workflowValues,
+		projectSelection: {
+			projectMode: "existing",
+			projectTitle: "Agent Guidance",
+			projectFolderName: "agent-guidance",
+		},
+		lifecycle: { projectSelectionCompleted: true },
+		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [
+			{ prerequisiteId: "project_overview", outcome: "not_found" },
+			{ prerequisiteId: "developer_guide", outcome: "not_found" },
+		],
+		ui: {
+			formSession: undefined,
+			stepResolutionSession: undefined,
+			suppressedWorkflowFormIds: [],
+			suppressedWorkflowStepResolutionRoutes: [],
+		},
+		branchContext: { activeBranchId: step.decisionTree.entryBranchId },
+	}
+}
+
+async function buildDocumentProjectPromptContext(
+	activeStepNumber: DocumentProjectPromptStepNumber,
+	apiRequestCount: 1 | 2,
+	workflowValues: WorkflowValues,
+): Promise<SystemPromptContext & WorkflowPromptProjection> {
+	const workspacePathPolicy: WorkflowWorkspacePathPolicy = { validateAccess: () => true }
+	const runtime = new WorkflowRuntime({ cwd: "/test/project", workspacePathPolicy })
+	const taskState = new TaskState()
+	taskState.activeWorkflowName = documentProjectWorkflowDefinition.name
+	taskState.activeWorkflowSession = createDocumentProjectWorkflowSession(activeStepNumber, workflowValues)
+	taskState.apiRequestCount = apiRequestCount
+	const workflowProjection = await runtime.buildTurnProjection({
+		taskState,
+		isFirstTaskRequest: taskState.apiRequestCount === 1,
+	})
+	return {
+		...baseContext,
+		mcpHub: makeMcpHub([]),
+		providerInfo: makeProviderInfo("gpt-5-codex", "openai"),
+		enableNativeToolCalls: true,
+		useMinimalGptPrompt: true,
+		...workflowProjection,
+	}
+}
+
+function requireDocumentProjectPromptProjection(
+	context: SystemPromptContext & WorkflowPromptProjection,
+): SystemPromptContext & RequiredDocumentProjectPromptProjection {
+	const { workflowInputPayloadBlock, continuationWorkflowInputPayloadBlock, workflowToolSchemaOverride } = context
+
+	if (workflowInputPayloadBlock === undefined) {
+		throw new Error("Expected Document Project full-turn workflow input payload.")
+	}
+
+	if (continuationWorkflowInputPayloadBlock === undefined) {
+		throw new Error("Expected Document Project continuation workflow input payload.")
+	}
+
+	if (workflowToolSchemaOverride === undefined) {
+		throw new Error("Expected Document Project workflow tool-schema override.")
+	}
+
+	return {
+		...context,
+		workflowInputPayloadBlock,
+		continuationWorkflowInputPayloadBlock,
+		workflowToolSchemaOverride,
+	}
+}
 
 function createQuickSpecWorkflowValues(args?: { additionalContext?: string }): WorkflowValues {
 	return {
@@ -1870,6 +2085,7 @@ function createQuickSpecWorkflowSession(
 		},
 		lifecycle: { projectSelectionCompleted: true },
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -1906,6 +2122,7 @@ function createQuickDevWorkflowSession(activeStepNumber: QuickDevPromptStepNumbe
 		},
 		lifecycle: { projectSelectionCompleted: true },
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -1940,6 +2157,7 @@ function createQuickReviewWorkflowSession(activeStepNumber: QuickReviewPromptSte
 		},
 		lifecycle: { projectSelectionCompleted: true },
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -2747,6 +2965,244 @@ describe("Prompt System Integration Tests", () => {
 					expect(systemPrompt).to.not.include("and undefined")
 				},
 			)
+		})
+
+		it("projects Document Project Steps 1-3 into both payload carriers with empty native tool overrides", async function () {
+			const stepCases = [
+				{
+					stepNumber: 1,
+					stepLabel: "Step 1: Identify Session Objective",
+					checklistLines: [
+						"1. Identify Session Objective - Active",
+						"2. Document Generation - Not Started",
+						"3. Identify Baseline Data - Not Started",
+						"4. Support System Documentation - Not Started",
+					],
+					buildToolSchemas: buildDocumentProjectStep1ToolSchemas,
+				},
+				{
+					stepNumber: 2,
+					stepLabel: "Step 2: Document Generation",
+					checklistLines: [
+						"1. Identify Session Objective - Complete",
+						"2. Document Generation - Active",
+						"3. Identify Baseline Data - Not Started",
+						"4. Support System Documentation - Not Started",
+					],
+					buildToolSchemas: buildDocumentProjectStep2ToolSchemas,
+				},
+				{
+					stepNumber: 3,
+					stepLabel: "Step 3: Identify Baseline Data",
+					checklistLines: [
+						"1. Identify Session Objective - Complete",
+						"2. Document Generation - Complete",
+						"3. Identify Baseline Data - Active",
+						"4. Support System Documentation - Not Started",
+					],
+					buildToolSchemas: buildDocumentProjectStep3ToolSchemas,
+				},
+			] as const
+
+			for (const stepCase of stepCases) {
+				const projection = requireDocumentProjectPromptProjection(
+					await buildDocumentProjectPromptContext(stepCase.stepNumber, 2, createDocumentProjectWorkflowValues()),
+				)
+				const projectedToolNames = projection.workflowToolSchemaOverride.map((tool) => tool.name)
+				for (const payload of [projection.workflowInputPayloadBlock, projection.continuationWorkflowInputPayloadBlock]) {
+					expect(payload).not.to.equal("")
+					expect(payload).to.include("Workflow:\ndocument project")
+					expect(payload).to.include(`Description: ${documentProjectWorkflowDefinition.description}`)
+					let previousChecklistIndex = -1
+					for (const checklistLine of stepCase.checklistLines) {
+						const checklistIndex = payload.indexOf(checklistLine)
+						expect(checklistIndex).to.be.greaterThan(previousChecklistIndex)
+						previousChecklistIndex = checklistIndex
+					}
+					expect(payload).to.include("CURRENT STEP DETAILED INSTRUCTIONS")
+					expect(payload).to.include(stepCase.stepLabel)
+					expect(payload).not.to.include("Role and Objective:")
+					expect(payload).not.to.include("/test/project/docs/projects/agent-guidance/project-overview.md")
+					expect(payload).not.to.include("/test/project/docs/projects/agent-guidance/developer-guide.md")
+					for (const rawPlaceholder of DOCUMENT_PROJECT_STEP_4_RAW_PLACEHOLDERS) {
+						expect(payload).not.to.include(rawPlaceholder)
+					}
+					for (const marker of DOCUMENT_PROJECT_SOURCE_AUTHORING_MARKERS) {
+						expect(payload).not.to.include(marker)
+					}
+					expect(/\{workflow\.[^}]+\}/.test(payload)).to.equal(false)
+					expect(/\bworkflow\.[A-Za-z_][A-Za-z0-9_]*/.test(payload)).to.equal(false)
+					expect(/\*\*\* begin [^\n]* example \*\*\*/.test(payload)).to.equal(false)
+					expect(/\*\*\* end [^\n]* example \*\*\*/.test(payload)).to.equal(false)
+					expect(payload).not.to.include("document-project.md")
+					expect(payload).not.to.include(".cline/skills/bmad-document-project")
+					expect(payload).not.to.include(".cline/workflow-config.yaml")
+					for (const forbiddenToolName of DOCUMENT_PROJECT_FORBIDDEN_MODEL_FACING_TOOL_NAMES) {
+						expect(payload).not.to.include(forbiddenToolName)
+					}
+				}
+				for (const forbiddenToolName of DOCUMENT_PROJECT_FORBIDDEN_MODEL_FACING_TOOL_NAMES) {
+					expect(projectedToolNames).not.to.include(forbiddenToolName)
+				}
+				expect(projection.workflowToolSchemaOverride).to.deep.equal(stepCase.buildToolSchemas())
+				expect(projection.workflowToolSchemaOverride).to.deep.equal([])
+				await runPromptTest(this, projection, "gpt-5-codex", async ({ systemPrompt, tools }) => {
+					expect(getNativeToolNames(tools)).to.deep.equal([])
+					for (const rawPlaceholder of DOCUMENT_PROJECT_STEP_4_RAW_PLACEHOLDERS) {
+						expect(systemPrompt).not.to.include(rawPlaceholder)
+					}
+					for (const marker of DOCUMENT_PROJECT_SOURCE_AUTHORING_MARKERS) {
+						expect(systemPrompt).not.to.include(marker)
+					}
+					expect(/\{workflow\.[^}]+\}/.test(systemPrompt)).to.equal(false)
+					expect(/\bworkflow\.[A-Za-z_][A-Za-z0-9_]*/.test(systemPrompt)).to.equal(false)
+					expect(/\*\*\* begin [^\n]* example \*\*\*/.test(systemPrompt)).to.equal(false)
+					expect(/\*\*\* end [^\n]* example \*\*\*/.test(systemPrompt)).to.equal(false)
+					expect(systemPrompt).not.to.include("document-project.md")
+					expect(systemPrompt).not.to.include(".cline/skills/bmad-document-project")
+					expect(systemPrompt).not.to.include(".cline/workflow-config.yaml")
+				})
+			}
+		})
+
+		it("projects Document Project Step 4 into both payload carriers with the exact native tool surface", async function () {
+			const trueTrueFirstTurnValues = createDocumentProjectWorkflowValues()
+			const trueTrueContinuationValues = createDocumentProjectWorkflowValues()
+			const updateExistingWorkflowValues = createDocumentProjectWorkflowValues()
+			updateExistingWorkflowValues[DocumentProjectWorkflowValueKey.ProjectOverviewCreationRequired] = false
+			updateExistingWorkflowValues[DocumentProjectWorkflowValueKey.DeveloperGuideCreationRequired] = false
+			updateExistingWorkflowValues[DocumentProjectWorkflowValueKey.SessionObjective] = "Update existing documents"
+			const projectionCases = [
+				{
+					name: "true/true first request",
+					apiRequestCount: 1,
+					workflowValues: trueTrueFirstTurnValues,
+					expectsPersona: true,
+				},
+				{
+					name: "true/true continuation request",
+					apiRequestCount: 2,
+					workflowValues: trueTrueContinuationValues,
+					expectsPersona: false,
+				},
+				{
+					name: "false/false update existing request",
+					apiRequestCount: 2,
+					workflowValues: updateExistingWorkflowValues,
+					expectsPersona: false,
+				},
+			] as const
+			const expectedToolNames = [
+				"execute_command",
+				"list_files",
+				"search_files",
+				"list_code_definition_names",
+				"read_file",
+				"read_file_range",
+				"apply_patch",
+				"write_to_file",
+				"send_user_message",
+				"ask_followup_question",
+				"attempt_completion",
+			]
+
+			for (const projectionCase of projectionCases) {
+				const projection = requireDocumentProjectPromptProjection(
+					await buildDocumentProjectPromptContext(4, projectionCase.apiRequestCount, projectionCase.workflowValues),
+				)
+				const payloads = [projection.workflowInputPayloadBlock, projection.continuationWorkflowInputPayloadBlock]
+				for (const payload of payloads) {
+					expect(payload, projectionCase.name).not.to.equal("")
+					expect(payload).to.include("CURRENT STEP DETAILED INSTRUCTIONS")
+					expect(payload).to.include("Step 4: Support System Documentation")
+					expect(payload).to.include("Role and Objective:")
+					expect(payload).to.include("/test/project/docs/projects/agent-guidance/project-overview.md")
+					expect(payload).to.include("/test/project/docs/projects/agent-guidance/developer-guide.md")
+					let previousChecklistIndex = -1
+					for (const checklistLine of [
+						"1. Identify Session Objective - Complete",
+						"2. Document Generation - Complete",
+						"3. Identify Baseline Data - Complete",
+						"4. Support System Documentation - Active",
+					]) {
+						const checklistIndex = payload.indexOf(checklistLine)
+						expect(checklistIndex).to.be.greaterThan(previousChecklistIndex)
+						previousChecklistIndex = checklistIndex
+					}
+				}
+				const fullPromptIndex = projection.workflowInputPayloadBlock.indexOf("Role and Objective:")
+				const continuationPromptIndex = projection.continuationWorkflowInputPayloadBlock.indexOf("Role and Objective:")
+				expect(fullPromptIndex).to.be.greaterThan(-1)
+				expect(continuationPromptIndex).to.be.greaterThan(-1)
+				expect(projection.workflowInputPayloadBlock.slice(fullPromptIndex)).to.equal(
+					projection.continuationWorkflowInputPayloadBlock.slice(continuationPromptIndex),
+				)
+
+				const personaStrings = [
+					"Persona:\nYou are to adopt this persona throughout your interactions with the user.",
+					"Name: Mary",
+					"Role: Technical Writer",
+				]
+				for (const personaString of personaStrings) {
+					expect(projection.workflowInputPayloadBlock.includes(personaString), projectionCase.name).to.equal(
+						projectionCase.expectsPersona,
+					)
+					expect(projection.continuationWorkflowInputPayloadBlock).not.to.include(personaString)
+				}
+
+				const projectedToolNames = projection.workflowToolSchemaOverride.map((tool) => tool.name)
+				expect(projection.workflowToolSchemaOverride).to.deep.equal(buildDocumentProjectStep4ToolSchemas())
+				expect(projectedToolNames).to.deep.equal(expectedToolNames)
+				const applicablePayload =
+					projectionCase.apiRequestCount === 1
+						? projection.workflowInputPayloadBlock
+						: projection.continuationWorkflowInputPayloadBlock
+				expect(applicablePayload).to.include("attempt_completion")
+				expect(projectedToolNames).to.include("attempt_completion")
+				if (projectionCase.name === "false/false update existing request") {
+					expect(applicablePayload).to.include("ask_followup_question")
+					expect(projectedToolNames).to.include("ask_followup_question")
+				}
+				for (const forbiddenToolName of DOCUMENT_PROJECT_FORBIDDEN_MODEL_FACING_TOOL_NAMES) {
+					expect(projectedToolNames).not.to.include(forbiddenToolName)
+					expect(applicablePayload).not.to.include(forbiddenToolName)
+				}
+				for (const rawPlaceholder of DOCUMENT_PROJECT_STEP_4_RAW_PLACEHOLDERS) {
+					expect(applicablePayload).not.to.include(rawPlaceholder)
+				}
+				for (const marker of DOCUMENT_PROJECT_SOURCE_AUTHORING_MARKERS) {
+					expect(applicablePayload).not.to.include(marker)
+				}
+				expect(/\{workflow\.[^}]+\}/.test(applicablePayload)).to.equal(false)
+				expect(/\bworkflow\.[A-Za-z_][A-Za-z0-9_]*/.test(applicablePayload)).to.equal(false)
+				expect(/\*\*\* begin [^\n]* example \*\*\*/.test(applicablePayload)).to.equal(false)
+				expect(/\*\*\* end [^\n]* example \*\*\*/.test(applicablePayload)).to.equal(false)
+				expect(applicablePayload).not.to.include("document-project.md")
+				expect(applicablePayload).not.to.include(".cline/skills/bmad-document-project")
+				expect(applicablePayload).not.to.include(".cline/workflow-config.yaml")
+				await runPromptTest(this, projection, "gpt-5-codex", async ({ systemPrompt, tools }) => {
+					expect(systemPrompt).not.to.include("CURRENT STEP DETAILED INSTRUCTIONS")
+					expect(getNativeToolNames(tools)).to.deep.equal(expectedToolNames)
+					expectResponseToolNames(
+						systemPrompt,
+						["`send_user_message`", "`ask_followup_question`", "`attempt_completion`"],
+						["`workflow_progress_request`"],
+					)
+					for (const rawPlaceholder of DOCUMENT_PROJECT_STEP_4_RAW_PLACEHOLDERS) {
+						expect(systemPrompt).not.to.include(rawPlaceholder)
+					}
+					for (const marker of DOCUMENT_PROJECT_SOURCE_AUTHORING_MARKERS) {
+						expect(systemPrompt).not.to.include(marker)
+					}
+					expect(/\{workflow\.[^}]+\}/.test(systemPrompt)).to.equal(false)
+					expect(/\bworkflow\.[A-Za-z_][A-Za-z0-9_]*/.test(systemPrompt)).to.equal(false)
+					expect(/\*\*\* begin [^\n]* example \*\*\*/.test(systemPrompt)).to.equal(false)
+					expect(/\*\*\* end [^\n]* example \*\*\*/.test(systemPrompt)).to.equal(false)
+					expect(systemPrompt).not.to.include("document-project.md")
+					expect(systemPrompt).not.to.include(".cline/skills/bmad-document-project")
+					expect(systemPrompt).not.to.include(".cline/workflow-config.yaml")
+				})
+			}
 		})
 
 		it("projects active brainstorming Step 3 suggest tools into native GPT-5 prompts", async function () {

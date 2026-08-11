@@ -34,6 +34,7 @@ describe("discoverWorkflowPrerequisiteFileCandidates", () => {
 		return {
 			id: "requirements",
 			requirement: "required",
+			resolutionMode: "interactive",
 			projectSubfolderSegments,
 			match,
 			producingWorkflowName: "create-prd",
@@ -231,5 +232,48 @@ describe("discoverWorkflowPrerequisiteFileCandidates", () => {
 				projectRelativePath: path.join("planning", "prd-allowed.md"),
 			},
 		])
+	})
+
+	it("scans only the selected project root for empty prerequisite path segments", async () => {
+		const rootPath = await writeProjectFile("project-overview.md")
+		await writeProjectFile(path.join("planning", "project-overview.md"))
+		const candidates = await discoverWorkflowPrerequisiteFileCandidates({
+			selectedProjectRoot,
+			prerequisite: createPrerequisiteDefinition({ kind: "exact_filename", filename: "project-overview.md" }, []),
+			workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+		})
+		expect(candidates).to.deep.equal([
+			{ filename: "project-overview.md", absolutePath: rootPath, projectRelativePath: "project-overview.md" },
+		])
+	})
+
+	it("does not broaden empty prerequisite path segments into subfolders", async () => {
+		await writeProjectFile(path.join("planning", "project-overview.md"))
+		const candidates = await discoverWorkflowPrerequisiteFileCandidates({
+			selectedProjectRoot,
+			prerequisite: createPrerequisiteDefinition({ kind: "exact_filename", filename: "project-overview.md" }, []),
+			workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+		})
+		expect(candidates).to.deep.equal([])
+	})
+
+	it("rejects a workspace-policy denied selected project root for empty prerequisite path segments", async () => {
+		let capturedError: unknown
+		try {
+			await discoverWorkflowPrerequisiteFileCandidates({
+				selectedProjectRoot,
+				prerequisite: createPrerequisiteDefinition({ kind: "exact_filename", filename: "project-overview.md" }, []),
+				workspacePathPolicy: { validateAccess: (filePath) => filePath !== selectedProjectRoot },
+			})
+		} catch (error) {
+			capturedError = error
+		}
+		expect(capturedError).to.be.instanceOf(Error)
+		if (!(capturedError instanceof Error)) {
+			throw new Error("Expected selected project root policy rejection.")
+		}
+		expect(capturedError.message).to.equal(
+			`Workflow prerequisite file directory is blocked by workspace path policy: ${selectedProjectRoot}`,
+		)
 	})
 })

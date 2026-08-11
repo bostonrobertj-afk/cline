@@ -57,6 +57,7 @@ function createSession(workflowValues: WorkflowValues): ActiveWorkflowSession {
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,

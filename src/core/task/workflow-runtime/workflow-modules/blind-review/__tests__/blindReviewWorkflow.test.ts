@@ -127,6 +127,7 @@ function createSession(
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession,
 			stepResolutionSession: undefined,
@@ -150,6 +151,7 @@ function createPredicateSession(args: { activeBranchId: string; workflowValues: 
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -461,7 +463,12 @@ describe("blindReviewWorkflowDefinition", () => {
 		expect(blindReviewWorkflowDefinition.description).to.equal(BLIND_REVIEW_WORKFLOW_DESCRIPTION)
 		expect(blindReviewWorkflowDefinition.slashCommandName).to.equal(BLIND_REVIEW_WORKFLOW_SLASH_COMMAND_NAME)
 		expect(blindReviewWorkflowDefinition.useSkillName).to.equal(BLIND_REVIEW_WORKFLOW_USE_SKILL_NAME)
-		expect(blindReviewWorkflowDefinition.projectSubfolder).to.equal(BLIND_REVIEW_WORKFLOW_PROJECT_SUBFOLDER)
+		expect(blindReviewWorkflowDefinition.projectSelection).to.deep.equal({ kind: "interactive" })
+		expect(blindReviewWorkflowDefinition.projectOutputPlacement).to.deep.equal({
+			kind: "selected_project_subfolder",
+			subfolder: BLIND_REVIEW_WORKFLOW_PROJECT_SUBFOLDER,
+		})
+		expect(Object.hasOwn(blindReviewWorkflowDefinition, "projectSubfolder")).to.equal(false)
 		expect(blindReviewWorkflowDefinition.persona).to.deep.equal(BLIND_REVIEW_WORKFLOW_PERSONA)
 		expect(blindReviewWorkflowDefinition.entryPanel.promptMarkdown).to.equal(BLIND_REVIEW_WORKFLOW_DESCRIPTION)
 		expect(blindReviewWorkflowDefinition.workflowValueKeys).to.deep.equal(BLIND_REVIEW_WORKFLOW_VALUE_KEYS)

@@ -1573,7 +1573,8 @@ export const piPlanningWorkflowDefinition: WorkflowDefinition = {
 	slashCommandName: PI_PLANNING_WORKFLOW_SLASH_COMMAND_NAME,
 	useSkillName: PI_PLANNING_WORKFLOW_USE_SKILL_NAME,
 	persona: PI_PLANNING_WORKFLOW_PERSONA,
-	projectSubfolder: PI_PLANNING_WORKFLOW_PROJECT_SUBFOLDER,
+	projectSelection: { kind: "interactive" },
+	projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: PI_PLANNING_WORKFLOW_PROJECT_SUBFOLDER },
 	workflowValueKeys: PI_PLANNING_WORKFLOW_VALUE_KEYS,
 	entryProjectValueKeys: {
 		projectMode: PiPlanningWorkflowValueKey.ProjectMode,
@@ -1590,6 +1591,7 @@ export const piPlanningWorkflowDefinition: WorkflowDefinition = {
 		[ARCHITECTURE_PREREQUISITE_ID]: {
 			id: ARCHITECTURE_PREREQUISITE_ID,
 			requirement: "required",
+			resolutionMode: "interactive",
 			producingWorkflowName: "create-architecture",
 			projectSubfolderSegments: ["planning"],
 			match: { kind: "exact_filename", filename: "architecture.md" },
@@ -1599,6 +1601,7 @@ export const piPlanningWorkflowDefinition: WorkflowDefinition = {
 		[EPICS_DOCUMENT_PREREQUISITE_ID]: {
 			id: EPICS_DOCUMENT_PREREQUISITE_ID,
 			requirement: "required",
+			resolutionMode: "interactive",
 			producingWorkflowName: "create-epics",
 			projectSubfolderSegments: ["planning"],
 			match: { kind: "exact_filename", filename: "Epics.md" },
@@ -1608,6 +1611,7 @@ export const piPlanningWorkflowDefinition: WorkflowDefinition = {
 		[EPICS_INDEX_PREREQUISITE_ID]: {
 			id: EPICS_INDEX_PREREQUISITE_ID,
 			requirement: "required",
+			resolutionMode: "interactive",
 			producingWorkflowName: "create-epics",
 			projectSubfolderSegments: ["planning"],
 			match: { kind: "exact_filename", filename: "Epics.index.json" },
@@ -1617,6 +1621,7 @@ export const piPlanningWorkflowDefinition: WorkflowDefinition = {
 		[BRAINSTORMING_PREREQUISITE_ID]: {
 			id: BRAINSTORMING_PREREQUISITE_ID,
 			requirement: "optional",
+			resolutionMode: "interactive",
 			producingWorkflowName: "brainstorming",
 			projectSubfolderSegments: ["discovery"],
 			match: { kind: "exact_filename", filename: "brainstorming.md" },

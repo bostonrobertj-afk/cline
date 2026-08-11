@@ -8,6 +8,10 @@ import sinon from "sinon"
 import { ClineIgnoreController } from "@/core/ignore/ClineIgnoreController"
 import { formatResponse } from "@/core/prompts/responses"
 import { TaskState } from "@/core/task/TaskState"
+import {
+	buildInitialDeveloperGuideDocument,
+	buildInitialProjectOverviewDocument,
+} from "@/core/task/workflow-runtime/workflow-modules/document-project/documentProjectDocument"
 import { ClineDefaultTool } from "@/shared/tools"
 import * as pathUtils from "@/utils/path"
 import { ToolValidator } from "../../ToolValidator"
@@ -48,6 +52,19 @@ function createBuildWorkflowDocumentBlock(destinationPath: string, workflowValue
 		isNativeToolCall: true,
 		call_id: "build_workflow_document_1",
 	}
+}
+
+function createDocumentProjectBuildBlock(args: {
+	artifactId: "project_overview" | "developer_guide"
+	destinationPath: string
+	content: string
+}): ToolUse {
+	const block = createBuildWorkflowDocumentBlock(args.destinationPath)
+	Object.assign(block.params, {
+		artifact_id: args.artifactId,
+		content: args.content,
+	})
+	return block
 }
 
 function createConfig(args: { cwd: string; clineIgnoreController: ClineIgnoreController }) {
@@ -266,4 +283,60 @@ describe("BuildWorkflowDocumentToolHandler", () => {
 			}
 		}
 	})
+
+	for (const { artifactId, filename, buildContent } of [
+		{ artifactId: "project_overview", filename: "project-overview.md", buildContent: buildInitialProjectOverviewDocument },
+		{ artifactId: "developer_guide", filename: "developer-guide.md", buildContent: buildInitialDeveloperGuideDocument },
+	] as const) {
+		it(`builds and idempotently replays the Document Project ${artifactId} scaffold`, async () => {
+			const cwd = await fs.mkdtemp(path.join(tmpdir(), "build-document-project-document-test-"))
+			const clineIgnoreController = new ClineIgnoreController(cwd)
+			const destinationPath = path.join(cwd, "docs", "projects", "agent-guidance", filename)
+			try {
+				await clineIgnoreController.initialize()
+				await fs.mkdir(path.dirname(destinationPath), { recursive: true })
+				await fs.writeFile(destinationPath, "", "utf8")
+				const { config, stubs } = createConfig({ cwd, clineIgnoreController })
+				stubs.shouldAutoApproveToolWithPath.resolves(true)
+				sandbox.stub(pathUtils, "isLocatedInWorkspace").resolves(true)
+				const handler = new BuildWorkflowDocumentToolHandler(new ToolValidator(clineIgnoreController))
+				const request = createDocumentProjectBuildBlock({ artifactId, destinationPath, content: buildContent() })
+
+				const result = await handler.execute(config, request)
+				expect(destinationPath).to.equal(path.join(cwd, "docs", "projects", "agent-guidance", filename))
+				expect(await fs.readFile(destinationPath, "utf8")).to.equal(buildContent())
+				if (typeof result !== "string") {
+					throw new Error("Expected Document Project build handler result to be a string.")
+				}
+				expect(JSON.parse(result)).to.deep.equal({
+					persisted: true,
+					artifact_id: artifactId,
+					destination_path: destinationPath,
+					document_updated: true,
+					workflow_value_writes_applied: false,
+					changed_workflow_value_keys: [],
+					unchanged_workflow_value_keys: [],
+				})
+
+				const renameSpy = sandbox.spy(fs, "rename")
+				const replayResult = await handler.execute(config, request)
+				sinon.assert.notCalled(renameSpy)
+				expect(await fs.readFile(destinationPath, "utf8")).to.equal(buildContent())
+				if (typeof replayResult !== "string") {
+					throw new Error("Expected Document Project replay handler result to be a string.")
+				}
+				expect(JSON.parse(replayResult)).to.deep.equal({
+					persisted: false,
+					artifact_id: artifactId,
+					destination_path: destinationPath,
+					document_updated: false,
+					workflow_value_writes_applied: false,
+					reason: "Destination already contained the requested content and no workflow values changed.",
+				})
+			} finally {
+				await clineIgnoreController.dispose()
+				await fs.rm(cwd, { recursive: true, force: true })
+			}
+		})
+	}
 })

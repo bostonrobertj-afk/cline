@@ -180,6 +180,7 @@ function createSession(workflowValues: WorkflowValues): ActiveWorkflowSession {
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -205,6 +206,7 @@ function createPredicateSession(args: { activeBranchId: string; workflowValues: 
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -297,7 +299,12 @@ describe("createArchitectureWorkflowDefinition", () => {
 				"Let user journeys, business value, and developer productivity guide technical decisions.",
 			],
 		})
-		expect(createArchitectureWorkflowDefinition.projectSubfolder).to.equal("planning")
+		expect(createArchitectureWorkflowDefinition.projectSelection).to.deep.equal({ kind: "interactive" })
+		expect(createArchitectureWorkflowDefinition.projectOutputPlacement).to.deep.equal({
+			kind: "selected_project_subfolder",
+			subfolder: "planning",
+		})
+		expect(Object.hasOwn(createArchitectureWorkflowDefinition, "projectSubfolder")).to.equal(false)
 		expect(createArchitectureWorkflowDefinition.entryPanel.promptMarkdown).to.equal(
 			createArchitectureWorkflowDefinition.description,
 		)

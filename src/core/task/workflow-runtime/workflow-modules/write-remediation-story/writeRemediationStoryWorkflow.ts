@@ -73,6 +73,7 @@ export const WRITE_REMEDIATION_STORY_PREREQUISITE_FILES: NonNullable<WorkflowDef
 	[WRITE_REMEDIATION_STORY_CODE_REVIEW_OUTPUT_PREREQUISITE_ID]: {
 		id: WRITE_REMEDIATION_STORY_CODE_REVIEW_OUTPUT_PREREQUISITE_ID,
 		requirement: "required",
+		resolutionMode: "interactive",
 		producingWorkflowName: "code-review",
 		projectSubfolderSegments: ["review"],
 		match: {
@@ -85,6 +86,7 @@ export const WRITE_REMEDIATION_STORY_PREREQUISITE_FILES: NonNullable<WorkflowDef
 	[WRITE_REMEDIATION_STORY_TARGET_STORY_PREREQUISITE_ID]: {
 		id: WRITE_REMEDIATION_STORY_TARGET_STORY_PREREQUISITE_ID,
 		requirement: "required",
+		resolutionMode: "interactive",
 		producingWorkflowName: "code-review",
 		projectSubfolderSegments: ["implementation", "drafts"],
 		match: {
@@ -1079,7 +1081,8 @@ export const writeRemediationStoryWorkflowDefinition: WorkflowDefinition = {
 	useSkillName: WRITE_REMEDIATION_STORY_WORKFLOW_USE_SKILL_NAME,
 	displayName: WRITE_REMEDIATION_STORY_WORKFLOW_DISPLAY_NAME,
 	description: WRITE_REMEDIATION_STORY_WORKFLOW_DESCRIPTION,
-	projectSubfolder: WRITE_REMEDIATION_STORY_WORKFLOW_PROJECT_SUBFOLDER,
+	projectSelection: { kind: "interactive" },
+	projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: WRITE_REMEDIATION_STORY_WORKFLOW_PROJECT_SUBFOLDER },
 	persona: WRITE_REMEDIATION_STORY_WORKFLOW_PERSONA,
 	entryPanel: { promptMarkdown: WRITE_REMEDIATION_STORY_WORKFLOW_DESCRIPTION },
 	workflowValueKeys: WRITE_REMEDIATION_STORY_WORKFLOW_VALUE_KEYS,

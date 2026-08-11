@@ -21,6 +21,17 @@ export type WorkflowValue = string | number | boolean | WorkflowValue[] | { [key
 export type WorkflowValues = Record<string, WorkflowValue>
 export type WorkflowProjectMode = "new" | "existing"
 export type WorkflowProjectSubfolder = "discovery" | "planning" | "implementation" | "review" | "testing" | "archive"
+export type WorkflowProjectSelectionDefinition =
+	| { kind: "interactive" }
+	| {
+			kind: "automatic_fixed"
+			projectTitle: string
+			projectFolderName: string
+	  }
+
+export type WorkflowProjectOutputPlacement =
+	| { kind: "selected_project_root" }
+	| { kind: "selected_project_subfolder"; subfolder: WorkflowProjectSubfolder }
 export type WorkflowEntryArtifactExistingAction = "none" | "continue_existing" | "archive_existing" | "delete_existing"
 
 export interface WorkflowEntryArtifactResolution {
@@ -72,17 +83,24 @@ export type WorkflowPrerequisiteFileMatchDefinition =
 	| { kind: "naming_pattern"; pattern: RegExp }
 
 export type WorkflowPrerequisiteFileRequirement = "required" | "optional"
+export type WorkflowPrerequisiteFileResolutionMode = "interactive" | "deterministic_exact_filename"
+
+export type WorkflowPrerequisiteFileResolution =
+	| { prerequisiteId: string; outcome: "found"; resolvedAbsolutePath: string }
+	| { prerequisiteId: string; outcome: "not_found" }
 
 export type WorkflowPrerequisiteFileOutputDocumentReference = "none" | "module_document_builder"
 
 export interface WorkflowPrerequisiteFileDefinition {
 	id: string
 	requirement: WorkflowPrerequisiteFileRequirement
+	resolutionMode: WorkflowPrerequisiteFileResolutionMode
 	projectSubfolderSegments: readonly string[]
 	match: WorkflowPrerequisiteFileMatchDefinition
 	producingWorkflowName: string
 	workflowValueKey: string
 	outputDocumentReference: WorkflowPrerequisiteFileOutputDocumentReference
+	artifactId?: string
 }
 
 export interface WorkflowProjectSelectionState {
@@ -149,6 +167,7 @@ export interface ActiveWorkflowSession {
 	projectSelection: WorkflowProjectSelectionState
 	lifecycle: WorkflowRuntimeLifecycleState
 	entryArtifactResolution: WorkflowEntryArtifactResolutionState | undefined
+	prerequisiteFileResolutions: readonly WorkflowPrerequisiteFileResolution[]
 	ui: WorkflowUiSessionState
 	branchContext: WorkflowBranchContextState
 }
@@ -446,6 +465,8 @@ export type WorkflowArtifactDefinition =
 				| WorkflowArtifactFamily.BrainstormingSession
 				| WorkflowArtifactFamily.ArchitectureDocument
 				| WorkflowArtifactFamily.QuickSpec
+				| WorkflowArtifactFamily.ProjectOverview
+				| WorkflowArtifactFamily.DeveloperGuide
 			intentMode: "new"
 			parentIdentitySource: undefined
 			targetIdentitySource: undefined
@@ -515,7 +536,8 @@ export interface WorkflowDefinition {
 	slashCommandName: string
 	useSkillName: string
 	persona: WorkflowPersonaDefinition
-	projectSubfolder: WorkflowProjectSubfolder
+	projectSelection: WorkflowProjectSelectionDefinition
+	projectOutputPlacement: WorkflowProjectOutputPlacement
 	workflowValueKeys: readonly string[]
 	entryProjectValueKeys: WorkflowEntryProjectValueKeys
 	entryPanel: WorkflowEntryInformationalPanelDefinition
@@ -542,7 +564,8 @@ export interface ShippedWorkflowMetadata {
 	displayName: string
 	description: string
 	persona: WorkflowPersonaDefinition
-	projectSubfolder: WorkflowProjectSubfolder
+	projectSelection: WorkflowProjectSelectionDefinition
+	projectOutputPlacement: WorkflowProjectOutputPlacement
 }
 
 export type WorkflowValidationResult = { valid: true } | { valid: false; errorMessage: string }

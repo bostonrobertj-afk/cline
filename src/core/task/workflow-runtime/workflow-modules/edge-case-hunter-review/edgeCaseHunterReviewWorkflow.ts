@@ -81,6 +81,7 @@ export const EDGE_CASE_HUNTER_REVIEW_PREREQUISITE_FILES: NonNullable<WorkflowDef
 	[EDGE_CASE_HUNTER_REVIEW_TARGET_STORY_PREREQUISITE_ID]: {
 		id: EDGE_CASE_HUNTER_REVIEW_TARGET_STORY_PREREQUISITE_ID,
 		requirement: "required",
+		resolutionMode: "interactive",
 		producingWorkflowName: "dev-story",
 		projectSubfolderSegments: ["implementation", "stories-review"],
 		match: {
@@ -1074,7 +1075,8 @@ export const edgeCaseHunterReviewWorkflowDefinition: WorkflowDefinition = {
 	slashCommandName: EDGE_CASE_HUNTER_REVIEW_WORKFLOW_SLASH_COMMAND_NAME,
 	useSkillName: EDGE_CASE_HUNTER_REVIEW_WORKFLOW_USE_SKILL_NAME,
 	persona: EDGE_CASE_HUNTER_REVIEW_WORKFLOW_PERSONA,
-	projectSubfolder: EDGE_CASE_HUNTER_REVIEW_WORKFLOW_PROJECT_SUBFOLDER,
+	projectSelection: { kind: "interactive" },
+	projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: EDGE_CASE_HUNTER_REVIEW_WORKFLOW_PROJECT_SUBFOLDER },
 	workflowValueKeys: EDGE_CASE_HUNTER_REVIEW_WORKFLOW_VALUE_KEYS,
 	entryProjectValueKeys: EDGE_CASE_HUNTER_REVIEW_ENTRY_PROJECT_VALUE_KEYS,
 	entryPanel: {

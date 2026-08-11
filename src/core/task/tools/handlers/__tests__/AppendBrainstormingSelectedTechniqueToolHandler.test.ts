@@ -51,6 +51,7 @@ function createBrainstormingSession(workflowValues: WorkflowValues): ActiveWorkf
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,

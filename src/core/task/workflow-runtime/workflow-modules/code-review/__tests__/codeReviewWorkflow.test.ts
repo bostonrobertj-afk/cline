@@ -102,6 +102,7 @@ function createSession(
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -125,6 +126,7 @@ function createPredicateSession(args: { activeBranchId: string; workflowValues: 
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -438,7 +440,12 @@ describe("codeReviewWorkflowDefinition", () => {
 		expect(codeReviewWorkflowDefinition.description).to.equal(CODE_REVIEW_WORKFLOW_DESCRIPTION)
 		expect(codeReviewWorkflowDefinition.slashCommandName).to.equal(CODE_REVIEW_WORKFLOW_SLASH_COMMAND_NAME)
 		expect(codeReviewWorkflowDefinition.useSkillName).to.equal(CODE_REVIEW_WORKFLOW_USE_SKILL_NAME)
-		expect(codeReviewWorkflowDefinition.projectSubfolder).to.equal(CODE_REVIEW_WORKFLOW_PROJECT_SUBFOLDER)
+		expect(codeReviewWorkflowDefinition.projectSelection).to.deep.equal({ kind: "interactive" })
+		expect(codeReviewWorkflowDefinition.projectOutputPlacement).to.deep.equal({
+			kind: "selected_project_subfolder",
+			subfolder: CODE_REVIEW_WORKFLOW_PROJECT_SUBFOLDER,
+		})
+		expect(Object.hasOwn(codeReviewWorkflowDefinition, "projectSubfolder")).to.equal(false)
 		expect(codeReviewWorkflowDefinition.persona).to.deep.equal(CODE_REVIEW_WORKFLOW_PERSONA)
 		expect(codeReviewWorkflowDefinition.entryPanel.promptMarkdown).to.equal(CODE_REVIEW_WORKFLOW_DESCRIPTION)
 		expect(codeReviewWorkflowDefinition.workflowValueKeys).to.deep.equal(CODE_REVIEW_WORKFLOW_VALUE_KEYS)

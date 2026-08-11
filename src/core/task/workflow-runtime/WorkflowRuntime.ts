@@ -84,6 +84,7 @@ import type {
 	WorkflowFormContinuationReplacement,
 	WorkflowNextAction,
 	WorkflowPrerequisiteFileDefinition,
+	WorkflowPrerequisiteFileResolution,
 	WorkflowProjectSelectionState,
 	WorkflowProjectSubfolder,
 	WorkflowPromptBuilderInput,
@@ -298,8 +299,10 @@ export class WorkflowRuntime {
 			return { kind: "no_op" }
 		}
 
+		const inheritsParentProjectSelection = parentSession !== undefined && workflow.projectSelection.kind === "interactive"
 		if (
-			parentSession &&
+			inheritsParentProjectSelection &&
+			parentSession !== undefined &&
 			(parentSession.projectSelection.projectTitle.trim() === "" ||
 				parentSession.projectSelection.projectFolderName.trim() === "")
 		) {
@@ -314,13 +317,14 @@ export class WorkflowRuntime {
 			}
 		}
 
-		const projectSelection = parentSession
-			? { ...parentSession.projectSelection }
-			: {
-					projectMode: "new" as const,
-					projectTitle: "",
-					projectFolderName: "",
-				}
+		const projectSelection =
+			inheritsParentProjectSelection && parentSession !== undefined
+				? { ...parentSession.projectSelection }
+				: {
+						projectMode: "new" as const,
+						projectTitle: "",
+						projectFolderName: "",
+					}
 
 		taskState.activeWorkflowName = workflow.name
 		taskState.activeWorkflowSession = {
@@ -328,10 +332,11 @@ export class WorkflowRuntime {
 			workflowValues,
 			projectSelection,
 			lifecycle: {
-				projectSelectionCompleted: parentSession !== undefined,
+				projectSelectionCompleted: inheritsParentProjectSelection,
 				...(parentWorkflowName === undefined ? {} : { parentWorkflowName }),
 			},
 			entryArtifactResolution: undefined,
+			prerequisiteFileResolutions: [],
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -342,6 +347,9 @@ export class WorkflowRuntime {
 		}
 
 		this.refreshCurrentFocusChainChecklist(taskState)
+		if (parentSession !== undefined && workflow.projectSelection.kind === "automatic_fixed") {
+			return this.resolveAutomaticFixedWorkflowProjectSelection({ taskState, definition: workflow })
+		}
 
 		return this.resolveNextAction({ taskState })
 	}
@@ -391,6 +399,22 @@ export class WorkflowRuntime {
 					session: session.ui.formSession,
 				}),
 			}
+		}
+
+		const deterministicPrerequisiteContinuationRoute = this.findIncompleteDeterministicPrerequisiteContinuationRoute({
+			definition,
+			session,
+			step: activeStep,
+		})
+		if (
+			deterministicPrerequisiteContinuationRoute !== undefined &&
+			deterministicPrerequisiteContinuationRoute.route.action.kind === "resolve_prerequisite_files"
+		) {
+			return this.buildResolvePrerequisiteFilesNextAction({
+				taskState,
+				definition,
+				action: deterministicPrerequisiteContinuationRoute.route.action,
+			})
 		}
 
 		if (activeStep.completionRules?.some((rule) => rule.isComplete(session))) {
@@ -800,6 +824,32 @@ export class WorkflowRuntime {
 		const { taskState, values } = args
 		const session = taskState.activeWorkflowSession
 		const definition = session ? this.getActiveWorkflowDefinition(taskState) : undefined
+		const result = this.applyWorkflowValueWritesToSession({
+			definition,
+			session,
+			values,
+			clearKeys: args.clearKeys,
+		})
+		const changedKeys = this.dedupeWorkflowValueKeys([...Object.keys(result.changedValues), ...result.clearedKeys])
+		if (changedKeys.length > 0) {
+			this.recordWorkflowValuesPersistedTriggerIfRouted({ taskState, changedKeys })
+		}
+
+		return result
+	}
+
+	private applyWorkflowValueWritesToSession(args: {
+		definition: WorkflowDefinition | undefined
+		session: ActiveWorkflowSession | undefined
+		values: WorkflowValues
+		clearKeys?: readonly string[]
+	}): {
+		changedValues: WorkflowValues
+		unchangedValues: WorkflowValues
+		clearedKeys: readonly string[]
+		unchangedClearKeys: readonly string[]
+	} {
+		const { definition, session, values } = args
 		const allowedKeys = new Set(definition?.workflowValueKeys ?? [])
 
 		const changedValues: WorkflowValues = {}
@@ -850,14 +900,6 @@ export class WorkflowRuntime {
 			if (clearedKeyIndex >= 0) {
 				clearedKeys.splice(clearedKeyIndex, 1)
 			}
-		}
-
-		const changedKeys = this.dedupeWorkflowValueKeys([...Object.keys(changedValues), ...clearedKeys])
-		if (changedKeys.length > 0) {
-			this.recordWorkflowValuesPersistedTriggerIfRouted({
-				taskState,
-				changedKeys,
-			})
 		}
 
 		return {
@@ -942,6 +984,36 @@ export class WorkflowRuntime {
 		const artifactDefinition = workflow.artifacts?.[artifactId]
 		if (!artifactDefinition || artifactDefinition.id !== artifactId) {
 			throw new Error(`Active workflow ${workflow.name} does not define artifactId ${artifactId}.`)
+		}
+
+		const linkedPrerequisite = Object.values(workflow.prerequisiteFiles ?? {}).find(
+			(prerequisite) =>
+				prerequisite.resolutionMode === "deterministic_exact_filename" && prerequisite.artifactId === artifactId,
+		)
+		if (linkedPrerequisite !== undefined) {
+			const validationResult = this.validateCurrentPrerequisiteFileResolutions(workflow, session)
+			if (validationResult.valid === false) {
+				throw new Error(validationResult.errorMessage)
+			}
+			const matchingResults = session.prerequisiteFileResolutions.filter(
+				(resolution) => resolution.prerequisiteId === linkedPrerequisite.id,
+			)
+			const artifactSpecificOutputKeys = [
+				artifactDefinition.outputValueKeys.artifactFamily,
+				artifactDefinition.outputValueKeys.artifactIdentity,
+				artifactDefinition.outputValueKeys.artifactFilename,
+				artifactDefinition.outputValueKeys.artifactRelativePath,
+				artifactDefinition.outputValueKeys.artifactAbsolutePath,
+			]
+			if (
+				matchingResults.length !== 1 ||
+				matchingResults[0].outcome !== "not_found" ||
+				artifactSpecificOutputKeys.some((key) => session.workflowValues[key] !== undefined)
+			) {
+				throw new Error(
+					`Cannot allocate workflow artifact ${artifactId} because its linked deterministic prerequisite is not a completed not_found result with entirely unset artifact outputs.`,
+				)
+			}
 		}
 
 		return this.resolveWorkflowArtifactAllocation({
@@ -1585,6 +1657,15 @@ export class WorkflowRuntime {
 			if (familyDefinition.allocationMode !== "singleton_project") {
 				continue
 			}
+			if (
+				Object.values(workflow.prerequisiteFiles ?? {}).some(
+					(prerequisite) =>
+						prerequisite.resolutionMode === "deterministic_exact_filename" &&
+						prerequisite.artifactId === artifactDefinition.id,
+				)
+			) {
+				continue
+			}
 
 			artifactOutputs.push(
 				await this.resolveWorkflowArtifactAllocation({
@@ -2153,6 +2234,7 @@ export class WorkflowRuntime {
 			projectSelection: structuredClone(session.projectSelection),
 			lifecycle: structuredClone(session.lifecycle),
 			entryArtifactResolution: structuredClone(session.entryArtifactResolution),
+			prerequisiteFileResolutions: session.prerequisiteFileResolutions.map((resolution) => ({ ...resolution })),
 			ui: structuredClone(session.ui),
 			branchContext: structuredClone(session.branchContext),
 		}
@@ -2160,6 +2242,30 @@ export class WorkflowRuntime {
 
 	private isPlainRecord(value: unknown): value is Record<string, unknown> {
 		return typeof value === "object" && value !== null && Array.isArray(value) === false
+	}
+
+	private isWorkflowPrerequisiteFileResolution(value: unknown): value is WorkflowPrerequisiteFileResolution {
+		if (this.isPlainRecord(value) === false || this.isNonEmptyString(value.prerequisiteId) === false) {
+			return false
+		}
+
+		if (value.outcome === "not_found") {
+			return Object.keys(value).length === 2 && Object.hasOwn(value, "prerequisiteId")
+		}
+
+		return (
+			value.outcome === "found" &&
+			Object.keys(value).length === 3 &&
+			Object.hasOwn(value, "prerequisiteId") &&
+			Object.hasOwn(value, "resolvedAbsolutePath") &&
+			typeof value.resolvedAbsolutePath === "string" &&
+			value.resolvedAbsolutePath !== "" &&
+			isAbsolute(value.resolvedAbsolutePath)
+		)
+	}
+
+	private isWorkflowPrerequisiteFileResolutionArray(value: unknown): value is readonly WorkflowPrerequisiteFileResolution[] {
+		return Array.isArray(value) && value.every((resolution) => this.isWorkflowPrerequisiteFileResolution(resolution))
 	}
 
 	private isFileNotFoundError(error: unknown): boolean {
@@ -2897,6 +3003,10 @@ export class WorkflowRuntime {
 			entryArtifactResolution = structuredClone(persistedSession.entryArtifactResolution)
 		}
 
+		if (this.isWorkflowPrerequisiteFileResolutionArray(persistedSession.prerequisiteFileResolutions) === false) {
+			return undefined
+		}
+
 		if (this.isPlainRecord(persistedSession.branchContext) === false) {
 			return undefined
 		}
@@ -2922,11 +3032,16 @@ export class WorkflowRuntime {
 					: { parentWorkflowName: persistedSession.lifecycle.parentWorkflowName }),
 			},
 			entryArtifactResolution,
+			prerequisiteFileResolutions: persistedSession.prerequisiteFileResolutions.map((resolution) => ({ ...resolution })),
 			ui: {
 				suppressedWorkflowFormIds: [],
 				suppressedWorkflowStepResolutionRoutes: [],
 			},
 			branchContext,
+		}
+		const prerequisiteResolutionValidation = this.validateCurrentPrerequisiteFileResolutions(definition, compatibilitySession)
+		if (prerequisiteResolutionValidation.valid === false) {
+			return undefined
 		}
 
 		if (persistedSession.branchContext.lastTriggerEvent !== undefined) {
@@ -3030,6 +3145,7 @@ export class WorkflowRuntime {
 					: { parentWorkflowName: persistedSession.lifecycle.parentWorkflowName }),
 			},
 			entryArtifactResolution,
+			prerequisiteFileResolutions: persistedSession.prerequisiteFileResolutions.map((resolution) => ({ ...resolution })),
 			ui: {
 				formSession,
 				stepResolutionSession,
@@ -3361,86 +3477,89 @@ export class WorkflowRuntime {
 	}
 
 	private buildWorkflowEntryFormDefinition(workflow: WorkflowDefinition): WorkflowFormDefinitionPayload {
+		const informationalPanel: WorkflowFormPanelDefinition = {
+			panelId: WORKFLOW_ENTRY_INFO_PANEL_ID,
+			title: "Workflow Overview",
+			promptMarkdown: workflow.entryPanel.promptMarkdown,
+			fields: [],
+			allowedActions: ["submit"],
+			actionLabels: {
+				submit: "Continue",
+			},
+			transition:
+				workflow.projectSelection.kind === "interactive"
+					? {
+							type: "sequential",
+							nextPanelId: WORKFLOW_ENTRY_PROJECT_SELECTION_PANEL_ID,
+						}
+					: {
+							type: "conditional",
+							conditionSourceKey: "__terminal__",
+							branches: [],
+							defaultTerminal: true,
+						},
+		}
+		const panels: WorkflowFormDefinitionPayload["panels"] = {
+			[WORKFLOW_ENTRY_INFO_PANEL_ID]: informationalPanel,
+		}
+
+		if (workflow.projectSelection.kind === "interactive") {
+			panels[WORKFLOW_ENTRY_PROJECT_SELECTION_PANEL_ID] = {
+				panelId: WORKFLOW_ENTRY_PROJECT_SELECTION_PANEL_ID,
+				title: "Project Selection",
+				promptMarkdown: "Choose whether to start a new project or continue with an existing project.",
+				fields: [
+					{
+						key: WORKFLOW_ENTRY_PROJECT_MODE_FIELD_KEY,
+						kind: "radio_group",
+						label: "Project mode",
+						helpText: "Select how this workflow should resolve its active project.",
+						required: true,
+						options: [
+							{ value: "new", label: "New Project" },
+							{ value: "existing", label: "Existing Project" },
+						],
+					},
+					{
+						key: WORKFLOW_ENTRY_EXISTING_PROJECT_FIELD_KEY,
+						kind: "dropdown",
+						label: "Existing project",
+						helpText: "Select an existing project output folder.",
+						required: true,
+						visibilityCondition: this.buildWorkflowEntryModeVisibilityCondition("existing"),
+						selectorDiscovery: {
+							root: { kind: "project_output_root" },
+							entryType: "directory",
+							immediateChildrenOnly: true,
+							sort: "alpha_asc",
+						},
+					},
+					{
+						key: WORKFLOW_ENTRY_NEW_PROJECT_TITLE_FIELD_KEY,
+						kind: "small_text",
+						label: "Project title",
+						helpText: "Provide the human-facing title for the new project.",
+						required: true,
+						placeholder: "Enter a project title",
+						visibilityCondition: this.buildWorkflowEntryModeVisibilityCondition("new"),
+					},
+				],
+				allowedActions: ["submit", "back"],
+				actionLabels: { submit: "Start Workflow", back: "Back" },
+				transition: {
+					type: "sequential",
+					nextPanelId: WORKFLOW_ENTRY_PROJECT_SELECTION_PANEL_ID,
+				},
+			}
+		}
+
 		return {
 			definitionVersion: 1,
 			title: this.buildWorkflowEntryTitle(workflow.name),
 			toolDictionaryTitle: "",
 			toolDictionaryMarkdown: "",
 			firstPanelId: WORKFLOW_ENTRY_INFO_PANEL_ID,
-			panels: {
-				[WORKFLOW_ENTRY_INFO_PANEL_ID]: {
-					panelId: WORKFLOW_ENTRY_INFO_PANEL_ID,
-					title: "Workflow Overview",
-					promptMarkdown: workflow.entryPanel.promptMarkdown,
-					fields: [],
-					allowedActions: ["submit"],
-					actionLabels: {
-						submit: "Continue",
-					},
-					transition: {
-						type: "sequential",
-						nextPanelId: WORKFLOW_ENTRY_PROJECT_SELECTION_PANEL_ID,
-					},
-				},
-				[WORKFLOW_ENTRY_PROJECT_SELECTION_PANEL_ID]: {
-					panelId: WORKFLOW_ENTRY_PROJECT_SELECTION_PANEL_ID,
-					title: "Project Selection",
-					promptMarkdown: "Choose whether to start a new project or continue with an existing project.",
-					fields: [
-						{
-							key: WORKFLOW_ENTRY_PROJECT_MODE_FIELD_KEY,
-							kind: "radio_group",
-							label: "Project mode",
-							helpText: "Select how this workflow should resolve its active project.",
-							required: true,
-							options: [
-								{
-									value: "new",
-									label: "New Project",
-								},
-								{
-									value: "existing",
-									label: "Existing Project",
-								},
-							],
-						},
-						{
-							key: WORKFLOW_ENTRY_EXISTING_PROJECT_FIELD_KEY,
-							kind: "dropdown",
-							label: "Existing project",
-							helpText: "Select an existing project output folder.",
-							required: true,
-							visibilityCondition: this.buildWorkflowEntryModeVisibilityCondition("existing"),
-							selectorDiscovery: {
-								root: {
-									kind: "project_output_root",
-								},
-								entryType: "directory",
-								immediateChildrenOnly: true,
-								sort: "alpha_asc",
-							},
-						},
-						{
-							key: WORKFLOW_ENTRY_NEW_PROJECT_TITLE_FIELD_KEY,
-							kind: "small_text",
-							label: "Project title",
-							helpText: "Provide the human-facing title for the new project.",
-							required: true,
-							placeholder: "Enter a project title",
-							visibilityCondition: this.buildWorkflowEntryModeVisibilityCondition("new"),
-						},
-					],
-					allowedActions: ["submit", "back"],
-					actionLabels: {
-						submit: "Start Workflow",
-						back: "Back",
-					},
-					transition: {
-						type: "sequential",
-						nextPanelId: WORKFLOW_ENTRY_PROJECT_SELECTION_PANEL_ID,
-					},
-				},
-			},
+			panels,
 		}
 	}
 
@@ -3762,6 +3881,73 @@ export class WorkflowRuntime {
 		}
 	}
 
+	private async finalizeWorkflowProjectSelection(args: {
+		taskState: TaskState
+		definition: WorkflowDefinition
+		projectSelection: WorkflowProjectSelectionState
+	}): Promise<WorkflowNextAction> {
+		const session = args.taskState.activeWorkflowSession
+		if (session === undefined) {
+			return { kind: "no_op" }
+		}
+
+		session.projectSelection = args.projectSelection
+		session.ui.formSession = undefined
+		await this.applyWorkflowValueWrites({
+			taskState: args.taskState,
+			values: {
+				[args.definition.entryProjectValueKeys.projectMode]: args.projectSelection.projectMode,
+				[args.definition.entryProjectValueKeys.projectTitle]: args.projectSelection.projectTitle,
+				[args.definition.entryProjectValueKeys.projectFolderName]: args.projectSelection.projectFolderName,
+			},
+		})
+		await this.ensureProjectFoldersExist(session)
+		this.recordWorkflowProjectSelectionCompleted(session)
+		if (args.projectSelection.projectMode === "existing") {
+			return this.continueWorkflowEntryArtifactResolution({
+				taskState: args.taskState,
+				workflow: args.definition,
+				artifactResolutions: [],
+			})
+		}
+
+		return this.completeWorkflowEntryArtifactResolution({
+			taskState: args.taskState,
+			artifactResolutions: await this.resolveNewProjectWorkflowEntryArtifactResolutions({
+				taskState: args.taskState,
+			}),
+		})
+	}
+
+	private async resolveAutomaticFixedWorkflowProjectSelection(args: {
+		taskState: TaskState
+		definition: WorkflowDefinition
+	}): Promise<WorkflowNextAction> {
+		if (args.definition.projectSelection.kind !== "automatic_fixed") {
+			return { kind: "no_op" }
+		}
+
+		const { projectTitle, projectFolderName } = args.definition.projectSelection
+		const candidates = await discoverWorkflowCandidates({
+			rootDirectory: this.resolveWorkflowProjectOutputRoot(),
+			workspacePathPolicy: this.workspacePathPolicy,
+			entryType: "directory",
+			immediateChildrenOnly: true,
+			buildLabel: (entryName) => entryName,
+			sort: "alpha_asc",
+		})
+		const projectSelection: WorkflowProjectSelectionState = {
+			projectMode: candidates.some((candidate) => candidate.value === projectFolderName) ? "existing" : "new",
+			projectTitle,
+			projectFolderName,
+		}
+		return this.finalizeWorkflowProjectSelection({
+			taskState: args.taskState,
+			definition: args.definition,
+			projectSelection,
+		})
+	}
+
 	private async handleWorkflowEntryFormOutcome(args: {
 		taskState: TaskState
 		request: WorkflowFormSubmissionRequest
@@ -3771,12 +3957,28 @@ export class WorkflowRuntime {
 		if (!session) {
 			return { kind: "no_op" }
 		}
+		const definition = this.getActiveWorkflowDefinition(args.taskState)
+		if (!definition) {
+			return this.teardownWorkflowAndRequirePersistence({ taskState: args.taskState })
+		}
 
 		switch (args.outcome.kind) {
 			case "runtime_routed_submission":
 				return { kind: "no_op" }
 			case "render_form":
 			case "complete_success": {
+				if (
+					args.request.action === WorkflowFormAction.SUBMIT &&
+					args.request.panelId === WORKFLOW_ENTRY_INFO_PANEL_ID &&
+					args.outcome.session.failure === undefined &&
+					definition.projectSelection.kind === "automatic_fixed"
+				) {
+					return this.resolveAutomaticFixedWorkflowProjectSelection({
+						taskState: args.taskState,
+						definition,
+					})
+				}
+
 				if (
 					args.request.action === WorkflowFormAction.SUBMIT &&
 					args.request.panelId === WORKFLOW_ENTRY_PROJECT_SELECTION_PANEL_ID &&
@@ -3801,36 +4003,10 @@ export class WorkflowRuntime {
 						return this.resolveNextAction({ taskState: args.taskState })
 					}
 
-					const workflow = this.getActiveWorkflowDefinition(args.taskState)
-					if (!workflow) {
-						return this.teardownWorkflowAndRequirePersistence({ taskState: args.taskState })
-					}
-
-					session.projectSelection = selectionResult.projectSelection
-					session.ui.formSession = undefined
-					await this.applyWorkflowValueWrites({
+					return this.finalizeWorkflowProjectSelection({
 						taskState: args.taskState,
-						values: {
-							[workflow.entryProjectValueKeys.projectMode]: selectionResult.projectSelection.projectMode,
-							[workflow.entryProjectValueKeys.projectTitle]: selectionResult.projectSelection.projectTitle,
-							[workflow.entryProjectValueKeys.projectFolderName]:
-								selectionResult.projectSelection.projectFolderName,
-						},
-					})
-					await this.ensureProjectFoldersExist(session)
-					this.recordWorkflowProjectSelectionCompleted(session)
-					if (selectionResult.projectSelection.projectMode === "existing") {
-						return this.continueWorkflowEntryArtifactResolution({
-							taskState: args.taskState,
-							workflow,
-							artifactResolutions: [],
-						})
-					}
-					return this.completeWorkflowEntryArtifactResolution({
-						taskState: args.taskState,
-						artifactResolutions: await this.resolveNewProjectWorkflowEntryArtifactResolutions({
-							taskState: args.taskState,
-						}),
+						definition,
+						projectSelection: selectionResult.projectSelection,
 					})
 				}
 
@@ -3838,10 +4014,7 @@ export class WorkflowRuntime {
 					args.request.action === WorkflowFormAction.SUBMIT &&
 					args.request.panelId === WORKFLOW_ENTRY_ARTIFACT_CONFLICT_PANEL_ID
 				) {
-					const workflow = this.getActiveWorkflowDefinition(args.taskState)
-					if (!workflow) {
-						return this.teardownWorkflowAndRequirePersistence({ taskState: args.taskState })
-					}
+					const workflow = definition
 
 					if (args.outcome.session.failure !== undefined) {
 						session.ui.formSession = args.outcome.session
@@ -5590,11 +5763,102 @@ export class WorkflowRuntime {
 		const skippedPrerequisiteIdSet = new Set(skippedPrerequisiteIds)
 		for (const prerequisiteId of args.action.prerequisiteIds) {
 			const prerequisite = args.definition.prerequisiteFiles?.[prerequisiteId]
-			if (
-				prerequisite === undefined ||
-				skippedPrerequisiteIdSet.has(prerequisiteId) ||
-				this.hasPersistedPrerequisiteWorkflowValue(session, prerequisite)
-			) {
+			if (prerequisite === undefined || skippedPrerequisiteIdSet.has(prerequisiteId)) {
+				continue
+			}
+
+			if (prerequisite.resolutionMode === "deterministic_exact_filename") {
+				if (prerequisite.requirement !== "optional" || prerequisite.match.kind !== "exact_filename") {
+					throw new Error(
+						`Workflow prerequisite file ${prerequisite.id} has an invalid deterministic exact-filename definition.`,
+					)
+				}
+				const validationResult = this.validateCurrentPrerequisiteFileResolutions(args.definition, session)
+				if (validationResult.valid === false) {
+					throw new Error(validationResult.errorMessage)
+				}
+				if (session.prerequisiteFileResolutions.some((resolution) => resolution.prerequisiteId === prerequisiteId)) {
+					continue
+				}
+
+				const candidates = await this.discoverPrerequisiteFileCandidates({ session, prerequisite })
+				if (candidates.length > 1) {
+					throw new Error(
+						`Workflow prerequisite file ${prerequisite.id} deterministic exact-filename resolution returned more than one candidate.`,
+					)
+				}
+				const candidate = candidates[0]
+				if (prerequisite.artifactId !== undefined) {
+					const artifactDefinition = args.definition.artifacts?.[prerequisite.artifactId]
+					if (artifactDefinition === undefined) {
+						throw new Error(
+							`Workflow prerequisite file ${prerequisite.id} references missing workflow artifact ${prerequisite.artifactId}.`,
+						)
+					}
+					if (candidate !== undefined) {
+						const resolvedArtifactOutput = await this.resolveWorkflowArtifactAllocation({
+							workflow: args.definition,
+							session,
+							artifactDefinition,
+						})
+						if (resolve(candidate.absolutePath) !== resolve(resolvedArtifactOutput.artifactAbsolutePath)) {
+							throw new Error(
+								`Workflow prerequisite file ${prerequisite.id} resolved path does not match linked workflow artifact ${artifactDefinition.id}.`,
+							)
+						}
+						this.commitDeterministicPrerequisiteResolution({
+							taskState: args.taskState,
+							definition: args.definition,
+							prerequisiteId,
+							resolution: { prerequisiteId, outcome: "found", resolvedAbsolutePath: candidate.absolutePath },
+							values: resolvedArtifactOutput.workflowValueWrites,
+							clearKeys: [],
+						})
+					} else {
+						this.commitDeterministicPrerequisiteResolution({
+							taskState: args.taskState,
+							definition: args.definition,
+							prerequisiteId,
+							resolution: { prerequisiteId, outcome: "not_found" },
+							values: {},
+							clearKeys: [
+								artifactDefinition.outputValueKeys.artifactFamily,
+								artifactDefinition.outputValueKeys.artifactIdentity,
+								artifactDefinition.outputValueKeys.artifactFilename,
+								artifactDefinition.outputValueKeys.artifactRelativePath,
+								artifactDefinition.outputValueKeys.artifactAbsolutePath,
+							],
+						})
+					}
+				} else if (candidate !== undefined) {
+					this.commitDeterministicPrerequisiteResolution({
+						taskState: args.taskState,
+						definition: args.definition,
+						prerequisiteId,
+						resolution: { prerequisiteId, outcome: "found", resolvedAbsolutePath: candidate.absolutePath },
+						values: { [prerequisite.workflowValueKey]: candidate.absolutePath },
+						clearKeys: [],
+					})
+				} else {
+					this.commitDeterministicPrerequisiteResolution({
+						taskState: args.taskState,
+						definition: args.definition,
+						prerequisiteId,
+						resolution: { prerequisiteId, outcome: "not_found" },
+						values: {},
+						clearKeys: [prerequisite.workflowValueKey],
+					})
+				}
+
+				return this.buildResolvePrerequisiteFilesNextAction({
+					taskState: args.taskState,
+					definition: args.definition,
+					action: args.action,
+					skippedPrerequisiteIds,
+				})
+			}
+
+			if (this.hasPersistedPrerequisiteWorkflowValue(session, prerequisite)) {
 				continue
 			}
 
@@ -5647,6 +5911,210 @@ export class WorkflowRuntime {
 
 		session.ui.formSession = undefined
 		return this.resolveNextAction({ taskState: args.taskState })
+	}
+
+	private commitDeterministicPrerequisiteResolution(args: {
+		taskState: TaskState
+		definition: WorkflowDefinition
+		prerequisiteId: string
+		resolution: WorkflowPrerequisiteFileResolution
+		values: WorkflowValues
+		clearKeys: readonly string[]
+	}): void {
+		const session = args.taskState.activeWorkflowSession
+		if (session === undefined) {
+			throw new Error("Cannot commit deterministic workflow prerequisite resolution without an active workflow session.")
+		}
+		const stagedSession = this.cloneWorkflowSession(session)
+		const workflowValueWriteResult = this.applyWorkflowValueWritesToSession({
+			definition: args.definition,
+			session: stagedSession,
+			values: args.values,
+			clearKeys: args.clearKeys,
+		})
+		const changedKeys = this.dedupeWorkflowValueKeys([
+			...Object.keys(workflowValueWriteResult.changedValues),
+			...workflowValueWriteResult.clearedKeys,
+		])
+		const resolutionById = new Map(
+			stagedSession.prerequisiteFileResolutions.map((resolution) => [resolution.prerequisiteId, resolution]),
+		)
+		resolutionById.set(args.prerequisiteId, args.resolution)
+		const deterministicPrerequisites = Object.values(args.definition.prerequisiteFiles ?? {}).filter(
+			(prerequisite) => prerequisite.resolutionMode === "deterministic_exact_filename",
+		)
+		stagedSession.prerequisiteFileResolutions = deterministicPrerequisites
+			.filter((prerequisite) => resolutionById.has(prerequisite.id))
+			.map((prerequisite) => resolutionById.get(prerequisite.id)!)
+
+		if (args.resolution.outcome === "not_found") {
+			const prerequisite = args.definition.prerequisiteFiles?.[args.prerequisiteId]
+			const artifactDefinition =
+				prerequisite?.artifactId === undefined ? undefined : args.definition.artifacts?.[prerequisite.artifactId]
+			const ownedKeys = [
+				prerequisite?.workflowValueKey,
+				artifactDefinition?.outputValueKeys.artifactFamily,
+				artifactDefinition?.outputValueKeys.artifactIdentity,
+				artifactDefinition?.outputValueKeys.artifactFilename,
+				artifactDefinition?.outputValueKeys.artifactRelativePath,
+				artifactDefinition?.outputValueKeys.artifactAbsolutePath,
+			].filter((key): key is string => key !== undefined)
+			if (ownedKeys.some((key) => stagedSession.workflowValues[key] !== undefined)) {
+				throw new Error(
+					`Workflow prerequisite file ${args.prerequisiteId} not_found commit must leave its path and linked artifact outputs unset.`,
+				)
+			}
+		}
+
+		const validationResult = this.validateCurrentPrerequisiteFileResolutions(args.definition, stagedSession)
+		if (validationResult.valid === false) {
+			throw new Error(validationResult.errorMessage)
+		}
+		args.taskState.activeWorkflowSession = stagedSession
+		if (changedKeys.length > 0) {
+			this.recordWorkflowValuesPersistedTriggerIfRouted({ taskState: args.taskState, changedKeys })
+		}
+	}
+
+	private validateCurrentPrerequisiteFileResolutions(
+		definition: WorkflowDefinition,
+		session: ActiveWorkflowSession,
+	): WorkflowValidationResult {
+		const invalid = (): WorkflowValidationResult => ({
+			valid: false,
+			errorMessage:
+				"Workflow prerequisite file resolution state is inconsistent with the active workflow definition or session.",
+		})
+		const prerequisites = Object.values(definition.prerequisiteFiles ?? {}).filter(
+			(prerequisite) => prerequisite.resolutionMode === "deterministic_exact_filename",
+		)
+		if (session.prerequisiteFileResolutions.length > prerequisites.length) {
+			return invalid()
+		}
+
+		const expectedMetadata = new Map<string, { writes: WorkflowValues; specificKeys: readonly string[] }>()
+		for (const prerequisite of prerequisites) {
+			if (prerequisite.match.kind !== "exact_filename") {
+				return invalid()
+			}
+			if (prerequisite.artifactId !== undefined) {
+				const artifactDefinition = definition.artifacts?.[prerequisite.artifactId]
+				if (artifactDefinition === undefined) {
+					return invalid()
+				}
+				const familyDefinition = WORKFLOW_ARTIFACT_FAMILY_REGISTRY[artifactDefinition.family]
+				if (familyDefinition.allocationMode !== "singleton_project" || familyDefinition.identityRequirement !== "none") {
+					return invalid()
+				}
+				const artifactRelativePath = join(
+					...this.resolveWorkflowProjectOutputPlacementSegments(definition),
+					familyDefinition.filenamePattern,
+				)
+				const artifactAbsolutePath = join(this.resolveWorkflowProjectOutputFolder(session), artifactRelativePath)
+				const writes = this.buildWorkflowArtifactOutputValueWrites({
+					outputValueKeys: artifactDefinition.outputValueKeys,
+					output: {
+						artifactId: artifactDefinition.id,
+						projectTitle: session.projectSelection.projectTitle,
+						projectFolderName: session.projectSelection.projectFolderName,
+						artifactFamily: artifactDefinition.family,
+						artifactIdentity: familyDefinition.singletonIdentity,
+						artifactFilename: familyDefinition.filenamePattern,
+						artifactRelativePath,
+						artifactAbsolutePath,
+						parentIdentity: undefined,
+						targetIdentity: undefined,
+					},
+				})
+				expectedMetadata.set(prerequisite.id, {
+					writes,
+					specificKeys: [
+						artifactDefinition.outputValueKeys.artifactFamily,
+						artifactDefinition.outputValueKeys.artifactIdentity,
+						artifactDefinition.outputValueKeys.artifactFilename,
+						artifactDefinition.outputValueKeys.artifactRelativePath,
+						artifactDefinition.outputValueKeys.artifactAbsolutePath,
+					],
+				})
+			}
+		}
+
+		for (const [index, prerequisite] of prerequisites.entries()) {
+			if (prerequisite.match.kind !== "exact_filename") {
+				return invalid()
+			}
+			const result = session.prerequisiteFileResolutions[index]
+			const metadata = expectedMetadata.get(prerequisite.id)
+			if (result === undefined) {
+				if (session.workflowValues[prerequisite.workflowValueKey] !== undefined) {
+					return invalid()
+				}
+				if (metadata?.specificKeys.some((key) => session.workflowValues[key] !== undefined)) {
+					return invalid()
+				}
+				continue
+			}
+			if (result.prerequisiteId !== prerequisite.id) {
+				return invalid()
+			}
+			const canonicalAbsolutePath = join(
+				this.resolveWorkflowProjectOutputFolder(session),
+				...prerequisite.projectSubfolderSegments,
+				prerequisite.match.filename,
+			)
+			const populatedPath = session.workflowValues[prerequisite.workflowValueKey]
+			if (populatedPath !== undefined) {
+				if (
+					typeof populatedPath !== "string" ||
+					populatedPath === "" ||
+					resolve(populatedPath) !== resolve(canonicalAbsolutePath)
+				) {
+					return invalid()
+				}
+				try {
+					this.assertWorkspacePathAllowed(populatedPath)
+				} catch (error) {
+					if (error instanceof Error) {
+						return { valid: false, errorMessage: error.message }
+					}
+					throw error
+				}
+			}
+			if (result.outcome === "found") {
+				if (typeof populatedPath !== "string" || populatedPath === "" || populatedPath !== result.resolvedAbsolutePath) {
+					return invalid()
+				}
+				if (
+					metadata !== undefined &&
+					Object.entries(metadata.writes).some(
+						([key, value]) => !areWorkflowValuesEqual(session.workflowValues[key], value),
+					)
+				) {
+					return invalid()
+				}
+			} else {
+				if (Object.hasOwn(result, "resolvedAbsolutePath")) {
+					return invalid()
+				}
+				if (metadata !== undefined) {
+					const populatedSpecificKeys = metadata.specificKeys.filter((key) => session.workflowValues[key] !== undefined)
+					if (populatedSpecificKeys.length !== 0 && populatedSpecificKeys.length !== metadata.specificKeys.length) {
+						return invalid()
+					}
+					if (
+						populatedSpecificKeys.length === metadata.specificKeys.length &&
+						Object.entries(metadata.writes).some(
+							([key, value]) => !areWorkflowValuesEqual(session.workflowValues[key], value),
+						)
+					) {
+						return invalid()
+					}
+				} else if (session.workflowValues[prerequisite.workflowValueKey] !== undefined) {
+					return invalid()
+				}
+			}
+		}
+		return { valid: true }
 	}
 
 	private buildDecisionTreeEvaluationInput(
@@ -5885,6 +6353,56 @@ export class WorkflowRuntime {
 		}
 
 		return undefined
+	}
+
+	private findIncompleteDeterministicPrerequisiteContinuationRoute(args: {
+		definition: WorkflowDefinition
+		session: ActiveWorkflowSession
+		step: WorkflowStepDefinition
+	}): WorkflowContinuationSourceRoute | undefined {
+		if (
+			Object.values(args.definition.prerequisiteFiles ?? {}).some(
+				(prerequisite) => prerequisite.resolutionMode === "deterministic_exact_filename",
+			) === false
+		) {
+			return undefined
+		}
+
+		const continuationRoute = this.findContinuationSourceRoute({
+			step: args.step,
+			activeBranchId: args.session.branchContext.activeBranchId,
+			matches: ({ route }) => {
+				if (route.action.kind !== "resolve_prerequisite_files") {
+					return false
+				}
+
+				return route.action.prerequisiteIds.some((prerequisiteId) => {
+					const prerequisite = args.definition.prerequisiteFiles?.[prerequisiteId]
+					return prerequisite?.resolutionMode === "deterministic_exact_filename"
+				})
+			},
+		})
+
+		if (continuationRoute === undefined || continuationRoute.route.action.kind !== "resolve_prerequisite_files") {
+			return undefined
+		}
+
+		const completedIds = new Set(args.session.prerequisiteFileResolutions.map((resolution) => resolution.prerequisiteId))
+		const deterministicPrerequisiteIds = continuationRoute.route.action.prerequisiteIds.filter((prerequisiteId) => {
+			const prerequisite = args.definition.prerequisiteFiles?.[prerequisiteId]
+			return prerequisite?.resolutionMode === "deterministic_exact_filename"
+		})
+
+		if (deterministicPrerequisiteIds.every((prerequisiteId) => completedIds.has(prerequisiteId))) {
+			return undefined
+		}
+
+		const validationResult = this.validateCurrentPrerequisiteFileResolutions(args.definition, args.session)
+		if (validationResult.valid === false) {
+			throw new Error(validationResult.errorMessage)
+		}
+
+		return continuationRoute
 	}
 
 	private findWorkflowFormContinuationSourceRoute(args: {
@@ -6419,6 +6937,14 @@ export class WorkflowRuntime {
 		return join(this.resolveWorkflowProjectOutputRoot(), session.projectSelection.projectFolderName)
 	}
 
+	private resolveWorkflowProjectOutputPlacementSegments(workflow: WorkflowDefinition): readonly WorkflowProjectSubfolder[] {
+		if (workflow.projectOutputPlacement.kind === "selected_project_root") {
+			return []
+		}
+
+		return [workflow.projectOutputPlacement.subfolder]
+	}
+
 	private normalizeExistingProjectArtifactIdentity(args: {
 		familyDefinition: WorkflowArtifactFamilyDefinition
 		rawIdentity: string
@@ -6677,7 +7203,7 @@ export class WorkflowRuntime {
 			familyDefinition,
 			artifactIdentity: identityResolution.artifactIdentity,
 		})
-		const artifactRelativePath = join(args.workflow.projectSubfolder, artifactFilename)
+		const artifactRelativePath = join(...this.resolveWorkflowProjectOutputPlacementSegments(args.workflow), artifactFilename)
 		const artifactAbsolutePath = join(this.resolveWorkflowProjectOutputFolder(args.session), artifactRelativePath)
 		const output = {
 			artifactId: args.artifactDefinition.id,
@@ -6712,9 +7238,9 @@ export class WorkflowRuntime {
 			throw new Error("Cannot discover workflow artifacts without a selected project folder.")
 		}
 
-		const projectSubfolderPathSegmentSets = (
-			args.searchProjectWide ? WORKFLOW_PROJECT_SUBFOLDERS : [args.workflow.projectSubfolder]
-		).map((subfolder): readonly string[] => [projectFolderName, subfolder])
+		const projectSubfolderPathSegmentSets = args.searchProjectWide
+			? WORKFLOW_PROJECT_SUBFOLDERS.map((subfolder): readonly string[] => [projectFolderName, subfolder])
+			: [[projectFolderName, ...this.resolveWorkflowProjectOutputPlacementSegments(args.workflow)]]
 		const implementationStoryChildFolderPathSegmentSets =
 			args.searchProjectWide &&
 			(args.familyDefinition.family === WorkflowArtifactFamily.Story ||
@@ -6755,7 +7281,9 @@ export class WorkflowRuntime {
 			case WorkflowArtifactFamily.EpicsIndex:
 			case WorkflowArtifactFamily.BrainstormingSession:
 			case WorkflowArtifactFamily.ArchitectureDocument:
-			case WorkflowArtifactFamily.QuickSpec: {
+			case WorkflowArtifactFamily.QuickSpec:
+			case WorkflowArtifactFamily.ProjectOverview:
+			case WorkflowArtifactFamily.DeveloperGuide: {
 				if (args.familyDefinition.allocationMode !== "singleton_project") {
 					throw new Error(`Workflow artifact ${args.artifactDefinition.id} requires a singleton project family.`)
 				}
@@ -6960,7 +7488,7 @@ export class WorkflowRuntime {
 	}): Promise<WorkflowEpicsIndex> {
 		const epicsIndexPath = join(
 			this.resolveWorkflowProjectOutputFolder(args.session),
-			args.workflow.projectSubfolder,
+			...this.resolveWorkflowProjectOutputPlacementSegments(args.workflow),
 			"Epics.index.json",
 		)
 		this.assertWorkspacePathAllowed(epicsIndexPath)
@@ -7191,6 +7719,8 @@ export class WorkflowRuntime {
 			case WorkflowArtifactFamily.BrainstormingSession:
 			case WorkflowArtifactFamily.ArchitectureDocument:
 			case WorkflowArtifactFamily.QuickSpec:
+			case WorkflowArtifactFamily.ProjectOverview:
+			case WorkflowArtifactFamily.DeveloperGuide:
 			case WorkflowArtifactFamily.ChangeManagementPlan:
 				return undefined
 			case WorkflowArtifactFamily.EpicDeliverySpec:
@@ -7587,6 +8117,57 @@ export class WorkflowRuntime {
 	}
 
 	private validateWorkflowDefinition(workflow: WorkflowDefinition): WorkflowValidationResult {
+		if (
+			this.isPlainRecord(workflow.projectSelection) === false ||
+			this.isPlainRecord(workflow.projectOutputPlacement) === false ||
+			this.isPlainRecord(workflow.entryProjectValueKeys) === false
+		) {
+			return {
+				valid: false,
+				errorMessage: "Workflow project selection, output placement, and entry project value keys are invalid.",
+			}
+		}
+
+		if (workflow.projectSelection.kind !== "interactive" && workflow.projectSelection.kind !== "automatic_fixed") {
+			return { valid: false, errorMessage: "Workflow projectSelection is invalid." }
+		}
+
+		if (workflow.projectSelection.kind === "automatic_fixed") {
+			const { projectTitle, projectFolderName } = workflow.projectSelection
+			if (
+				typeof projectTitle !== "string" ||
+				projectTitle === "" ||
+				projectTitle.trim() !== projectTitle ||
+				typeof projectFolderName !== "string" ||
+				projectFolderName === "" ||
+				projectFolderName.trim() !== projectFolderName ||
+				isWorkflowDiscoveryTargetPathSegment(projectFolderName) === false
+			) {
+				return { valid: false, errorMessage: "Workflow automatic fixed project selection is invalid." }
+			}
+
+			const normalizedProjectFolderName = this.normalizeProjectFolderName(projectFolderName)
+			if (normalizedProjectFolderName === "" || normalizedProjectFolderName !== projectFolderName) {
+				return { valid: false, errorMessage: "Workflow automatic fixed project folder name is invalid." }
+			}
+		}
+
+		if (
+			workflow.projectOutputPlacement.kind === "selected_project_root" &&
+			Object.hasOwn(workflow.projectOutputPlacement, "subfolder")
+		) {
+			return { valid: false, errorMessage: "Workflow selected project root output placement is invalid." }
+		}
+
+		if (
+			workflow.projectOutputPlacement.kind !== "selected_project_root" &&
+			(workflow.projectOutputPlacement.kind !== "selected_project_subfolder" ||
+				typeof workflow.projectOutputPlacement.subfolder !== "string" ||
+				WORKFLOW_PROJECT_SUBFOLDERS.includes(workflow.projectOutputPlacement.subfolder) === false)
+		) {
+			return { valid: false, errorMessage: "Workflow projectOutputPlacement is invalid." }
+		}
+
 		if (workflow.name.trim() === "") {
 			return { valid: false, errorMessage: "Workflow name must not be empty." }
 		}
@@ -7768,6 +8349,15 @@ export class WorkflowRuntime {
 		}
 
 		for (const [prerequisiteId, prerequisiteDefinition] of Object.entries(prerequisiteFiles)) {
+			if (
+				prerequisiteDefinition.resolutionMode !== "interactive" &&
+				prerequisiteDefinition.resolutionMode !== "deterministic_exact_filename"
+			) {
+				return {
+					valid: false,
+					errorMessage: `Workflow prerequisite file ${prerequisiteId} resolutionMode is invalid.`,
+				}
+			}
 			if (prerequisiteDefinition.id !== prerequisiteId) {
 				return {
 					valid: false,
@@ -7853,6 +8443,15 @@ export class WorkflowRuntime {
 					errorMessage: `Workflow prerequisite file ${prerequisiteId} match kind must be exact_filename or naming_pattern.`,
 				}
 			}
+			if (
+				prerequisiteDefinition.resolutionMode === "deterministic_exact_filename" &&
+				(prerequisiteDefinition.requirement !== "optional" || prerequisiteMatchKind !== "exact_filename")
+			) {
+				return {
+					valid: false,
+					errorMessage: `Workflow prerequisite file ${prerequisiteId} deterministic exact-filename definition is invalid.`,
+				}
+			}
 			if (prerequisiteMatchKind === "exact_filename") {
 				const exactFilename = prerequisiteMatch.filename
 				if (typeof exactFilename !== "string") {
@@ -7890,6 +8489,36 @@ export class WorkflowRuntime {
 				return {
 					valid: false,
 					errorMessage: `Workflow prerequisite file ${prerequisiteId} match kind ${prerequisiteMatchKind} is invalid.`,
+				}
+			}
+
+			if (prerequisiteDefinition.artifactId !== undefined) {
+				const artifactDefinition = artifacts[prerequisiteDefinition.artifactId]
+				const familyDefinition = artifactDefinition
+					? WORKFLOW_ARTIFACT_FAMILY_REGISTRY[artifactDefinition.family]
+					: undefined
+				const expectedProjectSubfolderSegments =
+					workflow.projectOutputPlacement.kind === "selected_project_root"
+						? []
+						: [workflow.projectOutputPlacement.subfolder]
+				if (
+					prerequisiteDefinition.resolutionMode !== "deterministic_exact_filename" ||
+					prerequisiteDefinition.requirement !== "optional" ||
+					prerequisiteMatchKind !== "exact_filename" ||
+					artifactDefinition === undefined ||
+					artifactDefinition.intentMode !== "new" ||
+					familyDefinition?.allocationMode !== "singleton_project" ||
+					familyDefinition.filenamePattern !== prerequisiteMatch.filename ||
+					artifactDefinition.outputValueKeys.artifactAbsolutePath !== prerequisiteDefinition.workflowValueKey ||
+					prerequisiteDefinition.projectSubfolderSegments.length !== expectedProjectSubfolderSegments.length ||
+					prerequisiteDefinition.projectSubfolderSegments.some(
+						(segment, index) => segment !== expectedProjectSubfolderSegments[index],
+					)
+				) {
+					return {
+						valid: false,
+						errorMessage: `Workflow prerequisite file ${prerequisiteId} artifact link is invalid.`,
+					}
 				}
 			}
 		}

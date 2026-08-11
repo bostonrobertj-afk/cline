@@ -92,6 +92,7 @@ function createPromptBuilderInput(
 				...(args.parentWorkflowName === undefined ? {} : { parentWorkflowName: args.parentWorkflowName }),
 			},
 			entryArtifactResolution: undefined,
+			prerequisiteFileResolutions: [],
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -135,6 +136,7 @@ function createActiveRuntimeSession(workflowValues: WorkflowValues = {}): Active
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -221,7 +223,12 @@ describe("validateStoryWorkflowDefinition", () => {
 		expect(validateStoryWorkflowDefinition.useSkillName).to.equal(VALIDATE_STORY_WORKFLOW_USE_SKILL_NAME)
 		expect(validateStoryWorkflowDefinition.displayName).to.equal(VALIDATE_STORY_WORKFLOW_DISPLAY_NAME)
 		expect(validateStoryWorkflowDefinition.description).to.equal(VALIDATE_STORY_WORKFLOW_DESCRIPTION)
-		expect(validateStoryWorkflowDefinition.projectSubfolder).to.equal(VALIDATE_STORY_WORKFLOW_PROJECT_SUBFOLDER)
+		expect(validateStoryWorkflowDefinition.projectSelection).to.deep.equal({ kind: "interactive" })
+		expect(validateStoryWorkflowDefinition.projectOutputPlacement).to.deep.equal({
+			kind: "selected_project_subfolder",
+			subfolder: VALIDATE_STORY_WORKFLOW_PROJECT_SUBFOLDER,
+		})
+		expect(Object.hasOwn(validateStoryWorkflowDefinition, "projectSubfolder")).to.equal(false)
 		expect(validateStoryWorkflowDefinition.persona).to.deep.equal(VALIDATE_STORY_WORKFLOW_PERSONA)
 		expect(validateStoryWorkflowDefinition.entryPanel).to.deep.equal({
 			promptMarkdown: VALIDATE_STORY_WORKFLOW_DESCRIPTION,
@@ -256,6 +263,7 @@ describe("validateStoryWorkflowDefinition", () => {
 		expect(prerequisiteFiles[VALIDATE_STORY_TARGET_STORY_PREREQUISITE_ID]).to.deep.equal({
 			id: VALIDATE_STORY_TARGET_STORY_PREREQUISITE_ID,
 			requirement: "required",
+			resolutionMode: "interactive",
 			producingWorkflowName: "create-story",
 			projectSubfolderSegments: ["implementation", "stories-backlog"],
 			match: { kind: "naming_pattern", pattern: VALIDATE_STORY_TARGET_STORY_FILENAME_PATTERN },
@@ -265,6 +273,7 @@ describe("validateStoryWorkflowDefinition", () => {
 		expect(prerequisiteFiles[VALIDATE_STORY_EPICS_DOCUMENT_PREREQUISITE_ID]).to.deep.equal({
 			id: VALIDATE_STORY_EPICS_DOCUMENT_PREREQUISITE_ID,
 			requirement: "required",
+			resolutionMode: "interactive",
 			producingWorkflowName: "create-epics",
 			projectSubfolderSegments: ["planning"],
 			match: { kind: "exact_filename", filename: "Epics.md" },
@@ -274,6 +283,7 @@ describe("validateStoryWorkflowDefinition", () => {
 		expect(prerequisiteFiles[VALIDATE_STORY_ARCHITECTURE_DOCUMENT_PREREQUISITE_ID]).to.deep.equal({
 			id: VALIDATE_STORY_ARCHITECTURE_DOCUMENT_PREREQUISITE_ID,
 			requirement: "required",
+			resolutionMode: "interactive",
 			producingWorkflowName: "create-architecture",
 			projectSubfolderSegments: ["planning"],
 			match: { kind: "exact_filename", filename: "architecture.md" },
@@ -743,6 +753,7 @@ describe("validateStoryWorkflowDefinition", () => {
 					projectSelectionCompleted: true,
 				},
 				entryArtifactResolution: undefined,
+				prerequisiteFileResolutions: [],
 				ui: {
 					formSession: undefined,
 					stepResolutionSession: undefined,

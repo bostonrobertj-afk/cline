@@ -75,6 +75,7 @@ export const CORRECT_COURSE_PREREQUISITE_FILES: NonNullable<WorkflowDefinition["
 	[CORRECT_COURSE_ARCHITECTURE_DOCUMENT_PREREQUISITE_ID]: {
 		id: CORRECT_COURSE_ARCHITECTURE_DOCUMENT_PREREQUISITE_ID,
 		requirement: "required",
+		resolutionMode: "interactive",
 		producingWorkflowName: "create-architecture",
 		projectSubfolderSegments: ["planning"],
 		match: { kind: "exact_filename", filename: "architecture.md" },
@@ -1139,7 +1140,8 @@ export const correctCourseWorkflowDefinition: WorkflowDefinition = {
 	slashCommandName: CORRECT_COURSE_WORKFLOW_SLASH_COMMAND_NAME,
 	useSkillName: CORRECT_COURSE_WORKFLOW_USE_SKILL_NAME,
 	persona: CORRECT_COURSE_WORKFLOW_PERSONA,
-	projectSubfolder: CORRECT_COURSE_WORKFLOW_PROJECT_SUBFOLDER,
+	projectSelection: { kind: "interactive" },
+	projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: CORRECT_COURSE_WORKFLOW_PROJECT_SUBFOLDER },
 	workflowValueKeys: CORRECT_COURSE_WORKFLOW_VALUE_KEYS,
 	entryProjectValueKeys: CORRECT_COURSE_ENTRY_PROJECT_VALUE_KEYS,
 	entryPanel: { promptMarkdown: CORRECT_COURSE_WORKFLOW_DESCRIPTION },

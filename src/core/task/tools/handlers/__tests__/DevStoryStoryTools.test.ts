@@ -112,6 +112,7 @@ function createActiveDevStoryTaskState(storyPath: string): TaskState {
 		projectSelection: { projectMode: "new", projectTitle: "", projectFolderName: "" },
 		lifecycle: { projectSelectionCompleted: false },
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,

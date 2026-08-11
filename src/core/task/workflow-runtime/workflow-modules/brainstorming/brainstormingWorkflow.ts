@@ -1276,7 +1276,8 @@ export const brainstormingWorkflowDefinition: WorkflowDefinition = {
 	slashCommandName: "brainstorming",
 	useSkillName: "brainstorming",
 	persona: BRAINSTORMING_WORKFLOW_PERSONA,
-	projectSubfolder: "discovery",
+	projectSelection: { kind: "interactive" },
+	projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "discovery" },
 	workflowValueKeys: BRAINSTORMING_WORKFLOW_VALUE_KEYS,
 	entryProjectValueKeys: {
 		projectMode: BrainstormingWorkflowValueKey.ProjectMode,

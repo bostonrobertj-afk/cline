@@ -101,6 +101,7 @@ export const CODE_REVIEW_PREREQUISITE_FILES: NonNullable<WorkflowDefinition["pre
 	[CODE_REVIEW_TARGET_STORY_PREREQUISITE_ID]: {
 		id: CODE_REVIEW_TARGET_STORY_PREREQUISITE_ID,
 		requirement: "required",
+		resolutionMode: "interactive",
 		producingWorkflowName: "dev-story",
 		projectSubfolderSegments: ["implementation", "stories-review"],
 		match: {
@@ -1804,7 +1805,8 @@ export const codeReviewWorkflowDefinition: WorkflowDefinition = {
 	slashCommandName: CODE_REVIEW_WORKFLOW_SLASH_COMMAND_NAME,
 	useSkillName: CODE_REVIEW_WORKFLOW_USE_SKILL_NAME,
 	persona: CODE_REVIEW_WORKFLOW_PERSONA,
-	projectSubfolder: CODE_REVIEW_WORKFLOW_PROJECT_SUBFOLDER,
+	projectSelection: { kind: "interactive" },
+	projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: CODE_REVIEW_WORKFLOW_PROJECT_SUBFOLDER },
 	workflowValueKeys: CODE_REVIEW_WORKFLOW_VALUE_KEYS,
 	entryProjectValueKeys: CODE_REVIEW_ENTRY_PROJECT_VALUE_KEYS,
 	entryPanel: {

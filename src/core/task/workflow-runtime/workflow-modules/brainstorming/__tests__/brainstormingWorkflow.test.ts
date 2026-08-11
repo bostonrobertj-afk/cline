@@ -38,6 +38,7 @@ function createSession(workflowValues: WorkflowValues): ActiveWorkflowSession {
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -63,6 +64,7 @@ function createPredicateSession(args: { activeBranchId: string; workflowValues: 
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -252,7 +254,12 @@ describe("brainstormingWorkflowDefinition", () => {
 		})
 		expect(brainstormingWorkflowDefinition.persona.name).to.equal("Mary")
 		expect(brainstormingWorkflowDefinition.persona).not.to.equal("analyst")
-		expect(brainstormingWorkflowDefinition.projectSubfolder).to.equal("discovery")
+		expect(brainstormingWorkflowDefinition.projectSelection).to.deep.equal({ kind: "interactive" })
+		expect(brainstormingWorkflowDefinition.projectOutputPlacement).to.deep.equal({
+			kind: "selected_project_subfolder",
+			subfolder: "discovery",
+		})
+		expect(Object.hasOwn(brainstormingWorkflowDefinition, "projectSubfolder")).to.equal(false)
 		expect(Object.values(brainstormingWorkflowDefinition.steps).map((step) => step.checklistLabel)).to.deep.equal([
 			"Gather Inputs",
 			"Resolve Session Approach",

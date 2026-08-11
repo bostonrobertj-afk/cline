@@ -84,6 +84,7 @@ function createSession(args: {
 		},
 		lifecycle: { projectSelectionCompleted: true },
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -145,7 +146,12 @@ describe("quickReviewWorkflow", () => {
 		expect(quickReviewWorkflowDefinition.description).to.equal(QUICK_REVIEW_WORKFLOW_DESCRIPTION)
 		expect(quickReviewWorkflowDefinition.slashCommandName).to.equal("quick-review")
 		expect(quickReviewWorkflowDefinition.useSkillName).to.equal("quick-review")
-		expect(quickReviewWorkflowDefinition.projectSubfolder).to.equal("review")
+		expect(quickReviewWorkflowDefinition.projectSelection).to.deep.equal({ kind: "interactive" })
+		expect(quickReviewWorkflowDefinition.projectOutputPlacement).to.deep.equal({
+			kind: "selected_project_subfolder",
+			subfolder: "review",
+		})
+		expect(Object.hasOwn(quickReviewWorkflowDefinition, "projectSubfolder")).to.equal(false)
 		expect(quickReviewWorkflowDefinition.persona).to.deep.equal(QUICK_REVIEW_WORKFLOW_PERSONA)
 		expect(quickReviewWorkflowDefinition.entryPanel).to.deep.equal({
 			promptMarkdown: QUICK_REVIEW_WORKFLOW_DESCRIPTION,
@@ -162,6 +168,7 @@ describe("quickReviewWorkflow", () => {
 		expect(quickReviewWorkflowDefinition.prerequisiteFiles?.[QUICK_REVIEW_SPEC_FILE_PREREQUISITE_ID]).to.deep.equal({
 			id: QUICK_REVIEW_SPEC_FILE_PREREQUISITE_ID,
 			requirement: "required",
+			resolutionMode: "interactive",
 			producingWorkflowName: "quick-spec",
 			projectSubfolderSegments: ["review"],
 			match: { kind: "exact_filename", filename: "quick-spec.md" },

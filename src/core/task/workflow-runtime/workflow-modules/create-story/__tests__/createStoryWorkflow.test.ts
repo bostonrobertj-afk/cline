@@ -66,6 +66,7 @@ function createSession(workflowValues: WorkflowValues, projectRoot = "/tmp/creat
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -91,6 +92,7 @@ function createPredicateSession(args: { activeBranchId: string; workflowValues: 
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -493,8 +495,13 @@ describe("createStoryWorkflowDefinition", () => {
 			description: CREATE_STORY_WORKFLOW_DESCRIPTION,
 			slashCommandName: "create-story",
 			useSkillName: "create-story",
-			projectSubfolder: "planning",
 		})
+		expect(createStoryWorkflowDefinition.projectSelection).to.deep.equal({ kind: "interactive" })
+		expect(createStoryWorkflowDefinition.projectOutputPlacement).to.deep.equal({
+			kind: "selected_project_subfolder",
+			subfolder: "planning",
+		})
+		expect(Object.hasOwn(createStoryWorkflowDefinition, "projectSubfolder")).to.equal(false)
 		expect(createStoryWorkflowDefinition.entryPanel.promptMarkdown).to.equal(CREATE_STORY_WORKFLOW_DESCRIPTION)
 		expect(createStoryWorkflowDefinition.persona).to.deep.equal(CREATE_STORY_WORKFLOW_PERSONA)
 		expect(createStoryWorkflowDefinition.persona).to.deep.include({
@@ -557,6 +564,7 @@ describe("createStoryWorkflowDefinition", () => {
 			[CREATE_STORY_ARCHITECTURE_PREREQUISITE_ID]: {
 				id: CREATE_STORY_ARCHITECTURE_PREREQUISITE_ID,
 				requirement: "required",
+				resolutionMode: "interactive",
 				producingWorkflowName: "create-architecture",
 				projectSubfolderSegments: ["planning"],
 				match: { kind: "exact_filename", filename: "architecture.md" },
@@ -566,6 +574,7 @@ describe("createStoryWorkflowDefinition", () => {
 			[CREATE_STORY_EPICS_DOCUMENT_PREREQUISITE_ID]: {
 				id: CREATE_STORY_EPICS_DOCUMENT_PREREQUISITE_ID,
 				requirement: "required",
+				resolutionMode: "interactive",
 				producingWorkflowName: "create-epics",
 				projectSubfolderSegments: ["planning"],
 				match: { kind: "exact_filename", filename: "Epics.md" },
@@ -575,6 +584,7 @@ describe("createStoryWorkflowDefinition", () => {
 			[CREATE_STORY_EPICS_INDEX_PREREQUISITE_ID]: {
 				id: CREATE_STORY_EPICS_INDEX_PREREQUISITE_ID,
 				requirement: "required",
+				resolutionMode: "interactive",
 				producingWorkflowName: "create-epics",
 				projectSubfolderSegments: ["planning"],
 				match: { kind: "exact_filename", filename: "Epics.index.json" },
@@ -584,6 +594,7 @@ describe("createStoryWorkflowDefinition", () => {
 			[CREATE_STORY_BRAINSTORMING_PREREQUISITE_ID]: {
 				id: CREATE_STORY_BRAINSTORMING_PREREQUISITE_ID,
 				requirement: "optional",
+				resolutionMode: "interactive",
 				producingWorkflowName: "brainstorming",
 				projectSubfolderSegments: ["discovery"],
 				match: { kind: "exact_filename", filename: "brainstorming.md" },

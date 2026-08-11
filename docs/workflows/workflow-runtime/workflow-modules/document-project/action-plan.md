@@ -24,6 +24,7 @@ Authorized implementation method:
 - User-approved clarification: treat registered workflow definitions as the shipped workflow inventory. Update `ShippedWorkflowMetadata` as a structural type contract and cover that contract directly in tests; do not add a separate metadata registry, projection function, accessor, or second production representation of shipped workflows.
 - User-approved clarification: persist deterministic prerequisite results in declaration order by staging each result plus its path and linked-artifact metadata changes on a cloned session, validating the complete staged session, and replacing the active session once. Do not mutate the live session and roll changes back.
 - User-approved clarification: after a failed deterministic prerequisite commit has left the session on the resolve route's following branch, use the existing `findContinuationSourceRoute(...)` seam to re-enter only unresolved deterministic prerequisite work. Preserve the existing branch advance; do not roll the branch back or add a resume ledger or lifecycle field.
+- User-approved clarification: the existing canonical epic inventory production output, including `"story-index-generated": false`, is authoritative. Update only the stale `UpsertEpicToolHandler.test.ts` expected epic objects during the Subtask 2.2 fixture cutover; do not change production behavior or any other assertion.
 - Reuse the existing shared prerequisite discovery, artifact allocation, empty-file creation, deterministic document-build, form, prompt rendering, persistence, resume, and teardown capabilities.
 - Preserve the live three-output prompt projection contract: full-turn input workflow block, continuation-turn input workflow block, and tool-schema override only. Both input blocks retain current-step details; no workflow-specific system-instructions block is added.
 - Reuse Step 4's shared registration, strict-plan, approval, auto-approval, hook, `.clineignore`, and workspace path-policy controls as-is. Run their existing regression suites, but do not add, reorganize, or recast shared execution-control tests merely because this module projects those tools.
@@ -77,7 +78,7 @@ These SHA-256 values capture the complete current content, including the user-ap
 
 ### Foundational Shared Contracts
 
-### [ ] Task 1: Register The Two Singleton Artifact Families
+### [x] Task 1: Register The Two Singleton Artifact Families
 
 Allowed files for this task and every numbered subtask below:
 
@@ -87,7 +88,7 @@ Allowed files for this task and every numbered subtask below:
 
 Full target file paths for this task and its numbered subtask: `src/core/task/workflow-runtime/artifactFamilies.ts` and `src/core/task/workflow-runtime/WorkflowRuntime.ts`. The action-plan path is allowed only for checkbox updates.
 
-- [ ] Subtask 1.1: Perform one atomic two-file patch so the artifact-family enum, singleton-family unions, exhaustive registry, and filename-parser switch remain compile-complete together. In `src/core/task/workflow-runtime/artifactFamilies.ts`, add:
+- [x] Subtask 1.1: Perform one atomic two-file patch so the artifact-family enum, singleton-family unions, exhaustive registry, and filename-parser switch remain compile-complete together. In `src/core/task/workflow-runtime/artifactFamilies.ts`, add:
 
 ```ts
 ProjectOverview = "project_overview",
@@ -123,7 +124,7 @@ to `WorkflowArtifactFamily`. Add both new enum members to `WorkflowSingletonProj
 
 In `src/core/task/workflow-runtime/WorkflowRuntime.ts`, add `WorkflowArtifactFamily.ProjectOverview` and `WorkflowArtifactFamily.DeveloperGuide` to the existing singleton-family case group in `parseWorkflowArtifactFilenameIdentity(...)` that returns `undefined`. These registered singleton artifacts use their linked deterministic exact-filename prerequisites as the sole existing-file resolution route; do not add either family to `normalizeExistingProjectArtifactIdentity(...)`, do not manufacture a `ParsedWorkflowArtifactIdentity`, and do not add generic existing-artifact resolution for either family. Do not add sidecar behavior or alter any existing family record.
 
-### [ ] Task 2: Perform The Compile-Safe Shared Contract Cutovers
+### [x] Task 2: Perform The Compile-Safe Shared Contract Cutovers
 
 Allowed files for this task and every numbered subtask below:
 
@@ -188,7 +189,7 @@ Full target file paths for this task and every numbered subtask below: every exp
 
 Each numbered subtask below is one atomic multi-file compile boundary and must be executed as one patch. Do not split either cutover across patches, add optional transitional fields, retain a compatibility alias, or defer any affected call site, fixture, or assertion to a later task.
 
-- [ ] Subtask 2.1: Perform the project-selection/output-placement cutover atomically.
+- [x] Subtask 2.1: Perform the project-selection/output-placement cutover atomically.
 
   In `types.ts`, add these exact exported types immediately after `WorkflowProjectSubfolder`:
 
@@ -226,7 +227,7 @@ private resolveWorkflowProjectOutputPlacementSegments(
 
   After this patch, `rg -n '\bprojectSubfolder\b' src --glob '*.ts' --glob '!**/__tests__/**' --glob '!**/*.test.ts'` must return no production match: the singular production field is removed completely, while `projectSubfolderSegments` remains because the word-boundary pattern does not match it. The exact negative test assertions prescribed in this subtask and Subtask 11.1 remain permitted test-only matches. Do not add a compatibility alias, metadata registry, projection, accessor, or second shipped-workflow representation.
 
-- [ ] Subtask 2.2: Perform the prerequisite-resolution/session-state cutover atomically.
+- [x] Subtask 2.2: Perform the prerequisite-resolution/session-state cutover atomically.
 
   In `types.ts`, add:
 
@@ -248,11 +249,13 @@ export type WorkflowPrerequisiteFileResolution =
 
   Add `prerequisiteFileResolutions: []` immediately after `entryArtifactResolution` in every existing explicit active/persisted session literal in the allowed test files, using these verified current counts: 16 in `integration.test.ts`; 14 in `SubagentRunner.test.ts`; 3 in `validateStoryWorkflow.test.ts`; 2 each in `response_tools.test.ts`, `workflow-runtime-metadata.test.ts`, and the acceptance-audit-review, blind-review, brainstorming, code-review, correct-course, create-architecture, create-epics, create-story, dev-story, edge-case-hunter-review, pi-planning, quick-spec, and write-remediation-story workflow tests; and 1 each in `ToolExecutor.workflowModelToolLifecycle.test.ts`, the seven listed handler tests other than `UseSkillToolHandler.test.ts`, `brainstormingDocument.test.ts`, `correctCourseDocument.test.ts`, `createArchitectureDocument.test.ts`, `createEpicsDocument.test.ts`, `piPlanningToolSchemas.test.ts`, `quickDevWorkflow.test.ts`, and `quickReviewWorkflow.test.ts`. Do not add the field to a deliberately malformed fixture later created to test missing or malformed resolution state. Remove no import, helper, export, or assertion solely because of this additive session field.
 
+  In `src/core/task/tools/handlers/__tests__/UpsertEpicToolHandler.test.ts`, update the existing `epics` deep-equality expectation in `inserts, replaces, orders, preserves canonical epics, returns inventory, and clears the file-read cache` so each expected epic includes exactly `"story-index-generated": false`, matching the existing canonical epic inventory returned by production. Do not change production behavior or any other assertion.
+
   Complete the same atomic production-session cutover in `WorkflowRuntime.ts`. Add `WorkflowPrerequisiteFileResolution` to the existing type-only import from `./types`. In `cloneWorkflowSession(...)`, add `prerequisiteFileResolutions: session.prerequisiteFileResolutions.map((resolution) => ({ ...resolution }))`, so neither the array nor either resolution object aliases the source session. Beside the existing restore type guards, add `private isWorkflowPrerequisiteFileResolution(value: unknown): value is WorkflowPrerequisiteFileResolution`, requiring a plain object with exactly `prerequisiteId` and `outcome` for `not_found`, or exactly those keys plus `resolvedAbsolutePath` for `found`; require a non-empty prerequisite id and require the found path to be a non-empty absolute path through the existing `isAbsolute` import. Add `private isWorkflowPrerequisiteFileResolutionArray(value: unknown): value is readonly WorkflowPrerequisiteFileResolution[]`, requiring an array whose entries all pass that guard. In `validatePersistedWorkflowSessionForRestore(...)`, reject a missing or malformed `prerequisiteFileResolutions`; after that guard, add `prerequisiteFileResolutions: persistedSession.prerequisiteFileResolutions.map((resolution) => ({ ...resolution }))` to both the restore-time `compatibilitySession` literal and the final normalized session. Do not defer any required `ActiveWorkflowSession` production literal, structural restore guard, or final clone shape past this subtask.
 
 ### Shared Runtime Support
 
-### [ ] Task 3: Implement Automatic Fixed Project Selection
+### [x] Task 3: Implement Automatic Fixed Project Selection
 
 Allowed files for this task and every numbered subtask below:
 
@@ -263,9 +266,9 @@ Allowed files for this task and every numbered subtask below:
 
 Full target file paths for this task and every numbered subtask below: `src/core/task/workflow-runtime/WorkflowRuntime.ts`, `src/core/task/tools/subagent/SubagentRunner.ts`, and `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`. The action-plan path is allowed only for checkbox updates.
 
-- [ ] Subtask 3.1: Refactor main-agent entry handling so `buildWorkflowEntryFormDefinition(...)` always renders the existing informational panel first, but adds the existing project-selection panel only when `workflow.projectSelection.kind === "interactive"`. Preserve the current informational-panel fields/actions/copy. For interactive selection, preserve its transition to `WORKFLOW_ENTRY_PROJECT_SELECTION_PANEL_ID` and the existing selector panel unchanged. For `automatic_fixed`, return a `panels` record containing only the informational panel and give that panel the exact terminal transition `{ type: "conditional", conditionSourceKey: "__terminal__", branches: [], defaultTerminal: true }`. Successful automatic informational-panel submission must not itself clear the entry form or mutate project lifecycle state; it must hand off to Subtask 3.3.
+- [x] Subtask 3.1: Refactor main-agent entry handling so `buildWorkflowEntryFormDefinition(...)` always renders the existing informational panel first, but adds the existing project-selection panel only when `workflow.projectSelection.kind === "interactive"`. Preserve the current informational-panel fields/actions/copy. For interactive selection, preserve its transition to `WORKFLOW_ENTRY_PROJECT_SELECTION_PANEL_ID` and the existing selector panel unchanged. For `automatic_fixed`, return a `panels` record containing only the informational panel and give that panel the exact terminal transition `{ type: "conditional", conditionSourceKey: "__terminal__", branches: [], defaultTerminal: true }`. Successful automatic informational-panel submission must not itself clear the entry form or mutate project lifecycle state; it must hand off to Subtask 3.3.
 
-- [ ] Subtask 3.2: Extract the existing successful project-selection finalization sequence into:
+- [x] Subtask 3.2: Extract the existing successful project-selection finalization sequence into:
 
 ```ts
 private async finalizeWorkflowProjectSelection(args: {
@@ -290,7 +293,7 @@ Return `{ kind: "no_op" }` if the active session is absent. Otherwise, assign `s
 
 Then `await this.ensureProjectFoldersExist(session)` and call `this.recordWorkflowProjectSelectionCompleted(session)`. For `projectMode === "existing"`, return `this.continueWorkflowEntryArtifactResolution({ taskState: args.taskState, workflow: args.definition, artifactResolutions: [] })`. Otherwise return `this.completeWorkflowEntryArtifactResolution({ taskState: args.taskState, artifactResolutions: await this.resolveNewProjectWorkflowEntryArtifactResolutions({ taskState: args.taskState }) })`. Move that exact sequence out of `handleWorkflowEntryFormOutcome(...)` without changing either continuation. Both interactive and automatic selection must return this helper's result and call the helper exactly once.
 
-- [ ] Subtask 3.3: Add:
+- [x] Subtask 3.3: Add:
 
 ```ts
 private async resolveAutomaticFixedWorkflowProjectSelection(args: {
@@ -322,11 +325,11 @@ Only after that guard may the helper read the fixed fields. Then call `discoverW
 
 It must not pass `targetPathSegments` or `namingPattern`. Build `WorkflowProjectSelectionState` from the definition, with `projectMode: "existing"` only when a candidate's `value` exactly equals `projectFolderName`, otherwise `"new"`, then return `this.finalizeWorkflowProjectSelection(...)`.
 
-- [ ] Subtask 3.4: In `handleWorkflowEntryFormOutcome(...)`, after obtaining the active definition, add a branch for a failure-free `WorkflowFormAction.SUBMIT` on `WORKFLOW_ENTRY_INFO_PANEL_ID` when `definition.projectSelection.kind === "automatic_fixed"`. Return `this.resolveAutomaticFixedWorkflowProjectSelection(...)` directly from that branch. Retain the current interactive project-selection-panel branch, but replace its inlined finalization sequence with one returned call to `this.finalizeWorkflowProjectSelection(...)`. Do not synthesize a project-selection panel or submission, and do not run discovery or create the fixed folder before successful informational-panel submission.
+- [x] Subtask 3.4: In `handleWorkflowEntryFormOutcome(...)`, after obtaining the active definition, add a branch for a failure-free `WorkflowFormAction.SUBMIT` on `WORKFLOW_ENTRY_INFO_PANEL_ID` when `definition.projectSelection.kind === "automatic_fixed"`. Return `this.resolveAutomaticFixedWorkflowProjectSelection(...)` directly from that branch. Retain the current interactive project-selection-panel branch, but replace its inlined finalization sequence with one returned call to `this.finalizeWorkflowProjectSelection(...)`. Do not synthesize a project-selection panel or submission, and do not run discovery or create the fixed folder before successful informational-panel submission.
 
-- [ ] Subtask 3.5: In `WorkflowRuntime.activateWorkflow(...)`, derive `inheritsParentProjectSelection = parentSession !== undefined && workflow.projectSelection.kind === "interactive"` immediately before the existing incomplete-parent-project guard. Make that guard return `{ kind: "no_op" }` only when `inheritsParentProjectSelection` is true and the parent project title or folder name trims to an empty string; an automatic-fixed child with a present but incomplete parent session must pass this guard. Copy `parentSession.projectSelection` and initialize `lifecycle.projectSelectionCompleted: true` only when `inheritsParentProjectSelection` is true; otherwise initialize the existing blank `new` selection and `projectSelectionCompleted: false`. After assigning and refreshing the new session, when `parentSession !== undefined && workflow.projectSelection.kind === "automatic_fixed"`, return `this.resolveAutomaticFixedWorkflowProjectSelection({ taskState, definition: workflow })`; otherwise preserve the existing `this.resolveNextAction(...)` return. Preserve the incomplete-parent no-op for interactive child selection, the existing prohibition on active-step child forms, and every parent-session isolation behavior.
+- [x] Subtask 3.5: In `WorkflowRuntime.activateWorkflow(...)`, derive `inheritsParentProjectSelection = parentSession !== undefined && workflow.projectSelection.kind === "interactive"` immediately before the existing incomplete-parent-project guard. Make that guard return `{ kind: "no_op" }` only when `inheritsParentProjectSelection` is true and the parent project title or folder name trims to an empty string; an automatic-fixed child with a present but incomplete parent session must pass this guard. Copy `parentSession.projectSelection` and initialize `lifecycle.projectSelectionCompleted: true` only when `inheritsParentProjectSelection` is true; otherwise initialize the existing blank `new` selection and `projectSelectionCompleted: false`. After assigning and refreshing the new session, when `parentSession !== undefined && workflow.projectSelection.kind === "automatic_fixed"`, return `this.resolveAutomaticFixedWorkflowProjectSelection({ taskState, definition: workflow })`; otherwise preserve the existing `this.resolveNextAction(...)` return. Preserve the incomplete-parent no-op for interactive child selection, the existing prohibition on active-step child forms, and every parent-session isolation behavior.
 
-- [ ] Subtask 3.6: In `SubagentRunner.autoActivateAssignedWorkflow(...)`, keep the existing `const parentSession = this.baseConfig.taskState.activeWorkflowSession` read in its current position after the assigned-skill-name guard. Split the current combined parent-session/project-completeness guard so a missing `parentSession` still returns the existing exact failure result before registry resolution:
+- [x] Subtask 3.6: In `SubagentRunner.autoActivateAssignedWorkflow(...)`, keep the existing `const parentSession = this.baseConfig.taskState.activeWorkflowSession` read in its current position after the assigned-skill-name guard. Split the current combined parent-session/project-completeness guard so a missing `parentSession` still returns the existing exact failure result before registry resolution:
 
 ```ts
 {
@@ -337,7 +340,7 @@ It must not pass `targetPathSegments` or `namingPattern`. Build `WorkflowProject
 
 Then preserve the existing `resolveWorkflowByUseSkillName(assignedSkillName)` lookup and unresolved-workflow failure block. Immediately after successful workflow resolution, apply the project-title/project-folder completeness check only when `resolvedWorkflow.projectSelection.kind === "interactive"`; on failure, return the same exact existing failure result above. Do not apply that completeness check when `resolvedWorkflow.projectSelection.kind === "automatic_fixed"`: continue through the existing state snapshot, active-name assignment, `WorkflowRuntime.activateWorkflow(...)` call with `structuredClone(parentSession)`, next-action handling, and failure restoration. Add no import, new error string, fallback assignment path, or child project-selection implementation to `SubagentRunner`.
 
-- [ ] Subtask 3.7: In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, add optional `projectSelection?: WorkflowDefinition["projectSelection"]` to `createResolvedWorkflow(...)` and make its migrated `projectSelection` property equal `args?.projectSelection ?? { kind: "interactive" }`; preserve the migrated `projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "review" }` and every other helper default.
+- [x] Subtask 3.7: In `src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, add optional `projectSelection?: WorkflowDefinition["projectSelection"]` to `createResolvedWorkflow(...)` and make its migrated `projectSelection` property equal `args?.projectSelection ?? { kind: "interactive" }`; preserve the migrated `projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "review" }` and every other helper default.
 
 Rename the existing `fails marker-present runs without complete parent project selection before the first child model request` test to `fails marker-present interactive workflow runs without complete parent project selection before the first child model request`. Preserve its missing-session, blank-title, and blank-folder cases, the exact existing user-visible error assertions, absence of child model requests, and per-case `activateWorkflow(...)` non-call. Because the revised runner resolves the workflow before testing completeness only for the two present-but-incomplete sessions, replace the final `resolveWorkflowByUseSkillNameStub` non-call assertion with exact call-count `2`; the missing-parent-session case must remain the sole case rejected before registry resolution.
 
@@ -372,13 +375,13 @@ After activation, assert the parent still owns both exact references and deep-eq
 
 Assert the registry resolver is called exactly twice across the automatic-fixed cases. Add no filesystem setup, child form, model request, or replacement error copy; the stub isolates the runner guard, while Subtask 10.4 owns real-runtime automatic-fixed resolution with incomplete parent projects.
 
-- [ ] Subtask 3.8: Run the focused child-activation validation:
+- [x] Subtask 3.8: Run the focused child-activation validation:
 
 ```sh
 npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts
 ```
 
-### [ ] Task 4: Implement Deterministic Artifact-Linked Prerequisite Resolution
+### [x] Task 4: Implement Deterministic Artifact-Linked Prerequisite Resolution
 
 Allowed files for this task and every numbered subtask below:
 
@@ -389,7 +392,7 @@ Full target file path for this task and every numbered subtask below: `src/core/
 
 Subtasks 4.2 through 4.7 are one compile boundary because the commit and resolver call the validator introduced in Subtask 4.7. Execute those six sequential same-file subtasks in one patch under the FrontMatter exception, then review and mark each subtask separately before proceeding to Subtask 4.8.
 
-- [ ] Subtask 4.1: Extract the value-map mutation core currently inside `applyWorkflowValueWrites(...)` into:
+- [x] Subtask 4.1: Extract the value-map mutation core currently inside `applyWorkflowValueWrites(...)` into:
 
 ```ts
 private applyWorkflowValueWritesToSession(args: {
@@ -407,7 +410,7 @@ private applyWorkflowValueWritesToSession(args: {
 
 Move the existing key-inventory, JSON-safety, deduplication, equality, set, and clear behavior into this synchronous helper without changing it; it must not emit a trigger. Keep `applyWorkflowValueWrites(...)` as the public canonical seam by calling this helper against the live session and, only when the deduplicated changed/cleared key list is non-empty, invoking `this.recordWorkflowValuesPersistedTriggerIfRouted(...)` exactly once. Preserve that recorder's current routed-only behavior; do not require a trigger when no matching route exists.
 
-- [ ] Subtask 4.2: Implement the user-approved staged-clone atomic commit method by adding:
+- [x] Subtask 4.2: Implement the user-approved staged-clone atomic commit method by adding:
 
 ```ts
 private commitDeterministicPrerequisiteResolution(args: {
@@ -430,9 +433,9 @@ It must:
 
 If any step before assignment throws or fails validation, leave the live session's prerequisite results, workflow values, and trigger state unchanged by this commit helper. Preserve the route's already-completed active-branch advance; Subtask 4.12 owns re-entry from that following branch. Do not implement live-session mutation plus rollback.
 
-- [ ] Subtask 4.3: In `buildResolvePrerequisiteFilesNextAction(...)`, narrow each prerequisite's `resolutionMode` before the current persisted-path shortcut or candidate/UI branches. For `"interactive"`, execute the current `hasPersistedPrerequisiteWorkflowValue(...)`, discovery, required/optional, single/multiple-match, skipped-id, and form behavior unchanged. For `"deterministic_exact_filename"`, do not use path presence as completion state; validate and consult `prerequisiteFileResolutions` as prescribed in Subtask 4.7. After narrowing the mode, require `prerequisite.requirement === "optional"` and `prerequisite.match.kind === "exact_filename"`; when either check fails, throw exactly `new Error(\`Workflow prerequisite file ${prerequisite.id} has an invalid deterministic exact-filename definition.\`)`. Call the existing `this.discoverPrerequisiteFileCandidates({ session, prerequisite })` wrapper, which owns selected-root resolution, workspace path policy, and `discoverWorkflowPrerequisiteFileCandidates(...)`. At each current-state validation call, narrow `validationResult.valid`; when it is `false`, execute `throw new Error(validationResult.errorMessage)` before discovery or mutation so the existing runtime caller owns failure reporting. Reuse a completed prefix member, and scan only the next unresolved declaration. Do not return `no_op`, construct module-specific failure copy, call local teardown, append/repair state, or create a terminal route from this shared resolver. Resolve valid state without any prerequisite choice, confirmation, rejection, cancel, skipped-id, or cannot-continue form.
+- [x] Subtask 4.3: In `buildResolvePrerequisiteFilesNextAction(...)`, narrow each prerequisite's `resolutionMode` before the current persisted-path shortcut or candidate/UI branches. For `"interactive"`, execute the current `hasPersistedPrerequisiteWorkflowValue(...)`, discovery, required/optional, single/multiple-match, skipped-id, and form behavior unchanged. For `"deterministic_exact_filename"`, do not use path presence as completion state; validate and consult `prerequisiteFileResolutions` as prescribed in Subtask 4.7. After narrowing the mode, require `prerequisite.requirement === "optional"` and `prerequisite.match.kind === "exact_filename"`; when either check fails, throw exactly `new Error(\`Workflow prerequisite file ${prerequisite.id} has an invalid deterministic exact-filename definition.\`)`. Call the existing `this.discoverPrerequisiteFileCandidates({ session, prerequisite })` wrapper, which owns selected-root resolution, workspace path policy, and `discoverWorkflowPrerequisiteFileCandidates(...)`. At each current-state validation call, narrow `validationResult.valid`; when it is `false`, execute `throw new Error(validationResult.errorMessage)` before discovery or mutation so the existing runtime caller owns failure reporting. Reuse a completed prefix member, and scan only the next unresolved declaration. Do not return `no_op`, construct module-specific failure copy, call local teardown, append/repair state, or create a terminal route from this shared resolver. Resolve valid state without any prerequisite choice, confirmation, rejection, cancel, skipped-id, or cannot-continue form.
 
-- [ ] Subtask 4.4: For deterministic resolution, persist exactly `{ prerequisiteId, outcome: "found", resolvedAbsolutePath: candidate.absolutePath }` for one exact match and exactly `{ prerequisiteId, outcome: "not_found" }` for no match. When `candidates.length > 1`, throw exactly `new Error(\`Workflow prerequisite file ${prerequisite.id} deterministic exact-filename resolution returned more than one candidate.\`)` before any commit. For an unlinked `found`, invoke:
+- [x] Subtask 4.4: For deterministic resolution, persist exactly `{ prerequisiteId, outcome: "found", resolvedAbsolutePath: candidate.absolutePath }` for one exact match and exactly `{ prerequisiteId, outcome: "not_found" }` for no match. When `candidates.length > 1`, throw exactly `new Error(\`Workflow prerequisite file ${prerequisite.id} deterministic exact-filename resolution returned more than one candidate.\`)` before any commit. For an unlinked `found`, invoke:
 
 ```ts
 this.commitDeterministicPrerequisiteResolution({
@@ -471,7 +474,7 @@ return this.buildResolvePrerequisiteFilesNextAction({
 
 Do not `await` that returned call and do not continue the current loop with its stale pre-commit `session` reference.
 
-- [ ] Subtask 4.5: For an artifact-linked result, first narrow with `if (prerequisite.artifactId !== undefined)`. Inside that branch, assign `const artifactDefinition = args.definition.artifacts?.[prerequisite.artifactId]`; when absent, throw exactly `new Error(\`Workflow prerequisite file ${prerequisite.id} references missing workflow artifact ${prerequisite.artifactId}.\`)`. For a `found` result, after that narrowing and the Subtask 4.10 guards, assign the result of exactly one awaited call as `const resolvedArtifactOutput = await this.resolveWorkflowArtifactAllocation({ workflow: args.definition, session, artifactDefinition })`. When `resolve(candidate.absolutePath) !== resolve(resolvedArtifactOutput.artifactAbsolutePath)`, throw exactly `new Error(\`Workflow prerequisite file ${prerequisite.id} resolved path does not match linked workflow artifact ${artifactDefinition.id}.\`)` before committing. Then invoke:
+- [x] Subtask 4.5: For an artifact-linked result, first narrow with `if (prerequisite.artifactId !== undefined)`. Inside that branch, assign `const artifactDefinition = args.definition.artifacts?.[prerequisite.artifactId]`; when absent, throw exactly `new Error(\`Workflow prerequisite file ${prerequisite.id} references missing workflow artifact ${prerequisite.artifactId}.\`)`. For a `found` result, after that narrowing and the Subtask 4.10 guards, assign the result of exactly one awaited call as `const resolvedArtifactOutput = await this.resolveWorkflowArtifactAllocation({ workflow: args.definition, session, artifactDefinition })`. When `resolve(candidate.absolutePath) !== resolve(resolvedArtifactOutput.artifactAbsolutePath)`, throw exactly `new Error(\`Workflow prerequisite file ${prerequisite.id} resolved path does not match linked workflow artifact ${artifactDefinition.id}.\`)` before committing. Then invoke:
 
 ```ts
 this.commitDeterministicPrerequisiteResolution({
@@ -486,7 +489,7 @@ this.commitDeterministicPrerequisiteResolution({
 
 Because the validated artifact absolute-path output key equals the prerequisite `workflowValueKey`, that one map atomically writes the prerequisite path plus the complete registry-derived project, family, singleton identity, filename, filename-only relative-path, absolute-path, and undefined parent/target output behavior that a new allocation would use. This call resolves canonical metadata only: do not call `this.prepareWorkflowArtifactCreation(...)`, `this.createWorkflowArtifact(...)`, document building, archive, delete, replace, suffix, or any file mutation.
 
-- [ ] Subtask 4.6: For an artifact-linked `not_found`, use the narrowed `artifactDefinition` from Subtask 4.5 and invoke:
+- [x] Subtask 4.6: For an artifact-linked `not_found`, use the narrowed `artifactDefinition` from Subtask 4.5 and invoke:
 
 ```ts
 this.commitDeterministicPrerequisiteResolution({
@@ -507,7 +510,7 @@ this.commitDeterministicPrerequisiteResolution({
 
 Retain `projectMode`, `projectTitle`, and `projectFolderName`; do not include any of those keys in `clearKeys`.
 
-- [ ] Subtask 4.7: Add `private validateCurrentPrerequisiteFileResolutions(definition: WorkflowDefinition, session: ActiveWorkflowSession): WorkflowValidationResult`. Treat `session.prerequisiteFileResolutions` as an empty list or a declaration-order prefix of the definition's deterministic exact-filename prerequisites. Each included id must appear exactly once. For every populated deterministic prerequisite path, derive the one canonical absolute path from `this.resolveWorkflowProjectOutputFolder(session)`, the declaration's exact `projectSubfolderSegments`, and `prerequisite.match.filename`; for an artifact-linked prerequisite, the Subtask 4.10 definition guard additionally proves that filename equals the registered filename. Require `resolve(populatedPath) === resolve(canonicalAbsolutePath)` so the path remains contained in the selected project at the declared placement, and call `this.assertWorkspacePathAllowed(populatedPath)` before accepting it. Catch only an `Error` from that path-policy guard and return `{ valid: false, errorMessage: error.message }`, preserving the shared path-policy diagnostic unchanged; rethrow a non-`Error` value. For every other invalid state prescribed here, return exactly `{ valid: false, errorMessage: "Workflow prerequisite file resolution state is inconsistent with the active workflow definition or session." }`.
+- [x] Subtask 4.7: Add `private validateCurrentPrerequisiteFileResolutions(definition: WorkflowDefinition, session: ActiveWorkflowSession): WorkflowValidationResult`. Treat `session.prerequisiteFileResolutions` as an empty list or a declaration-order prefix of the definition's deterministic exact-filename prerequisites. Each included id must appear exactly once. For every populated deterministic prerequisite path, derive the one canonical absolute path from `this.resolveWorkflowProjectOutputFolder(session)`, the declaration's exact `projectSubfolderSegments`, and `prerequisite.match.filename`; for an artifact-linked prerequisite, the Subtask 4.10 definition guard additionally proves that filename equals the registered filename. Require `resolve(populatedPath) === resolve(canonicalAbsolutePath)` so the path remains contained in the selected project at the declared placement, and call `this.assertWorkspacePathAllowed(populatedPath)` before accepting it. Catch only an `Error` from that path-policy guard and return `{ valid: false, errorMessage: error.message }`, preserving the shared path-policy diagnostic unchanged; rethrow a non-`Error` value. For every other invalid state prescribed here, return exactly `{ valid: false, errorMessage: "Workflow prerequisite file resolution state is inconsistent with the active workflow definition or session." }`.
 
 For an artifact-linked prerequisite, synchronously derive the expected metadata without calling the async `resolveWorkflowArtifactAllocation(...)`: read its linked definition and family registry entry; narrow `allocationMode === "singleton_project"` and `identityRequirement === "none"`; use the registry's exact `singletonIdentity` and `filenamePattern`; derive the relative and absolute paths from `this.resolveWorkflowProjectOutputPlacementSegments(definition)`, `this.resolveWorkflowProjectOutputFolder(session)`, and the registered filename; construct the expected project/family/identity/filename/relative-path/absolute-path values with `parentIdentity` and `targetIdentity` undefined; then pass that object and the artifact definition's exact `outputValueKeys` to the existing synchronous `this.buildWorkflowArtifactOutputValueWrites(...)`. Define the artifact-specific output keys as exactly `artifactFamily`, `artifactIdentity`, `artifactFilename`, `artifactRelativePath`, and `artifactAbsolutePath`; `projectTitle` and `projectFolderName` are shared entry-project outputs and are never part of an unset-state check.
 
@@ -515,17 +518,17 @@ A `found` result must agree with that non-empty canonical path workflow value an
 
 In `commitDeterministicPrerequisiteResolution(...)`, additionally require the just-committed `not_found` prerequisite's path and, when linked, the five artifact-specific outputs to be entirely unset; otherwise throw exactly `new Error(\`Workflow prerequisite file ${args.prerequisiteId} not_found commit must leave its path and linked artifact outputs unset.\`)` before clone assignment. Do not inspect or clear the shared project values for this check. This proves the atomic resolution mutation itself did not retain or create allocation output.
 
-- [ ] Subtask 4.8: Update `resolveActiveWorkflowNewSingletonArtifactOutputs(...)` to exclude artifacts linked to deterministic exact-filename prerequisites so they never enter entry singleton conflict/replacement/archive/delete handling or the `entry_artifact_resolution_completed` payload.
+- [x] Subtask 4.8: Update `resolveActiveWorkflowNewSingletonArtifactOutputs(...)` to exclude artifacts linked to deterministic exact-filename prerequisites so they never enter entry singleton conflict/replacement/archive/delete handling or the `entry_artifact_resolution_completed` payload.
 
-- [ ] Subtask 4.9: In `prepareWorkflowArtifactCreation(...)`, when the target artifact is linked to a deterministic prerequisite, first call `this.validateCurrentPrerequisiteFileResolutions(definition, session)` and narrow with `if (validationResult.valid === false) { throw new Error(validationResult.errorMessage) }`; every invalid category enumerated in Subtask 4.7 therefore fails with that exact validator or preserved path-policy diagnostic. After valid-state narrowing, authorize allocation only when exactly one persisted current result exists for that prerequisite, its outcome is `not_found`, and that artifact's family, identity, filename, relative-path, and absolute-path workflow values are all `undefined`. When that complete authorization conjunction is false—including an unresolved prefix, `found` result, or fully allocated historical `not_found` result—throw exactly `new Error(\`Cannot allocate workflow artifact ${artifactId} because its linked deterministic prerequisite is not a completed not_found result with entirely unset artifact outputs.\`)`. Preserve all existing allocation authorization for unlinked artifacts.
+- [x] Subtask 4.9: In `prepareWorkflowArtifactCreation(...)`, when the target artifact is linked to a deterministic prerequisite, first call `this.validateCurrentPrerequisiteFileResolutions(definition, session)` and narrow with `if (validationResult.valid === false) { throw new Error(validationResult.errorMessage) }`; every invalid category enumerated in Subtask 4.7 therefore fails with that exact validator or preserved path-policy diagnostic. After valid-state narrowing, authorize allocation only when exactly one persisted current result exists for that prerequisite, its outcome is `not_found`, and that artifact's family, identity, filename, relative-path, and absolute-path workflow values are all `undefined`. When that complete authorization conjunction is false—including an unresolved prefix, `found` result, or fully allocated historical `not_found` result—throw exactly `new Error(\`Cannot allocate workflow artifact ${artifactId} because its linked deterministic prerequisite is not a completed not_found result with entirely unset artifact outputs.\`)`. Preserve all existing allocation authorization for unlinked artifacts.
 
-- [ ] Subtask 4.10: Extend `validateWorkflowDefinition(...)` for `resolutionMode` and `artifactId`. An artifact link is valid only for optional deterministic exact-filename prerequisites targeting a same-definition `intentMode: "new"` singleton artifact whose registry filename equals the exact prerequisite filename and whose absolute-path output key equals `workflowValueKey`. Require exact placement equivalence: selected root with `[]`, or selected subfolder `X` with `[X]`.
+- [x] Subtask 4.10: Extend `validateWorkflowDefinition(...)` for `resolutionMode` and `artifactId`. An artifact link is valid only for optional deterministic exact-filename prerequisites targeting a same-definition `intentMode: "new"` singleton artifact whose registry filename equals the exact prerequisite filename and whose absolute-path output key equals `workflowValueKey`. Require exact placement equivalence: selected root with `[]`, or selected subfolder `X` with `[X]`.
 
-- [ ] Subtask 4.11: In `validatePersistedWorkflowSessionForRestore(...)`, after constructing the structurally validated `compatibilitySession` from Subtask 2.2 and before branch-trigger compatibility checks, call `this.validateCurrentPrerequisiteFileResolutions(definition, compatibilitySession)` and return `undefined` when the result is invalid.
+- [x] Subtask 4.11: In `validatePersistedWorkflowSessionForRestore(...)`, after constructing the structurally validated `compatibilitySession` from Subtask 2.2 and before branch-trigger compatibility checks, call `this.validateCurrentPrerequisiteFileResolutions(definition, compatibilitySession)` and return `undefined` when the result is invalid.
 
   The restore validation must apply the same empty-or-declaration-order-prefix contract from Subtask 4.7: at most one result per included declared id, no skipped declaration, valid matching full path on `found`, no result-owned `resolvedAbsolutePath` on `not_found`, and complete linked metadata consistency. For an artifact-linked `not_found`, accept either the five artifact-specific outputs from Subtask 4.7 all unset before allocation or every key/value in the complete canonical output map after shared allocation; reject partial or noncanonical population and never require the retained shared project values to be unset. Accept a valid partial prefix so shared resume can resolve only the next declaration, and preserve the existing shared branch context, trigger, suppression, and step-resolution session state used by allocation/build resume. Reject invalid persisted sessions without repair or append; do not add a Document Project-specific lifecycle field or resume ledger.
 
-- [ ] Subtask 4.12: Add `private findIncompleteDeterministicPrerequisiteContinuationRoute(args: { definition: WorkflowDefinition; session: ActiveWorkflowSession; step: WorkflowStepDefinition }): WorkflowContinuationSourceRoute | undefined`. Return `undefined` when the definition has no deterministic exact-filename prerequisite. Otherwise, first call `this.findContinuationSourceRoute(...)` with the current active branch and a matcher that selects a `resolve_prerequisite_files` route containing at least one deterministic exact-filename prerequisite. Return `undefined` when no such continuation route exists. Build `completedIds` directly from `args.session.prerequisiteFileResolutions`, then derive the deterministic prerequisite ids named by that continuation route. If every one of those route-owned deterministic ids is represented in `completedIds`, return `undefined` before shared validation. That complete-state bypass is required so ordinary evaluation reaches the module-owned deterministic validation procedure and its exact terminal error when a complete Document Project result/path state is inconsistent; the shared continuation helper owns only incomplete resolution resume.
+- [x] Subtask 4.12: Add `private findIncompleteDeterministicPrerequisiteContinuationRoute(args: { definition: WorkflowDefinition; session: ActiveWorkflowSession; step: WorkflowStepDefinition }): WorkflowContinuationSourceRoute | undefined`. Return `undefined` when the definition has no deterministic exact-filename prerequisite. Otherwise, first call `this.findContinuationSourceRoute(...)` with the current active branch and a matcher that selects a `resolve_prerequisite_files` route containing at least one deterministic exact-filename prerequisite. Return `undefined` when no such continuation route exists. Build `completedIds` directly from `args.session.prerequisiteFileResolutions`, then derive the deterministic prerequisite ids named by that continuation route. If every one of those route-owned deterministic ids is represented in `completedIds`, return `undefined` before shared validation. That complete-state bypass is required so ordinary evaluation reaches the module-owned deterministic validation procedure and its exact terminal error when a complete Document Project result/path state is inconsistent; the shared continuation helper owns only incomplete resolution resume.
 
   Use this exact route lookup, required post-lookup narrowing, complete-id bypass, partial-prefix validation, and return sequence:
 
@@ -573,7 +576,7 @@ return continuationRoute
 
 ### Foundational Cutover Validation
 
-### [ ] Task 5: Validate The Compile-Safe Shared Contract Cutovers
+### [x] Task 5: Validate The Compile-Safe Shared Contract Cutovers
 
 Allowed files for this task and every numbered subtask below:
 
@@ -589,7 +592,7 @@ The six generated-code paths immediately above are allowed only as command-owned
 
 Full target file path for this task and every numbered subtask below: `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md`. The six generated-code paths are command-owned output targets only.
 
-- [ ] Subtask 5.1: Run:
+- [x] Subtask 5.1: Run:
 
 ```sh
 npm run check-types
@@ -597,13 +600,13 @@ npm run check-types
 
 `npm run check-types` already invokes `npm run protos`. After it succeeds, run `git diff --exit-code -- src/shared/proto src/generated src/core/controller src/hosts webview-ui/src/services/grpc-client.ts`. The command must report no new tracked diff; the ignored `dist-standalone/proto/descriptor_set.pb` output may remain as a command-owned build product. If a tracked generated or formatter diff appears, stop and inspect it rather than accepting or repairing it implicitly.
 
-- [ ] Subtask 5.2: Run the exact migrated workflow-definition regression set:
+- [x] Subtask 5.2: Run the exact migrated workflow-definition regression set:
 
 ```sh
 npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/acceptance-audit-review/__tests__/acceptanceAuditReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/correct-course/__tests__/correctCourseWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/dev-story/__tests__/devStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/quick-review/__tests__/quickReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts
 ```
 
-- [ ] Subtask 5.3: Run the exact non-definition fixture regression set affected by the two atomic cutovers:
+- [x] Subtask 5.3: Run the exact non-definition fixture regression set affected by the two atomic cutovers:
 
 ```sh
 npm run test:unit -- src/core/prompts/system-prompt/__tests__/response_tools.test.ts src/core/task/__tests__/ToolExecutor.workflowModelToolLifecycle.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/handlers/__tests__/AppendBrainstormingSelectedTechniqueToolHandler.test.ts src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts src/core/task/tools/handlers/__tests__/DevStoryGitFinalizeToolHandler.test.ts src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts src/core/task/tools/handlers/__tests__/RecordFindingsToolHandler.test.ts src/core/task/tools/handlers/__tests__/UpsertEpicToolHandler.test.ts src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingDocument.test.ts src/core/task/workflow-runtime/workflow-modules/correct-course/__tests__/correctCourseDocument.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureDocument.test.ts src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts src/core/slash-commands/__tests__/index.test.ts src/core/prompts/system-prompt/__tests__/integration.test.ts
@@ -611,7 +614,7 @@ npm run test:unit -- src/core/prompts/system-prompt/__tests__/response_tools.tes
 
 ### Document Project Module
 
-### [ ] Task 6: Add Deterministic Initial Document Builders
+### [x] Task 6: Add Deterministic Initial Document Builders
 
 Allowed files for this task and every numbered subtask below:
 
@@ -620,7 +623,7 @@ Allowed files for this task and every numbered subtask below:
 
 Full target file path for this task and every numbered subtask below: `src/core/task/workflow-runtime/workflow-modules/document-project/documentProjectDocument.ts`. The action-plan path is allowed only for checkbox updates.
 
-- [ ] Subtask 6.1: The verified production module directory does not yet exist. Run `mkdir -p src/core/task/workflow-runtime/workflow-modules/document-project`, then add `src/core/task/workflow-runtime/workflow-modules/document-project/documentProjectDocument.ts`. Export these exact Project Overview heading constants and ordered inventory:
+- [x] Subtask 6.1: The verified production module directory does not yet exist. Run `mkdir -p src/core/task/workflow-runtime/workflow-modules/document-project`, then add `src/core/task/workflow-runtime/workflow-modules/document-project/documentProjectDocument.ts`. Export these exact Project Overview heading constants and ordered inventory:
 
 ```ts
 export const DOCUMENT_PROJECT_PROJECT_OVERVIEW_HEADING_EXECUTIVE_SUMMARY = "Executive Summary"
@@ -652,7 +655,7 @@ export const DOCUMENT_PROJECT_PROJECT_OVERVIEW_HEADINGS: readonly string[] = [
 
 Export `buildInitialProjectOverviewDocument(): string`. Its code-owned template must interpolate these heading constants at the exact Appendix A heading positions and return the complete exact Project Overview content with one final newline.
 
-- [ ] Subtask 6.2: Export these exact Developer Guide heading constants and ordered inventory:
+- [x] Subtask 6.2: Export these exact Developer Guide heading constants and ordered inventory:
 
 ```ts
 export const DOCUMENT_PROJECT_DEVELOPER_GUIDE_HEADING_CODING_STYLE = "Coding Style"
@@ -682,9 +685,9 @@ export const DOCUMENT_PROJECT_DEVELOPER_GUIDE_HEADINGS: readonly string[] = [
 
 Export `buildInitialDeveloperGuideDocument(): string`. Its code-owned template must interpolate these heading constants at the exact Appendix A heading positions and return the complete exact Developer Guide content with one final newline.
 
-- [ ] Subtask 6.3: Use code-owned template literals and the exact exported heading constants only. Do not accept a session, import `fs` or `fs/promises`, compute a path, read the source workflow, read BMAD files, include source example delimiters, or add a generic renderer.
+- [x] Subtask 6.3: Use code-owned template literals and the exact exported heading constants only. Do not accept a session, import `fs` or `fs/promises`, compute a path, read the source workflow, read BMAD files, include source example delimiters, or add a generic renderer.
 
-### [ ] Task 7: Add Exact Per-Step Tool Schema Builders
+### [x] Task 7: Add Exact Per-Step Tool Schema Builders
 
 Allowed files for this task and every numbered subtask below:
 
@@ -693,7 +696,7 @@ Allowed files for this task and every numbered subtask below:
 
 Full target file path for this task and every numbered subtask below: `src/core/task/workflow-runtime/workflow-modules/document-project/documentProjectToolSchemas.ts`. The action-plan path is allowed only for checkbox updates.
 
-- [ ] Subtask 7.1: Add `documentProjectToolSchemas.ts` with these exact imports:
+- [x] Subtask 7.1: Add `documentProjectToolSchemas.ts` with these exact imports:
 
 ```ts
 import { ClineToolSet } from "@/core/prompts/system-prompt/registry/ClineToolSet"
@@ -703,7 +706,7 @@ import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
 ```
 
-- [ ] Subtask 7.2: Add this exact exported ordered list:
+- [x] Subtask 7.2: Add this exact exported ordered list:
 
 ```ts
 export const DOCUMENT_PROJECT_STEP_4_TOOL_IDS: readonly ClineDefaultTool[] = [
@@ -721,7 +724,7 @@ export const DOCUMENT_PROJECT_STEP_4_TOOL_IDS: readonly ClineDefaultTool[] = [
 ]
 ```
 
-- [ ] Subtask 7.3: Add this exact file-local helper:
+- [x] Subtask 7.3: Add this exact file-local helper:
 
 ```ts
 function resolveDocumentProjectSharedToolSpec(toolId: ClineDefaultTool): ClineToolSpec {
@@ -735,7 +738,7 @@ function resolveDocumentProjectSharedToolSpec(toolId: ClineDefaultTool): ClineTo
 }
 ```
 
-- [ ] Subtask 7.4: Add these exact named exports:
+- [x] Subtask 7.4: Add these exact named exports:
 
 ```ts
 export function buildDocumentProjectStep1ToolSchemas(): readonly ClineToolSpec[] {
@@ -751,7 +754,7 @@ export function buildDocumentProjectStep3ToolSchemas(): readonly ClineToolSpec[]
 }
 ```
 
-- [ ] Subtask 7.5: Add:
+- [x] Subtask 7.5: Add:
 
 ```ts
 export function buildDocumentProjectStep4ToolSchemas(): readonly ClineToolSpec[] {
@@ -761,7 +764,7 @@ export function buildDocumentProjectStep4ToolSchemas(): readonly ClineToolSpec[]
 
 Do not copy or wrap any shared tool config.
 
-### [ ] Task 8: Add The Document Project Workflow Definition
+### [x] Task 8: Add The Document Project Workflow Definition
 
 Allowed files for this task and every numbered subtask below:
 
@@ -770,9 +773,9 @@ Allowed files for this task and every numbered subtask below:
 
 Full target file path for this task and every numbered subtask below: `src/core/task/workflow-runtime/workflow-modules/document-project/documentProjectWorkflow.ts`. The action-plan path is allowed only for checkbox updates.
 
-- [ ] Subtask 8.1: Add `documentProjectWorkflow.ts` with `WorkflowFormDefinitionPayload` imported as a type from `@shared/ExtensionMessage`; `WorkflowFormSessionData` imported as a type from `@/core/task/workflow-form/types`; `WorkflowArtifactFamily` imported as a value from `../../artifactFamilies`; `ActiveWorkflowSession`, `WorkflowDecisionBranchTrigger`, `WorkflowDecisionTree`, `WorkflowDefinition`, `WorkflowDeterministicProcedureResult`, `WorkflowPersonaDefinition`, `WorkflowPromptBuilderInput`, `WorkflowStepPromptSource`, and `WorkflowValues` imported as types from `../../types`; `buildInitialProjectOverviewDocument` and `buildInitialDeveloperGuideDocument` imported from `./documentProjectDocument`; and `buildDocumentProjectStep1ToolSchemas`, `buildDocumentProjectStep2ToolSchemas`, `buildDocumentProjectStep3ToolSchemas`, and `buildDocumentProjectStep4ToolSchemas` imported from `./documentProjectToolSchemas`. Remove no prescribed import; Subtask 8.19 removes any provisional import outside this list and Subtask 8.12's one additional type import.
+- [x] Subtask 8.1: Add `documentProjectWorkflow.ts` with `WorkflowFormDefinitionPayload` imported as a type from `@shared/ExtensionMessage`; `WorkflowFormSessionData` imported as a type from `@/core/task/workflow-form/types`; `WorkflowArtifactFamily` imported as a value from `../../artifactFamilies`; `ActiveWorkflowSession`, `WorkflowDecisionBranchTrigger`, `WorkflowDecisionTree`, `WorkflowDefinition`, `WorkflowDeterministicProcedureResult`, `WorkflowPersonaDefinition`, `WorkflowPromptBuilderInput`, `WorkflowStepPromptSource`, and `WorkflowValues` imported as types from `../../types`; `buildInitialProjectOverviewDocument` and `buildInitialDeveloperGuideDocument` imported from `./documentProjectDocument`; and `buildDocumentProjectStep1ToolSchemas`, `buildDocumentProjectStep2ToolSchemas`, `buildDocumentProjectStep3ToolSchemas`, and `buildDocumentProjectStep4ToolSchemas` imported from `./documentProjectToolSchemas`. Remove no prescribed import; Subtask 8.19 removes any provisional import outside this list and Subtask 8.12's one additional type import.
 
-- [ ] Subtask 8.2: Export identity/entry constants with these exact values:
+- [x] Subtask 8.2: Export identity/entry constants with these exact values:
 
 ```ts
 export const DOCUMENT_PROJECT_WORKFLOW_NAME = "document-project"
@@ -785,7 +788,7 @@ export const DOCUMENT_PROJECT_ENTRY_PROMPT =
 	"In this workflow, you'll generate or update the developer guide and project overview, which are used in other workflows to provide agents with context regarding your project and ways of working."
 ```
 
-- [ ] Subtask 8.3: Export `DOCUMENT_PROJECT_WORKFLOW_PERSONA: WorkflowPersonaDefinition` exactly:
+- [x] Subtask 8.3: Export `DOCUMENT_PROJECT_WORKFLOW_PERSONA: WorkflowPersonaDefinition` exactly:
 
 ```ts
 {
@@ -798,7 +801,7 @@ export const DOCUMENT_PROJECT_ENTRY_PROMPT =
 }
 ```
 
-- [ ] Subtask 8.4: Add this exact exported enum, then define `DOCUMENT_PROJECT_WORKFLOW_VALUE_KEYS` by listing these enum members in the same order:
+- [x] Subtask 8.4: Add this exact exported enum, then define `DOCUMENT_PROJECT_WORKFLOW_VALUE_KEYS` by listing these enum members in the same order:
 
 ```ts
 export enum DocumentProjectWorkflowValueKey {
@@ -876,7 +879,7 @@ export const DOCUMENT_PROJECT_ENTRY_PROJECT_VALUE_KEYS = {
 
 Add no AI-writable value list and no generic `creationRequired`.
 
-- [ ] Subtask 8.5: Add `export const DOCUMENT_PROJECT_PROJECT_OVERVIEW_ARTIFACT_ID = "project_overview"` and `export const DOCUMENT_PROJECT_DEVELOPER_GUIDE_ARTIFACT_ID = "developer_guide"`, then export `DOCUMENT_PROJECT_ARTIFACTS: NonNullable<WorkflowDefinition["artifacts"]>` with exactly:
+- [x] Subtask 8.5: Add `export const DOCUMENT_PROJECT_PROJECT_OVERVIEW_ARTIFACT_ID = "project_overview"` and `export const DOCUMENT_PROJECT_DEVELOPER_GUIDE_ARTIFACT_ID = "developer_guide"`, then export `DOCUMENT_PROJECT_ARTIFACTS: NonNullable<WorkflowDefinition["artifacts"]>` with exactly:
 
 ```ts
 {
@@ -919,7 +922,7 @@ Add no AI-writable value list and no generic `creationRequired`.
 }
 ```
 
-- [ ] Subtask 8.6: Add `export const DOCUMENT_PROJECT_PROJECT_OVERVIEW_PREREQUISITE_ID = "project_overview"` and `export const DOCUMENT_PROJECT_DEVELOPER_GUIDE_PREREQUISITE_ID = "developer_guide"`, then export `DOCUMENT_PROJECT_PREREQUISITE_FILES: NonNullable<WorkflowDefinition["prerequisiteFiles"]>` with exactly this insertion order and shape:
+- [x] Subtask 8.6: Add `export const DOCUMENT_PROJECT_PROJECT_OVERVIEW_PREREQUISITE_ID = "project_overview"` and `export const DOCUMENT_PROJECT_DEVELOPER_GUIDE_PREREQUISITE_ID = "developer_guide"`, then export `DOCUMENT_PROJECT_PREREQUISITE_FILES: NonNullable<WorkflowDefinition["prerequisiteFiles"]>` with exactly this insertion order and shape:
 
 ```ts
 {
@@ -948,7 +951,7 @@ Add no AI-writable value list and no generic `creationRequired`.
 }
 ```
 
-- [ ] Subtask 8.7: Export these exact named constants and reuse them in every matching route without variants:
+- [x] Subtask 8.7: Export these exact named constants and reuse them in every matching route without variants:
 
 ```ts
 export const DOCUMENT_PROJECT_REFERENCE_DOCUMENT_STATE_TERMINAL_ERROR =
@@ -967,7 +970,7 @@ export const DOCUMENT_PROJECT_DOCUMENTATION_TASK_TERMINAL_ERROR =
 	"I could not determine the appropriate documentation task for the current session."
 ```
 
-- [ ] Subtask 8.8: Export these exact Form 1 constants:
+- [x] Subtask 8.8: Export these exact Form 1 constants:
 
 ```ts
 export const DOCUMENT_PROJECT_STEP_1_FORM_ID = "step-1-confirm-document-generation-form"
@@ -988,7 +991,7 @@ Export `buildDocumentProjectStep1WorkflowForm(): WorkflowFormDefinitionPayload` 
 
 Use each exported panel constant as both its `panels` record key and its `panelId`. Every panel has only `allowedActions: ["submit"]`, `actionLabels: { submit: "continue" }`, and transition `{ type: "conditional", conditionSourceKey: "__terminal__", branches: [], defaultTerminal: true }`. Add no other field property or copy.
 
-- [ ] Subtask 8.9: Export these exact Form 2 constants:
+- [x] Subtask 8.9: Export these exact Form 2 constants:
 
 ```ts
 export const DOCUMENT_PROJECT_STEP_3_FORM_ID = "step-3-gather-baseline-project-data-form"
@@ -1050,7 +1053,7 @@ K: { type: "sequential", nextPanelId: DOCUMENT_PROJECT_STEP_3_PANEL_L_ID }
 L: { type: "conditional", conditionSourceKey: "__terminal__", branches: [], defaultTerminal: true }
 ```
 
-- [ ] Subtask 8.10: Add `readWorkflowStringValue(workflowValues: WorkflowValues, key: DocumentProjectWorkflowValueKey): string | undefined`, returning only a non-empty trimmed string; and `readWorkflowBooleanValue(workflowValues: WorkflowValues, key: DocumentProjectWorkflowValueKey): boolean | undefined`, returning only booleans. Also add:
+- [x] Subtask 8.10: Add `readWorkflowStringValue(workflowValues: WorkflowValues, key: DocumentProjectWorkflowValueKey): string | undefined`, returning only a non-empty trimmed string; and `readWorkflowBooleanValue(workflowValues: WorkflowValues, key: DocumentProjectWorkflowValueKey): boolean | undefined`, returning only booleans. Also add:
 
 ```ts
 type DocumentProjectSessionObjective = "Update existing documents" | "Add supporting documentation"
@@ -1073,11 +1076,11 @@ interface DocumentProjectReferenceDocumentState {
 
 and `readDocumentProjectReferenceDocumentState(session: ActiveWorkflowSession): DocumentProjectReferenceDocumentState | undefined`. First assign `const orderedPrerequisites = Object.values(DOCUMENT_PROJECT_PREREQUISITE_FILES)`, then require `session.prerequisiteFileResolutions.length === orderedPrerequisites.length`. Iterate `for (const [index, prerequisite] of orderedPrerequisites.entries())`; assign `const result = session.prerequisiteFileResolutions[index]`, return `undefined` when `result === undefined || result.prerequisiteId !== prerequisite.id`, and only after that guard assign `const rawPath = session.workflowValues[prerequisite.workflowValueKey]`. A `found` result requires `typeof rawPath === "string" && rawPath.length > 0 && rawPath === result.resolvedAbsolutePath`; it must compare the raw value directly and must not trim it or compare the return from `readWorkflowStringValue(...)`. A `not_found` result requires `rawPath === undefined`. A present empty, whitespace-only, padded, or wrong-typed raw value is invalid and must not be treated as an exact `found` path or an unset `not_found` path. Return both pre-allocation creation states only after both declarations pass. Decision predicates must not read `prerequisiteFileResolutions` directly.
 
-- [ ] Subtask 8.11: Add `validateReferenceDocumentResolutionState(session: ActiveWorkflowSession): WorkflowDeterministicProcedureResult`, invoking the shared reader and returning `{ kind: "succeeded" }` with no writes when valid or `{ kind: "failed", errorMessage: DOCUMENT_PROJECT_REFERENCE_DOCUMENT_STATE_TERMINAL_ERROR }`. Add `deriveDocumentCreationRequirements(session: ActiveWorkflowSession): WorkflowDeterministicProcedureResult`, invoking the same reader and returning one `{ kind: "succeeded", workflowValueWrites: { project_overview_creation_required: boolean, developer_guide_creation_required: boolean } }`, or the same exact failure. The runtime must apply this successfully derived, validated Boolean map through its existing `run_deterministic_procedure` workflow-value persistence seam; add no module-specific persistence-failure route, mapping, callback, or post-write carrier. Add `buildBaselineProjectDataFormSessionData(session: ActiveWorkflowSession): WorkflowFormSessionData`: assign both values through `readWorkflowBooleanValue(...)`; if either is `undefined`, throw `new Error(DOCUMENT_PROJECT_BASELINE_DATA_TERMINAL_ERROR)`; after that narrowing, return exactly `{ project_overview_creation_required: projectOverviewCreationRequired, developer_guide_creation_required: developerGuideCreationRequired }`. Do not coerce an invalid value to `false`; the Step 3 route prevents this helper from being called for invalid state, and the exact guard keeps the helper fail-closed if invoked directly.
+- [x] Subtask 8.11: Add `validateReferenceDocumentResolutionState(session: ActiveWorkflowSession): WorkflowDeterministicProcedureResult`, invoking the shared reader and returning `{ kind: "succeeded" }` with no writes when valid or `{ kind: "failed", errorMessage: DOCUMENT_PROJECT_REFERENCE_DOCUMENT_STATE_TERMINAL_ERROR }`. Add `deriveDocumentCreationRequirements(session: ActiveWorkflowSession): WorkflowDeterministicProcedureResult`, invoking the same reader and returning one `{ kind: "succeeded", workflowValueWrites: { project_overview_creation_required: boolean, developer_guide_creation_required: boolean } }`, or the same exact failure. The runtime must apply this successfully derived, validated Boolean map through its existing `run_deterministic_procedure` workflow-value persistence seam; add no module-specific persistence-failure route, mapping, callback, or post-write carrier. Add `buildBaselineProjectDataFormSessionData(session: ActiveWorkflowSession): WorkflowFormSessionData`: assign both values through `readWorkflowBooleanValue(...)`; if either is `undefined`, throw `new Error(DOCUMENT_PROJECT_BASELINE_DATA_TERMINAL_ERROR)`; after that narrowing, return exactly `{ project_overview_creation_required: projectOverviewCreationRequired, developer_guide_creation_required: developerGuideCreationRequired }`. Do not coerce an invalid value to `false`; the Step 3 route prevents this helper from being called for invalid state, and the exact guard keeps the helper fail-closed if invoked directly.
 
-- [ ] Subtask 8.12: Add `sourceRouteMatches(sourceRoute: WorkflowStepResolutionSourceRoute, branchId: string, routeId: string): boolean`, comparing both fields; `toolBackedOperationSucceeded(branchId: string, routeId: string): WorkflowDecisionBranchTrigger`; `toolBackedOperationFailed(branchId: string, routeId: string): WorkflowDecisionBranchTrigger`; and `workflowFormCompleted(workflowFormId: string): WorkflowDecisionBranchTrigger`. The operation helpers must return `event_predicate` triggers requiring the corresponding event kind and exact source-route match; the form helper must require `workflow_form_completed` and the exact form id. Add `WorkflowStepResolutionSourceRoute` to the type imports from `@/core/task/workflow-step-resolution/types`. Require these helpers for every artifact-operation result.
+- [x] Subtask 8.12: Add `sourceRouteMatches(sourceRoute: WorkflowStepResolutionSourceRoute, branchId: string, routeId: string): boolean`, comparing both fields; `toolBackedOperationSucceeded(branchId: string, routeId: string): WorkflowDecisionBranchTrigger`; `toolBackedOperationFailed(branchId: string, routeId: string): WorkflowDecisionBranchTrigger`; and `workflowFormCompleted(workflowFormId: string): WorkflowDecisionBranchTrigger`. The operation helpers must return `event_predicate` triggers requiring the corresponding event kind and exact source-route match; the form helper must require `workflow_form_completed` and the exact form id. Add `WorkflowStepResolutionSourceRoute` to the type imports from `@/core/task/workflow-step-resolution/types`. Require these helpers for every artifact-operation result.
 
-- [ ] Subtask 8.13: Add `buildDocumentProjectStep1DecisionTree(): WorkflowDecisionTree` with entry branch `step-1-resolve-branch` and these exact branch/route transitions:
+- [x] Subtask 8.13: Add `buildDocumentProjectStep1DecisionTree(): WorkflowDecisionTree` with entry branch `step-1-resolve-branch` and these exact branch/route transitions:
 
 | Branch | Route | Predicate | Action / next branch |
 | --- | --- | --- | --- |
@@ -1091,7 +1094,7 @@ and `readDocumentProjectReferenceDocumentState(session: ActiveWorkflowSession): 
 
 Each form-selection route uses `session_predicate` and calls `readWorkflowStringValue(input.workflowValues, DocumentProjectWorkflowValueKey.ProjectOverview)` and `readWorkflowStringValue(input.workflowValues, DocumentProjectWorkflowValueKey.DeveloperGuide)`, comparing each result to `undefined` or non-`undefined` for its exact table state. The four routes are mutually exclusive and exhaustive after `validateReferenceDocumentResolutionState(...)` succeeds. That preceding deterministic procedure owns all reads of `prerequisiteFileResolutions` and returns the exact `DOCUMENT_PROJECT_REFERENCE_DOCUMENT_STATE_TERMINAL_ERROR` failure before this branch when results are unresolved, inconsistent, or cannot select one valid pre-allocation path state. Add no overlapping `always` fallback to the form-selection branch, and do not rely on route order as priority.
 
-- [ ] Subtask 8.14: Add `buildDocumentProjectStep2DecisionTree(): WorkflowDecisionTree` with `entryBranchId: "step-2-derive-branch"` and exactly these branch ids:
+- [x] Subtask 8.14: Add `buildDocumentProjectStep2DecisionTree(): WorkflowDecisionTree` with `entryBranchId: "step-2-derive-branch"` and exactly these branch ids:
 
 ```ts
 [
@@ -1145,7 +1148,7 @@ Each record key and its `id` must be the same string. Build the routes exactly a
 
 Use `toolBackedOperationSucceeded(...)` or `toolBackedOperationFailed(...)` for every operation-result route with the exact branch and route that initiated the operation. Within every multi-route branch, the prescribed false, true, undefined, success, failure, valid-completion, and invalid-completion predicates are mutually exclusive for one evaluation; add no priority-dependent fallback. The two allocation attempts must be consecutive runtime-owned operations; build failures do not retry; every failure blocks later actions. When both flags are true, the order is Project Overview allocation/build followed by Developer Guide allocation/build.
 
-- [ ] Subtask 8.15: Add `buildDocumentProjectStep3DecisionTree(): WorkflowDecisionTree` with entry branch `step-3-route-branch` and await branch `step-3-await-form-branch`. In the entry branch, add four mutually exclusive `session_predicate` routes that each call `readWorkflowBooleanValue(input.workflowValues, DocumentProjectWorkflowValueKey.ProjectOverviewCreationRequired)` and `readWorkflowBooleanValue(input.workflowValues, DocumentProjectWorkflowValueKey.DeveloperGuideCreationRequired)` and compare them to the exact combinations below, plus one disjoint invalid-state `session_predicate`:
+- [x] Subtask 8.15: Add `buildDocumentProjectStep3DecisionTree(): WorkflowDecisionTree` with entry branch `step-3-route-branch` and await branch `step-3-await-form-branch`. In the entry branch, add four mutually exclusive `session_predicate` routes that each call `readWorkflowBooleanValue(input.workflowValues, DocumentProjectWorkflowValueKey.ProjectOverviewCreationRequired)` and `readWorkflowBooleanValue(input.workflowValues, DocumentProjectWorkflowValueKey.DeveloperGuideCreationRequired)` and compare them to the exact combinations below, plus one disjoint invalid-state `session_predicate`:
   - `step-3-skip-form`: false/false; `{ kind: "transition_step", target: { kind: "entry_branch", stepNumber: 4 } }`.
   - `step-3-render-form-a-project-overview-only`: true/false; `{ kind: "render_workflow_form", workflowFormId: DOCUMENT_PROJECT_STEP_3_FORM_ID, startPanelId: DOCUMENT_PROJECT_STEP_3_PANEL_A_ID, buildSessionData: buildBaselineProjectDataFormSessionData }`; `followingBranchId: "step-3-await-form-branch"`.
   - `step-3-render-form-j-developer-guide-only`: false/true; the same action with `DOCUMENT_PROJECT_STEP_3_PANEL_J_ID`; the same following branch.
@@ -1154,7 +1157,7 @@ Use `toolBackedOperationSucceeded(...)` or `toolBackedOperationFailed(...)` for 
 
 The four valid predicates exhaust only the Boolean/Boolean combinations, and the invalid predicate matches only an absent or wrong-typed flag; add no `always` fallback and do not use route order as priority. The await branch has only `step-3-complete-form`, triggered by `workflowFormCompleted(DOCUMENT_PROJECT_STEP_3_FORM_ID)`, with `{ kind: "transition_step", target: { kind: "entry_branch", stepNumber: 4 } }`.
 
-- [ ] Subtask 8.16: Define the Appendix B text exactly in these named constants: `DOCUMENT_PROJECT_STEP_4_BASE_PROMPT`, `DOCUMENT_PROJECT_STEP_4_BOTH_CREATED_STATUS_PROMPT`, `DOCUMENT_PROJECT_STEP_4_SHARED_PATHS_PROMPT`, `DOCUMENT_PROJECT_STEP_4_PROJECT_OVERVIEW_ONLY_STATUS_PROMPT`, `DOCUMENT_PROJECT_STEP_4_DEVELOPER_GUIDE_ONLY_STATUS_PROMPT`, `DOCUMENT_PROJECT_STEP_4_INPUT_INTRODUCTION_PROMPT`, `DOCUMENT_PROJECT_STEP_4_PROJECT_OVERVIEW_INPUTS_PROMPT`, `DOCUMENT_PROJECT_STEP_4_DEVELOPER_GUIDE_INPUTS_PROMPT`, `DOCUMENT_PROJECT_STEP_4_BOTH_DOCUMENT_WORK_PROMPT`, `DOCUMENT_PROJECT_STEP_4_DEVELOPER_GUIDE_ONLY_WORK_PROMPT`, `DOCUMENT_PROJECT_STEP_4_PROJECT_OVERVIEW_ONLY_WORK_PROMPT`, `DOCUMENT_PROJECT_STEP_4_UPDATE_EXISTING_DOCUMENTS_WORK_PROMPT`, and `DOCUMENT_PROJECT_STEP_4_ADD_SUPPORTING_DOCUMENTATION_WORK_PROMPT`. Each constant must be a readable multiline template literal, flush-left except for whitespace prescribed by Appendix B; do not encode a prompt body with `\n`, concatenate prompt prose, use `String.raw`, or mutate text with replacement.
+- [x] Subtask 8.16: Define the Appendix B text exactly in these named constants: `DOCUMENT_PROJECT_STEP_4_BASE_PROMPT`, `DOCUMENT_PROJECT_STEP_4_BOTH_CREATED_STATUS_PROMPT`, `DOCUMENT_PROJECT_STEP_4_SHARED_PATHS_PROMPT`, `DOCUMENT_PROJECT_STEP_4_PROJECT_OVERVIEW_ONLY_STATUS_PROMPT`, `DOCUMENT_PROJECT_STEP_4_DEVELOPER_GUIDE_ONLY_STATUS_PROMPT`, `DOCUMENT_PROJECT_STEP_4_INPUT_INTRODUCTION_PROMPT`, `DOCUMENT_PROJECT_STEP_4_PROJECT_OVERVIEW_INPUTS_PROMPT`, `DOCUMENT_PROJECT_STEP_4_DEVELOPER_GUIDE_INPUTS_PROMPT`, `DOCUMENT_PROJECT_STEP_4_BOTH_DOCUMENT_WORK_PROMPT`, `DOCUMENT_PROJECT_STEP_4_DEVELOPER_GUIDE_ONLY_WORK_PROMPT`, `DOCUMENT_PROJECT_STEP_4_PROJECT_OVERVIEW_ONLY_WORK_PROMPT`, `DOCUMENT_PROJECT_STEP_4_UPDATE_EXISTING_DOCUMENTS_WORK_PROMPT`, and `DOCUMENT_PROJECT_STEP_4_ADD_SUPPORTING_DOCUMENTATION_WORK_PROMPT`. Each constant must be a readable multiline template literal, flush-left except for whitespace prescribed by Appendix B; do not encode a prompt body with `\n`, concatenate prompt prose, use `String.raw`, or mutate text with replacement.
 
 Add:
 
@@ -1174,7 +1177,7 @@ function buildDocumentProjectStep4PromptSource(
 
 The selector must require `project_overview` and `developer_guide` to be non-empty strings and both creation-required values to be booleans. For true/true, additionally require non-empty string `repo_type`, `product_type`, `primary_programming_language`, `repo_status`, `recent_project`, `planned_enhancements`, and `known_issues`, plus boolean `api_indicator`, `database_indicator`, `state_management_indicator`, `ui_indicator`, and `deployment_indicator`. For true/false, require the four Project Overview strings and five Project Overview booleans only. For false/true, require the three Developer Guide strings only. For false/false, require no baseline field, call `readDocumentProjectSessionObjective(session.workflowValues)` exactly once, return `{ valid: false }` when it returns `undefined`, and select the corresponding exact existing-document section only from the returned `DocumentProjectSessionObjective`. Do not read this objective through `readWorkflowStringValue(...)` or compare a trimmed value. The selector returns `{ valid: true, sections }` in the exact Subtask 8.17 order or `{ valid: false }`. The Step 4 valid-route predicate must call it with `input.session` and test `.valid`; the prompt builder must call it with `input.session`, return `{ kind: "none" }` for invalid selection, or return `{ kind: "current_step_instruction_template", currentStepInstructionTemplate: selection.sections.join("\n\n") }` for valid selection. Neither caller may independently duplicate the selection logic.
 
-- [ ] Subtask 8.17: Add `buildDocumentProjectStep4DecisionTree(): WorkflowDecisionTree` with entry branch `step-4-prompt-branch` and completion branch `step-4-await-completion-branch`. Route `step-4-project-prompt` uses `{ kind: "session_predicate", matches: (input) => selectDocumentProjectStep4PromptSections(input.session).valid === true }`, action `{ kind: "project_prompt" }`, and `followingBranchId: "step-4-await-completion-branch"`. Route `step-4-invalid-state` uses `{ kind: "session_predicate", matches: (input) => selectDocumentProjectStep4PromptSections(input.session).valid === false }` and `{ kind: "terminal_error", errorMessage: DOCUMENT_PROJECT_DOCUMENTATION_TASK_TERMINAL_ERROR }`. These two routes are mutually exclusive and exhaustive; add no `always` fallback or route-priority dependency. In the completion branch, only route `step-4-complete-workflow`, triggered by `{ kind: "on_event", eventKind: "attempt_completion_succeeded" }`, uses `{ kind: "complete_workflow" }`. Implement the five prompt section sequences exactly:
+- [x] Subtask 8.17: Add `buildDocumentProjectStep4DecisionTree(): WorkflowDecisionTree` with entry branch `step-4-prompt-branch` and completion branch `step-4-await-completion-branch`. Route `step-4-project-prompt` uses `{ kind: "session_predicate", matches: (input) => selectDocumentProjectStep4PromptSections(input.session).valid === true }`, action `{ kind: "project_prompt" }`, and `followingBranchId: "step-4-await-completion-branch"`. Route `step-4-invalid-state` uses `{ kind: "session_predicate", matches: (input) => selectDocumentProjectStep4PromptSections(input.session).valid === false }` and `{ kind: "terminal_error", errorMessage: DOCUMENT_PROJECT_DOCUMENTATION_TASK_TERMINAL_ERROR }`. These two routes are mutually exclusive and exhaustive; add no `always` fallback or route-priority dependency. In the completion branch, only route `step-4-complete-workflow`, triggered by `{ kind: "on_event", eventKind: "attempt_completion_succeeded" }`, uses `{ kind: "complete_workflow" }`. Implement the five prompt section sequences exactly:
   - true/true: Base, Both-created status, Shared paths, Input introduction, Project Overview inputs, Developer Guide inputs, Both-document work;
   - true/false: Base, Shared paths, Project Overview-only status, Input introduction, Project Overview inputs, Project Overview-only work;
   - false/true: Base, Shared paths, Developer Guide-only status, Input introduction, Developer Guide inputs, Developer Guide-only work;
@@ -1183,7 +1186,7 @@ The selector must require `project_overview` and `developer_guide` to be non-emp
 
 The valid route returns `project_prompt`; invalid state terminates with the exact documentation-task failure; only `attempt_completion_succeeded` routes to `complete_workflow`. Add no `completionRules`.
 
-- [ ] Subtask 8.18: Export the exact complete definition below. It contains only four steps; Steps 1–3 return `{ kind: "none" }` and delegate to the three empty schema builders, while Step 4 uses `buildDocumentProjectStep4PromptSource` and the Step 4 schema builder. The exact 13-entry `promptTemplates` list exposes every possible token-bearing Step 4 section to shared definition validation. Do not add `childInheritance` or `completionRules`.
+- [x] Subtask 8.18: Export the exact complete definition below. It contains only four steps; Steps 1–3 return `{ kind: "none" }` and delegate to the three empty schema builders, while Step 4 uses `buildDocumentProjectStep4PromptSource` and the Step 4 schema builder. The exact 13-entry `promptTemplates` list exposes every possible token-bearing Step 4 section to shared definition validation. Do not add `childInheritance` or `completionRules`.
 
 ```ts
 export const documentProjectWorkflowDefinition: WorkflowDefinition = {
@@ -1262,9 +1265,9 @@ export const documentProjectWorkflowDefinition: WorkflowDefinition = {
 }
 ```
 
-- [ ] Subtask 8.19: Make the final import surface exactly the imports prescribed by Subtasks 8.1 and 8.12; remove any provisional import not in those two lists. Retain only the named builders, readers, selectors, trigger helpers, form builders, deterministic procedures, and decision-tree builders prescribed in Subtasks 8.2–8.18; remove any provisional helper outside that inventory. The file must contain no direct filesystem access, local path construction, local prompt-token replacement, source/BMAD import, `continue_workflow_form`, `entry_artifact_resolution_completed`, specialized handler, module-owned resume state, or source-authoring delimiter.
+- [x] Subtask 8.19: Make the final import surface exactly the imports prescribed by Subtasks 8.1 and 8.12; remove any provisional import not in those two lists. Retain only the named builders, readers, selectors, trigger helpers, form builders, deterministic procedures, and decision-tree builders prescribed in Subtasks 8.2–8.18; remove any provisional helper outside that inventory. The file must contain no direct filesystem access, local path construction, local prompt-token replacement, source/BMAD import, `continue_workflow_form`, `entry_artifact_resolution_completed`, specialized handler, module-owned resume state, or source-authoring delimiter.
 
-### [ ] Task 9: Add The Module Barrel And Registry Entry
+### [x] Task 9: Add The Module Barrel And Registry Entry
 
 Allowed files for this task and every numbered subtask below:
 
@@ -1274,7 +1277,7 @@ Allowed files for this task and every numbered subtask below:
 
 Full target file paths for this task and every numbered subtask below: `src/core/task/workflow-runtime/workflow-modules/document-project/index.ts` and `src/core/task/workflow-runtime/WorkflowRegistry.ts`. The action-plan path is allowed only for checkbox updates.
 
-- [ ] Subtask 9.1: Add `index.ts` with exactly these barrel exports:
+- [x] Subtask 9.1: Add `index.ts` with exactly these barrel exports:
 
 ```ts
 export * from "./documentProjectDocument"
@@ -1282,13 +1285,13 @@ export * from "./documentProjectToolSchemas"
 export * from "./documentProjectWorkflow"
 ```
 
-- [ ] Subtask 9.2: In `WorkflowRegistry.ts`, add `import { documentProjectWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/document-project"` with the existing module imports and add `documentProjectWorkflowDefinition` once to `shippedWorkflowDefinitions`. Preserve every existing entry and lookup implementation.
+- [x] Subtask 9.2: In `WorkflowRegistry.ts`, add `import { documentProjectWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/document-project"` with the existing module imports and add `documentProjectWorkflowDefinition` once to `shippedWorkflowDefinitions`. Preserve every existing entry and lookup implementation.
 
-- [ ] Subtask 9.3: Per the user-approved structural-contract clarification, `shippedWorkflowDefinitions` remains the sole shipped inventory. Do not add a `.md` alias, metadata registry/accessor/projection, Document Project-specific registry, or any registration outside `WorkflowRegistry.ts`.
+- [x] Subtask 9.3: Per the user-approved structural-contract clarification, `shippedWorkflowDefinitions` remains the sole shipped inventory. Do not add a `.md` alias, metadata registry/accessor/projection, Document Project-specific registry, or any registration outside `WorkflowRegistry.ts`.
 
 ### Focused Tests And Migration Fallout
 
-### [ ] Task 10: Update Shared Runtime And Prerequisite Tests
+### [x] Task 10: Update Shared Runtime And Prerequisite Tests
 
 Allowed files for this task and every numbered subtask below:
 
@@ -1299,7 +1302,7 @@ Allowed files for this task and every numbered subtask below:
 
 Full target file paths for this task and every numbered subtask below: `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, `src/core/task/workflow-runtime/__tests__/prerequisiteFiles.test.ts`, and `src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts`. The action-plan path is allowed only for checkbox updates.
 
-- [ ] Subtask 10.1: In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, replace the existing `WorkflowArtifactFamily` import with `import { WORKFLOW_ARTIFACT_FAMILY_REGISTRY, WorkflowArtifactFamily } from "../artifactFamilies"` and add exactly one namespace import `import * as WorkflowPrerequisiteFiles from "../prerequisiteFiles"`. Also add one named import from `../workflow-modules/document-project` containing exactly:
+- [x] Subtask 10.1: In `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`, replace the existing `WorkflowArtifactFamily` import with `import { WORKFLOW_ARTIFACT_FAMILY_REGISTRY, WorkflowArtifactFamily } from "../artifactFamilies"` and add exactly one namespace import `import * as WorkflowPrerequisiteFiles from "../prerequisiteFiles"`. Also add one named import from `../workflow-modules/document-project` containing exactly:
 
 ```ts
 buildInitialDeveloperGuideDocument,
@@ -1336,7 +1339,7 @@ documentProjectWorkflowDefinition,
 
 These imports are consumed by Subtasks 10.2 and 10.6–10.10. The two document builders are consumed by Subtask 10.10; the handler test imports its builders directly under Subtask 10.12. Task 2 already completed every compile-boundary fixture and helper migration; do not repeat or replace those migrated fields here. Remove no import: every newly prescribed import has an exact consumer.
 
-- [ ] Subtask 10.2: In `WorkflowRuntime.test.ts`, add `expectDefinitionRejected(workflow: WorkflowDefinition, label: string): Promise<void>`. Inside it, assign `const result = await activateWorkflow(taskState, workflow)`; the existing `activateWorkflow(...)` test helper owns the `resolveWorkflowDefinitionStub` registration. Assert `expect(result, label).to.deep.equal({ kind: "no_op" })`, `expect(taskState.activeWorkflowName, label).to.equal(undefined)`, and `expect(taskState.activeWorkflowSession, label).to.equal(undefined)`; the supplied label is assertion context, not runtime copy. Build one valid linked fixture using `WorkflowArtifactFamily.ProjectOverview`, `intentMode: "new"`, the complete standalone output-key map from Subtask 8.5, the exact Project Overview prerequisite from Subtask 8.6, and root placement. Produce every malformed required or discriminated-union field below only with `Reflect.deleteProperty(...)` or `Reflect.set(...)`, so the malformed runtime objects do not weaken production types. Start every rejection from a fresh valid fixture and apply exactly one listed mutation unless that case explicitly prescribes a paired inventory update:
+- [x] Subtask 10.2: In `WorkflowRuntime.test.ts`, add `expectDefinitionRejected(workflow: WorkflowDefinition, label: string): Promise<void>`. Inside it, assign `const result = await activateWorkflow(taskState, workflow)`; the existing `activateWorkflow(...)` test helper owns the `resolveWorkflowDefinitionStub` registration. Assert `expect(result, label).to.deep.equal({ kind: "no_op" })`, `expect(taskState.activeWorkflowName, label).to.equal(undefined)`, and `expect(taskState.activeWorkflowSession, label).to.equal(undefined)`; the supplied label is assertion context, not runtime copy. Build one valid linked fixture using `WorkflowArtifactFamily.ProjectOverview`, `intentMode: "new"`, the complete standalone output-key map from Subtask 8.5, the exact Project Overview prerequisite from Subtask 8.6, and root placement. Produce every malformed required or discriminated-union field below only with `Reflect.deleteProperty(...)` or `Reflect.set(...)`, so the malformed runtime objects do not weaken production types. Start every rejection from a fresh valid fixture and apply exactly one listed mutation unless that case explicitly prescribes a paired inventory update:
 
 - delete `projectSelection`; set it to `{ kind: "unsupported" }`; set automatic `projectTitle` in separate cases to `""` and `" Agent Guidance "`; set automatic `projectFolderName` in separate cases to `""` and `" agent-guidance "`;
 - set automatic `projectFolderName`, in separate cases, to `.`, `..`, `agent/guidance`, `agent\\guidance`, `join(cwd, "agent-guidance")`, `C:`, `Agent Guidance`, `agent guidance`, `agent--guidance`, `Agent-Guidance`, `agent_guidance`, and `agent@guidance`; assert a separate unchanged `agent-guidance` case activates successfully;
@@ -1348,11 +1351,11 @@ These imports are consumed by Subtasks 10.2 and 10.6–10.10. The two document b
 
 Also add one valid selected-subfolder case pairing `{ kind: "selected_project_subfolder", subfolder: "planning" }` with prerequisite segments `["planning"]`; assert both that case and the unchanged valid selected-root/empty-segments case activate successfully and return the entry form. Preserve validation of `projectSubfolderSegments` on prerequisites and decision actions; the type migration, production static guard, and exact module-definition assertions own proof that singular `projectSubfolder` is removed rather than treating it as an alias.
 
-- [ ] Subtask 10.3: Add project-selection tests proving: informational panel first; no automatic discovery/finalization/folder creation before submit; exact-match `existing` and absent `new`; exact fixed selection plus the three fixed values persisted through entry keys; one finalization; cleared entry-form state; `lifecycle.projectSelectionCompleted === true`; no synthetic selector submission; no separate root value; and normal new/existing entry-artifact continuation. In the absent/new case, begin with `join(cwd, "docs", "projects", "agent-guidance")` absent. Inside the asynchronous `discoverWorkflowCandidatesStub.callsFake(...)`, call `access(...)` for that exact folder and assert the caught Node error has `code === "ENOENT"` before returning `[]`; after informational-panel submission resolves, assert `access(...)` succeeds for that root and for each exact shared canonical folder beneath it: `discovery`, `planning`, `implementation`, `review`, `testing`, `archive`, `implementation/drafts`, `implementation/stories-backlog`, `implementation/stories-review`, and `implementation/stories-complete`. This directly proves discovery runs after submission but before new-folder creation and that the shared finalizer completes its existing folder contract.
+- [x] Subtask 10.3: Add project-selection tests proving: informational panel first; no automatic discovery/finalization/folder creation before submit; exact-match `existing` and absent `new`; exact fixed selection plus the three fixed values persisted through entry keys; one finalization; cleared entry-form state; `lifecycle.projectSelectionCompleted === true`; no synthetic selector submission; no separate root value; and normal new/existing entry-artifact continuation. In the absent/new case, begin with `join(cwd, "docs", "projects", "agent-guidance")` absent. Inside the asynchronous `discoverWorkflowCandidatesStub.callsFake(...)`, call `access(...)` for that exact folder and assert the caught Node error has `code === "ENOENT"` before returning `[]`; after informational-panel submission resolves, assert `access(...)` succeeds for that root and for each exact shared canonical folder beneath it: `discovery`, `planning`, `implementation`, `review`, `testing`, `archive`, `implementation/drafts`, `implementation/stories-backlog`, `implementation/stories-review`, and `implementation/stories-complete`. This directly proves discovery runs after submission but before new-folder creation and that the shared finalizer completes its existing folder contract.
 
 Capture the `discoverWorkflowCandidates(...)` request from one existing interactive-selection submission and from one automatic-fixed informational submission. For each request, assert `Object.keys(request).sort()` exactly equals `["buildLabel", "entryType", "immediateChildrenOnly", "rootDirectory", "sort", "workspacePathPolicy"]`; destructure `buildLabel` from each request; assert both remaining request objects deeply equal the exact common `{ rootDirectory, workspacePathPolicy, entryType: "directory", immediateChildrenOnly: true, sort: "alpha_asc" }` object; require both `buildLabel` values to be functions; and assert each returns its supplied entry name. The exact key assertion proves neither request owns `targetPathSegments` or `namingPattern`.
 
-- [ ] Subtask 10.4: Preserve the current complete-parent interactive-child project-selection test and its fixture shape, adding assertions that `discoverWorkflowCandidatesStub` was not called and the child owns no entry form. Rename the current `no-ops child workflow activation without mutating state when parent project selection is incomplete` test to `no-ops interactive child workflow activation without mutating state when parent project selection is incomplete`; preserve both incomplete-parent cases and every existing no-op/no-mutation assertion.
+- [x] Subtask 10.4: Preserve the current complete-parent interactive-child project-selection test and its fixture shape, adding assertions that `discoverWorkflowCandidatesStub` was not called and the child owns no entry form. Rename the current `no-ops child workflow activation without mutating state when parent project selection is incomplete` test to `no-ops interactive child workflow activation without mutating state when parent project selection is incomplete`; preserve both incomplete-parent cases and every existing no-op/no-mutation assertion.
 
 Add two automatic-fixed child cases, one where discovery returns an exact `agent-guidance` directory candidate and one where it returns `[]`. For the exact-candidate case, create the parent with `projectTitle: ""`, `projectFolderName: "unrelated-parent"`, and `lifecycle.projectSelectionCompleted: false`; for the absent-candidate case, create it with `projectTitle: "Unrelated Parent"`, `projectFolderName: ""`, and `lifecycle.projectSelectionCompleted: false`. Activate each automatic-fixed child with its incomplete parent session. Before each activation, assign exactly:
 
@@ -1365,9 +1368,9 @@ const parentWorkflowValuesSnapshot = structuredClone(parentSession.workflowValue
 
 Assert the child uses exact fixed `Agent Guidance` / `agent-guidance`, derives `projectMode: "existing"` for the exact candidate and `"new"` for absence, persists those exact three entry values, has `lifecycle.projectSelectionCompleted === true` and the existing `parentWorkflowName`, does not copy any parent project field, owns no form, and invokes discovery and finalization exactly once. After activation, assert `parentSession.projectSelection === parentProjectSelectionReference` and `parentSession.workflowValues === parentWorkflowValuesReference`; deeply equal the two parent values to their respective snapshots; and assert the child `projectSelection` and `workflowValues` objects are each not reference-equal to their parent counterparts. This proves the automatic-fixed branch neither mutates the parent nor shares either mutable map.
 
-- [ ] Subtask 10.5: Add output-placement tests that call the existing allocation seam for root and subfolder definitions and assert `artifactRelativePath` equals the canonical filename for root and `join("planning", artifactFilename)` for subfolder. For targeted numbered-artifact discovery, capture each `discoverWorkflowCandidates(...)` request and assert `targetPathSegments` deeply equals `[projectFolderName]` for root or `[projectFolderName, "planning"]` for subfolder. Write `Epics.index.json` at each exact placement and assert `loadEpicsIndex(...)` reads it successfully. For `searchProjectWide === true` Story discovery, filter captured requests by the Story registry discovery expression and assert the target sets, in existing runtime order, are exactly `[projectFolderName, "discovery"]`, `[projectFolderName, "planning"]`, `[projectFolderName, "implementation"]`, `[projectFolderName, "review"]`, `[projectFolderName, "testing"]`, `[projectFolderName, "archive"]`, `[projectFolderName, "implementation", "drafts"]`, `[projectFolderName, "implementation", "stories-backlog"]`, `[projectFolderName, "implementation", "stories-review"]`, and `[projectFolderName, "implementation", "stories-complete"]`; assert `[projectFolderName]` is absent.
+- [x] Subtask 10.5: Add output-placement tests that call the existing allocation seam for root and subfolder definitions and assert `artifactRelativePath` equals the canonical filename for root and `join("planning", artifactFilename)` for subfolder. For targeted numbered-artifact discovery, capture each `discoverWorkflowCandidates(...)` request and assert `targetPathSegments` deeply equals `[projectFolderName]` for root or `[projectFolderName, "planning"]` for subfolder. Write `Epics.index.json` at each exact placement and assert `loadEpicsIndex(...)` reads it successfully. For `searchProjectWide === true` Story discovery, filter captured requests by the Story registry discovery expression and assert the target sets, in existing runtime order, are exactly `[projectFolderName, "discovery"]`, `[projectFolderName, "planning"]`, `[projectFolderName, "implementation"]`, `[projectFolderName, "review"]`, `[projectFolderName, "testing"]`, `[projectFolderName, "archive"]`, `[projectFolderName, "implementation", "drafts"]`, `[projectFolderName, "implementation", "stories-backlog"]`, `[projectFolderName, "implementation", "stories-review"]`, and `[projectFolderName, "implementation", "stories-complete"]`; assert `[projectFolderName]` is absent.
 
-- [ ] Subtask 10.6: Assign:
+- [x] Subtask 10.6: Assign:
 
 ```ts
 const projectOverview = WORKFLOW_ARTIFACT_FAMILY_REGISTRY[WorkflowArtifactFamily.ProjectOverview]
@@ -1472,7 +1475,7 @@ Assert `Object.keys(projectOverview).sort()` and `Object.keys(developerGuide).so
 
 Assert allocation normalizes to the exact registry singleton identity `"project_overview"` or `"developer_guide"` for the corresponding row. The exact own-key list and complete deep equality to the Task 1.1 registry objects are the finite no-sidecar-behavior assertions. Do not call the generic existing-artifact parser or resolver for either singleton family.
 
-- [ ] Subtask 10.7: Reuse the single `WorkflowPrerequisiteFiles` namespace import added by Subtask 10.1; do not add a second import. Stub `WorkflowPrerequisiteFiles.discoverWorkflowPrerequisiteFileCandidates(...)` with these exact canonical candidates:
+- [x] Subtask 10.7: Reuse the single `WorkflowPrerequisiteFiles` namespace import added by Subtask 10.1; do not add a second import. Stub `WorkflowPrerequisiteFiles.discoverWorkflowPrerequisiteFileCandidates(...)` with these exact canonical candidates:
 
 ```ts
 const projectOverviewCandidate = {
@@ -1532,7 +1535,7 @@ Add one separate optional unlinked fixture exactly as:
 
 Use `join(selectedProjectRoot, "unlinked-reference.md")` as its canonical path. For one exact candidate, assert exactly `{ prerequisiteId: "unlinked_reference", outcome: "found", resolvedAbsolutePath: join(selectedProjectRoot, "unlinked-reference.md") }` and only `unlinked_reference` is written. For `[]`, assert exactly `{ prerequisiteId: "unlinked_reference", outcome: "not_found" }` and `unlinked_reference` remains unset. Begin every no-match case with outputs unset; do not preload stale unresolved outputs, because Subtask 4.7 must reject unresolved populated state before clearing it.
 
-- [ ] Subtask 10.8: Add `createDeterministicPrerequisiteContinuationDecisionTree(): WorkflowDecisionTree`, returning exactly:
+- [x] Subtask 10.8: Add `createDeterministicPrerequisiteContinuationDecisionTree(): WorkflowDecisionTree`, returning exactly:
 
 ```ts
 {
@@ -1565,13 +1568,19 @@ Use `join(selectedProjectRoot, "unlinked-reference.md")` as its canonical path. 
 		},
 		"trigger-consumed": {
 			id: "trigger-consumed",
-			routes: [],
+			routes: [
+				{
+					id: "trigger-consumed-no-op",
+					trigger: { kind: "always" },
+					action: { kind: "no_op" },
+				},
+			],
 		},
 	},
 }
 ```
 
-When the persisted-values event is absent, no route matches; add no fallback route or priority dependency. Stub the exact Subtask 10.7 canonical candidates. Inject the atomic failure with a mutable `WorkflowWorkspacePathPolicy` that permits discovery but rejects only `projectOverviewAbsolutePath` when staged validation runs. Assert the thrown attempt leaves `taskState.activeWorkflowSession` as the same object reference; leaves result, path, linked metadata, and trigger state empty/unchanged; preserves `activeBranchId === "after-prerequisites"`; and adds no own session key containing `resume`, `rollback`, or `ledger` and no own lifecycle key beyond the existing `lifecycle`.
+When the persisted-values event is absent, no route in `after-prerequisites` matches; add no fallback route or priority dependency to that branch. After the event is consumed, `trigger-consumed-no-op` provides the runtime-required parking route and must remain an `always`-triggered `no_op` without a following branch. Stub the exact Subtask 10.7 canonical candidates. Inject the atomic failure with a mutable `WorkflowWorkspacePathPolicy` that permits discovery but rejects only `projectOverviewAbsolutePath` when staged validation runs. Assert the thrown attempt leaves `taskState.activeWorkflowSession` as the same object reference; leaves result, path, linked metadata, and trigger state empty/unchanged; preserves `activeBranchId === "after-prerequisites"`; and adds no own session key containing `resume`, `rollback`, or `ledger` and no own lifecycle key beyond the existing `lifecycle`.
 
 Permit that path and call `runtime.resolveNextAction({ taskState })`; assert the first declaration scans again. Seed a valid one-result prefix with no trigger and assert the first declaration is reused and only the second scans. In a separate case, allow the first Project Overview `found` commit, reject the second candidate path, and assert the surviving prefix plus the exact routed `{ kind: "workflow_values_persisted", changedKeys: ["project_overview_artifact_family", "project_overview_artifact_identity", "project_overview_artifact_filename", "project_overview_artifact_relative_path", "project_overview"] }`; `projectTitle` and `projectFolderName` are unchanged fixed entry values and therefore must not appear. On retry, assert inside the second discovery stub that the trigger is still present and the first prerequisite is not rescanned. With a complete result list, assert zero discovery calls and normal following-branch consumption of its then-current trigger. On one successful `found` commit, capture the old session and assert exactly one replacement: the old object remains unchanged while the new object contains result, path, and metadata together.
 
@@ -1581,7 +1590,7 @@ For state-consistency validation, mutate a fresh fixture once per case with exac
 
 Reject every listed restore-shape and state-consistency mutation. Accept Project Overview `not_found` with all five artifact-specific outputs unset and the same historical result with the complete canonical `projectOverviewMetadata` map populated. Every accepted populated path must equal the selected project's exact canonical declared-placement path and pass workspace path policy.
 
-- [ ] Subtask 10.9: From the same valid Project Overview-linked fixture, call `runtime.createWorkflowArtifact({ taskState, artifactId: "project_overview", expectedArtifactAbsolutePath: undefined })` with one current `{ prerequisiteId: "project_overview", outcome: "not_found" }` result and all five artifact-specific outputs unset; assert `projectOverviewAbsolutePath` and the complete `projectOverviewMetadata` map are created.
+- [x] Subtask 10.9: From the same valid Project Overview-linked fixture, call `runtime.createWorkflowArtifact({ taskState, artifactId: "project_overview", expectedArtifactAbsolutePath: undefined })` with one current `{ prerequisiteId: "project_overview", outcome: "not_found" }` result and all five artifact-specific outputs unset; assert `projectOverviewAbsolutePath` and the complete `projectOverviewMetadata` map are created.
 
 For the exact Subtask 4.9 authorization error, test separately: unresolved `[]` with all five outputs unset; canonical Project Overview `found` with complete `projectOverviewMetadata`; and Project Overview `not_found` with complete `projectOverviewMetadata`. Assert exactly `"Cannot allocate workflow artifact project_overview because its linked deterministic prerequisite is not a completed not_found result with entirely unset artifact outputs."`.
 
@@ -1589,7 +1598,7 @@ For the exact Subtask 4.7 generic validator error, test separately: two identica
 
 In every failure case, assert unchanged session values/results and unchanged files. After the valid `not_found` result, pre-create `projectOverviewAbsolutePath` with `"collision project overview sentinel\n"`, capture the thrown Node error and assert `code === "EEXIST"`, assert the selected-project directory entries deeply equal `["project-overview.md"]`, assert the sentinel bytes are unchanged, and assert all five artifact-specific outputs remain unset. Preserve unchanged the existing test named `allocates the quick-spec singleton artifact in planning and maps its absolute path to output_document`.
 
-- [ ] Subtask 10.10: Import the shipped `documentProjectWorkflowDefinition`; `DOCUMENT_PROJECT_STEP_1_FORM_ID`; `DOCUMENT_PROJECT_STEP_1_PANEL_A_ID`, `DOCUMENT_PROJECT_STEP_1_PANEL_B_ID`, `DOCUMENT_PROJECT_STEP_1_PANEL_C_ID`, and `DOCUMENT_PROJECT_STEP_1_PANEL_D_ID`; `DOCUMENT_PROJECT_STEP_3_FORM_ID`; `DOCUMENT_PROJECT_STEP_3_PANEL_A_ID`, `DOCUMENT_PROJECT_STEP_3_PANEL_B_ID`, `DOCUMENT_PROJECT_STEP_3_PANEL_C_ID`, `DOCUMENT_PROJECT_STEP_3_PANEL_D_ID`, `DOCUMENT_PROJECT_STEP_3_PANEL_E_ID`, `DOCUMENT_PROJECT_STEP_3_PANEL_F_ID`, `DOCUMENT_PROJECT_STEP_3_PANEL_G_ID`, `DOCUMENT_PROJECT_STEP_3_PANEL_H_ID`, `DOCUMENT_PROJECT_STEP_3_PANEL_I_ID`, `DOCUMENT_PROJECT_STEP_3_PANEL_J_ID`, `DOCUMENT_PROJECT_STEP_3_PANEL_K_ID`, and `DOCUMENT_PROJECT_STEP_3_PANEL_L_ID`; and `DOCUMENT_PROJECT_REFERENCE_DOCUMENT_STATE_TERMINAL_ERROR`, `DOCUMENT_PROJECT_PROJECT_OVERVIEW_ALLOCATION_TERMINAL_ERROR`, `DOCUMENT_PROJECT_PROJECT_OVERVIEW_BUILD_TERMINAL_ERROR`, `DOCUMENT_PROJECT_DEVELOPER_GUIDE_ALLOCATION_TERMINAL_ERROR`, `DOCUMENT_PROJECT_DEVELOPER_GUIDE_BUILD_TERMINAL_ERROR`, `DOCUMENT_PROJECT_BASELINE_DATA_TERMINAL_ERROR`, and `DOCUMENT_PROJECT_DOCUMENTATION_TASK_TERMINAL_ERROR`, exactly as prescribed in Subtask 10.1. Reuse `submitActiveWorkflowFormPanel(state: TaskState)` for the automatic informational entry panel. Add:
+- [x] Subtask 10.10: Import the shipped `documentProjectWorkflowDefinition`; `DOCUMENT_PROJECT_STEP_1_FORM_ID`; `DOCUMENT_PROJECT_STEP_1_PANEL_A_ID`, `DOCUMENT_PROJECT_STEP_1_PANEL_B_ID`, `DOCUMENT_PROJECT_STEP_1_PANEL_C_ID`, and `DOCUMENT_PROJECT_STEP_1_PANEL_D_ID`; `DOCUMENT_PROJECT_STEP_3_FORM_ID`; `DOCUMENT_PROJECT_STEP_3_PANEL_A_ID`, `DOCUMENT_PROJECT_STEP_3_PANEL_B_ID`, `DOCUMENT_PROJECT_STEP_3_PANEL_C_ID`, `DOCUMENT_PROJECT_STEP_3_PANEL_D_ID`, `DOCUMENT_PROJECT_STEP_3_PANEL_E_ID`, `DOCUMENT_PROJECT_STEP_3_PANEL_F_ID`, `DOCUMENT_PROJECT_STEP_3_PANEL_G_ID`, `DOCUMENT_PROJECT_STEP_3_PANEL_H_ID`, `DOCUMENT_PROJECT_STEP_3_PANEL_I_ID`, `DOCUMENT_PROJECT_STEP_3_PANEL_J_ID`, `DOCUMENT_PROJECT_STEP_3_PANEL_K_ID`, and `DOCUMENT_PROJECT_STEP_3_PANEL_L_ID`; and `DOCUMENT_PROJECT_REFERENCE_DOCUMENT_STATE_TERMINAL_ERROR`, `DOCUMENT_PROJECT_PROJECT_OVERVIEW_ALLOCATION_TERMINAL_ERROR`, `DOCUMENT_PROJECT_PROJECT_OVERVIEW_BUILD_TERMINAL_ERROR`, `DOCUMENT_PROJECT_DEVELOPER_GUIDE_ALLOCATION_TERMINAL_ERROR`, `DOCUMENT_PROJECT_DEVELOPER_GUIDE_BUILD_TERMINAL_ERROR`, `DOCUMENT_PROJECT_BASELINE_DATA_TERMINAL_ERROR`, and `DOCUMENT_PROJECT_DOCUMENTATION_TASK_TERMINAL_ERROR`, exactly as prescribed in Subtask 10.1. Reuse `submitActiveWorkflowFormPanel(state: TaskState)` for the automatic informational entry panel. Add:
 
 ```ts
 async function completeSuccessfulDocumentProjectAllocation(
@@ -1616,9 +1625,9 @@ Cover all three shared resume boundaries without adding module state. First, per
 
 For Step 3, preload a distinct sentinel value for every panel destination that the chosen path skips. Cover skip, A–I, J–L, and A–L. Submit every displayed panel through `WorkflowRuntime.submitWorkflowForm(...)`; store the returned action without inspecting it, assert the submitted exact durable value, then inspect its next panel. Assert each skipped destination retains its sentinel. Before Step 4 completion, preload workflow values and UI form/step-resolution state and assert `buildTurnProjection(...)` is non-empty. Call `handleAttemptCompletionSucceeded(...)`, assert it returns `complete_workflow`, then assert `activeWorkflowName === undefined`, `activeWorkflowSession === undefined`, `currentFocusChainChecklist === null`, and a fresh projection deeply equals `{ workflowInputPayloadBlock: undefined, continuationWorkflowInputPayloadBlock: undefined, workflowToolSchemaOverride: undefined }`.
 
-- [ ] Subtask 10.11: In `prerequisiteFiles.test.ts`, add three exact empty-segment scanner tests using `createPrerequisiteDefinition({ kind: "exact_filename", filename: "project-overview.md" }, [])`. First, write both root `project-overview.md` and `planning/project-overview.md`, then assert the result contains only `{ filename: "project-overview.md", absolutePath: rootPath, projectRelativePath: "project-overview.md" }`. Second, write only `planning/project-overview.md` and assert the result is `[]`, proving empty segments do not broaden into subfolders. Third, deny the selected project root through `WorkflowWorkspacePathPolicy`, assert the call throws an `Error`, and assert its message equals the existing scanner contract ``Workflow prerequisite file directory is blocked by workspace path policy: ${selectedProjectRoot}``. Preserve every existing scanner test and do not change production `prerequisiteFiles.ts`.
+- [x] Subtask 10.11: In `prerequisiteFiles.test.ts`, add three exact empty-segment scanner tests using `createPrerequisiteDefinition({ kind: "exact_filename", filename: "project-overview.md" }, [])`. First, write both root `project-overview.md` and `planning/project-overview.md`, then assert the result contains only `{ filename: "project-overview.md", absolutePath: rootPath, projectRelativePath: "project-overview.md" }`. Second, write only `planning/project-overview.md` and assert the result is `[]`, proving empty segments do not broaden into subfolders. Third, deny the selected project root through `WorkflowWorkspacePathPolicy`, assert the call throws an `Error`, and assert its message equals the existing scanner contract ``Workflow prerequisite file directory is blocked by workspace path policy: ${selectedProjectRoot}``. Preserve every existing scanner test and do not change production `prerequisiteFiles.ts`.
 
-- [ ] Subtask 10.12: In `src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts`, add:
+- [x] Subtask 10.12: In `src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts`, add:
 
 ```ts
 import {
@@ -1684,13 +1693,13 @@ Then assert `JSON.parse(replayResult)` deeply equals:
 
 Dispose the controller and remove the temporary directory in `finally`; preserve every existing handler test. This is Document Project's exact scaffold-through-shared-handler integration proof, not a change to shared handler behavior or execution-control coverage.
 
-- [ ] Subtask 10.13: Run the focused shared-runtime and deterministic-document validation in this implementation phase:
+- [x] Subtask 10.13: Run the focused shared-runtime and deterministic-document validation in this implementation phase:
 
 ```sh
 npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/prerequisiteFiles.test.ts src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts
 ```
 
-### [ ] Task 11: Add Shipped Metadata Coverage And Run Existing Shared Regressions
+### [x] Task 11: Add Shipped Metadata Coverage And Run Existing Shared Regressions
 
 Allowed files for this task and every numbered subtask below:
 
@@ -1699,7 +1708,7 @@ Allowed files for this task and every numbered subtask below:
 
 Full target file path for this task and every numbered subtask below: `src/core/task/__tests__/workflow-runtime-metadata.test.ts`. The action-plan path is allowed only for checkbox updates; every shared regression path named in Subtask 11.3 is read/executed but not edited.
 
-- [ ] Subtask 11.1: In `workflow-runtime-metadata.test.ts`, add `ShippedWorkflowMetadata` to the existing type-only import from `@/core/task/workflow-runtime/types`; reuse the existing `import * as WorkflowRegistry` without adding a registry import. Add one test that assigns `const registeredDefinition = WorkflowRegistry.resolveWorkflowDefinition("document-project")`, asserts it is not `undefined`, and narrows it with:
+- [x] Subtask 11.1: In `workflow-runtime-metadata.test.ts`, add `ShippedWorkflowMetadata` to the existing type-only import from `@/core/task/workflow-runtime/types`; reuse the existing `import * as WorkflowRegistry` without adding a registry import. Add one test that assigns `const registeredDefinition = WorkflowRegistry.resolveWorkflowDefinition("document-project")`, asserts it is not `undefined`, and narrows it with:
 
 ```ts
 if (registeredDefinition === undefined) {
@@ -1722,13 +1731,13 @@ const metadata = {
 
 Assert `metadata.projectSelection` deeply equals `{ kind: "automatic_fixed", projectTitle: "Agent Guidance", projectFolderName: "agent-guidance" }`, `metadata.projectOutputPlacement` deeply equals `{ kind: "selected_project_root" }`, and `Object.hasOwn(metadata, "entryProjectValueKeys")` and `Object.hasOwn(metadata, "projectSubfolder")` are both `false`. This is compile-time/runtime regression proof for the user-approved structural metadata contract; do not add a production metadata producer, projection, registry, or accessor. Task 2 already migrated the file's existing fixture fields atomically; do not repeat that migration. Preserve all unrelated metadata assertions and remove no import.
 
-- [ ] Subtask 11.2: Run the focused metadata test:
+- [x] Subtask 11.2: Run the focused metadata test:
 
 ```sh
 npm run test:unit -- src/core/task/__tests__/workflow-runtime-metadata.test.ts
 ```
 
-- [ ] Subtask 11.3: Run the existing shared execution-control regression suites without editing them or adding Document Project-specific shared-control assertions:
+- [x] Subtask 11.3: Run the existing shared execution-control regression suites without editing them or adding Document Project-specific shared-control assertions:
 
 ```sh
 npm run test:unit -- src/core/ignore/ClineIgnoreController.test.ts src/core/permissions/CommandPermissionController.test.ts src/core/workspace/__tests__/WorkspaceResolver.test.ts src/core/workspace/__tests__/WorkspacePathAdapter.test.ts src/core/workspace/__tests__/parseWorkspaceInlinePath.test.ts src/core/task/tools/utils/__tests__/ToolHookUtils.test.ts src/test/tool-executor-hooks.test.ts src/core/task/__tests__/ToolExecutor.test.ts src/core/task/tools/handlers/__tests__/ExecuteCommandToolHandler.timeout.test.ts src/core/task/tools/handlers/__tests__/PathToolHandlers.gracefulErrors.test.ts src/core/task/tools/handlers/__tests__/ReadFileToolHandler.fileNotFound.test.ts src/core/task/tools/handlers/__tests__/ReadFileToolHandler.repeatReads.test.ts src/core/task/tools/handlers/__tests__/ReadFileRangeToolHandler.test.ts src/core/task/tools/handlers/__tests__/WriteToFileToolHandler.consecutiveMistakeCount.test.ts
@@ -1736,7 +1745,7 @@ npm run test:unit -- src/core/ignore/ClineIgnoreController.test.ts src/core/perm
 
 These suites are shared-capability regression gates only. Do not add, reorganize, or recast shared strict-plan, approval, auto-approval, hook, `.clineignore`, workspace-policy, or handler-control coverage in this module build.
 
-### [ ] Task 12: Add Document Project Module Tests
+### [x] Task 12: Add Document Project Module Tests
 
 Allowed files for this task and every numbered subtask below:
 
@@ -1747,7 +1756,7 @@ Allowed files for this task and every numbered subtask below:
 
 Full target file paths for this task and every numbered subtask below: `src/core/task/workflow-runtime/workflow-modules/document-project/__tests__/documentProjectDocument.test.ts`, `src/core/task/workflow-runtime/workflow-modules/document-project/__tests__/documentProjectToolSchemas.test.ts`, and `src/core/task/workflow-runtime/workflow-modules/document-project/__tests__/documentProjectWorkflow.test.ts`. The action-plan path is allowed only for checkbox updates.
 
-- [ ] Subtask 12.1: The verified module test directory does not yet exist. Run `mkdir -p src/core/task/workflow-runtime/workflow-modules/document-project/__tests__`, then add `src/core/task/workflow-runtime/workflow-modules/document-project/__tests__/documentProjectDocument.test.ts` with `expect` from `chai`, `describe`/`it` from `mocha`, and this exact import from `../documentProjectDocument`:
+- [x] Subtask 12.1: The verified module test directory does not yet exist. Run `mkdir -p src/core/task/workflow-runtime/workflow-modules/document-project/__tests__`, then add `src/core/task/workflow-runtime/workflow-modules/document-project/__tests__/documentProjectDocument.test.ts` with `expect` from `chai`, `describe`/`it` from `mocha`, and this exact import from `../documentProjectDocument`:
 
 ```ts
 import {
@@ -1795,7 +1804,7 @@ const FORBIDDEN_DOCUMENT_SOURCE_TEXT = [
 
 Assert each ordered heading inventory deeply equals both its ordered individual-constant list and its exact string list from Task 6. Extract every line beginning `# ` from each built document, remove that prefix, and assert the resulting sequence deeply equals the corresponding heading inventory. Assert full exact equality to both Appendix A documents, including blank lines, indentation, punctuation, Developer Guide pre-generated lines, and one final newline. Assert every `FORBIDDEN_DOCUMENT_SOURCE_TEXT` entry is absent from both generated documents; the production static guard, not a mocked filesystem, proves runtime filesystem independence.
 
-- [ ] Subtask 12.2: Add `documentProjectToolSchemas.test.ts` with `expect`, `describe`/`it`, `ClineToolSet`, type `ClineToolSpec`, `registerClineToolSets`, `ModelFamily`, `ClineDefaultTool`, the four builders, and `DOCUMENT_PROJECT_STEP_4_TOOL_IDS`. Add:
+- [x] Subtask 12.2: Add `documentProjectToolSchemas.test.ts` with `expect`, `describe`/`it`, `ClineToolSet`, type `ClineToolSpec`, `registerClineToolSets`, `ModelFamily`, `ClineDefaultTool`, the four builders, and `DOCUMENT_PROJECT_STEP_4_TOOL_IDS`. Add:
 
 ```ts
 function expectedSharedToolSpecs(toolIds: readonly ClineDefaultTool[]): readonly ClineToolSpec[] {
@@ -1813,7 +1822,7 @@ function expectedSharedToolSpecs(toolIds: readonly ClineDefaultTool[]): readonly
 
 Assert Steps 1–3 each equal `[]`; Step 4 ids equal the exact 11 enum ids; names equal `execute_command`, `list_files`, `search_files`, `list_code_definition_names`, `read_file`, `read_file_range`, `apply_patch`, `write_to_file`, `send_user_message`, `ask_followup_question`, `attempt_completion`; and each spec deeply equals the registered config.
 
-- [ ] Subtask 12.3: In `documentProjectToolSchemas.test.ts`, define `FORBIDDEN_MODEL_FACING_TOOL_NAMES` exactly as:
+- [x] Subtask 12.3: In `documentProjectToolSchemas.test.ts`, define `FORBIDDEN_MODEL_FACING_TOOL_NAMES` exactly as:
 
 ```ts
 [
@@ -1862,7 +1871,7 @@ Assert Steps 1–3 each equal `[]`; Step 4 ids equal the exact 11 enum ids; name
 
 Assert every name is absent, the three response tools are present, and descriptions, parameters, required fields, and context requirements are inherited by deep equality rather than copied expected prose.
 
-- [ ] Subtask 12.4: Add `documentProjectWorkflow.test.ts` with `expect` from `chai`; `describe` and `it` from `mocha`; types `ActiveWorkflowSession`, `WorkflowBranchTriggerEvent`, `WorkflowDecisionBranchEvaluationInput`, `WorkflowDecisionBranchRoute`, `WorkflowPromptBuilderInput`, `WorkflowStepDefinition`, and `WorkflowValues` from `../../../types`; `WorkflowArtifactFamily` and `WORKFLOW_ARTIFACT_FAMILY_REGISTRY` from `../../../artifactFamilies`; `resolveWorkflowDefinition`, `resolveWorkflowBySlashCommand`, and `resolveWorkflowByUseSkillName` from `../../../WorkflowRegistry`; `renderWorkflowPromptTemplate` from `../../../workflowPromptTemplates`; `buildDocumentProjectStep1ToolSchemas`, `buildDocumentProjectStep2ToolSchemas`, `buildDocumentProjectStep3ToolSchemas`, and `buildDocumentProjectStep4ToolSchemas` from `../documentProjectToolSchemas`; and these exact named imports from `../documentProjectWorkflow`:
+- [x] Subtask 12.4: Add `documentProjectWorkflow.test.ts` with `expect` from `chai`; `describe` and `it` from `mocha`; type `WorkflowFormTransitionDefinition` from `@shared/ExtensionMessage`; types `ActiveWorkflowSession`, `WorkflowBranchTriggerEvent`, `WorkflowDecisionBranchEvaluationInput`, `WorkflowDecisionBranchRoute`, `WorkflowPromptBuilderInput`, `WorkflowStepDefinition`, and `WorkflowValues` from `../../../types`; `WorkflowArtifactFamily` and `WORKFLOW_ARTIFACT_FAMILY_REGISTRY` from `../../../artifactFamilies`; `resolveWorkflowDefinition`, `resolveWorkflowBySlashCommand`, and `resolveWorkflowByUseSkillName` from `../../../WorkflowRegistry`; `renderWorkflowPromptTemplate` from `../../../workflowPromptTemplates`; `buildDocumentProjectStep1ToolSchemas`, `buildDocumentProjectStep2ToolSchemas`, `buildDocumentProjectStep3ToolSchemas`, and `buildDocumentProjectStep4ToolSchemas` from `../documentProjectToolSchemas`; and these exact named imports from `../documentProjectWorkflow`:
 
 ```ts
 buildDocumentProjectStep1WorkflowForm
@@ -1930,11 +1939,28 @@ function routeMatches(
 
 `getStep` must throw exactly `new Error(\`Expected Document Project step ${stepNumber}.\`)` when absent. `findStepRoute` must throw exactly `new Error(\`Expected Document Project route ${branchId}/${routeId} in step ${stepNumber}.\`)` when absent. The base session must use the supplied values, Step 1 and its entry branch, fixed `existing` Agent Guidance selection, completed project-selection lifecycle, `prerequisiteFileResolutions: []`, undefined entry-artifact resolution, and empty form/step-resolution state and suppression arrays. `createDocumentProjectPromptBuilderInput` must clone that base, set the requested step number and that step's entry branch, and return the matching step. `routeMatches` must evaluate `always`, `session_predicate`, and `event_predicate` against a complete `WorkflowDecisionBranchEvaluationInput`, returning false when an event predicate has no event. Assert exact identity, entry copy, persona, fixed selection, root placement, entry mapping, 28 keys, no AI-writable values, four labels, no child inheritance, no `.md` alias, no legacy property, exact artifacts, and exact ordered prerequisites.
 
-- [ ] Subtask 12.5: Assert both full form objects: version/titles/empty dictionaries, exact ids/titles/prompts, exact fields/options/order/types/required/destinations, submit-only `continue`, no boolean labels, no extra optional copy, and every exact transition object from Tasks 8.8–8.9. Assert Form 1 Panel D, Form 2 Panels A and B have effective cardinality `(field.selectionCardinality ?? "single") === "single"`; assert Form 2 Panel D explicitly owns `selectionCardinality: "single"`; and assert no other field owns `selectionCardinality`.
+- [x] Subtask 12.5: Assert both full form objects: version/titles/empty dictionaries, exact ids/titles/prompts, exact fields/options/order/types/required/destinations, submit-only `continue`, no boolean labels, no extra optional copy, and every exact transition object from Tasks 8.8–8.9. Assert Form 1 Panel D, Form 2 Panels A and B have effective cardinality `(field.selectionCardinality ?? "single") === "single"`; assert Form 2 Panel D explicitly owns `selectionCardinality: "single"`; and assert no other field owns `selectionCardinality`.
 
-- [ ] Subtask 12.6: Assert Step 1 prerequisite validation and all A–D matrix states; separately cover unresolved/missing result, result/path disagreement, and a `not_found` path holding `""`, whitespace, or Boolean `true`, and assert each fails through `validateReferenceDocumentResolutionState(...)` before form selection. Add an exact padded-`found` case whose ordered results are `{ prerequisiteId: "project_overview", outcome: "found", resolvedAbsolutePath: "/test/project/docs/projects/agent-guidance/project-overview.md" }` followed by `{ prerequisiteId: "developer_guide", outcome: "not_found" }`, whose `project_overview` value equals `" /test/project/docs/projects/agent-guidance/project-overview.md "`, and whose `developer_guide` value is unset; assert it fails through the same validator before form selection. Assert the form-selection branch owns exactly the four mutually exclusive panel predicates with no `always` fallback. Assert Step 2 derivation failure and the exact atomic Boolean write map, with no module-specific persistence-failure route or mapping; every exact branch id, route id, predicate, action, following branch, skip, allocate, retry, build, failure, and order from Subtask 8.14; and exact false/true/undefined and valid/invalid-completion predicate complementarity with no overlapping fallback. Assert Step 3's four Boolean-combination routes, its disjoint either-flag-undefined invalid route, and A–I/J–L sequences; operation source-route correlation; and the exact seven terminal messages. For every enumerated Step 1–3 state case, evaluate every route in its branch and assert exactly one matches. For each operation-result branch, assert the exact correlated success event matches only its success route, the exact correlated failure event matches only its failure route, and an absent or unrelated event matches no route. Task 10.10 owns successful persistence of the validated Boolean map through the shared deterministic-procedure seam plus shared runtime form-persistence and skipped-panel non-mutation coverage.
+- [x] Subtask 12.6: Assert Step 1 prerequisite validation and all A–D matrix states; separately cover unresolved/missing result, result/path disagreement, and a `not_found` path holding `""`, whitespace, or Boolean `true`, and assert each fails through `validateReferenceDocumentResolutionState(...)` before form selection. Add an exact padded-`found` case whose ordered results are `{ prerequisiteId: "project_overview", outcome: "found", resolvedAbsolutePath: "/test/project/docs/projects/agent-guidance/project-overview.md" }` followed by `{ prerequisiteId: "developer_guide", outcome: "not_found" }`, whose `project_overview` value equals `" /test/project/docs/projects/agent-guidance/project-overview.md "`, and whose `developer_guide` value is unset; assert it fails through the same validator before form selection. Assert the form-selection branch owns exactly the four mutually exclusive panel predicates with no `always` fallback. Assert Step 2 derivation failure and the exact atomic Boolean write map, with no module-specific persistence-failure route or mapping; every exact branch id, route id, predicate, action, following branch, skip, allocate, retry, build, failure, and order from Subtask 8.14; and exact false/true/undefined and valid/invalid-completion predicate complementarity with no overlapping fallback. Assert Step 3's four Boolean-combination routes and its disjoint either-flag-undefined invalid route. Define the exact helper below and use it to assert the A–I and J–L sequences:
 
-- [ ] Subtask 12.7: Read `const step4PromptTemplates = getStep(4).promptTemplates` and narrow the optional inventory exactly with:
+```ts
+const collectSequentialPanelIds = (startPanelId: string): string[] => {
+	const panelIds: string[] = []
+	let panelId: string | undefined = startPanelId
+
+	while (panelId !== undefined) {
+		panelIds.push(panelId)
+		const transition: WorkflowFormTransitionDefinition = form.panels[panelId].transition
+		panelId = transition.type === "sequential" ? transition.nextPanelId : undefined
+	}
+
+	return panelIds
+}
+```
+
+The explicit `WorkflowFormTransitionDefinition` annotation is required so the helper passes the repository's strict TypeScript configuration without `TS7022`; do not use `any`, a type assertion, or a suppression directive. Also assert operation source-route correlation and the exact seven terminal messages. For every enumerated Step 1–3 state case, evaluate every route in its branch and assert exactly one matches. For each operation-result branch, assert the exact correlated success event matches only its success route, the exact correlated failure event matches only its failure route, and an absent or unrelated event matches no route. Task 10.10 owns successful persistence of the validated Boolean map through the shared deterministic-procedure seam plus shared runtime form-persistence and skipped-panel non-mutation coverage.
+
+- [x] Subtask 12.7: Read `const step4PromptTemplates = getStep(4).promptTemplates` and narrow the optional inventory exactly with:
 
 ```ts
 if (step4PromptTemplates === undefined || step4PromptTemplates.length !== 13) {
@@ -2062,17 +2088,25 @@ const DOCUMENT_PROJECT_STEP_4_REQUIRED_BRANCH_VALUE_KEYS = [
 
 For each globally required artifact-path key `DocumentProjectWorkflowValueKey.ProjectOverview` and `DocumentProjectWorkflowValueKey.DeveloperGuide`, separately delete the key, set it to `""`, and replace it with Boolean `true`. For each creation-required key `DocumentProjectWorkflowValueKey.ProjectOverviewCreationRequired` and `DocumentProjectWorkflowValueKey.DeveloperGuideCreationRequired`, separately delete the key and replace it with string `"true"`. For each row in the exact branch inventory, separately delete each `stringKeys` entry, set it to `""`, and replace it with Boolean `true`; separately delete each `booleanKeys` entry and replace it with string `"true"`. For false/false, separately delete `DocumentProjectWorkflowValueKey.SessionObjective`, replace it with Boolean `true`, and set it to each exact invalid string in `["unsupported", " Update existing documents ", " Add supporting documentation "]`. For every mutation, the Step 4 `buildPromptSource(...)` result must be `{ kind: "none" }` and decision-tree evaluation must select `DOCUMENT_PROJECT_DOCUMENTATION_TASK_TERMINAL_ERROR`. Do not assert one monolithic editable prompt snapshot.
 
-- [ ] Subtask 12.8: Assert Step 4's valid selector matches only `step-4-project-prompt`, its invalid selector matches only `step-4-invalid-state`, and the entry branch owns no `always` fallback or priority dependency. Assert Step 4 initially returns `project_prompt`, only `attempt_completion_succeeded` selects `complete_workflow`, failures/unrelated tools remain incomplete, Steps 1–3 expose `{ kind: "none" }` prompt sources and exact empty tool overrides, Step 4 exposes the exact schema and exact 13-entry `promptTemplates` inventory, and no module-owned form-failure wrapper or completion rule exists. For every literal tool name matched from the exact 11-name projected list in a rendered Step 4 prompt, assert that name is present in the projected list; Subtask 12.7 owns the complementary exact 40-name unprojected-tool absence assertions. Task 10.10 owns the shared-runtime teardown assertions after this route.
+- [x] Subtask 12.8: Assert Step 4's valid selector matches only `step-4-project-prompt`, its invalid selector matches only `step-4-invalid-state`, and the entry branch owns no `always` fallback or priority dependency. Assert Step 4 initially returns `project_prompt`, only `attempt_completion_succeeded` selects `complete_workflow`, failures/unrelated tools remain incomplete, Steps 1–3 expose `{ kind: "none" }` prompt sources and exact empty tool overrides, Step 4 exposes the exact schema and exact 13-entry `promptTemplates` inventory, and no module-owned form-failure wrapper or completion rule exists. For every literal tool name matched from the exact 11-name projected list in a rendered Step 4 prompt, assert that name is present in the projected list; Subtask 12.7 owns the complementary exact 40-name unprojected-tool absence assertions. Task 10.10 owns the shared-runtime teardown assertions after this route.
 
-- [ ] Subtask 12.9: Add registry-resolution assertions for canonical name, slash command, and use-skill name, and assert `document-project.md` does not resolve.
+- [x] Subtask 12.9: Add registry-resolution assertions for canonical name, slash command, and use-skill name, and assert `document-project.md` does not resolve.
 
-- [ ] Subtask 12.10: Run the focused module validation in this implementation phase:
+- [x] Subtask 12.10: Run the focused module validation in this implementation phase:
 
 ```sh
 npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/document-project/__tests__/documentProjectWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/document-project/__tests__/documentProjectToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/document-project/__tests__/documentProjectDocument.test.ts
 ```
 
-### [ ] Task 13: Add Prompt, Slash, And Registration Regression Coverage
+Because Task 12 adds TypeScript test files after Task 5's compile-safe cutover validation, run this post-Task-12 typecheck before considering Phase 1 complete:
+
+```sh
+npm run check-types
+```
+
+Apply Subtask 5.1's generated-proto fallback and generated-code diff-guard instructions unchanged. After `npm run check-types` succeeds, run `git diff --exit-code -- src/shared/proto src/generated src/core/controller src/hosts webview-ui/src/services/grpc-client.ts`; it must report no new tracked diff.
+
+### [x] Task 13: Add Prompt, Slash, And Registration Regression Coverage
 
 Allowed files for this task and every numbered subtask below:
 
@@ -2083,7 +2117,7 @@ Allowed files for this task and every numbered subtask below:
 
 Full target file paths for this task and every numbered subtask below: `src/core/prompts/system-prompt/__tests__/integration.test.ts`, `src/core/slash-commands/__tests__/index.test.ts`, and `src/test/slash-commands.test.ts`. The action-plan path is allowed only for checkbox updates.
 
-- [ ] Subtask 13.1: In `integration.test.ts`, add this exact module import:
+- [x] Subtask 13.1: In `integration.test.ts`, add this exact module import:
 
 ```ts
 import {
@@ -2178,17 +2212,17 @@ For Step 4, require both payload blocks to be non-empty. Assert both the full-tu
 
 Assert the Step 4 override deeply equals `buildDocumentProjectStep4ToolSchemas()` and its names deeply equal `["execute_command", "list_files", "search_files", "list_code_definition_names", "read_file", "read_file_range", "apply_patch", "write_to_file", "send_user_message", "ask_followup_question", "attempt_completion"]`. Through `runPromptTest(...)`, assert native tool names deeply equal that list and call the existing `expectResponseToolNames(systemPrompt, ["\`send_user_message\`", "\`ask_followup_question\`", "\`attempt_completion\`"], ["\`workflow_progress_request\`"])`.
 
-- [ ] Subtask 13.2: In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, define file-local `DOCUMENT_PROJECT_FORBIDDEN_MODEL_FACING_TOOL_NAMES` as a readonly array containing, in the exact order, the complete 40-string array prescribed in Subtask 12.3; do not import from another test file or export production data for this assertion. Also define file-local `DOCUMENT_PROJECT_STEP_4_RAW_PLACEHOLDERS` as the exact 14-string array prescribed in Subtask 12.7 and file-local `DOCUMENT_PROJECT_SOURCE_AUTHORING_MARKERS` as the exact 12-string array prescribed in Subtask 12.7.
+- [x] Subtask 13.2: In `src/core/prompts/system-prompt/__tests__/integration.test.ts`, define file-local `DOCUMENT_PROJECT_FORBIDDEN_MODEL_FACING_TOOL_NAMES` as a readonly array containing, in the exact order, the complete 40-string array prescribed in Subtask 12.3; do not import from another test file or export production data for this assertion. Also define file-local `DOCUMENT_PROJECT_STEP_4_RAW_PLACEHOLDERS` as the exact 14-string array prescribed in Subtask 12.7 and file-local `DOCUMENT_PROJECT_SOURCE_AUTHORING_MARKERS` as the exact 12-string array prescribed in Subtask 12.7.
 
 For the full-turn and continuation carriers of both Step 4 value states from Subtask 13.1, derive `projectedToolNames = projection.workflowToolSchemaOverride.map((tool) => tool.name)` from the narrowed `projection`. Assert each applicable true/true payload contains the exact prompt reference `attempt_completion` and that the name is present in `projectedToolNames`. Assert each applicable false/false Update Existing Documents payload contains the exact prompt references `ask_followup_question` and `attempt_completion` and that both names are present in `projectedToolNames`. For every projection, assert every string in the 40-string forbidden array is absent from `projectedToolNames` and the applicable non-empty input payload block; this directly proves no unprojected tool is referenced by the module prompt or projected schema. Do not apply the 40-string inventory to generated `systemPrompt`, because unchanged shared Native GPT-5 guidance legitimately names tools outside this module's projection. The existing `expectResponseToolNames(...)` assertion in Subtask 13.1 separately proves that system response guidance references all three projected response tools and omits `workflow_progress_request`.
 
 For each applicable payload block and generated `systemPrompt`, assert every entry in the 14-string raw-placeholder array and exact 12-string source-authoring-marker array is absent; assert `/\{workflow\.[^}]+\}/`, `/\bworkflow\.[A-Za-z_][A-Za-z0-9_]*/`, `/\*\*\* begin [^\n]* example \*\*\*/`, and `/\*\*\* end [^\n]* example \*\*\*/` do not match; and assert absence of `document-project.md`, `.cline/skills/bmad-document-project`, and `.cline/workflow-config.yaml`. The key-bearing `workflow.<key>` guard must not reject ordinary source-prescribed prose whose sentence ends with the standalone word `workflow.`. Apply the payload assertions to `workflowInputPayloadBlock` on the full turn and `continuationWorkflowInputPayloadBlock` on the continuation turn; do not add or update an editable system-prompt snapshot.
 
-- [ ] Subtask 13.3: In `src/core/slash-commands/__tests__/index.test.ts`, add canonical `/document-project` activation assertions resolving to the registered unsuffixed workflow and assert `/document-project.md` does not activate.
+- [x] Subtask 13.3: In `src/core/slash-commands/__tests__/index.test.ts`, add canonical `/document-project` activation assertions resolving to the registered unsuffixed workflow and assert `/document-project.md` does not activate.
 
-- [ ] Subtask 13.4: In `src/test/slash-commands.test.ts`, assert the shipped command list contains exactly one `document-project` custom CLI-compatible command with description `Shipped workflow: document-project`, while preserving every existing registered workflow and built-in command assertion.
+- [x] Subtask 13.4: In `src/test/slash-commands.test.ts`, assert the shipped command list contains exactly one `document-project` custom CLI-compatible command with description `Shipped workflow: document-project`, while preserving every existing registered workflow and built-in command assertion.
 
-- [ ] Subtask 13.5: Run the focused prompt and activation validation in this implementation phase:
+- [x] Subtask 13.5: Run the focused prompt and activation validation in this implementation phase:
 
 ```sh
 npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts
@@ -2258,13 +2292,19 @@ npm run test:unit -- src/core/prompts/system-prompt/__tests__/response_tools.tes
 
 The shared execution-control suites are validation-only and remain unmodified.
 
-- [ ] Subtask 14.7: Run:
+- [ ] Subtask 14.7: Run `npm run check-types` with elevated permissions:
 
 ```sh
 npm run check-types
 ```
 
-`npm run check-types` already invokes `npm run protos`.
+`npm run check-types` already invokes `npm run protos`. If it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` with elevated permissions. Regardless of whether the typecheck succeeds or fails, immediately run:
+
+```sh
+git diff --exit-code -- src/shared/proto src/generated src/core/controller src/hosts webview-ui/src/services/grpc-client.ts
+```
+
+The command must report no tracked generated or formatter diff. Do not accept, repair, stage, or revert generated fallout implicitly. If TypeScript checking is reached and fails, treat that failure as a code defect.
 
 - [ ] Subtask 14.8: Run:
 
@@ -2272,13 +2312,13 @@ npm run check-types
 npm run lint
 ```
 
-- [ ] Subtask 14.9: Run:
+- [ ] Subtask 14.9: Run `npm run package` with elevated permissions because it invokes `npm run check-types`:
 
 ```sh
 npm run package
 ```
 
-`npm run package` invokes `npm run check-types`, which already invokes `npm run protos`. After this command succeeds, run `git diff --exit-code -- src/shared/proto src/generated src/core/controller src/hosts webview-ui/src/services/grpc-client.ts`. The command must report no new tracked diff; ignored `dist`, `dist-standalone/proto`, and `webview-ui/build` outputs may remain as build products. If a tracked generated or formatter diff appears, stop and inspect it rather than accepting or repairing it implicitly.
+`npm run package` invokes `npm run check-types`, which already invokes `npm run protos`. If its nested typecheck fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, run `npm run check-types` with elevated permissions, and then rerun `npm run package` with elevated permissions. Regardless of whether the package command succeeds or fails, immediately run `git diff --exit-code -- src/shared/proto src/generated src/core/controller src/hosts webview-ui/src/services/grpc-client.ts`. The command must report no tracked generated or formatter diff; ignored `dist`, `dist-standalone/proto`, and `webview-ui/build` outputs may remain as build products. If a tracked generated or formatter diff appears, stop and inspect it rather than accepting, repairing, staging, or reverting it implicitly.
 
 ### [ ] Task 15: Run Static Guards
 
@@ -2357,20 +2397,26 @@ git diff --name-only
 - [ ] Subtask 16.2: Run:
 
 ```sh
-git ls-files --others --exclude-standard
+git diff --cached --name-only
 ```
 
 - [ ] Subtask 16.3: Run:
 
 ```sh
+git ls-files --others --exclude-standard
+```
+
+- [ ] Subtask 16.4: Run:
+
+```sh
 shasum -a 256 docs/workflows/workflow-runtime/workflow-modules/document-project/document-project.md docs/workflows/workflow-runtime/workflow-modules/document-project/document-project-requirements.md docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md docs/workflows/workflow-runtime/requirements.md docs/workflows/workflow-runtime/architecture.md
 ```
 
-Require the five output lines to equal the Protected-document authoring baseline byte-for-byte. A protected path reported by Subtask 16.1 or 16.2 whose hash still equals that baseline is preserved authoring-baseline state and is explicitly exempt from the implementation allowlist comparison; it must remain reported and must not be edited, reverted, staged, or treated as implementation fallout. If any hash differs, stop and ask the user. For every other path from Subtasks 16.1 and 16.2, confirm it is either this action plan or appears in the exact allowed-files set of the task that prescribed the implementation change.
+Require the five output lines to equal the Protected-document authoring baseline byte-for-byte. A protected path reported by Subtask 16.1, 16.2, or 16.3 whose hash still equals that baseline is preserved authoring-baseline state and is explicitly exempt from the implementation allowlist comparison; it must remain reported and must not be edited, reverted, staged, or treated as implementation fallout. If any hash differs, stop and ask the user. For every other path from Subtasks 16.1, 16.2, and 16.3, confirm it is either this action plan or appears in the exact allowed-files set of the task that prescribed the implementation change.
 
-- [ ] Subtask 16.4: Reread `docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md` and `docs/action-plan-guide.md`, then perform a line-by-line review of this action plan against both guides. Confirm every task/subtask is requirements-backed, compile-safe, uses the module guide's prescribed method, is exact about imports/symbols/types/fixtures/actions/events/assertions/cleanup, contains no invented user or AI-facing copy, and leaves no implementation choice to the developer.
+- [ ] Subtask 16.5: Reread `docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md` and `docs/action-plan-guide.md`, then perform a line-by-line review of this action plan against both guides. Confirm every task/subtask is requirements-backed, compile-safe, uses the module guide's prescribed method, is exact about imports/symbols/types/fixtures/actions/events/assertions/cleanup, contains no invented user or AI-facing copy, and leaves no implementation choice to the developer.
 
-- [ ] Subtask 16.5: Confirm every task/subtask has a checkbox, an allowed-files list inherited from its numbered task, an exact target path, prescribed fallout cleanup, and validation coverage. If any requirement or live contract has changed, stop and ask the user rather than improvising.
+- [ ] Subtask 16.6: Confirm every task/subtask has a checkbox, an allowed-files list inherited from its numbered task, an exact target path, prescribed fallout cleanup, and validation coverage. If any requirement or live contract has changed, stop and ask the user rather than improvising.
 
 ## Appendix A: Exact Initial Documents
 
@@ -2683,7 +2729,7 @@ Every task and numbered subtask has its own complete row.
 | 1.1 | Main FR-20b1a, FR-20j3d; module exact family ids and registration table | `src/core/task/workflow-runtime/artifactFamilies.ts`<br>`src/core/task/workflow-runtime/WorkflowRuntime.ts` | Two enum members, singleton unions, two complete registry records, and parser singleton `undefined` cases | Discriminated singleton contract, exhaustive registry, and `ParsedWorkflowArtifactIdentity` requirements verified | One atomic two-file patch; preserve existing records; do not add normalization or manufacture parser identity | 10.6, 12.4, 14.1-14.2 |
 | Task 2 | Main FR-12a-b3, FR-20j3d, FR-20j6g-k, FR-57h-k and approved `projectSubfolder` matrix disposition; module Foundational contract | Every explicit production/test target in Task 2's allowed-files list | Two atomic multi-file contract cutovers, including every production session constructor/clone/restore carrier | Every live singular-field, prerequisite declaration, session fixture, and production session literal was inventoried | No optional transition field, alias, deferred call site, or second state carrier | 5.1-5.3, 10.2-10.8, 14.2, 14.5-14.7, 15.1 |
 | 2.1 | Main FR-10d2-d6, FR-12a-b3, FR-20a/l, FR-57h-k and approved `projectSubfolder` matrix disposition, NFR-7a; module project selection and placement | `types.ts`, `WorkflowRuntime.ts`, 16 shipped definitions, and exact affected fixtures enumerated in Task 2 | Selection/placement unions; required fields; canonical fixed-folder normalization equality; placement resolver; path callers; validators; test-title cleanup; all migrated definitions/fixtures | Live types, `normalizeProjectFolderName(...)`, three runtime singular-field reads, 16 definitions, and every direct test occurrence verified | One atomic patch removes singular `projectSubfolder`; preserves segment contracts/constants/imports; accepts no safe-but-noncanonical fixed identity; adds no metadata replica | 5.1-5.3, 10.2-10.5, 11.1-11.2, 14.2, 14.5-14.7, 15.1 |
-| 2.2 | Main FR-20j3d, FR-20j6g-k; module prerequisite/session contract | `types.ts`, `WorkflowRuntime.ts`, 13 prerequisite owners, and every explicit session/prerequisite fixture enumerated in Task 2 | Resolution mode/result types; `artifactId`; session array; artifact union; singleton identity switch cases; structural restore guards; final activation, clone, compatibility-restore, and normalized-restore carriers; exact migrations/counts | Live prerequisite owners, exhaustive artifact-definition switch, every production session literal, restore guard seam, and session fixture inventory verified | One atomic final-shape patch; no intermediate carrier, incomplete union, legacy default in types, parallel carrier, lifecycle field, or deferred fixture | 5.1-5.3, 10.2, 10.7-10.8, 14.2, 14.5-14.7 |
+| 2.2 | Main FR-20j3d, FR-20j6g-k; module prerequisite/session contract; user-approved canonical epic inventory expectation alignment | `types.ts`, `WorkflowRuntime.ts`, 13 prerequisite owners, and every explicit session/prerequisite fixture enumerated in Task 2 | Resolution mode/result types; `artifactId`; session array; artifact union; singleton identity switch cases; structural restore guards; final activation, clone, compatibility-restore, and normalized-restore carriers; exact migrations/counts; exact canonical epic inventory expectation | Live prerequisite owners, exhaustive artifact-definition switch, every production session literal, restore guard seam, session fixture inventory, and production canonical epic inventory output verified | One atomic final-shape patch; no intermediate carrier, incomplete union, legacy default in types, parallel carrier, lifecycle field, deferred fixture, production epic-output change, or unrelated assertion change | 5.1-5.3, 10.2, 10.7-10.8, 14.2, 14.5-14.7 |
 | Task 3 | Main FR-10d2-d6, FR-10g-g2, FR-10j5, FR-62e/i; module automatic fixed selection | `src/core/task/workflow-runtime/WorkflowRuntime.ts`<br>`src/core/task/tools/subagent/SubagentRunner.ts`<br>`src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts` | Entry form, shared finalizer, automatic discovery, submission route, runtime and runner child-activation guards | Existing entry-selection, child-activation, assignment-resolution, and runner-test seams verified | Interactive behavior and existing failure copy unchanged; no synthetic selector or parallel project state | 3.8, 5.3, 10.3-10.4, 10.10, 14.2, 14.6 |
 | 3.1 | Main FR-10d-d6; module Entry contract | `src/core/task/workflow-runtime/WorkflowRuntime.ts` | `buildWorkflowEntryFormDefinition(...)` conditional panel inventory | Existing info/selector panels and copy verified | Preserve interactive panel; automatic path is info-only | 10.3-10.4, 14.2 |
 | 3.2 | Main FR-10j1-j5 | `src/core/task/workflow-runtime/WorkflowRuntime.ts` | Exact `finalizeWorkflowProjectSelection(...)` | Existing finalization sequence and continuations verified | Remove duplicate sequence; one call per mode | 10.3-10.4, 10.10, 14.2 |
@@ -2752,7 +2798,7 @@ Every task and numbered subtask has its own complete row.
 | 10.5 | Main FR-12b2, FR-20a/l | `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts` | Root/subfolder allocation, discovery, index loading, and project-wide scan sets | Existing path, candidate-discovery, and index-loading seams verified | Preserve canonical project-wide target sets and ordering | 10.13; 14.2 |
 | 10.6 | Main FR-20j3d, FR-20j8h, FR-20l1 | `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts` | Exact enum string ids, shared paths/metadata, finite filename matrices, regex source/flags, registry keys, adoption, and allocation | Enum, registry, singleton parser return contract, discovery expression, own-key inventory, and allocation assertions verified | No generic existing-artifact parser/resolver call, alternate identity, filename, relative path, extra registry key, or sidecar behavior | 10.13; 14.2 |
 | 10.7 | Main FR-10m8, FR-20j6g-j, FR-20p7a | `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts` | Exact candidates/sentinels, four-state ordered results/panels, pre-commit multiple-candidate diagnostic, containment/policy diagnostics, and unlinked fixture | Resolver, policy, form, artifact, content-preservation, cardinality, and canonical-path seams verified | Reuse one namespace import; persist no intended path and render no prerequisite-choice form | 10.13; 14.2 |
-| 10.8 | Main FR-16n, FR-20j6j, FR-29b2, FR-48-52d | `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts` | Exact three-branch tree, atomic commits, prefix reuse, continuation re-entry, trigger preservation, and finite restore/state mutations | Session replacement, route-trigger, branch, restore-shape, metadata, placement, and policy harnesses verified | No fallback, priority dependency, rollback/resume ledger, rescan, repair, or partial/noncanonical-state acceptance | 10.13; 14.2 |
+| 10.8 | Main FR-16n, FR-20j6j, FR-29b2, FR-48-52d | `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts` | Exact validated three-branch tree with terminal no-op parking route, atomic commits, prefix reuse, continuation re-entry, trigger preservation, and finite restore/state mutations | Session replacement, route-trigger, branch, restore-shape, metadata, placement, and policy harnesses verified | No `after-prerequisites` fallback, priority dependency, rollback/resume ledger, rescan, repair, or partial/noncanonical-state acceptance | 10.13; 14.2 |
 | 10.9 | Main FR-20i8, FR-20b9 | `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts` | Finite authorization/validator fixtures, exact diagnostics, canonical allocation, and sentinel collision contract | Existing create-artifact, path-policy, error-code, directory-entry, byte-preservation, and unlinked regression seams verified | Fail without suffix/overwrite; preserve unchanged state/files and named unlinked success | 10.13; 14.2 |
 | 10.10 | Module Steps 1-4 runtime integration | `src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts` | Exact build requests/content, four presence states, found-file preservation, retries/failures, complete-state module terminal routing, three restore boundaries, form durability, and teardown | Runtime allocation/build source recovery, forms, persistence, projection, continuation-helper bypass, and completion verified | Shared continuation validation must not preempt the exact module error; no overwrite, reallocation, or module resume state; skipped values remain untouched | 10.13; 14.2 |
 | 10.11 | Main FR-20j7-j7b | `src/core/task/workflow-runtime/__tests__/prerequisiteFiles.test.ts` | Three exact empty-segment root-only scanner cases | Existing scanner result and path-policy error contracts verified | Preserve production scanner and every existing scanner test | 10.13; 14.2 |
@@ -2786,18 +2832,19 @@ Every task and numbered subtask has its own complete row.
 | 14.4 | Main FR-1-5i; slash/registration validation | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | Exact core and shipped slash-test arguments | Both slash suites and script verified | Command-only | Exact command result |
 | 14.5 | Main compile-safe contract migration regressions | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | Exact 16 directly migrated module workflow-test arguments | Every path corresponds to a Task 2 definition/fixture cutover | Command-only; omit or substitute no suite | Exact command result |
 | 14.6 | Main directly touched and shared-capability regressions | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | Exact directly touched metadata/fixture/handler/document/tool-schema paths plus existing shared execution-control suites | Every directly touched path and every shared validation-only suite verified | Do not edit the shared regression suites or rely on typecheck in place of tests | Exact command result |
-| 14.7 | Main OR-2; type safety | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md`<br>command-owned: `src/shared/proto/**/*`, `src/generated/**/*`, `src/core/controller/**/*`, `src/hosts/**/*`, `webview-ui/src/services/grpc-client.ts`, `dist-standalone/proto/descriptor_set.pb` | `npm run check-types`; implicit `npm run protos` | Repo script chain verified | Edit no generated path manually; inspect any failure or tracked fallout | Exact command result |
+| 14.7 | Main OR-2; type safety | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md`<br>command-owned: `src/shared/proto/**/*`, `src/generated/**/*`, `src/core/controller/**/*`, `src/hosts/**/*`, `webview-ui/src/services/grpc-client.ts`, `dist-standalone/proto/descriptor_set.pb` | Elevated `npm run check-types`; implicit `npm run protos`; proto/host-probing fallback; exact tracked-generated diff guard | Repo script chain, fallback, and generated-output paths verified | Edit no generated path manually; run the guard after success or failure; accept, repair, stage, or revert no generated fallout implicitly | Typecheck result plus exact `git diff --exit-code` result |
 | 14.8 | Main OR-2; lint gate | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | `npm run lint` | Repo lint script verified | Command-only; silently reformat no out-of-scope file | Exact command result |
-| 14.9 | Main OR-2; package/build gate | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md`<br>command-owned: `src/shared/proto/**/*`, `src/generated/**/*`, `src/core/controller/**/*`, `src/hosts/**/*`, `webview-ui/src/services/grpc-client.ts`, `dist-standalone/proto/descriptor_set.pb`, `webview-ui/build/**/*`, `dist/**/*` | `npm run package`, implicit check-types/protos, and exact tracked-generated diff guard | Package script chain and ignored build outputs verified | Stop on tracked generated/formatter diff; accept or repair nothing implicitly | Package result plus exact `git diff --exit-code` result |
+| 14.9 | Main OR-2; package/build gate | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md`<br>command-owned: `src/shared/proto/**/*`, `src/generated/**/*`, `src/core/controller/**/*`, `src/hosts/**/*`, `webview-ui/src/services/grpc-client.ts`, `dist-standalone/proto/descriptor_set.pb`, `webview-ui/build/**/*`, `dist/**/*` | Elevated `npm run package`, implicit check-types/protos, proto/host-probing fallback, and exact tracked-generated diff guard | Package script chain, fallback, and ignored build outputs verified | Run the guard after success or failure; stop on tracked generated/formatter diff; accept, repair, stage, or revert nothing implicitly | Package result plus exact `git diff --exit-code` result |
 | Task 15 | Module Source Independence and Tool Schema restrictions; Action Plan Guide Steps 6-7 | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | Five exact `rg`/git static guard groups | Repo-supported `rg`, git pathspecs, runtime root, and schema path verified | Guards cover only approved retired/dependency/tool/scope risks; edit no file | 15.1-15.5 command output |
 | 15.1 | Main FR-12b2-b3; retired-field guard | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | Exact production `rg` for word-boundary `projectSubfolder` | Glob exclusions and non-match with `projectSubfolderSegments` verified | Require zero production matches; remove no valid segment field | Exact zero-match result |
 | 15.2 | Main FR-53/55/57; source independence guard | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | Exact whole-runtime `rg` for source/BMAD/placeholder dependencies | `src/core/task/workflow-runtime` production scope and protected source paths verified | Require zero matches; alter no protected source or BMAD file | Exact zero-match result |
 | 15.3 | Main FR-14/20/53; forbidden module implementation guard | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | Exact `rg` alternatives for fs, replacement, retired form/event/state/placement concepts | Word-boundary and test exclusions verified | Require zero production matches while retaining `projectSubfolderSegments` | Exact zero-match result |
 | 15.4 | Main FR-15g-h; forbidden Step 4 tool guard | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | Exact 38 enum-id alternatives plus complete 40 string-name alternatives | Live enum inventory and Subtasks 12.3/13.2 verified | Require zero matches; weaken no regex and add no local alias | Exact zero-match result |
 | 15.5 | Scope protection; module Source Independence | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | Unstaged, staged, and untracked checks for `.cline/skills/bmad-document-project` | Protected package path verified | All three outputs empty; do not edit, revert, or stage the package | Exact three command results |
-| Task 16 | Main OR-1/OR-1a/OR-2; Action Plan Guide Steps 7-9 | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | Tracked/untracked scope, protected hashes, both-guide audit, and per-row completeness | Guides, allowed-file sets, protected baseline, and plan structure verified | Stop on scope/hash/contract drift; never infer, revert, or broaden scope | 16.1-16.5 command/manual audit results |
-| 16.1 | Action Plan Guide Step 7 scope diff | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | `git diff --name-only` | Repo root and tracked-diff command verified | Review every returned path; perform no implicit cleanup | Exact command output checked against allowed files |
-| 16.2 | Action Plan Guide Step 7 untracked scope | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | `git ls-files --others --exclude-standard` | Repo root and untracked-file command verified | Review every returned path; delete nothing implicitly | Exact command output checked against allowed files |
-| 16.3 | Protected governing-document baseline | Read-only: `docs/workflows/workflow-runtime/workflow-modules/document-project/document-project.md`<br>`docs/workflows/workflow-runtime/workflow-modules/document-project/document-project-requirements.md`<br>`docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`<br>`docs/workflows/workflow-runtime/requirements.md`<br>`docs/workflows/workflow-runtime/architecture.md`<br>checkbox target: `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | Exact five-file SHA-256 command/baseline and scope reconciliation | Protected-document hashes and allowed-file sets verified | Stop on any hash mismatch; edit/revert no protected file; map every other diff path to its prescribing task | Byte-for-byte hash equality plus scope reconciliation |
-| 16.4 | Action Plan Guide Step 9; module build guide compliance | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | Full line-by-line requirements, method, compile, import, type, fixture, action, event, assertion, copy, cleanup, and choice audit | Both `docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md` and `docs/action-plan-guide.md` verified as audit inputs | Rewrite deficient plan text only with authority; do not declare completion while inference remains | Recorded line-by-line audit result |
-| 16.5 | Action Plan Guide Steps 5, 6, and 8 | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | Every Task 1-16 and Subtask 1.1-16.5 checkbox, inherited allowed files, exact target, cleanup, and validation row | Plan numbering, allowed-files lists, and matrix contract verified | Stop on changed requirement/live contract; no implementation improvisation | Complete row-by-row compliance review |
+| Task 16 | Main OR-1/OR-1a/OR-2; Action Plan Guide Steps 7-9 | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | Unstaged, staged, and untracked scope; protected hashes; both-guide audit; and per-row completeness | Guides, allowed-file sets, protected baseline, and plan structure verified | Stop on scope/hash/contract drift; never infer, revert, or broaden scope | 16.1-16.6 command/manual audit results |
+| 16.1 | Action Plan Guide Step 7 unstaged scope diff | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | `git diff --name-only` | Repo root and unstaged tracked-diff command verified | Review every returned path; perform no implicit cleanup | Exact command output checked against allowed files |
+| 16.2 | Action Plan Guide Step 7 staged scope diff | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | `git diff --cached --name-only` | Repo root and staged-diff command verified | Review every returned path; perform no implicit cleanup | Exact command output checked against allowed files |
+| 16.3 | Action Plan Guide Step 7 untracked scope | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | `git ls-files --others --exclude-standard` | Repo root and untracked-file command verified | Review every returned path; delete nothing implicitly | Exact command output checked against allowed files |
+| 16.4 | Protected governing-document baseline | Read-only: `docs/workflows/workflow-runtime/workflow-modules/document-project/document-project.md`<br>`docs/workflows/workflow-runtime/workflow-modules/document-project/document-project-requirements.md`<br>`docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md`<br>`docs/workflows/workflow-runtime/requirements.md`<br>`docs/workflows/workflow-runtime/architecture.md`<br>checkbox target: `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | Exact five-file SHA-256 command/baseline and reconciliation across unstaged, staged, and untracked scope | Protected-document hashes and allowed-file sets verified | Stop on any hash mismatch; edit/revert no protected file; map every other diff path to its prescribing task | Byte-for-byte hash equality plus scope reconciliation |
+| 16.5 | Action Plan Guide Step 9; module build guide compliance | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | Full line-by-line requirements, method, compile, import, type, fixture, action, event, assertion, copy, cleanup, and choice audit | Both `docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md` and `docs/action-plan-guide.md` verified as audit inputs | Rewrite deficient plan text only with authority; do not declare completion while inference remains | Recorded line-by-line audit result |
+| 16.6 | Action Plan Guide Steps 5, 6, and 8 | `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md` | Every Task 1-16 and Subtask 1.1-16.6 checkbox, inherited allowed files, exact target, cleanup, and validation row | Plan numbering, allowed-files lists, and matrix contract verified | Stop on changed requirement/live contract; no implementation improvisation | Complete row-by-row compliance review |

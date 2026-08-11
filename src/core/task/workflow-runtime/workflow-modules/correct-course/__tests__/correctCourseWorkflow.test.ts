@@ -136,6 +136,7 @@ function createSession(workflowValues: WorkflowValues = SAMPLE_WORKFLOW_VALUES):
 		},
 		lifecycle: { projectSelectionCompleted: true },
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: { suppressedWorkflowFormIds: [], suppressedWorkflowStepResolutionRoutes: [] },
 		branchContext: { activeBranchId: "entry" },
 	}
@@ -154,6 +155,7 @@ function createPredicateSession(args: { activeBranchId: string; workflowValues: 
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -373,7 +375,12 @@ describe("correctCourseWorkflow", () => {
 		expect(correctCourseWorkflowDefinition.useSkillName).to.equal(CORRECT_COURSE_WORKFLOW_USE_SKILL_NAME)
 		expect(correctCourseWorkflowDefinition.displayName).to.equal(CORRECT_COURSE_WORKFLOW_DISPLAY_NAME)
 		expect(correctCourseWorkflowDefinition.description).to.equal(CORRECT_COURSE_WORKFLOW_DESCRIPTION)
-		expect(correctCourseWorkflowDefinition.projectSubfolder).to.equal(CORRECT_COURSE_WORKFLOW_PROJECT_SUBFOLDER)
+		expect(correctCourseWorkflowDefinition.projectSelection).to.deep.equal({ kind: "interactive" })
+		expect(correctCourseWorkflowDefinition.projectOutputPlacement).to.deep.equal({
+			kind: "selected_project_subfolder",
+			subfolder: CORRECT_COURSE_WORKFLOW_PROJECT_SUBFOLDER,
+		})
+		expect(Object.hasOwn(correctCourseWorkflowDefinition, "projectSubfolder")).to.equal(false)
 		expect(correctCourseWorkflowDefinition.persona).to.deep.equal(CORRECT_COURSE_WORKFLOW_PERSONA)
 		expect(correctCourseWorkflowDefinition.entryPanel).to.deep.equal({
 			promptMarkdown: CORRECT_COURSE_WORKFLOW_DESCRIPTION,
@@ -416,6 +423,7 @@ describe("correctCourseWorkflow", () => {
 		expect(CORRECT_COURSE_PREREQUISITE_FILES[CORRECT_COURSE_ARCHITECTURE_DOCUMENT_PREREQUISITE_ID]).to.deep.equal({
 			id: CORRECT_COURSE_ARCHITECTURE_DOCUMENT_PREREQUISITE_ID,
 			requirement: "required",
+			resolutionMode: "interactive",
 			producingWorkflowName: "create-architecture",
 			projectSubfolderSegments: ["planning"],
 			match: { kind: "exact_filename", filename: "architecture.md" },

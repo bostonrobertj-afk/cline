@@ -680,7 +680,8 @@ export const createEpicsWorkflowDefinition: WorkflowDefinition = {
 	slashCommandName: CREATE_EPICS_WORKFLOW_SLASH_COMMAND_NAME,
 	useSkillName: CREATE_EPICS_WORKFLOW_USE_SKILL_NAME,
 	persona: CREATE_EPICS_WORKFLOW_PERSONA,
-	projectSubfolder: CREATE_EPICS_WORKFLOW_PROJECT_SUBFOLDER,
+	projectSelection: { kind: "interactive" },
+	projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: CREATE_EPICS_WORKFLOW_PROJECT_SUBFOLDER },
 	workflowValueKeys: CREATE_EPICS_WORKFLOW_VALUE_KEYS,
 	entryProjectValueKeys: {
 		projectMode: CreateEpicsWorkflowValueKey.ProjectMode,
@@ -698,6 +699,7 @@ export const createEpicsWorkflowDefinition: WorkflowDefinition = {
 		[ARCHITECTURE_PREREQUISITE_ID]: {
 			id: ARCHITECTURE_PREREQUISITE_ID,
 			requirement: "required",
+			resolutionMode: "interactive",
 			projectSubfolderSegments: ["planning"],
 			match: { kind: "exact_filename", filename: "architecture.md" },
 			producingWorkflowName: "create-architecture",

@@ -958,7 +958,8 @@ export const createArchitectureWorkflowDefinition: WorkflowDefinition = {
 	slashCommandName: "create-architecture",
 	useSkillName: "create-architecture",
 	persona: CREATE_ARCHITECTURE_WORKFLOW_PERSONA,
-	projectSubfolder: "planning",
+	projectSelection: { kind: "interactive" },
+	projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "planning" },
 	workflowValueKeys: CREATE_ARCHITECTURE_WORKFLOW_VALUE_KEYS,
 	entryProjectValueKeys: {
 		projectMode: CreateArchitectureWorkflowValueKey.ProjectMode,

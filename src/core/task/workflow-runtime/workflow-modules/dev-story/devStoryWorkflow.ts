@@ -94,6 +94,7 @@ export const DEV_STORY_PREREQUISITE_FILES: NonNullable<WorkflowDefinition["prere
 	[DEV_STORY_TARGET_STORY_PREREQUISITE_ID]: {
 		id: DEV_STORY_TARGET_STORY_PREREQUISITE_ID,
 		requirement: "required",
+		resolutionMode: "interactive",
 		producingWorkflowName: "create-story",
 		projectSubfolderSegments: ["implementation", "stories-backlog"],
 		match: {
@@ -1159,7 +1160,8 @@ export const devStoryWorkflowDefinition: WorkflowDefinition = {
 	slashCommandName: DEV_STORY_WORKFLOW_SLASH_COMMAND_NAME,
 	useSkillName: DEV_STORY_WORKFLOW_USE_SKILL_NAME,
 	persona: DEV_STORY_WORKFLOW_PERSONA,
-	projectSubfolder: DEV_STORY_WORKFLOW_PROJECT_SUBFOLDER,
+	projectSelection: { kind: "interactive" },
+	projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: DEV_STORY_WORKFLOW_PROJECT_SUBFOLDER },
 	workflowValueKeys: DEV_STORY_WORKFLOW_VALUE_KEYS,
 	entryProjectValueKeys: DEV_STORY_ENTRY_PROJECT_VALUE_KEYS,
 	entryPanel: {

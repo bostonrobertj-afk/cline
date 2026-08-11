@@ -8,6 +8,7 @@ import { createArchitectureWorkflowDefinition } from "@/core/task/workflow-runti
 import { createEpicsWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-epics"
 import { createStoryWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-story"
 import { devStoryWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/dev-story"
+import { documentProjectWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/document-project"
 import { edgeCaseHunterReviewWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review"
 import { piPlanningWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/pi-planning"
 import { quickDevWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/quick-dev"
@@ -22,6 +23,7 @@ const shippedWorkflowDefinitions: WorkflowDefinition[] = [
 	createEpicsWorkflowDefinition,
 	createStoryWorkflowDefinition,
 	devStoryWorkflowDefinition,
+	documentProjectWorkflowDefinition,
 	piPlanningWorkflowDefinition,
 	quickSpecWorkflowDefinition,
 	quickDevWorkflowDefinition,

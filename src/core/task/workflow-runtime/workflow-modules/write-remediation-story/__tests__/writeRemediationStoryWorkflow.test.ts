@@ -137,6 +137,7 @@ function createSession(
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -160,6 +161,7 @@ function createPredicateSession(args: { activeBranchId: string; workflowValues: 
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -365,9 +367,12 @@ describe("writeRemediationStoryWorkflow", () => {
 		expect(writeRemediationStoryWorkflowDefinition.useSkillName).to.equal(WRITE_REMEDIATION_STORY_WORKFLOW_USE_SKILL_NAME)
 		expect(writeRemediationStoryWorkflowDefinition.displayName).to.equal(WRITE_REMEDIATION_STORY_WORKFLOW_DISPLAY_NAME)
 		expect(writeRemediationStoryWorkflowDefinition.description).to.equal(WRITE_REMEDIATION_STORY_WORKFLOW_DESCRIPTION)
-		expect(writeRemediationStoryWorkflowDefinition.projectSubfolder).to.equal(
-			WRITE_REMEDIATION_STORY_WORKFLOW_PROJECT_SUBFOLDER,
-		)
+		expect(writeRemediationStoryWorkflowDefinition.projectSelection).to.deep.equal({ kind: "interactive" })
+		expect(writeRemediationStoryWorkflowDefinition.projectOutputPlacement).to.deep.equal({
+			kind: "selected_project_subfolder",
+			subfolder: WRITE_REMEDIATION_STORY_WORKFLOW_PROJECT_SUBFOLDER,
+		})
+		expect(Object.hasOwn(writeRemediationStoryWorkflowDefinition, "projectSubfolder")).to.equal(false)
 	})
 
 	it("resolves from the shipped workflow registry by canonical names only", () => {

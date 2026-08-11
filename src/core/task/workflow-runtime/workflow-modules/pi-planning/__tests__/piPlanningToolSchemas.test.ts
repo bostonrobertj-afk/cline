@@ -110,6 +110,7 @@ function createStep6ToolSchemaInput(editIntent: PiPlanningEditIntent | undefined
 			},
 			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
+			prerequisiteFileResolutions: [],
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,

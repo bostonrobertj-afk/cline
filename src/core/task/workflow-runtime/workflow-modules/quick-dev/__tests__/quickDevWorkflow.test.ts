@@ -58,6 +58,7 @@ function createSession(args: {
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -199,7 +200,12 @@ describe("quickDevWorkflow", () => {
 		expect(quickDevWorkflowDefinition.description).to.equal(QUICK_DEV_WORKFLOW_DESCRIPTION)
 		expect(quickDevWorkflowDefinition.slashCommandName).to.equal("quick-dev")
 		expect(quickDevWorkflowDefinition.useSkillName).to.equal("quick-dev")
-		expect(quickDevWorkflowDefinition.projectSubfolder).to.equal("implementation")
+		expect(quickDevWorkflowDefinition.projectSelection).to.deep.equal({ kind: "interactive" })
+		expect(quickDevWorkflowDefinition.projectOutputPlacement).to.deep.equal({
+			kind: "selected_project_subfolder",
+			subfolder: "implementation",
+		})
+		expect(Object.hasOwn(quickDevWorkflowDefinition, "projectSubfolder")).to.equal(false)
 		expect(quickDevWorkflowDefinition.persona).to.deep.equal(QUICK_DEV_WORKFLOW_PERSONA)
 		expect(quickDevWorkflowDefinition.entryPanel.promptMarkdown).to.equal(QUICK_DEV_WORKFLOW_DESCRIPTION)
 		expect(quickDevWorkflowDefinition.workflowValueKeys).to.deep.equal(QUICK_DEV_WORKFLOW_VALUE_KEYS)
@@ -231,6 +237,7 @@ describe("quickDevWorkflow", () => {
 		expect(prerequisite).to.deep.equal({
 			id: "spec_file",
 			requirement: "required",
+			resolutionMode: "interactive",
 			producingWorkflowName: "quick-spec",
 			projectSubfolderSegments: ["planning"],
 			match: { kind: "exact_filename", filename: "quick-spec.md" },

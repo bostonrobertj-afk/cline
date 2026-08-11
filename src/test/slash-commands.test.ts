@@ -119,5 +119,16 @@ describe("getAvailableSlashCommands", () => {
 			quickReview!.cliCompatible.should.equal(true)
 			quickReview!.description.should.equal("Shipped workflow: quick-review")
 		})
+
+		it("includes exactly one registered document-project workflow slash command", async () => {
+			const response = await getResponse()
+			const documentProjectCommands = response.commands.filter((cmd) => cmd.name === "document-project")
+
+			documentProjectCommands.length.should.equal(1)
+			const documentProject = documentProjectCommands[0]
+			documentProject!.section.should.equal("custom")
+			documentProject!.cliCompatible.should.equal(true)
+			documentProject!.description.should.equal("Shipped workflow: document-project")
+		})
 	})
 })

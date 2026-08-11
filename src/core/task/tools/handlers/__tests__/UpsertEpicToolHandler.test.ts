@@ -58,6 +58,7 @@ function createSession(workflowValues: WorkflowValues): ActiveWorkflowSession {
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -526,9 +527,9 @@ describe("UpsertEpicToolHandler", () => {
 			expect(resultObject.identity).to.equal("2")
 			expect(resultObject.title).to.equal("Second revised outcome")
 			expect(epics).to.deep.equal([
-				{ identity: "1", title: "First outcome" },
-				{ identity: "2", title: "Second revised outcome" },
-				{ identity: "10", title: "Tenth outcome" },
+				{ identity: "1", title: "First outcome", "story-index-generated": false },
+				{ identity: "2", title: "Second revised outcome", "story-index-generated": false },
+				{ identity: "10", title: "Tenth outcome", "story-index-generated": false },
 			])
 			expect(harness.config.taskState.fileReadCache.has(outputPath.toLowerCase())).to.equal(false)
 			expect(harness.config.taskState.didEditFile).to.equal(true)

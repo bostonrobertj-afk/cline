@@ -28,6 +28,7 @@ import type { WorkflowFormSessionState } from "@/core/task/workflow-form/types"
 import { WorkflowArtifactFamily } from "@/core/task/workflow-runtime/artifactFamilies"
 import type {
 	PersistedWorkflowSession,
+	ShippedWorkflowMetadata,
 	WorkflowDefinition,
 	WorkflowEntryArtifactResolution,
 	WorkflowNextAction,
@@ -66,6 +67,7 @@ function createPersistedSession(): PersistedWorkflowSession {
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -113,6 +115,7 @@ function createPersistedCreateEpicsSession(): PersistedWorkflowSession {
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -140,7 +143,8 @@ function createMetadataRestoreWorkflow(): WorkflowDefinition {
 			communicationStyle: "Direct and deterministic.",
 			principles: ["Keep persisted workflow state canonical."],
 		},
-		projectSubfolder: "planning",
+		projectSelection: { kind: "interactive" },
+		projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "planning" },
 		workflowValueKeys: ["entry_project_mode", "entry_project_title", "entry_project_folder_name"],
 		entryProjectValueKeys: {
 			projectMode: "entry_project_mode",
@@ -462,6 +466,32 @@ describe("workflow runtime metadata persistence", () => {
 
 	afterEach(() => {
 		sandbox.restore()
+	})
+
+	it("exposes Document Project through the shipped workflow metadata contract", () => {
+		const registeredDefinition = WorkflowRegistry.resolveWorkflowDefinition("document-project")
+		expect(registeredDefinition).to.not.equal(undefined)
+		if (registeredDefinition === undefined) {
+			throw new Error("Expected registered document-project workflow definition.")
+		}
+
+		const metadata = {
+			name: registeredDefinition.name,
+			displayName: registeredDefinition.displayName,
+			description: registeredDefinition.description,
+			persona: registeredDefinition.persona,
+			projectSelection: registeredDefinition.projectSelection,
+			projectOutputPlacement: registeredDefinition.projectOutputPlacement,
+		} satisfies ShippedWorkflowMetadata
+
+		expect(metadata.projectSelection).to.deep.equal({
+			kind: "automatic_fixed",
+			projectTitle: "Agent Guidance",
+			projectFolderName: "agent-guidance",
+		})
+		expect(metadata.projectOutputPlacement).to.deep.equal({ kind: "selected_project_root" })
+		expect(Object.hasOwn(metadata, "entryProjectValueKeys")).to.equal(false)
+		expect(Object.hasOwn(metadata, "projectSubfolder")).to.equal(false)
 	})
 
 	it("persists cleared workflow metadata when invalid persisted sessions require teardown cleanup", async () => {

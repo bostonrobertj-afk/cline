@@ -382,6 +382,7 @@ function createResolvedWorkflow(args?: {
 	workflowToolSchemaOverride?: readonly ClineToolSpec[]
 	workflowValueKeys?: readonly string[]
 	childInheritance?: WorkflowDefinition["childInheritance"]
+	projectSelection?: WorkflowDefinition["projectSelection"]
 }): WorkflowDefinition {
 	const createProjectPromptDecisionTree = (): WorkflowDecisionTree => ({
 		entryBranchId: "project-prompt",
@@ -445,7 +446,8 @@ function createResolvedWorkflow(args?: {
 			communicationStyle: "Concise and evidence-oriented.",
 			principles: ["Keep review findings grounded in observable behavior."],
 		},
-		projectSubfolder: "review",
+		projectSelection: args?.projectSelection ?? { kind: "interactive" },
+		projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "review" },
 		workflowValueKeys: [...Object.values(ENTRY_PROJECT_VALUE_KEYS), ...(args?.workflowValueKeys ?? [])],
 		entryProjectValueKeys: ENTRY_PROJECT_VALUE_KEYS,
 		entryPanel: { promptMarkdown: "Start this workflow" },
@@ -703,6 +705,7 @@ describe("SubagentRunner", () => {
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
 			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
+			prerequisiteFileResolutions: [],
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -776,6 +779,7 @@ describe("SubagentRunner", () => {
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
 			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
+			prerequisiteFileResolutions: [],
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -878,6 +882,7 @@ describe("SubagentRunner", () => {
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
 			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
+			prerequisiteFileResolutions: [],
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -969,6 +974,7 @@ describe("SubagentRunner", () => {
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
 			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
+			prerequisiteFileResolutions: [],
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -1062,6 +1068,7 @@ describe("SubagentRunner", () => {
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
 			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
+			prerequisiteFileResolutions: [],
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -1267,6 +1274,7 @@ describe("SubagentRunner", () => {
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
 			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
+			prerequisiteFileResolutions: [],
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -1967,6 +1975,7 @@ describe("SubagentRunner", () => {
 			},
 			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
+			prerequisiteFileResolutions: [],
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -1993,7 +2002,7 @@ describe("SubagentRunner", () => {
 		assert.equal(activateWorkflowSpy.firstCall.args[0].parentWorkflowName, "parent-workflow")
 	})
 
-	it("fails marker-present runs without complete parent project selection before the first child model request", async () => {
+	it("fails marker-present interactive workflow runs without complete parent project selection before the first child model request", async () => {
 		const createMessage = sinon.stub()
 		const workflow = createResolvedWorkflow({
 			name: "review-workflow",
@@ -2025,6 +2034,7 @@ describe("SubagentRunner", () => {
 					},
 					lifecycle: { projectSelectionCompleted: false },
 					entryArtifactResolution: undefined,
+					prerequisiteFileResolutions: [],
 					ui: {
 						formSession: undefined,
 						stepResolutionSession: undefined,
@@ -2048,6 +2058,7 @@ describe("SubagentRunner", () => {
 					},
 					lifecycle: { projectSelectionCompleted: false },
 					entryArtifactResolution: undefined,
+					prerequisiteFileResolutions: [],
 					ui: {
 						formSession: undefined,
 						stepResolutionSession: undefined,
@@ -2083,7 +2094,95 @@ describe("SubagentRunner", () => {
 			sinon.assert.notCalled(activateWorkflowSpy)
 			sinon.assert.notCalled(createMessage)
 		}
-		sinon.assert.notCalled(resolveWorkflowByUseSkillNameStub)
+		sinon.assert.callCount(resolveWorkflowByUseSkillNameStub, 2)
+	})
+
+	it("allows marker-present automatic-fixed workflow activation with incomplete parent project selection", async () => {
+		const workflow = createResolvedWorkflow({
+			name: "document-project",
+			useSkillName: "document-project",
+			projectSelection: {
+				kind: "automatic_fixed",
+				projectTitle: "Agent Guidance",
+				projectFolderName: "agent-guidance",
+			},
+		})
+		const resolveWorkflowByUseSkillNameStub = sinon.stub(WorkflowRegistry, "resolveWorkflowByUseSkillName").returns(workflow)
+		const parentSessionCases: ActiveWorkflowSession[] = [
+			{
+				activeStepNumber: 1,
+				workflowValues: {},
+				projectSelection: {
+					projectMode: "existing",
+					projectTitle: " ",
+					projectFolderName: "unrelated-parent",
+				},
+				lifecycle: { projectSelectionCompleted: false },
+				entryArtifactResolution: undefined,
+				prerequisiteFileResolutions: [],
+				ui: {
+					formSession: undefined,
+					stepResolutionSession: undefined,
+					suppressedWorkflowFormIds: [],
+					suppressedWorkflowStepResolutionRoutes: [],
+				},
+				branchContext: { activeBranchId: "project-prompt" },
+			},
+			{
+				activeStepNumber: 1,
+				workflowValues: {},
+				projectSelection: {
+					projectMode: "existing",
+					projectTitle: "Unrelated Parent",
+					projectFolderName: " ",
+				},
+				lifecycle: { projectSelectionCompleted: false },
+				entryArtifactResolution: undefined,
+				prerequisiteFileResolutions: [],
+				ui: {
+					formSession: undefined,
+					stepResolutionSession: undefined,
+					suppressedWorkflowFormIds: [],
+					suppressedWorkflowStepResolutionRoutes: [],
+				},
+				branchContext: { activeBranchId: "project-prompt" },
+			},
+		]
+
+		for (const parentSession of parentSessionCases) {
+			const config = createTaskConfig(false)
+			config.taskState.activeWorkflowName = "parent-workflow"
+			config.taskState.activeWorkflowSession = parentSession
+			const activateWorkflowStub = sinon.stub(config.workflowRuntime, "activateWorkflow").resolves({
+				kind: "project_prompt",
+				promptProjection: createEmptyWorkflowPromptProjection(),
+			})
+			const runner = new SubagentRunner(config)
+			const state = new TaskState()
+			const parentProjectSelectionReference = parentSession.projectSelection
+			const parentWorkflowValuesReference = parentSession.workflowValues
+			const parentProjectSelectionSnapshot = structuredClone(parentSession.projectSelection)
+			const parentWorkflowValuesSnapshot = structuredClone(parentSession.workflowValues)
+
+			await autoActivateAssignedWorkflow.call(runner, state, [workflow.useSkillName])
+
+			sinon.assert.calledOnce(activateWorkflowStub)
+			const activationArgs = activateWorkflowStub.firstCall.args[0]
+			assert.equal(activationArgs.taskState, state)
+			assert.equal(activationArgs.workflowName, workflow.name)
+			assert.equal(activationArgs.parentWorkflowName, "parent-workflow")
+			assert.deepEqual(activationArgs.parentSession, parentSession)
+			assert.notEqual(activationArgs.parentSession, parentSession)
+			assert.notEqual(activationArgs.parentSession?.projectSelection, parentProjectSelectionReference)
+			assert.notEqual(activationArgs.parentSession?.workflowValues, parentWorkflowValuesReference)
+			assert.equal(parentSession.projectSelection, parentProjectSelectionReference)
+			assert.equal(parentSession.workflowValues, parentWorkflowValuesReference)
+			assert.deepEqual(parentSession.projectSelection, parentProjectSelectionSnapshot)
+			assert.deepEqual(parentSession.workflowValues, parentWorkflowValuesSnapshot)
+			assert.equal(state.activeWorkflowName, workflow.name)
+		}
+
+		sinon.assert.callCount(resolveWorkflowByUseSkillNameStub, 2)
 	})
 
 	it("fails clearly when a child workflow attempts to render a workflow form", async () => {
@@ -2145,6 +2244,7 @@ describe("SubagentRunner", () => {
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
 			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
+			prerequisiteFileResolutions: [],
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -2307,6 +2407,7 @@ describe("SubagentRunner", () => {
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
 			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
+			prerequisiteFileResolutions: [],
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -2364,6 +2465,7 @@ describe("SubagentRunner", () => {
 			projectSelection: { projectMode: "new", projectTitle: "", projectFolderName: "" },
 			lifecycle: { projectSelectionCompleted: false },
 			entryArtifactResolution: undefined,
+			prerequisiteFileResolutions: [],
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -2456,6 +2558,7 @@ describe("SubagentRunner", () => {
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
 			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
+			prerequisiteFileResolutions: [],
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,
@@ -2500,6 +2603,7 @@ describe("SubagentRunner", () => {
 			projectSelection: { projectMode: "existing", projectTitle: "Parent Project", projectFolderName: "parent-project" },
 			lifecycle: { projectSelectionCompleted: true },
 			entryArtifactResolution: undefined,
+			prerequisiteFileResolutions: [],
 			ui: {
 				formSession: undefined,
 				stepResolutionSession: undefined,

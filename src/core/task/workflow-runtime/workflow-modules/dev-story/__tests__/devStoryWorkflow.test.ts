@@ -180,6 +180,7 @@ function createSession(args: {
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -220,6 +221,7 @@ function createPredicateSession(args: { activeBranchId: string; workflowValues: 
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -534,7 +536,12 @@ describe("devStoryWorkflowDefinition", () => {
 		expect(devStoryWorkflowDefinition.slashCommandName).to.equal("dev-story")
 		expect(devStoryWorkflowDefinition.useSkillName).to.equal("dev-story")
 		expect(devStoryWorkflowDefinition.displayName).to.equal("dev-story")
-		expect(devStoryWorkflowDefinition.projectSubfolder).to.equal("implementation")
+		expect(devStoryWorkflowDefinition.projectSelection).to.deep.equal({ kind: "interactive" })
+		expect(devStoryWorkflowDefinition.projectOutputPlacement).to.deep.equal({
+			kind: "selected_project_subfolder",
+			subfolder: "implementation",
+		})
+		expect(Object.hasOwn(devStoryWorkflowDefinition, "projectSubfolder")).to.equal(false)
 		expect(devStoryWorkflowDefinition.description).to.equal(DEV_STORY_WORKFLOW_DESCRIPTION)
 		expect(devStoryWorkflowDefinition.persona).to.deep.equal(DEV_STORY_WORKFLOW_PERSONA)
 		expect(devStoryWorkflowDefinition.entryPanel).to.deep.equal({
@@ -559,6 +566,7 @@ describe("devStoryWorkflowDefinition", () => {
 		expect(prerequisite).to.deep.include({
 			id: "target_story",
 			requirement: "required",
+			resolutionMode: "interactive",
 			producingWorkflowName: "create-story",
 			workflowValueKey: "target_story",
 			outputDocumentReference: "none",

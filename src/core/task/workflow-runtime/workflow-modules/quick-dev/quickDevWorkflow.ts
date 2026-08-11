@@ -60,6 +60,7 @@ export const QUICK_DEV_PREREQUISITE_FILES: NonNullable<WorkflowDefinition["prere
 	[QUICK_DEV_SPEC_FILE_PREREQUISITE_ID]: {
 		id: QUICK_DEV_SPEC_FILE_PREREQUISITE_ID,
 		requirement: "required",
+		resolutionMode: "interactive",
 		producingWorkflowName: "quick-spec",
 		projectSubfolderSegments: ["planning"],
 		match: { kind: "exact_filename", filename: "quick-spec.md" },
@@ -372,7 +373,8 @@ export const quickDevWorkflowDefinition: WorkflowDefinition = {
 	slashCommandName: QUICK_DEV_WORKFLOW_SLASH_COMMAND_NAME,
 	useSkillName: QUICK_DEV_WORKFLOW_USE_SKILL_NAME,
 	persona: QUICK_DEV_WORKFLOW_PERSONA,
-	projectSubfolder: QUICK_DEV_WORKFLOW_PROJECT_SUBFOLDER,
+	projectSelection: { kind: "interactive" },
+	projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: QUICK_DEV_WORKFLOW_PROJECT_SUBFOLDER },
 	workflowValueKeys: QUICK_DEV_WORKFLOW_VALUE_KEYS,
 	entryProjectValueKeys: QUICK_DEV_ENTRY_PROJECT_VALUE_KEYS,
 	entryPanel: { promptMarkdown: QUICK_DEV_WORKFLOW_DESCRIPTION },

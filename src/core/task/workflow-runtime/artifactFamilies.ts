@@ -14,6 +14,8 @@ export enum WorkflowArtifactFamily {
 	EdgeCaseReviewOutput = "edge_case_review_output",
 	CodeReviewOutput = "code_review_output",
 	ReviewScopeManifest = "review_scope_manifest",
+	ProjectOverview = "project_overview",
+	DeveloperGuide = "developer_guide",
 }
 
 export type WorkflowArtifactAllocationMode =
@@ -52,10 +54,19 @@ export interface WorkflowSingletonProjectArtifactFamilyDefinition extends Workfl
 		| WorkflowArtifactFamily.BrainstormingSession
 		| WorkflowArtifactFamily.ArchitectureDocument
 		| WorkflowArtifactFamily.QuickSpec
+		| WorkflowArtifactFamily.ProjectOverview
+		| WorkflowArtifactFamily.DeveloperGuide
 	allocationMode: "singleton_project"
 	identityRequirement: "none"
 	numberingScope: "project_singleton"
-	singletonIdentity: "epics" | "epics_index" | "brainstorming_session" | "architecture_document" | "quick_spec"
+	singletonIdentity:
+		| "epics"
+		| "epics_index"
+		| "brainstorming_session"
+		| "architecture_document"
+		| "quick_spec"
+		| "project_overview"
+		| "developer_guide"
 }
 
 export interface WorkflowEpicIndexDerivedArtifactFamilyDefinition extends WorkflowArtifactFamilyDefinitionBase {
@@ -153,6 +164,28 @@ export const WORKFLOW_ARTIFACT_FAMILY_REGISTRY: Readonly<Record<WorkflowArtifact
 		numberingScope: "project_singleton",
 		singletonIdentity: "quick_spec",
 		discoveryPattern: /^quick-spec\.md$/,
+	},
+	[WorkflowArtifactFamily.ProjectOverview]: {
+		family: WorkflowArtifactFamily.ProjectOverview,
+		allocationMode: "singleton_project",
+		identityRequirement: "none",
+		filenamePattern: "project-overview.md",
+		fileExtension: ".md",
+		contentKind: "markdown",
+		numberingScope: "project_singleton",
+		singletonIdentity: "project_overview",
+		discoveryPattern: /^project-overview\.md$/,
+	},
+	[WorkflowArtifactFamily.DeveloperGuide]: {
+		family: WorkflowArtifactFamily.DeveloperGuide,
+		allocationMode: "singleton_project",
+		identityRequirement: "none",
+		filenamePattern: "developer-guide.md",
+		fileExtension: ".md",
+		contentKind: "markdown",
+		numberingScope: "project_singleton",
+		singletonIdentity: "developer_guide",
+		discoveryPattern: /^developer-guide\.md$/,
 	},
 	[WorkflowArtifactFamily.ChangeManagementPlan]: {
 		family: WorkflowArtifactFamily.ChangeManagementPlan,

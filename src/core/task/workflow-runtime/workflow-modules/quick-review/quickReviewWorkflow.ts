@@ -55,6 +55,7 @@ export const QUICK_REVIEW_PREREQUISITE_FILES: NonNullable<WorkflowDefinition["pr
 	[QUICK_REVIEW_SPEC_FILE_PREREQUISITE_ID]: {
 		id: QUICK_REVIEW_SPEC_FILE_PREREQUISITE_ID,
 		requirement: "required",
+		resolutionMode: "interactive",
 		producingWorkflowName: "quick-spec",
 		projectSubfolderSegments: ["review"],
 		match: { kind: "exact_filename", filename: "quick-spec.md" },
@@ -295,7 +296,8 @@ export const quickReviewWorkflowDefinition: WorkflowDefinition = {
 	slashCommandName: QUICK_REVIEW_WORKFLOW_SLASH_COMMAND_NAME,
 	useSkillName: QUICK_REVIEW_WORKFLOW_USE_SKILL_NAME,
 	persona: QUICK_REVIEW_WORKFLOW_PERSONA,
-	projectSubfolder: QUICK_REVIEW_WORKFLOW_PROJECT_SUBFOLDER,
+	projectSelection: { kind: "interactive" },
+	projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: QUICK_REVIEW_WORKFLOW_PROJECT_SUBFOLDER },
 	workflowValueKeys: QUICK_REVIEW_WORKFLOW_VALUE_KEYS,
 	entryProjectValueKeys: QUICK_REVIEW_ENTRY_PROJECT_VALUE_KEYS,
 	entryPanel: { promptMarkdown: QUICK_REVIEW_WORKFLOW_DESCRIPTION },

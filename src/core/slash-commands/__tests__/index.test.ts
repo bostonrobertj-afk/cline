@@ -28,7 +28,8 @@ function createResolvedWorkflow(
 			communicationStyle: "Concise and practical.",
 			principles: ["Keep plans actionable", "Preserve workflow contracts"],
 		},
-		projectSubfolder: "planning",
+		projectSelection: { kind: "interactive" },
+		projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "planning" },
 		workflowValueKeys: Object.values(ENTRY_PROJECT_VALUE_KEYS),
 		entryProjectValueKeys: ENTRY_PROJECT_VALUE_KEYS,
 		entryPanel: { promptMarkdown: "Entry panel" },
@@ -220,6 +221,27 @@ describe("slash-commands", () => {
 				workflowName: "quick-spec",
 				invocationSource: "slash_command",
 			})
+		})
+
+		it("activates the registered document-project command without accepting the markdown filename", async () => {
+			const result = await parseSlashCommands("<task>/document-project document this repo</task>", "test-ulid")
+
+			expect(result.processedText).to.equal("<task> document this repo</task>")
+			expect(result.needsClinerulesFileCheck).to.equal(false)
+			expect(result.persistentSlashCommandAction).to.deep.equal({
+				type: "activate_workflow",
+				workflowName: "document-project",
+				invocationSource: "slash_command",
+			})
+
+			const markdownFilenameResult = await parseSlashCommands(
+				"<task>/document-project.md document this repo</task>",
+				"test-ulid",
+			)
+
+			expect(markdownFilenameResult.processedText).to.equal("<task>/document-project.md document this repo</task>")
+			expect(markdownFilenameResult.needsClinerulesFileCheck).to.equal(false)
+			expect(markdownFilenameResult.persistentSlashCommandAction).to.equal(undefined)
 		})
 	})
 })

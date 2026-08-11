@@ -85,6 +85,7 @@ function createCreateArchitecturePromptBuilderInput(args: {
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			suppressedWorkflowFormIds: [],
 			suppressedWorkflowStepResolutionRoutes: [],
@@ -127,6 +128,7 @@ function createCreateEpicsPromptBuilderInput(): WorkflowPromptBuilderInput {
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			suppressedWorkflowFormIds: [],
 			suppressedWorkflowStepResolutionRoutes: [],

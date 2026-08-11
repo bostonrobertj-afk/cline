@@ -139,6 +139,7 @@ function createSession(
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession,
 			stepResolutionSession: undefined,
@@ -162,6 +163,7 @@ function createPredicateSession(args: { activeBranchId: string; workflowValues: 
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -464,9 +466,12 @@ describe("edgeCaseHunterReviewWorkflowDefinition", () => {
 			EDGE_CASE_HUNTER_REVIEW_WORKFLOW_SLASH_COMMAND_NAME,
 		)
 		expect(edgeCaseHunterReviewWorkflowDefinition.useSkillName).to.equal(EDGE_CASE_HUNTER_REVIEW_WORKFLOW_USE_SKILL_NAME)
-		expect(edgeCaseHunterReviewWorkflowDefinition.projectSubfolder).to.equal(
-			EDGE_CASE_HUNTER_REVIEW_WORKFLOW_PROJECT_SUBFOLDER,
-		)
+		expect(edgeCaseHunterReviewWorkflowDefinition.projectSelection).to.deep.equal({ kind: "interactive" })
+		expect(edgeCaseHunterReviewWorkflowDefinition.projectOutputPlacement).to.deep.equal({
+			kind: "selected_project_subfolder",
+			subfolder: EDGE_CASE_HUNTER_REVIEW_WORKFLOW_PROJECT_SUBFOLDER,
+		})
+		expect(Object.hasOwn(edgeCaseHunterReviewWorkflowDefinition, "projectSubfolder")).to.equal(false)
 		expect(edgeCaseHunterReviewWorkflowDefinition.persona).to.deep.equal(EDGE_CASE_HUNTER_REVIEW_WORKFLOW_PERSONA)
 		expect(edgeCaseHunterReviewWorkflowDefinition.entryPanel.promptMarkdown).to.equal(
 			EDGE_CASE_HUNTER_REVIEW_WORKFLOW_DESCRIPTION,

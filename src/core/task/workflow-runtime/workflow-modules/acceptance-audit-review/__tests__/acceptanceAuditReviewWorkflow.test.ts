@@ -140,6 +140,7 @@ function createSession(
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession,
 			stepResolutionSession: undefined,
@@ -163,6 +164,7 @@ function createPredicateSession(args: { activeBranchId: string; workflowValues: 
 			projectSelectionCompleted: true,
 		},
 		entryArtifactResolution: undefined,
+		prerequisiteFileResolutions: [],
 		ui: {
 			formSession: undefined,
 			stepResolutionSession: undefined,
@@ -537,9 +539,12 @@ describe("acceptanceAuditReviewWorkflowDefinition", () => {
 			ACCEPTANCE_AUDIT_REVIEW_WORKFLOW_SLASH_COMMAND_NAME,
 		)
 		expect(acceptanceAuditReviewWorkflowDefinition.useSkillName).to.equal(ACCEPTANCE_AUDIT_REVIEW_WORKFLOW_USE_SKILL_NAME)
-		expect(acceptanceAuditReviewWorkflowDefinition.projectSubfolder).to.equal(
-			ACCEPTANCE_AUDIT_REVIEW_WORKFLOW_PROJECT_SUBFOLDER,
-		)
+		expect(acceptanceAuditReviewWorkflowDefinition.projectSelection).to.deep.equal({ kind: "interactive" })
+		expect(acceptanceAuditReviewWorkflowDefinition.projectOutputPlacement).to.deep.equal({
+			kind: "selected_project_subfolder",
+			subfolder: ACCEPTANCE_AUDIT_REVIEW_WORKFLOW_PROJECT_SUBFOLDER,
+		})
+		expect(Object.hasOwn(acceptanceAuditReviewWorkflowDefinition, "projectSubfolder")).to.equal(false)
 	})
 
 	it("declares the Fred quality-control persona", () => {

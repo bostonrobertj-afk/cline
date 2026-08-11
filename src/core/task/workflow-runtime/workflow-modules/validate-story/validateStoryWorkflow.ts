@@ -64,6 +64,7 @@ export const VALIDATE_STORY_PREREQUISITE_FILES: NonNullable<WorkflowDefinition["
 	[VALIDATE_STORY_TARGET_STORY_PREREQUISITE_ID]: {
 		id: VALIDATE_STORY_TARGET_STORY_PREREQUISITE_ID,
 		requirement: "required",
+		resolutionMode: "interactive",
 		producingWorkflowName: "create-story",
 		projectSubfolderSegments: ["implementation", "stories-backlog"],
 		match: { kind: "naming_pattern", pattern: VALIDATE_STORY_TARGET_STORY_FILENAME_PATTERN },
@@ -73,6 +74,7 @@ export const VALIDATE_STORY_PREREQUISITE_FILES: NonNullable<WorkflowDefinition["
 	[VALIDATE_STORY_EPICS_DOCUMENT_PREREQUISITE_ID]: {
 		id: VALIDATE_STORY_EPICS_DOCUMENT_PREREQUISITE_ID,
 		requirement: "required",
+		resolutionMode: "interactive",
 		producingWorkflowName: "create-epics",
 		projectSubfolderSegments: ["planning"],
 		match: { kind: "exact_filename", filename: "Epics.md" },
@@ -82,6 +84,7 @@ export const VALIDATE_STORY_PREREQUISITE_FILES: NonNullable<WorkflowDefinition["
 	[VALIDATE_STORY_ARCHITECTURE_DOCUMENT_PREREQUISITE_ID]: {
 		id: VALIDATE_STORY_ARCHITECTURE_DOCUMENT_PREREQUISITE_ID,
 		requirement: "required",
+		resolutionMode: "interactive",
 		producingWorkflowName: "create-architecture",
 		projectSubfolderSegments: ["planning"],
 		match: { kind: "exact_filename", filename: "architecture.md" },
@@ -290,7 +293,8 @@ export const validateStoryWorkflowDefinition: WorkflowDefinition = {
 	useSkillName: VALIDATE_STORY_WORKFLOW_USE_SKILL_NAME,
 	displayName: VALIDATE_STORY_WORKFLOW_DISPLAY_NAME,
 	description: VALIDATE_STORY_WORKFLOW_DESCRIPTION,
-	projectSubfolder: VALIDATE_STORY_WORKFLOW_PROJECT_SUBFOLDER,
+	projectSelection: { kind: "interactive" },
+	projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: VALIDATE_STORY_WORKFLOW_PROJECT_SUBFOLDER },
 	persona: VALIDATE_STORY_WORKFLOW_PERSONA,
 	entryPanel: { promptMarkdown: VALIDATE_STORY_WORKFLOW_DESCRIPTION },
 	workflowValueKeys: VALIDATE_STORY_WORKFLOW_VALUE_KEYS,
