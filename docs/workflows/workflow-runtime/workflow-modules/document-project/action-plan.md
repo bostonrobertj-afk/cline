@@ -2236,7 +2236,7 @@ npm run test:unit -- src/core/slash-commands/__tests__/index.test.ts src/test/sl
 
 ## Phase 2: Final Validation And Scope Review
 
-### [ ] Task 14: Run Focused And Full Quality Gates
+### [x] Task 14: Run Focused And Full Quality Gates
 
 Allowed files for this task and every numbered subtask below:
 
@@ -2254,37 +2254,37 @@ The eight generated/build paths immediately above are allowed only as command-ow
 
 Full target file path for this task and every numbered subtask below: `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md`. The eight generated/build paths are command-owned output targets only.
 
-- [ ] Subtask 14.1: Run:
+- [x] Subtask 14.1: Run:
 
 ```sh
 npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/document-project/__tests__/documentProjectWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/document-project/__tests__/documentProjectToolSchemas.test.ts src/core/task/workflow-runtime/workflow-modules/document-project/__tests__/documentProjectDocument.test.ts
 ```
 
-- [ ] Subtask 14.2: Run:
+- [x] Subtask 14.2: Run:
 
 ```sh
 npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts src/core/task/workflow-runtime/__tests__/prerequisiteFiles.test.ts src/core/task/tools/handlers/__tests__/BuildWorkflowDocumentToolHandler.test.ts
 ```
 
-- [ ] Subtask 14.3: Run:
+- [x] Subtask 14.3: Run:
 
 ```sh
 npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts
 ```
 
-- [ ] Subtask 14.4: Run:
+- [x] Subtask 14.4: Run:
 
 ```sh
 npm run test:unit -- src/core/slash-commands/__tests__/index.test.ts src/test/slash-commands.test.ts
 ```
 
-- [ ] Subtask 14.5: Run the directly migrated existing module workflow tests:
+- [x] Subtask 14.5: Run the directly migrated existing module workflow tests:
 
 ```sh
 npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/acceptance-audit-review/__tests__/acceptanceAuditReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/blind-review/__tests__/blindReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/code-review/__tests__/codeReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/correct-course/__tests__/correctCourseWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/create-story/__tests__/createStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/dev-story/__tests__/devStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/edge-case-hunter-review/__tests__/edgeCaseHunterReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/quick-dev/__tests__/quickDevWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/quick-review/__tests__/quickReviewWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/quick-spec/__tests__/quickSpecWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/validate-story/__tests__/validateStoryWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/write-remediation-story/__tests__/writeRemediationStoryWorkflow.test.ts
 ```
 
-- [ ] Subtask 14.6: Run the remaining directly touched tests and the existing shared execution-control regression gates:
+- [x] Subtask 14.6: Run the remaining directly touched tests and the existing shared execution-control regression gates:
 
 ```sh
 npm run test:unit -- src/core/prompts/system-prompt/__tests__/response_tools.test.ts src/core/task/__tests__/ToolExecutor.workflowModelToolLifecycle.test.ts src/core/task/__tests__/workflow-runtime-metadata.test.ts src/core/task/tools/handlers/__tests__/AppendBrainstormingSelectedTechniqueToolHandler.test.ts src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts src/core/task/tools/handlers/__tests__/DevStoryGitFinalizeToolHandler.test.ts src/core/task/tools/handlers/__tests__/DevStoryStoryTools.test.ts src/core/task/tools/handlers/__tests__/RecordFindingsToolHandler.test.ts src/core/task/tools/handlers/__tests__/UpsertEpicToolHandler.test.ts src/core/task/tools/handlers/__tests__/UseSkillToolHandler.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts src/core/task/workflow-runtime/workflow-modules/brainstorming/__tests__/brainstormingDocument.test.ts src/core/task/workflow-runtime/workflow-modules/correct-course/__tests__/correctCourseDocument.test.ts src/core/task/workflow-runtime/workflow-modules/create-architecture/__tests__/createArchitectureDocument.test.ts src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts src/core/ignore/ClineIgnoreController.test.ts src/core/permissions/CommandPermissionController.test.ts src/core/workspace/__tests__/WorkspaceResolver.test.ts src/core/workspace/__tests__/WorkspacePathAdapter.test.ts src/core/workspace/__tests__/parseWorkspaceInlinePath.test.ts src/core/task/tools/utils/__tests__/ToolHookUtils.test.ts src/test/tool-executor-hooks.test.ts src/core/task/__tests__/ToolExecutor.test.ts src/core/task/tools/handlers/__tests__/ExecuteCommandToolHandler.timeout.test.ts src/core/task/tools/handlers/__tests__/PathToolHandlers.gracefulErrors.test.ts src/core/task/tools/handlers/__tests__/ReadFileToolHandler.fileNotFound.test.ts src/core/task/tools/handlers/__tests__/ReadFileToolHandler.repeatReads.test.ts src/core/task/tools/handlers/__tests__/ReadFileRangeToolHandler.test.ts src/core/task/tools/handlers/__tests__/WriteToFileToolHandler.consecutiveMistakeCount.test.ts
@@ -2292,7 +2292,7 @@ npm run test:unit -- src/core/prompts/system-prompt/__tests__/response_tools.tes
 
 The shared execution-control suites are validation-only and remain unmodified.
 
-- [ ] Subtask 14.7: Run `npm run check-types` with elevated permissions:
+- [x] Subtask 14.7: Run `npm run check-types` with elevated permissions:
 
 ```sh
 npm run check-types
@@ -2306,13 +2306,13 @@ git diff --exit-code -- src/shared/proto src/generated src/core/controller src/h
 
 The command must report no tracked generated or formatter diff. Do not accept, repair, stage, or revert generated fallout implicitly. If TypeScript checking is reached and fails, treat that failure as a code defect.
 
-- [ ] Subtask 14.8: Run:
+- [x] Subtask 14.8: Run:
 
 ```sh
 npm run lint
 ```
 
-- [ ] Subtask 14.9: Run `npm run package` with elevated permissions because it invokes `npm run check-types`:
+- [x] Subtask 14.9: Run `npm run package` with elevated permissions because it invokes `npm run check-types`:
 
 ```sh
 npm run package
@@ -2320,7 +2320,7 @@ npm run package
 
 `npm run package` invokes `npm run check-types`, which already invokes `npm run protos`. If its nested typecheck fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, run `npm run check-types` with elevated permissions, and then rerun `npm run package` with elevated permissions. Regardless of whether the package command succeeds or fails, immediately run `git diff --exit-code -- src/shared/proto src/generated src/core/controller src/hosts webview-ui/src/services/grpc-client.ts`. The command must report no tracked generated or formatter diff; ignored `dist`, `dist-standalone/proto`, and `webview-ui/build` outputs may remain as build products. If a tracked generated or formatter diff appears, stop and inspect it rather than accepting, repairing, staging, or reverting it implicitly.
 
-### [ ] Task 15: Run Static Guards
+### [x] Task 15: Run Static Guards
 
 Allowed files for this task and every numbered subtask below:
 
@@ -2328,7 +2328,7 @@ Allowed files for this task and every numbered subtask below:
 
 Full target file path for this task and every numbered subtask below: `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md`.
 
-- [ ] Subtask 15.1: Confirm no legacy definition/metadata field remains:
+- [x] Subtask 15.1: Confirm no legacy definition/metadata field remains:
 
 ```sh
 rg -n '\bprojectSubfolder\b' src --glob '*.ts' --glob '!**/__tests__/**' --glob '!**/*.test.ts'
@@ -2336,7 +2336,7 @@ rg -n '\bprojectSubfolder\b' src --glob '*.ts' --glob '!**/__tests__/**' --glob 
 
 The command must return no production matches, including inline declarations, quoted keys, or property reads. The word-boundary pattern must not reject valid `projectSubfolderSegments`.
 
-- [ ] Subtask 15.2: Confirm no runtime source/BMAD dependency:
+- [x] Subtask 15.2: Confirm no runtime source/BMAD dependency:
 
 ```sh
 rg -n 'document-project\.md|\.cline/skills/bmad-document-project|bmad-document-project|\.cline/workflow-config\.yaml|placeholder-workflow' src/core/task/workflow-runtime --glob '!**/__tests__/**' --glob '!**/*.test.ts'
@@ -2344,7 +2344,7 @@ rg -n 'document-project\.md|\.cline/skills/bmad-document-project|bmad-document-p
 
 The command must return no production matches.
 
-- [ ] Subtask 15.3: Confirm no forbidden module implementation:
+- [x] Subtask 15.3: Confirm no forbidden module implementation:
 
 ```sh
 rg -n "from[[:space:]]+['\"](?:node:)?fs(?:/promises)?['\"]|require\\([[:space:]]*['\"](?:node:)?fs|import\\([[:space:]]*['\"](?:node:)?fs|replaceAll|\\.replace\\(|continue_workflow_form|entry_artifact_resolution_completed|creationRequired|\\bprojectSubfolder\\b" src/core/task/workflow-runtime/workflow-modules/document-project --glob '!**/__tests__/**' --glob '!**/*.test.ts'
@@ -2352,7 +2352,7 @@ rg -n "from[[:space:]]+['\"](?:node:)?fs(?:/promises)?['\"]|require\\([[:space:]
 
 The command must return no production-file matches. The exact `projectSubfolderSegments` prerequisite field must not match the word-boundary alternative.
 
-- [ ] Subtask 15.4: Confirm no forbidden Step 4 tool id is declared:
+- [x] Subtask 15.4: Confirm no forbidden Step 4 tool id is declared:
 
 ```sh
 rg -n "ClineDefaultTool\\.(WORKFLOW_PROGRESS_REQUEST|FILE_EDIT|BROWSER|MCP_USE|MCP_ACCESS|MCP_DOCS|NEW_TASK|PLAN_MODE|ACT_MODE|TODO|WEB_FETCH|WEB_SEARCH|CONDENSE|SUMMARIZE_TASK|REPORT_BUG|NEW_RULE|GENERATE_EXPLANATION|USE_SKILL|SET_WORKFLOW_VALUES|BUILD_WORKFLOW_DOCUMENT|CREATE_WORKFLOW_ARTIFACT|ARCHIVE_WORKFLOW_ARTIFACT|DELETE_WORKFLOW_ARTIFACT|MOVE_WORKFLOW_PROJECT_FILE|GET_BRAINSTORMING_METHODS|APPEND_BRAINSTORMING_SELECTED_TECHNIQUE|UPSERT_EPIC|PLAN_STORY_ARTIFACTS|PLAN_REMEDIATION_STORY_ARTIFACT|GENERATE_STORY_FILES|UPDATE_STORY_INDEX_STATUS|DEV_STORY_GIT_FINALIZE|RECORD_FINDINGS|STORY_TASK_REMINDER|STORY_TASK_COMPLETE|REQUEST_TASK_DETAIL|SHOW_INCOMPLETE_TASKS|USE_SUBAGENTS)|['\"](workflow_progress_request|replace_in_file|browser_action|use_mcp_tool|access_mcp_resource|load_mcp_documentation|new_task|generate_plan_output|act_mode_respond|focus_chain|web_fetch|web_search|condense|summarize_task|report_bug|new_rule|generate_explanation|use_skill|set_workflow_values|build_workflow_document|create_workflow_artifact|archive_workflow_artifact|delete_workflow_artifact|move_workflow_project_file|resolve_existing_project_artifact|validate_story_index_entry|get_brainstorming_methods|append_brainstorming_selected_technique|upsert_epic|plan_story_artifacts|plan_remediation_story_artifact|generate_story_files|update_story_index_status|dev_story_git_finalize|record_findings|story_task_reminder|story_task_complete|request_task_detail|show_incomplete_tasks|use_subagents)['\"]" src/core/task/workflow-runtime/workflow-modules/document-project/documentProjectToolSchemas.ts
@@ -2360,7 +2360,7 @@ rg -n "ClineDefaultTool\\.(WORKFLOW_PROGRESS_REQUEST|FILE_EDIT|BROWSER|MCP_USE|M
 
 The command must return no matches.
 
-- [ ] Subtask 15.5: Confirm the BMAD package is untouched:
+- [x] Subtask 15.5: Confirm the BMAD package is untouched:
 
 ```sh
 git diff --name-only -- .cline/skills/bmad-document-project
@@ -2380,7 +2380,7 @@ git ls-files --others --exclude-standard -- .cline/skills/bmad-document-project
 
 All three commands must return no output.
 
-### [ ] Task 16: Run Scope-Diff And Final Compliance Review
+### [x] Task 16: Run Scope-Diff And Final Compliance Review
 
 Allowed files for this task and every numbered subtask below:
 
@@ -2388,25 +2388,25 @@ Allowed files for this task and every numbered subtask below:
 
 Full target file path for this task and every numbered subtask below: `docs/workflows/workflow-runtime/workflow-modules/document-project/action-plan.md`.
 
-- [ ] Subtask 16.1: Run:
+- [x] Subtask 16.1: Run:
 
 ```sh
 git diff --name-only
 ```
 
-- [ ] Subtask 16.2: Run:
+- [x] Subtask 16.2: Run:
 
 ```sh
 git diff --cached --name-only
 ```
 
-- [ ] Subtask 16.3: Run:
+- [x] Subtask 16.3: Run:
 
 ```sh
 git ls-files --others --exclude-standard
 ```
 
-- [ ] Subtask 16.4: Run:
+- [x] Subtask 16.4: Run:
 
 ```sh
 shasum -a 256 docs/workflows/workflow-runtime/workflow-modules/document-project/document-project.md docs/workflows/workflow-runtime/workflow-modules/document-project/document-project-requirements.md docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md docs/workflows/workflow-runtime/requirements.md docs/workflows/workflow-runtime/architecture.md
@@ -2414,9 +2414,9 @@ shasum -a 256 docs/workflows/workflow-runtime/workflow-modules/document-project/
 
 Require the five output lines to equal the Protected-document authoring baseline byte-for-byte. A protected path reported by Subtask 16.1, 16.2, or 16.3 whose hash still equals that baseline is preserved authoring-baseline state and is explicitly exempt from the implementation allowlist comparison; it must remain reported and must not be edited, reverted, staged, or treated as implementation fallout. If any hash differs, stop and ask the user. For every other path from Subtasks 16.1, 16.2, and 16.3, confirm it is either this action plan or appears in the exact allowed-files set of the task that prescribed the implementation change.
 
-- [ ] Subtask 16.5: Reread `docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md` and `docs/action-plan-guide.md`, then perform a line-by-line review of this action plan against both guides. Confirm every task/subtask is requirements-backed, compile-safe, uses the module guide's prescribed method, is exact about imports/symbols/types/fixtures/actions/events/assertions/cleanup, contains no invented user or AI-facing copy, and leaves no implementation choice to the developer.
+- [x] Subtask 16.5: Reread `docs/workflows/workflow-runtime/workflow-modules/module-build-guide.md` and `docs/action-plan-guide.md`, then perform a line-by-line review of this action plan against both guides. Confirm every task/subtask is requirements-backed, compile-safe, uses the module guide's prescribed method, is exact about imports/symbols/types/fixtures/actions/events/assertions/cleanup, contains no invented user or AI-facing copy, and leaves no implementation choice to the developer.
 
-- [ ] Subtask 16.6: Confirm every task/subtask has a checkbox, an allowed-files list inherited from its numbered task, an exact target path, prescribed fallout cleanup, and validation coverage. If any requirement or live contract has changed, stop and ask the user rather than improvising.
+- [x] Subtask 16.6: Confirm every task/subtask has a checkbox, an allowed-files list inherited from its numbered task, an exact target path, prescribed fallout cleanup, and validation coverage. If any requirement or live contract has changed, stop and ask the user rather than improvising.
 
 ## Appendix A: Exact Initial Documents
 
