@@ -57,6 +57,7 @@ export enum PiPlanningWorkflowValueKey {
 	AdditionalContext = "additional_context",
 	TargetEpic = "target_epic",
 	EpicIdentity = "epic_identity",
+	StoryCount = "story_count",
 	StoriesIndex = "stories_index",
 	StoriesIndexExistedAtWorkflowStart = "stories_index_existed_at_workflow_start",
 	EditIntent = "edit_intent",
@@ -183,6 +184,11 @@ function readWorkflowStringValue(workflowValues: WorkflowValues, key: PiPlanning
 function readWorkflowBooleanValue(workflowValues: WorkflowValues, key: PiPlanningWorkflowValueKey): boolean | undefined {
 	const value = workflowValues[key]
 	return typeof value === "boolean" ? value : undefined
+}
+
+function readWorkflowPositiveIntegerValue(workflowValues: WorkflowValues, key: PiPlanningWorkflowValueKey): number | undefined {
+	const value = workflowValues[key]
+	return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined
 }
 
 function workflowFormCompleted(workflowFormId: string): WorkflowDecisionBranchTrigger {
@@ -322,6 +328,15 @@ function workflowProgressRequestConfirmed(): WorkflowDecisionBranchTrigger {
 	}
 }
 
+function workflowProgressRequestConfirmedWithValidStoryCount(expected: boolean): WorkflowDecisionBranchTrigger {
+	return {
+		kind: "event_predicate",
+		matches: ({ triggerEvent, workflowValues }) =>
+			triggerEvent.kind === "workflow_progress_request_confirmed" &&
+			(readWorkflowPositiveIntegerValue(workflowValues, PiPlanningWorkflowValueKey.StoryCount) !== undefined) === expected,
+	}
+}
+
 function workflowProgressRequestDenied(): WorkflowDecisionBranchTrigger {
 	return {
 		kind: "on_event",
@@ -449,17 +464,17 @@ Split a story if:
 
 Stories should not be created that are only file edits, test updates, cleanup chores, or technical layers unless that layer is itself the deliverable contract.
 
-Once you've determined how many stories are needed, provide an update to the user explaining how many stories are needed, then call workflow_progress_request to unlock the next workflow step's instructions.`
+Once you've determined how many stories are needed, provide an update to the user explaining how many stories are needed. Then call set_workflow_values to persist that positive integer as story_count. Only after story_count is persisted, call workflow_progress_request to unlock the next workflow step's instructions.`
 
 const PI_PLANNING_STEP_4_EXISTING_STORY_INDEX_PROMPT_TEMPLATE = `This system uses a story index as the canonical indicator of which stories must exist for each epic.
 Target epic: {workflow.target_epic}
 Story Index: {workflow.stories_index}
 
-Review the existing story index, then call plan_story_artifacts if additional stories are required beyond what the story index indicates. Use {workflow.epic_identity} when calling the tool. Indicate how many story files are needed to support delivery of {workflow.target_epic}. This tool will add additional stories to the existing story index when you indicate a number of stories greater than the index already contains. e.g. if a story index exists with three story files, and you call plan_story_artifacts and include story_count: 5, the tool will add 2 additional stories to the index so that it contains a total of 5 stories.
+Review the existing story index, then call plan_story_artifacts if additional stories are required beyond what the story index indicates. Set epic_identity to {workflow.epic_identity} and story_count to the approved persisted value {workflow.story_count}. This tool will add additional stories to the existing story index when story_count is greater than the number of primary stories the index already contains. e.g. if a story index exists with three story files, and you call plan_story_artifacts and include story_count: 5, the tool will add 2 additional stories to the index so that it contains a total of 5 stories.
 
 If the existing story index does not need additional stories added, use workflow_progress_request to unlock the next workflow step's instructions.`
 
-const PI_PLANNING_STEP_4_NEW_STORY_INDEX_PROMPT_TEMPLATE = `This system uses a story index as the canonical indicator of which stories must exist for each epic. Generate the story index by calling plan_story_artifacts and including the total number of stories required in the story_count field. Use {workflow.epic_identity} when calling the tool.
+const PI_PLANNING_STEP_4_NEW_STORY_INDEX_PROMPT_TEMPLATE = `This system uses a story index as the canonical indicator of which stories must exist for each epic. Generate the story index by calling plan_story_artifacts. Set epic_identity to {workflow.epic_identity} and story_count to the approved persisted value {workflow.story_count}.
 
 Once you generate the story index, call set_workflow_values to set the generated file's full file path as the stories_index workflow session key.`
 
@@ -1393,8 +1408,15 @@ function buildStep3DecisionTree(): WorkflowDecisionTree {
 				id: "step-3-await-progress-request",
 				routes: [
 					{
+						id: "step-3-return-to-project-prompt-without-story-count",
+						trigger: workflowProgressRequestConfirmedWithValidStoryCount(false),
+						action: {
+							kind: "project_prompt",
+						},
+					},
+					{
 						id: "step-3-transition-to-step-4",
-						trigger: workflowProgressRequestConfirmed(),
+						trigger: workflowProgressRequestConfirmedWithValidStoryCount(true),
 						action: {
 							kind: "transition_step",
 							target: {

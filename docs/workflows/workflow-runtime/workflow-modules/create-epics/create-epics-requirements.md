@@ -127,6 +127,8 @@ When `entry_artifact_resolution_completed` reports `creationRequired: false` for
 
 `Epics.index.json` must be generated or regenerated deterministically when Step 2 receives `attempt_completion_succeeded`, and successful index generation must route to `complete_workflow`. The final index content must match this schema exactly:
 
+If runtime-owned allocation of a missing `Epics.index.json` fails, Step 2 must terminate with `Unable to allocate Epics.index.json. {underlying runtime error}`, where `{underlying runtime error}` is the normalized error carried by the canonical `tool_backed_operation_failed` event. If the tool supplies no detail, the shared runtime fallback must produce `Unable to allocate Epics.index.json. Tool-backed operation failed.` The workflow must not discard the allocation failure detail.
+
 ```json
 { "version": 1, "epics": [{ "identity": "1", "title": "...", "story-index-generated": false }] }
 ```

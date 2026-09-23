@@ -676,6 +676,22 @@ describe("createEpicsWorkflowDefinition", () => {
 		})
 	})
 
+	it("preserves the underlying Epics.index.json allocation failure detail", () => {
+		const failureRoute = findRoute("step-2", "step-2-await-index-allocation", "step-2-terminal-error-after-index-allocation")
+
+		expectStep2RouteMatchesToolBackedOperationEvent(
+			failureRoute,
+			"tool_backed_operation_failed",
+			"step-2-await-attempt-completion",
+			"step-2-allocate-index-after-attempt-completion",
+		)
+		expect(failureRoute.action).to.deep.equal({
+			kind: "terminal_error",
+			errorMessage: "Unable to allocate Epics.index.json.",
+			appendToolBackedOperationError: true,
+		})
+	})
+
 	it("builds the Step 2 prompt and exposes only the approved model-facing tools", () => {
 		const step2 = createEpicsWorkflowDefinition.steps["step-2"]
 		const workflowValues: WorkflowValues = {

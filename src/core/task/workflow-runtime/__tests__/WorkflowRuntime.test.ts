@@ -9660,6 +9660,46 @@ describe("WorkflowRuntime", () => {
 		expectWorkflowStateCleared(terminalFailureState)
 	})
 
+	it("appends the normalized tool-backed failure detail when a terminal-error action requires it", async () => {
+		const terminalFailureWorkflow = createWorkflowDefinition({
+			steps: {
+				"step-1": createStepDefinition({
+					stepNumber: 1,
+					decisionTree: createToolBackedOperationDecisionTree({
+						startAction: {
+							kind: "execute_tool_backed_operation",
+							instruction: createToolBackedActionInstruction({ shouldSucceed: false }),
+						},
+						failureAction: {
+							kind: "terminal_error",
+							errorMessage: "Unable to allocate Epics.index.json.",
+							appendToolBackedOperationError: true,
+						},
+					}),
+				}),
+				"step-2": createStepDefinition({ stepNumber: 2 }),
+			},
+		})
+
+		const taskState = new TaskState()
+		await activateWorkflow(taskState, terminalFailureWorkflow)
+		await runtime.resolveNextAction({ taskState })
+		await submitNewProjectSelection(taskState, "Detailed Terminal Failure Project")
+		expect((await runtime.resolveNextAction({ taskState })).kind).to.equal("execute_tool_backed_operation")
+
+		const result = await runtime.handleToolBackedOperationToolResult({
+			taskState,
+			toolResultText: "ok",
+			runtimeOwnedSourceRoute: undefined,
+		})
+
+		expect(result).to.deep.equal({
+			kind: "terminal_error",
+			errorMessage: "Unable to allocate Epics.index.json. failure",
+		})
+		expectWorkflowStateCleared(taskState)
+	})
+
 	it("fails closed with terminal_error when tool-backed operation failure has no matching failure branch", async () => {
 		const unmatchedFailureWorkflow = createWorkflowDefinition({
 			steps: {
@@ -15057,6 +15097,108 @@ describe("WorkflowRuntime", () => {
 				{ identity: "4", title: "Unselected Four", "story-index-generated": true },
 			],
 		})
+	})
+
+	it("enforces the persisted PI Planning Step 4 story count before story-index mutation", async () => {
+		const projectFolderName = "pi-planning-story-count-project"
+		resolveWorkflowDefinitionStub.callsFake((workflowName: string) =>
+			workflowName === piPlanningWorkflowDefinition.name ? piPlanningWorkflowDefinition : undefined,
+		)
+		taskState.activeWorkflowName = piPlanningWorkflowDefinition.name
+		taskState.activeWorkflowSession = {
+			activeStepNumber: 4,
+			workflowValues: {
+				story_count: 3,
+			},
+			projectSelection: {
+				projectMode: "existing",
+				projectTitle: "PI Planning Story Count Project",
+				projectFolderName,
+			},
+			lifecycle: { projectSelectionCompleted: true },
+			entryArtifactResolution: undefined,
+			prerequisiteFileResolutions: [],
+			ui: {
+				formSession: undefined,
+				stepResolutionSession: undefined,
+				suppressedWorkflowFormIds: [],
+				suppressedWorkflowStepResolutionRoutes: [],
+			},
+			branchContext: { activeBranchId: "step-4-await-story-index" },
+		}
+
+		const preparation = await runtime.preparePlanStoryArtifacts({ taskState, epicIdentity: "1" })
+		await writeSingleEpicIndex(preparation.epicsIndexAbsolutePath, "1")
+
+		let mismatchError: unknown
+		try {
+			await runtime.planStoryArtifacts({
+				taskState,
+				epicIdentity: "1",
+				storyCount: 1,
+				expectedStoryIndexAbsolutePath: preparation.storyIndexAbsolutePath,
+				expectedEpicsIndexAbsolutePath: preparation.epicsIndexAbsolutePath,
+			})
+		} catch (error) {
+			mismatchError = error
+		}
+		expect(mismatchError).to.be.instanceOf(Error)
+		if (!(mismatchError instanceof Error)) {
+			throw new Error("Expected mismatched PI Planning story count to throw.")
+		}
+		expect(mismatchError.message).to.equal("PI Planning story_count 1 does not match the approved persisted story_count 3.")
+		expect(await pathExists(preparation.storyIndexAbsolutePath)).to.equal(false)
+
+		const result = await runtime.planStoryArtifacts({
+			taskState,
+			epicIdentity: "1",
+			storyCount: 3,
+			expectedStoryIndexAbsolutePath: preparation.storyIndexAbsolutePath,
+			expectedEpicsIndexAbsolutePath: preparation.epicsIndexAbsolutePath,
+		})
+		expect(result.storyIndex.stories).to.have.length(3)
+
+		delete getActiveWorkflowSession(taskState).workflowValues.story_count
+		let missingCountError: unknown
+		try {
+			await runtime.planStoryArtifacts({
+				taskState,
+				epicIdentity: "1",
+				storyCount: 3,
+				expectedStoryIndexAbsolutePath: preparation.storyIndexAbsolutePath,
+				expectedEpicsIndexAbsolutePath: preparation.epicsIndexAbsolutePath,
+			})
+		} catch (error) {
+			missingCountError = error
+		}
+		expect(missingCountError).to.be.instanceOf(Error)
+		if (!(missingCountError instanceof Error)) {
+			throw new Error("Expected missing PI Planning story count to throw.")
+		}
+		expect(missingCountError.message).to.equal(
+			"PI Planning requires a persisted positive-integer story_count before planning stories.",
+		)
+
+		getActiveWorkflowSession(taskState).workflowValues.story_count = 1.5
+		let invalidCountError: unknown
+		try {
+			await runtime.planStoryArtifacts({
+				taskState,
+				epicIdentity: "1",
+				storyCount: 3,
+				expectedStoryIndexAbsolutePath: preparation.storyIndexAbsolutePath,
+				expectedEpicsIndexAbsolutePath: preparation.epicsIndexAbsolutePath,
+			})
+		} catch (error) {
+			invalidCountError = error
+		}
+		expect(invalidCountError).to.be.instanceOf(Error)
+		if (!(invalidCountError instanceof Error)) {
+			throw new Error("Expected invalid PI Planning story count to throw.")
+		}
+		expect(invalidCountError.message).to.equal(
+			"PI Planning requires a persisted positive-integer story_count before planning stories.",
+		)
 	})
 
 	it("fails primary story artifact planning when the requested epic is absent from Epics.index.json", async () => {

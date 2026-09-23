@@ -945,3 +945,59 @@ Allowed files:
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsDocument.test.ts`
 - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+
+## Phase 8: Preserve Epics Index Allocation Failure Detail
+
+[x] Task 19. Extend the shared terminal-error action with opt-in tool-backed failure detail.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/types.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+
+[x] Subtask 19.1. Add optional `appendToolBackedOperationError` to `terminal_error`, validate it as a Boolean when present, and append the normalized canonical tool-backed failure detail only when the action opts in.
+
+[x] Subtask 19.2. Add runtime coverage proving an opted-in terminal error preserves its module-owned prefix, appends the normalized failure detail, and tears down the workflow.
+
+[x] Task 20. Apply detailed allocation failure reporting to Create Epics.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/create-epics/create-epics-requirements.md`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/createEpicsWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts`
+
+[x] Subtask 20.1. Require and implement `Unable to allocate Epics.index.json. {underlying runtime error}`, retaining the shared `Tool-backed operation failed.` fallback when the tool returns no detail.
+
+[x] Subtask 20.2. Add module route coverage for the opted-in allocation failure and real-handler coverage that creates `planning/Epics.index.json` after `Epics.md` already exists.
+
+[x] Task 21. Validate Phase 8.
+
+Allowed files:
+- Command-owned generated files from `npm run check-types` only.
+
+[x] Subtask 21.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/create-epics/__tests__/createEpicsWorkflow.test.ts src/core/task/tools/handlers/__tests__/CreateWorkflowArtifactToolHandler.test.ts src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`.
+
+[x] Subtask 21.2. Run `npm run check-types`.
+
+[x] Subtask 21.3. Run `npm run lint`.
+
+## Phase 9: Permit Runtime-Owned Post-Completion Operations
+
+[x] Task 22. Fix the response-turn guard that rejects runtime-authored workflow tools scheduled by `attempt_completion_succeeded`.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/ToolExecutor.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/__tests__/ToolExecutor.workflowModelToolLifecycle.test.ts`
+
+[x] Subtask 22.1. Keep rejecting model-authored tools after a response tool ends its turn, but permit calls whose native call id identifies them as runtime-authored workflow or workflow-step-resolution operations.
+
+[x] Subtask 22.2. Add regression coverage proving runtime-authored `create_workflow_artifact` executes and emits a correlated result after response completion, while an ordinary model-authored tool remains rejected.
+
+[x] Task 23. Validate Phase 9.
+
+[x] Subtask 23.1. Run the focused ToolExecutor, Create Epics, handler, and workflow-runtime tests.
+
+[x] Subtask 23.2. Run `npm run check-types` and verify no generated diff.
+
+[x] Subtask 23.3. Run `npm run lint`.

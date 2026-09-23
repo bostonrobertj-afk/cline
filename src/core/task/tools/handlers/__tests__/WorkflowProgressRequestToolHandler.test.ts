@@ -200,6 +200,70 @@ describe("WorkflowProgressRequestToolHandler", () => {
 		})
 	})
 
+	it("recognizes a selected Yes response with additional feedback", async () => {
+		const lastFollowupMessage: ClineMessage = { ts: 3, type: "ask", ask: "followup", text: "{}" }
+		const { config, stubs } = createConfig({
+			askResult: { text: "Yes: I align with that approach." },
+			lastFollowupMessage,
+		})
+		const handler = new WorkflowProgressRequestToolHandler()
+
+		const result = await handler.execute(config, createWorkflowProgressRequestToolUse())
+
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		sinon.assert.calledOnceWithExactly(stubs.submitWorkflowProgressRequest, {
+			taskState: config.taskState,
+			approved: true,
+		})
+		assert.deepEqual(config.taskState.pendingResponseToolFollowup, {
+			toolName: ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
+			route: "normal_user_turn",
+			text: "Yes: I align with that approach.",
+			images: undefined,
+			files: undefined,
+		})
+		const lastFollowupText = lastFollowupMessage.text
+		if (typeof lastFollowupText !== "string") {
+			throw new Error("Expected workflow progress followup message text to be a string.")
+		}
+		assert.equal(JSON.parse(lastFollowupText).selected, "Yes")
+	})
+
+	it("recognizes a selected No response with additional feedback without approving progress", async () => {
+		const { config, stubs } = createConfig({
+			askResult: { text: "No: Please revise the proposed approach." },
+		})
+		const handler = new WorkflowProgressRequestToolHandler()
+
+		const result = await handler.execute(config, createWorkflowProgressRequestToolUse())
+
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		sinon.assert.calledOnceWithExactly(stubs.submitWorkflowProgressRequest, {
+			taskState: config.taskState,
+			approved: false,
+		})
+		assert.deepEqual(config.taskState.pendingResponseToolFollowup, {
+			toolName: ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST,
+			route: "normal_user_turn",
+			text: "No: Please revise the proposed approach.",
+			images: undefined,
+			files: undefined,
+		})
+	})
+
+	it("keeps free-form feedback conversational without advancing the workflow", async () => {
+		const { config, stubs } = createConfig({
+			askResult: { text: "Please explain the approach first." },
+		})
+		const handler = new WorkflowProgressRequestToolHandler()
+
+		const result = await handler.execute(config, createWorkflowProgressRequestToolUse())
+
+		assert.equal(result, RESPONSE_TOOL_SUCCESS_MESSAGE)
+		sinon.assert.notCalled(stubs.submitWorkflowProgressRequest)
+		sinon.assert.calledOnceWithExactly(stubs.say, "user_feedback", "Please explain the approach first.", undefined, undefined)
+	})
+
 	it("returns a tool error when workflow progress request does not advance the active workflow step", async () => {
 		const { config, stubs } = createConfig({
 			askResult: { text: "Yes" },

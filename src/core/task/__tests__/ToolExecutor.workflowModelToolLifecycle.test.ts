@@ -365,4 +365,42 @@ describe("ToolExecutor workflow model-tool lifecycle", () => {
 			sinon.assert.notCalled(workflowRuntime.handleModelToolResult)
 		}
 	})
+
+	it("executes runtime-authored workflow tools after a response tool ends the model turn", async () => {
+		const toolName = ClineDefaultTool.CREATE_WORKFLOW_ARTIFACT
+		const { executor, taskState, coordinator, workflowRuntime } = createExecutor()
+		taskState.activeWorkflowName = "workflow-runtime-test"
+		taskState.activeWorkflowSession = createActiveWorkflowSession()
+		taskState.responseToolTurnShouldEnd = true
+		const executeSpy = sinon.spy()
+		coordinator.register(new LifecycleTestHandler(toolName, { kind: "return", toolResult: "artifact created" }, executeSpy))
+		const block = createToolUse(toolName)
+		block.call_id = "workflow_runtime_task-1_1_create_workflow_artifact"
+
+		const outcome = await executor.executeTool(block)
+
+		expect(outcome.status).to.equal("executed")
+		expect(outcome.emittedToolResult).to.equal(true)
+		sinon.assert.calledOnce(executeSpy)
+		sinon.assert.notCalled(workflowRuntime.handleModelToolResult)
+		expect(taskState.userMessageContent).to.have.length(1)
+		expect(taskState.nativeToolCallIdsWithResults.has(block.call_id)).to.equal(true)
+	})
+
+	it("continues rejecting model-authored tools after a response tool ends the turn", async () => {
+		const toolName = ClineDefaultTool.GET_BRAINSTORMING_METHODS
+		const { executor, taskState, coordinator, workflowRuntime } = createExecutor()
+		taskState.activeWorkflowName = "workflow-runtime-test"
+		taskState.activeWorkflowSession = createActiveWorkflowSession()
+		taskState.responseToolTurnShouldEnd = true
+		const executeSpy = sinon.spy()
+		coordinator.register(new LifecycleTestHandler(toolName, { kind: "return", toolResult: "methods" }, executeSpy))
+
+		const outcome = await executor.executeTool(createToolUse(toolName))
+
+		expect(outcome.status).to.equal("rejected")
+		expect(outcome.emittedToolResult).to.equal(false)
+		sinon.assert.notCalled(executeSpy)
+		sinon.assert.notCalled(workflowRuntime.handleModelToolResult)
+	})
 })

@@ -1804,6 +1804,7 @@ const PI_PLANNING_BRAINSTORMING_DOCUMENT = "/test/project/discovery/brainstormin
 const PI_PLANNING_ADDITIONAL_CONTEXT = "/test/project/discovery/research-notes.md"
 const PI_PLANNING_TARGET_EPIC = "Epic 7: Workflow runtime PI planning"
 const PI_PLANNING_EPIC_IDENTITY = "7"
+const PI_PLANNING_STORY_COUNT = 3
 const PI_PLANNING_IMPLEMENTATION_FOLDER = "/test/project/implementation"
 const PI_PLANNING_DRAFTS_FOLDER = "/test/project/implementation/drafts"
 const PI_PLANNING_STORIES_INDEX = "/test/project/implementation/epic-7-stories.index.json"
@@ -1839,6 +1840,7 @@ const createPiPlanningWorkflowSession = (
 		[PiPlanningWorkflowValueKey.AdditionalContext]: PI_PLANNING_ADDITIONAL_CONTEXT,
 		[PiPlanningWorkflowValueKey.TargetEpic]: PI_PLANNING_TARGET_EPIC,
 		[PiPlanningWorkflowValueKey.EpicIdentity]: PI_PLANNING_EPIC_IDENTITY,
+		[PiPlanningWorkflowValueKey.StoryCount]: PI_PLANNING_STORY_COUNT,
 		[PiPlanningWorkflowValueKey.ImplementationFolder]: PI_PLANNING_IMPLEMENTATION_FOLDER,
 		[PiPlanningWorkflowValueKey.DraftsFolder]: PI_PLANNING_DRAFTS_FOLDER,
 		[PiPlanningWorkflowValueKey.StoriesIndex]: PI_PLANNING_STORIES_INDEX,
@@ -3340,6 +3342,7 @@ describe("Prompt System Integration Tests", () => {
 				"list_code_definition_names",
 				"read_file",
 				"read_file_range",
+				"set_workflow_values",
 				"send_user_message",
 				"ask_followup_question",
 				"workflow_progress_request",

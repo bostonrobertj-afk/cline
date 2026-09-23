@@ -1226,6 +1226,24 @@ export class WorkflowRuntime {
 			throw new Error("Story count must be a positive integer.")
 		}
 
+		const session = args.taskState.activeWorkflowSession
+		const definition = this.getActiveWorkflowDefinition(args.taskState)
+		if (definition?.name === "pi-planning" && session?.activeStepNumber === 4) {
+			const persistedStoryCount = session.workflowValues.story_count
+			if (
+				typeof persistedStoryCount !== "number" ||
+				Number.isInteger(persistedStoryCount) === false ||
+				persistedStoryCount <= 0
+			) {
+				throw new Error("PI Planning requires a persisted positive-integer story_count before planning stories.")
+			}
+			if (args.storyCount !== persistedStoryCount) {
+				throw new Error(
+					`PI Planning story_count ${args.storyCount} does not match the approved persisted story_count ${persistedStoryCount}.`,
+				)
+			}
+		}
+
 		const preparation = await this.preparePlanStoryArtifacts({
 			taskState: args.taskState,
 			epicIdentity: args.epicIdentity,
@@ -6884,8 +6902,15 @@ export class WorkflowRuntime {
 					promptProjection,
 				}
 			}
-			case "terminal_error":
-				return await this.buildTerminalErrorNextAction({ taskState, errorMessage: action.errorMessage })
+			case "terminal_error": {
+				const toolBackedOperationError = action.appendToolBackedOperationError
+					? session.branchContext.failureState?.terminalErrorMessage
+					: undefined
+				const errorMessage = toolBackedOperationError
+					? `${action.errorMessage} ${toolBackedOperationError}`
+					: action.errorMessage
+				return await this.buildTerminalErrorNextAction({ taskState, errorMessage })
+			}
 			case "no_op":
 				return { kind: "no_op" }
 			case "complete_workflow":
@@ -9021,6 +9046,15 @@ export class WorkflowRuntime {
 								return {
 									valid: false,
 									errorMessage: `Workflow step ${step.id} route ${route.id} terminal_error errorMessage must not be empty.`,
+								}
+							}
+							if (
+								route.action.appendToolBackedOperationError !== undefined &&
+								typeof route.action.appendToolBackedOperationError !== "boolean"
+							) {
+								return {
+									valid: false,
+									errorMessage: `Workflow step ${step.id} route ${route.id} terminal_error appendToolBackedOperationError must be a boolean.`,
 								}
 							}
 							break

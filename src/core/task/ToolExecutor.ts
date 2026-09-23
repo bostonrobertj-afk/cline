@@ -496,7 +496,7 @@ export class ToolExecutor {
 				return { status: "rejected", emittedToolResult: false, workflowNextActions }
 			}
 
-			if (this.taskState.responseToolTurnShouldEnd) {
+			if (this.taskState.responseToolTurnShouldEnd && !this.isWorkflowRuntimeAuthoredToolUse(block)) {
 				const reason = block.partial
 					? "Tool was interrupted because a previous response tool already completed the current assistant turn."
 					: "Skipping tool because a previous response tool already completed the current assistant turn."

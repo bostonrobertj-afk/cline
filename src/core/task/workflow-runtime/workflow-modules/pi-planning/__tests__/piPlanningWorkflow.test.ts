@@ -35,6 +35,7 @@ const SAMPLE_WORKFLOW_VALUES: WorkflowValues = {
 	[PiPlanningWorkflowValueKey.AdditionalContext]: `${PROJECT_ROOT}/research/context.md`,
 	[PiPlanningWorkflowValueKey.TargetEpic]: "Epic 1: Improve workflow runtime",
 	[PiPlanningWorkflowValueKey.EpicIdentity]: "1",
+	[PiPlanningWorkflowValueKey.StoryCount]: 3,
 	[PiPlanningWorkflowValueKey.ImplementationFolder]: `${PROJECT_ROOT}/implementation`,
 	[PiPlanningWorkflowValueKey.DraftsFolder]: `${PROJECT_ROOT}/implementation/drafts`,
 	[PiPlanningWorkflowValueKey.StoriesIndex]: `${PROJECT_ROOT}/implementation/epic-1-stories.index.json`,
@@ -448,6 +449,7 @@ describe("piPlanningWorkflowDefinition", () => {
 			PiPlanningWorkflowValueKey.AdditionalContext,
 			PiPlanningWorkflowValueKey.TargetEpic,
 			PiPlanningWorkflowValueKey.EpicIdentity,
+			PiPlanningWorkflowValueKey.StoryCount,
 			PiPlanningWorkflowValueKey.StoriesIndex,
 			PiPlanningWorkflowValueKey.StoriesIndexExistedAtWorkflowStart,
 			PiPlanningWorkflowValueKey.EditIntent,
@@ -1526,6 +1528,8 @@ describe("piPlanningWorkflowDefinition", () => {
 					"Review provided context and existing runtime code/ tests to determine the full set of stories needed",
 					"Split a story if:",
 					"Stories should not be created that are only file edits, test updates, cleanup chores, or technical layers",
+					"set_workflow_values",
+					"story_count",
 					"workflow_progress_request",
 				],
 			},
@@ -1536,6 +1540,7 @@ describe("piPlanningWorkflowDefinition", () => {
 					"Epic 1: Improve workflow runtime",
 					SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.StoriesIndex].toString(),
 					SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.EpicIdentity].toString(),
+					SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.StoryCount].toString(),
 					SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.ImplementationFolder].toString(),
 					"Review the existing story index, then call plan_story_artifacts",
 					"The story index file can be found in",
@@ -1722,8 +1727,11 @@ Once the user is fully aligned with the story set and each story's content, use 
 			`Story Index: ${SAMPLE_WORKFLOW_VALUES[PiPlanningWorkflowValueKey.StoriesIndex].toString()}`,
 		)
 		expect(step4ExistingPrompt).to.include("Review the existing story index, then call plan_story_artifacts")
+		expect(step4ExistingPrompt).to.include("Set epic_identity to 1 and story_count to the approved persisted value 3")
+		expect(step4ExistingPrompt).not.to.include("Use 1 when calling the tool")
 		const step4NewPrompt = buildPrompt("step-4", storyIndexPresentButCreatedDuringWorkflowValues)
 		expect(step4NewPrompt).to.include("Generate the story index by calling plan_story_artifacts")
+		expect(step4NewPrompt).to.include("Set epic_identity to 1 and story_count to the approved persisted value 3")
 		expect(step4NewPrompt).not.to.include("Review the existing story index, then call plan_story_artifacts")
 
 		const step5ExistingPrompt = buildPrompt("step-5", existingIndexValues)
@@ -1764,20 +1772,49 @@ Once the user is fully aligned with the story set and each story's content, use 
 
 		for (const progressionCase of progressionCases) {
 			const branch = getStep(progressionCase.stepId).decisionTree.branches[progressionCase.awaitBranchId]
-			expect(branch?.routes.map((route) => route.id)).to.deep.equal([
-				progressionCase.confirmedRouteId,
-				progressionCase.deniedRouteId,
-			])
+			const expectedRouteIds =
+				progressionCase.stepId === "step-3"
+					? [
+							"step-3-return-to-project-prompt-without-story-count",
+							progressionCase.confirmedRouteId,
+							progressionCase.deniedRouteId,
+						]
+					: [progressionCase.confirmedRouteId, progressionCase.deniedRouteId]
+			expect(branch?.routes.map((route) => route.id)).to.deep.equal(expectedRouteIds)
 
 			const confirmedRoute = findRoute(
 				progressionCase.stepId,
 				progressionCase.awaitBranchId,
 				progressionCase.confirmedRouteId,
 			)
-			expect(confirmedRoute.trigger).to.deep.equal({
-				kind: "on_event",
-				eventKind: "workflow_progress_request_confirmed",
-			})
+			if (progressionCase.stepId === "step-3") {
+				expectEventPredicateMatches({
+					route: confirmedRoute,
+					activeBranchId: progressionCase.awaitBranchId,
+					workflowValues: SAMPLE_WORKFLOW_VALUES,
+					step: getStep(progressionCase.stepId),
+					triggerEvent: { kind: "workflow_progress_request_confirmed" },
+				})
+				const missingCountRoute = findRoute(
+					"step-3",
+					"step-3-await-progress-request",
+					"step-3-return-to-project-prompt-without-story-count",
+				)
+				const missingCountWorkflowValues: WorkflowValues = { ...SAMPLE_WORKFLOW_VALUES }
+				delete missingCountWorkflowValues[PiPlanningWorkflowValueKey.StoryCount]
+				expectEventPredicateMatches({
+					route: missingCountRoute,
+					activeBranchId: "step-3-await-progress-request",
+					workflowValues: missingCountWorkflowValues,
+					step: getStep("step-3"),
+					triggerEvent: { kind: "workflow_progress_request_confirmed" },
+				})
+			} else {
+				expect(confirmedRoute.trigger).to.deep.equal({
+					kind: "on_event",
+					eventKind: "workflow_progress_request_confirmed",
+				})
+			}
 			expectTransitionStepAction(confirmedRoute.action, progressionCase.nextStepNumber)
 
 			const deniedRoute = findRoute(progressionCase.stepId, progressionCase.awaitBranchId, progressionCase.deniedRouteId)

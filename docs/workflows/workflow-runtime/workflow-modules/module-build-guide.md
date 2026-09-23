@@ -14,7 +14,7 @@ Reference implementation:
 - Module registry/data: `src/core/task/workflow-runtime/workflow-modules/brainstorming/brainstormingTechniqueRegistry.ts`
 - Module exports: `src/core/task/workflow-runtime/workflow-modules/brainstorming/index.ts`
 
-The checked-in brainstorming module remains the reference for overall module composition, but it predates the target `projectOutputPlacement` migration and still uses the former `projectSubfolder` field. New requirements and action plans must follow the target contract in this guide and must include migration of affected workflow definitions, `ShippedWorkflowMetadata`, runtime path resolution, and tests rather than copying that legacy field.
+The checked-in brainstorming module remains the reference for overall module composition and uses the current project-selection and output-placement contracts: `projectSelection: { kind: "interactive" }` and `projectOutputPlacement: { kind: "selected_project_subfolder", subfolder: "discovery" }`. The migration from the former `projectSubfolder` field is complete. New requirements and action plans must use the `projectSelection` and `projectOutputPlacement` contracts described in this guide and must not reintroduce `projectSubfolder` or a compatibility alias.
 
 ## Build Order
 

@@ -27,6 +27,7 @@ const STEP_3_TOOL_NAMES: readonly string[] = [
 	"list_code_definition_names",
 	"read_file",
 	"read_file_range",
+	"set_workflow_values",
 	"send_user_message",
 	"ask_followup_question",
 	"workflow_progress_request",
@@ -141,17 +142,35 @@ describe("piPlanningToolSchemas", () => {
 		).to.deep.equal(["read_file", "apply_patch", "send_user_message", "ask_followup_question", "attempt_completion"])
 	})
 
-	it("exposes set_workflow_values only in Step 4", () => {
+	it("exposes set_workflow_values only in Step 3 and Step 4", () => {
+		const step3ToolNames = schemaNames(buildPiPlanningStep3ToolSchemas())
 		const step4ToolNames = schemaNames(buildPiPlanningStep4ToolSchemas())
+		expect(step3ToolNames).to.include("set_workflow_values")
 		expect(step4ToolNames).to.include("set_workflow_values")
 
-		const nonStep4Builders: readonly ToolSchemaBuilder[] = PI_PLANNING_NON_STEP_6_BUILDERS.filter(
-			(buildToolSchemas) => buildToolSchemas !== buildPiPlanningStep4ToolSchemas,
+		const nonWritableStepBuilders: readonly ToolSchemaBuilder[] = PI_PLANNING_NON_STEP_6_BUILDERS.filter(
+			(buildToolSchemas) =>
+				buildToolSchemas !== buildPiPlanningStep3ToolSchemas && buildToolSchemas !== buildPiPlanningStep4ToolSchemas,
 		)
 
-		for (const buildToolSchemas of nonStep4Builders) {
+		for (const buildToolSchemas of nonWritableStepBuilders) {
 			expect(schemaNames(buildToolSchemas())).not.to.include("set_workflow_values")
 		}
+	})
+
+	it("restricts Step 3 set_workflow_values to positive-integer story_count", () => {
+		const setWorkflowValuesSchema = buildPiPlanningStep3ToolSchemas().find((schema) => schema.name === "set_workflow_values")
+		if (setWorkflowValuesSchema === undefined) {
+			throw new Error("Expected Step 3 to expose set_workflow_values")
+		}
+		const valuesParameter = setWorkflowValuesSchema.parameters?.find((parameter) => parameter.name === "values")
+		if (valuesParameter === undefined) {
+			throw new Error("Expected Step 3 set_workflow_values to define values")
+		}
+
+		expect(valuesParameter.properties).to.deep.equal({ story_count: { type: "integer", minimum: 1 } })
+		expect(valuesParameter.requiredProperties).to.deep.equal(["story_count"])
+		expect(valuesParameter.additionalProperties).to.equal(false)
 	})
 
 	it("restricts Step 4 set_workflow_values to the stories_index value key", () => {

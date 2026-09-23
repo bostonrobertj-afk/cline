@@ -617,6 +617,7 @@ function buildStep2DecisionTree(): WorkflowDecisionTree {
 						action: {
 							kind: "terminal_error",
 							errorMessage: "Unable to allocate Epics.index.json.",
+							appendToolBackedOperationError: true,
 						},
 					},
 				],

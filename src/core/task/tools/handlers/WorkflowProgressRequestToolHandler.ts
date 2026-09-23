@@ -12,6 +12,15 @@ import type { StronglyTypedUIHelpers } from "../types/UIHelpers"
 
 const responseToolRuntime = new ResponseToolRuntime()
 
+function parseWorkflowProgressResponse(text: string | undefined): { selected: "Yes" | "No" } | undefined {
+	const match = text?.match(/^(Yes|No)(?::[\s\S]*)?$/)
+	if (!match) {
+		return undefined
+	}
+
+	return { selected: match[1] as "Yes" | "No" }
+}
+
 export class WorkflowProgressRequestToolHandler implements IToolHandler, IPartialBlockHandler {
 	readonly name = ClineDefaultTool.WORKFLOW_PROGRESS_REQUEST
 
@@ -59,23 +68,24 @@ export class WorkflowProgressRequestToolHandler implements IToolHandler, IPartia
 			images,
 			files: followupFiles,
 		} = await config.callbacks.ask("followup", JSON.stringify(sharedMessage), false)
+		const progressResponse = parseWorkflowProgressResponse(text)
 
-		if (text === "Yes" || text === "No") {
+		if (progressResponse) {
 			const clineMessages = config.messageState.getClineMessages()
 			const lastFollowupMessage = findLast(clineMessages, (m: any) => m.ask === "followup")
 			if (lastFollowupMessage) {
 				lastFollowupMessage.text = JSON.stringify({
 					...sharedMessage,
-					selected: text,
+					selected: progressResponse.selected,
 				} satisfies ClineAskQuestion)
 				await config.messageState.saveClineMessagesAndUpdateHistory()
 			}
 
 			const nextAction = await config.workflowRuntime.submitWorkflowProgressRequest({
 				taskState: config.taskState,
-				approved: text === "Yes",
+				approved: progressResponse.selected === "Yes",
 			})
-			if (text === "Yes" && nextAction.kind === "no_op") {
+			if (progressResponse.selected === "Yes" && nextAction.kind === "no_op") {
 				return formatResponse.toolError("workflow_progress_request could not advance the active workflow step.")
 			}
 			if (nextAction.kind !== "no_op") {

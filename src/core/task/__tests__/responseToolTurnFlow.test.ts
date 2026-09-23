@@ -265,18 +265,13 @@ describe("response tool turn flow", () => {
 		})
 
 		assert.equal(result, true)
-		sinon.assert.calledOnceWithExactly(messageStateHandler.addToApiConversationHistory, {
-			role: "user",
-			content: [
-				{
-					type: "tool_result",
-					tool_use_id: "toolu_send_message",
-					content: "[Message displayed.]",
-				},
-			],
-			ts: sinon.match.number,
-		} as any)
+		sinon.assert.notCalled(messageStateHandler.addToApiConversationHistory)
 		sinon.assert.calledOnceWithExactly(recursivelyMakeClineRequests, [
+			{
+				type: "tool_result",
+				tool_use_id: "toolu_send_message",
+				content: "[Message displayed.]",
+			},
 			{
 				type: "text",
 				text: formatResponse.normalNextTurnDialogue("user_message", "Tighten the summary."),
@@ -326,7 +321,13 @@ describe("response tool turn flow", () => {
 		})
 
 		assert.equal(result, true)
+		sinon.assert.notCalled(messageStateHandler.addToApiConversationHistory)
 		sinon.assert.calledOnceWithExactly(recursivelyMakeClineRequests, [
+			{
+				type: "tool_result",
+				tool_use_id: "toolu_workflow_progress_request",
+				content: "[Message displayed.]",
+			},
 			{
 				type: "text",
 				text: formatResponse.normalNextTurnDialogue("user_message", "Yes"),

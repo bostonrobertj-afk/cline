@@ -1,6 +1,6 @@
 import type { ToolUse } from "@core/assistant-message"
 import { expect } from "chai"
-import { access, mkdtemp, readFile, rm, writeFile } from "fs/promises"
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises"
 import { afterEach, beforeEach, describe, it } from "mocha"
 import { tmpdir } from "os"
 import path from "path"
@@ -19,6 +19,7 @@ import type {
 import * as WorkflowRegistry from "@/core/task/workflow-runtime/WorkflowRegistry"
 import type { WorkflowArtifactAllocationOutput } from "@/core/task/workflow-runtime/WorkflowRuntime"
 import { WorkflowRuntime } from "@/core/task/workflow-runtime/WorkflowRuntime"
+import { createEpicsWorkflowDefinition } from "@/core/task/workflow-runtime/workflow-modules/create-epics"
 import { ClineDefaultTool } from "@/shared/tools"
 import * as pathUtils from "@/utils/path"
 import { ToolValidator } from "../../ToolValidator"
@@ -588,6 +589,58 @@ describe("CreateWorkflowArtifactToolHandler", () => {
 			await access(artifactAbsolutePath)
 			expect(await readFile(artifactAbsolutePath, "utf8")).to.equal("")
 			expect(parsedResult.persisted_artifact_output_values.epic_artifact_absolute_path).to.equal(artifactAbsolutePath)
+		} finally {
+			await rm(tmpCwd, { recursive: true, force: true })
+		}
+	})
+
+	it("allocates the real Create Epics index artifact after Epics.md already exists", async () => {
+		const tmpCwd = await mkdtemp(path.join(tmpdir(), "create-epics-index-artifact-handler-test-"))
+		try {
+			sandbox
+				.stub(WorkflowRegistry, "resolveWorkflowDefinition")
+				.callsFake((workflowName: string) =>
+					workflowName === createEpicsWorkflowDefinition.name ? createEpicsWorkflowDefinition : undefined,
+				)
+			const taskState = new TaskState()
+			taskState.activeWorkflowName = createEpicsWorkflowDefinition.name
+			taskState.activeWorkflowSession = {
+				...createActiveWorkflowSession(createEpicsWorkflowDefinition),
+				activeStepNumber: 2,
+				workflowValues: {
+					output_file: path.join(tmpCwd, "docs", "projects", "real-artifact-project", "planning", "Epics.md"),
+				},
+				branchContext: { activeBranchId: "step-2-await-attempt-completion" },
+			}
+			const epicsPath = taskState.activeWorkflowSession.workflowValues.output_file as string
+			await mkdir(path.dirname(epicsPath), { recursive: true })
+			await writeFile(epicsPath, "# Epics\n\n## Epic 1: Runtime Test\n", { encoding: "utf8", flag: "wx" })
+			const runtime = new WorkflowRuntime({
+				cwd: tmpCwd,
+				workspacePathPolicy: createAllowAllWorkspacePathPolicy(),
+			})
+			const { config } = createConfig({ cwd: tmpCwd, taskState, workflowRuntime: runtime })
+			const handler = new CreateWorkflowArtifactToolHandler(createToolValidator(config.cwd))
+
+			const result = await handler.execute(config, createArtifactBlock({ artifactId: "epics_index" }))
+
+			expect(typeof result).to.equal("string")
+			if (typeof result !== "string") {
+				throw new Error("Expected string tool result.")
+			}
+			const parsedResult = JSON.parse(result)
+			const expectedIndexPath = path.join(
+				tmpCwd,
+				"docs",
+				"projects",
+				"real-artifact-project",
+				"planning",
+				"Epics.index.json",
+			)
+			expect(parsedResult.artifact_absolute_path).to.equal(expectedIndexPath)
+			await access(expectedIndexPath)
+			expect(await readFile(expectedIndexPath, "utf8")).to.equal("")
+			expect(taskState.activeWorkflowSession.workflowValues.epics_index_file).to.equal(expectedIndexPath)
 		} finally {
 			await rm(tmpCwd, { recursive: true, force: true })
 		}

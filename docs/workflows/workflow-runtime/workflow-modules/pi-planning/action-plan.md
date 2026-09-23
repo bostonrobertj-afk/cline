@@ -59,7 +59,7 @@ Sibling-pattern audit summary:
 - Do not add a new artifact family.
 - Do not add a new backend tool.
 - Do not expose `build_workflow_document`, `create_workflow_artifact`, `archive_workflow_artifact`, `delete_workflow_artifact`, or `move_workflow_project_file` in any pi-planning model-facing tool schema.
-- Do not expose `set_workflow_values` outside Step 4, and Step 4 must restrict it to `stories_index`.
+- Do not expose `set_workflow_values` outside Step 3 and Step 4. Step 3 must restrict it to `story_count`; Step 4 must restrict it to `stories_index`.
 - Do not expose `execute_command` in the pi-planning workflow.
 - Do not add compatibility aliases for `pi-planning.md`; the runtime workflow identity is `pi-planning`.
 - Do not add exact prompt-prose tests for editable step prompt wording unless the assertion protects a stable runtime contract or forbidden tool boundary.
@@ -1195,7 +1195,7 @@ Allowed files:
 
     [x] Subtask 19.9: Run `git diff --name-only && git ls-files --others --exclude-standard` and confirm persistent diffs and untracked files are limited to Phase 8 allowed files: `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`, `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`, `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`, `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts`, `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`, and `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/pi-planning/action-plan.md`.
 
-## Validation
+## Completed Phase 1-8 Validation Record
 
 Required validation after all phases are complete:
 
@@ -1218,4 +1218,74 @@ git ls-files --others --exclude-standard
 Expected `rg` result:
 
 - The `Epic-\{E\}-delivery-spec`, Required Context panel, shared target-story resolver, and legacy source-alias `rg` commands above must return no matches. If a command returns matches, review whether the match is this action-plan document or a test-only negative fixture. Runtime source matches must be treated as failures unless explicitly justified by the requirements.
-- The backend-only/model-facing tool guard must return no matches for `build_workflow_document`, `create_workflow_artifact`, `archive_workflow_artifact`, `delete_workflow_artifact`, `move_workflow_project_file`, or `execute_command`; any `set_workflow_values` matches must be limited to the Step 4 schema builder and the Step 4-only `buildPiPlanningSetWorkflowValuesToolSchema` helper.
+- For the completed Phase 1-8 implementation, the backend-only/model-facing tool guard returned no matches for `build_workflow_document`, `create_workflow_artifact`, `archive_workflow_artifact`, `delete_workflow_artifact`, `move_workflow_project_file`, or `execute_command`; at that historical checkpoint, `set_workflow_values` was limited to Step 4. Phase 9 intentionally supersedes that Step 4-only boundary.
+
+### Phase 9 - Persisted Story Count And Planning Enforcement
+
+This phase remedies the production defect where the rendered Step 4 sentence `Use 1 when calling the tool` allowed the selected epic identity to be mistaken for `story_count`. The approved design uses the existing `set_workflow_values` capability in Step 3 to persist the user-visible story total before progression.
+
+After completing this phase, pause for QA review.
+
+[x] Task 20. Add the Step 3 story-count workflow-value contract and unambiguous Step 4 prompt.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningToolSchemas.ts`
+
+[x] Subtask 20.1. In `PiPlanningWorkflowValueKey`, add `StoryCount = "story_count"`; allow the existing workflow-value inventory construction to include it.
+
+[x] Subtask 20.2. Add a dedicated Step 3 `set_workflow_values` schema whose required `values` object permits exactly one required property, `story_count`, with integer type, JSON Schema `minimum: 1`, and prompt instruction identifying it as the approved total number of primary stories. Preserve the Step 4 schema as a separate builder permitting only required string `stories_index`.
+
+[x] Subtask 20.3. Update `buildPiPlanningStep3ToolSchemas()` to return exactly `list_files`, `search_files`, `list_code_definition_names`, `read_file`, `read_file_range`, `set_workflow_values`, `send_user_message`, `ask_followup_question`, and `workflow_progress_request`.
+
+[x] Subtask 20.4. Update the Step 3 prompt to require the AI to explain its story total, persist that positive integer as `story_count`, and only then call `workflow_progress_request`.
+
+[x] Subtask 20.5. Add a typed positive-integer workflow-value reader and update the Step 3 confirmed-progress trigger so confirmation advances to Step 4 only when valid persisted `story_count` exists. Add a higher-priority confirmed-without-valid-count recovery route back to the Step 3 project prompt.
+
+[x] Subtask 20.6. Update both Step 4 prompt branches to render explicit parameter ownership: `epic_identity` must equal the persisted selected epic identity and `story_count` must equal the approved persisted story count. Remove every ambiguous `Use {workflow.epic_identity} when calling the tool` sentence from Step 4.
+
+[x] Task 21. Enforce the approved persisted story count at the model-tool execution boundary.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/WorkflowRuntime.ts`
+
+[x] Subtask 21.1. In `WorkflowRuntime.planStoryArtifacts(...)`, when the active workflow definition name is `pi-planning` and the active step number is `4`, read persisted `story_count` from the active workflow session. Require it to be a positive integer and require `args.storyCount` to equal it before any story-index read or write.
+
+[x] Subtask 21.2. Return a deterministic tool error without writing files when the persisted count is missing or invalid, or when the tool argument differs from it. Keep non-PI-planning callers and other PI Planning steps on their existing behavior.
+
+[x] Task 22. Add regression coverage for persisted count ownership and enforcement.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/prompts/system-prompt/__tests__/integration.test.ts`
+
+[x] Subtask 22.1. Prove `story_count` is declared in the workflow-value inventory and Step 3 projects `set_workflow_values` restricted to required positive-integer `story_count`; prove Step 4 remains restricted to `stories_index`.
+
+[x] Subtask 22.2. Prove Step 3 cannot transition on confirmed progress without a valid persisted count and does transition when `story_count: 3` is present.
+
+[x] Subtask 22.3. Prove both Step 4 prompt branches render `epic_identity` and `story_count` as separately named arguments; for epic identity `1` and approved count `3`, assert the prompt directs `epic_identity: 1` and `story_count: 3` and does not contain `Use 1 when calling the tool`.
+
+[x] Subtask 22.4. Add `WorkflowRuntime` coverage proving active PI Planning Step 4 accepts matching `story_count: 3`, rejects `story_count: 1`, rejects a missing or invalid persisted count before file mutation, and preserves existing story-planning behavior outside active PI Planning Step 4.
+
+[x] Subtask 22.5. Update prompt integration fixtures and exact Step 3 native-tool projections to include `story_count` and `set_workflow_values`.
+
+[x] Task 23. Run Phase 9 validation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/workflow-modules/pi-planning/action-plan.md`
+
+[x] Subtask 23.1. Run `npm run test:unit -- src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningWorkflow.test.ts src/core/task/workflow-runtime/workflow-modules/pi-planning/__tests__/piPlanningToolSchemas.test.ts`.
+
+[x] Subtask 23.2. Run `npm run test:unit -- src/core/task/workflow-runtime/__tests__/WorkflowRuntime.test.ts`.
+
+[x] Subtask 23.3. Run `npm run test:unit -- src/core/prompts/system-prompt/__tests__/integration.test.ts`.
+
+[x] Subtask 23.4. Run `npm run check-types` with elevated permissions. If it fails before TypeScript checking because generated proto files are missing or host probing fails, run `npm run protos`, then rerun `npm run check-types` with elevated permissions before treating the failure as a code defect.
+
+[x] Subtask 23.5. Run `npm run lint`.
+
+[x] Subtask 23.6. Run `rg -n "Generate the story index.*Use \{workflow\.epic_identity\}|Review the existing story index.*Use \{workflow\.epic_identity\}" src/core/task/workflow-runtime/workflow-modules/pi-planning/piPlanningWorkflow.ts` and confirm no matches for either retired ambiguous Step 4 sentence pattern.
+
+[x] Subtask 23.7. Run `git diff --name-only && git ls-files --others --exclude-standard` and report whether persistent diffs and untracked files are limited to the Phase 9 authorized file set.

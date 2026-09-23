@@ -486,15 +486,17 @@ export async function handleCompletedResponseToolTurn(params: {
 	setThreadDisplayState: (threadDisplayState: ThreadDisplayState, reason: string, details?: Record<string, unknown>) => void
 	postStateToWebview: () => Promise<void>
 }) {
+	const continuedUserContent = await consumeCompletedResponseToolContinuationUserContent(params.taskState)
+	if (continuedUserContent) {
+		const completedToolResultContent = cloneDeep(params.taskState.completedResponseToolResultContent)
+		params.taskState.completedResponseToolResultContent = []
+		return await params.recursivelyMakeClineRequests([...completedToolResultContent, ...continuedUserContent])
+	}
+
 	await persistCompletedResponseToolResultIfNeeded({
 		taskState: params.taskState,
 		messageStateHandler: params.messageStateHandler,
 	})
-
-	const continuedUserContent = await consumeCompletedResponseToolContinuationUserContent(params.taskState)
-	if (continuedUserContent) {
-		return await params.recursivelyMakeClineRequests(continuedUserContent)
-	}
 
 	if (params.completedResponseTool.threadDisplayStateAfterTurnEnds && !params.abort) {
 		params.setThreadDisplayState(params.completedResponseTool.threadDisplayStateAfterTurnEnds, "response_tool_turn_ended", {
@@ -4277,18 +4279,20 @@ export class Task {
 				}
 
 				if (this.taskState.completedResponseToolResultContent.length > 0) {
+					const continuedUserContent = await consumeCompletedResponseToolContinuationUserContent(this.taskState)
+					if (continuedUserContent) {
+						const completedToolResultContent = cloneDeep(this.taskState.completedResponseToolResultContent)
+						this.taskState.completedResponseToolResultContent = []
+						Logger.warn(
+							`[Task ${this.taskId}] response-tool fallback continuation gate engaged with provider-balanced tool output`,
+						)
+						return await this.recursivelyMakeClineRequests([...completedToolResultContent, ...continuedUserContent])
+					}
+
 					await persistCompletedResponseToolResultIfNeeded({
 						taskState: this.taskState,
 						messageStateHandler: this.messageStateHandler,
 					})
-
-					const continuedUserContent = await consumeCompletedResponseToolContinuationUserContent(this.taskState)
-					if (continuedUserContent) {
-						Logger.warn(
-							`[Task ${this.taskId}] response-tool fallback continuation gate engaged after completed-result persistence`,
-						)
-						return await this.recursivelyMakeClineRequests(continuedUserContent)
-					}
 
 					Logger.warn(
 						`[Task ${this.taskId}] response-tool fallback stop engaged after completed-result persistence with no explicit continuation content`,

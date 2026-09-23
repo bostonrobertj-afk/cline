@@ -372,7 +372,7 @@ export type WorkflowDecisionAction =
 	| { kind: "resolve_prerequisite_files"; prerequisiteIds: readonly string[] }
 	| { kind: "transition_step"; target: WorkflowStepTransitionTarget }
 	| { kind: "project_prompt" }
-	| { kind: "terminal_error"; errorMessage: string }
+	| { kind: "terminal_error"; errorMessage: string; appendToolBackedOperationError?: boolean }
 	| { kind: "complete_workflow" }
 	| { kind: "no_op" }
 

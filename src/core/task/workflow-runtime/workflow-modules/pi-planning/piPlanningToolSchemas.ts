@@ -276,7 +276,30 @@ export function buildPiPlanningGenerateStoryFilesToolSchema(): ClineToolSpec {
 	}
 }
 
-export function buildPiPlanningSetWorkflowValuesToolSchema(): ClineToolSpec {
+export function buildPiPlanningStep3SetWorkflowValuesToolSchema(): ClineToolSpec {
+	return {
+		variant: PI_PLANNING_TOOL_SCHEMA_VARIANT,
+		id: ClineDefaultTool.SET_WORKFLOW_VALUES,
+		name: "set_workflow_values",
+		description: "Persist the approved PI Planning story count for the active workflow session.",
+		parameters: [
+			{
+				name: "values",
+				required: true,
+				type: "object",
+				instruction: "Persist the approved total number of primary stories as story_count.",
+				description: "Approved PI Planning story count.",
+				properties: {
+					story_count: { type: "integer", minimum: 1 },
+				},
+				requiredProperties: ["story_count"],
+				additionalProperties: false,
+			},
+		],
+	}
+}
+
+export function buildPiPlanningStep4SetWorkflowValuesToolSchema(): ClineToolSpec {
 	return {
 		variant: PI_PLANNING_TOOL_SCHEMA_VARIANT,
 		id: ClineDefaultTool.SET_WORKFLOW_VALUES,
@@ -315,6 +338,7 @@ export function buildPiPlanningStep3ToolSchemas(): readonly ClineToolSpec[] {
 		buildPiPlanningListCodeDefinitionNamesToolSchema(),
 		buildPiPlanningReadFileToolSchema(),
 		buildPiPlanningReadFileRangeToolSchema(),
+		buildPiPlanningStep3SetWorkflowValuesToolSchema(),
 		buildPiPlanningSendUserMessageToolSchema(),
 		buildPiPlanningAskFollowupQuestionToolSchema(),
 		buildPiPlanningWorkflowProgressRequestToolSchema(),
@@ -325,7 +349,7 @@ export function buildPiPlanningStep4ToolSchemas(): readonly ClineToolSpec[] {
 	return [
 		buildPiPlanningReadFileToolSchema(),
 		buildPiPlanningPlanStoryArtifactsToolSchema(),
-		buildPiPlanningSetWorkflowValuesToolSchema(),
+		buildPiPlanningStep4SetWorkflowValuesToolSchema(),
 		buildPiPlanningSendUserMessageToolSchema(),
 		buildPiPlanningAskFollowupQuestionToolSchema(),
 		buildPiPlanningWorkflowProgressRequestToolSchema(),

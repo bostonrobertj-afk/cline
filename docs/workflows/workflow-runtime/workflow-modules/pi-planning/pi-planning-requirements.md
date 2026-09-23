@@ -78,6 +78,7 @@ The module must include workflow-value keys for:
 - optional `additional_context`, the user-provided full file paths for additional context files
 - `target_epic`, the selected epic's user-facing label or title
 - `epic_identity`, the selected epic's canonical positive numeric identity
+- optional `story_count`, the positive integer total number of primary stories approved during Step 3 for the selected epic
 - optional `stories_index`, the selected epic's `implementation/epic-{E}-stories.index.json` absolute path when it exists at workflow start or after story planning
 - `stories_index_existed_at_workflow_start`, a boolean indicating whether the selected epic already had a story index when Step 1 derived selected-epic values
 - optional `edit_intent`, the user's Panel B selection, with exact allowed values `Complete initial story buildout` and `edit existing story file`
@@ -94,13 +95,16 @@ Workflow-owned values must clear on teardown and participate in safe resume thro
 
 ## AI-Writable Workflow Values
 
+The pi-planning module must define `story_count` as AI-writable only for Step 3. Step 3 must expose `set_workflow_values` with only the `story_count` key, and the value must be a positive integer. This write records the story total the AI has explained to the user before asking for progression approval.
+
 The pi-planning module must define `stories_index` as AI-writable only for Step 4, and only so the AI can persist the generated story-index absolute path after successfully calling `plan_story_artifacts` for an epic that did not have a story index at workflow start.
 
-Step 4 is the only pi-planning step that may expose `set_workflow_values`.
+Step 3 and Step 4 are the only pi-planning steps that may expose `set_workflow_values`. Each step must use a step-specific schema:
 
-When exposed in Step 4, `set_workflow_values` must allow writing only the `stories_index` key. It must not allow the AI to mutate `epic_identity`, `target_epic`, prerequisite file paths, project folder paths, story identities, story filenames, story counts, or any artifact metadata.
+- Step 3 permits only `story_count` as a required positive integer.
+- Step 4 permits only `stories_index` as a required string.
 
-No other pi-planning step may expose `set_workflow_values`.
+Neither schema may allow the AI to mutate `epic_identity`, `target_epic`, prerequisite file paths, project folder paths, story identities, story filenames, any other workflow value, or artifact metadata.
 
 ## Required And Optional Prerequisite Files
 
@@ -327,7 +331,7 @@ Split a story if:
 
 Stories should not be created that are only file edits, test updates, cleanup chores, or technical layers unless that layer is itself the deliverable contract.
 
-Once you've determined how many stories are needed, provide an update to the user explaining how many stories are needed, then call workflow_progress_request to unlock the next workflow step's instructions.
+Once you've determined how many stories are needed, provide an update to the user explaining how many stories are needed. Then call set_workflow_values to persist that positive integer as story_count. Only after story_count is persisted, call workflow_progress_request to unlock the next workflow step's instructions.
 ```
 
 The Step 3 prompt must not render source-document conditional marker text such as `Shown only if` or `end conditional prompt block`.
@@ -339,6 +343,7 @@ Step 3 tool schema must expose exactly:
 - `list_code_definition_names`
 - `read_file`
 - `read_file_range`
+- `set_workflow_values`
 - `send_user_message`
 - `ask_followup_question`
 - `workflow_progress_request`
@@ -346,7 +351,6 @@ Step 3 tool schema must expose exactly:
 Step 3 must not expose:
 
 - `apply_patch`
-- `set_workflow_values`
 - `plan_story_artifacts`
 - `generate_story_files`
 - `attempt_completion`
@@ -356,7 +360,9 @@ Step 3 must not expose:
 - `delete_workflow_artifact`
 - `move_workflow_project_file`
 
-Step 3 must transition to Step 4 only on `workflow_progress_request_confirmed`. A denied progression request must return to the Step 3 project prompt.
+Step 3 `set_workflow_values` exposure must be limited to the required positive-integer `story_count` key.
+
+Step 3 must transition to Step 4 only on `workflow_progress_request_confirmed` when a valid persisted `story_count` exists. A denied progression request must return to the Step 3 project prompt. A confirmation without a valid persisted `story_count` must fail closed and return to the Step 3 project prompt without advancing.
 
 ## Step 4: Generate An Updated Story Index
 
@@ -371,7 +377,7 @@ This system uses a story index as the canonical indicator of which stories must 
 Target epic: {target_epic}
 Story Index: {stories_index}
 
-Review the existing story index, then call plan_story_artifacts if additional stories are required beyond what the story index indicates. Use {epic_identity} when calling the tool. Indicate how many story files are needed to support delivery of {target_epic}. This tool will add additional stories to the existing story index when you indicate a number of stories greater than the index already contains. e.g. if a story index exists with three story files, and you call plan_story_artifacts and include story_count: 5, the tool will add 2 additional stories to the index so that it contains a total of 5 stories.
+Review the existing story index, then call plan_story_artifacts if additional stories are required beyond what the story index indicates. Set epic_identity to {epic_identity} and story_count to the approved persisted value {story_count}. This tool will add additional stories to the existing story index when story_count is greater than the number of primary stories the index already contains. e.g. if a story index exists with three story files, and you call plan_story_artifacts and include story_count: 5, the tool will add 2 additional stories to the index so that it contains a total of 5 stories.
 
 If the existing story index does not need additional stories added, use workflow_progress_request to unlock the next workflow step's instructions.
 ```
@@ -379,7 +385,7 @@ If the existing story index does not need additional stories added, use workflow
 When `stories_index` did not exist at workflow start, the Step 4 prompt must include this source prompt text:
 
 ```text
-This system uses a story index as the canonical indicator of which stories must exist for each epic. Generate the story index by calling plan_story_artifacts and including the total number of stories required in the story_count field. Use {epic_identity} when calling the tool.
+This system uses a story index as the canonical indicator of which stories must exist for each epic. Generate the story index by calling plan_story_artifacts. Set epic_identity to {epic_identity} and story_count to the approved persisted value {story_count}.
 
 Once you generate the story index, call set_workflow_values to set the generated file's full file path as the stories_index workflow session key.
 ```
@@ -402,6 +408,8 @@ Step 4 tool schema must expose exactly:
 - `workflow_progress_request`
 
 Step 4 `set_workflow_values` exposure must be limited to `stories_index`.
+
+Before executing `plan_story_artifacts` during an active pi-planning Step 4 turn, runtime must require a persisted positive-integer `story_count` and require the tool's `story_count` argument to equal that persisted value. A missing, invalid, or mismatched value must fail the tool call without creating or updating the story index.
 
 Step 4 must not expose:
 
@@ -618,7 +626,10 @@ The pi-planning module must include module tests for:
 - Step 2 prompt source output for optional-context states: brainstorming only, additional context only, both present, and neither present
 - Step 2 prompt output excluding absent optional context lines and excluding the invented fallback text `not provided`
 - Step 3 prompt source output, including the source-backed existing-story-index conditional prompt section, the source-backed shared prompt body, and exclusion of source-document conditional marker text
+- Step 3 `set_workflow_values` schema restriction to the required positive-integer `story_count` key
+- Step 3 persistence of `story_count` before progression and fail-closed behavior when confirmation occurs without a valid persisted count
 - Step 4 prompt source output for existing and missing story-index branches, including source-backed branch text, the shared story-index location line, and exclusion of source-document conditional marker text
+- Step 4 prompt output explicitly distinguishing `epic_identity` from the persisted `story_count`
 - Step 5 prompt source output for existing and missing story-index branches, including source-backed branch text, the shared generated-story-file location line, and exclusion of source-document conditional marker text
 - Step 6 prompt source output for the initial-buildout variant
 - Step 6 prompt source output for the edit-existing-story variant
@@ -627,6 +638,7 @@ The pi-planning module must include module tests for:
 - exact Step 6 initial-buildout tool-schema output
 - exact Step 6 edit-existing-story tool-schema output
 - Step 4 `set_workflow_values` schema restriction to `stories_index`
+- `plan_story_artifacts` rejection when its `story_count` is missing from the active PI Planning session, invalid, or different from the persisted approved count
 - Step 4 transition after successful existing-index `plan_story_artifacts` re-entry and after new-index `stories_index` persistence
 - Step 4 transition after confirmed no-additional-stories progression
 - Step 5 transition after successful `generate_story_files`
@@ -640,7 +652,7 @@ Tests must verify that model-facing schemas do not expose backend-only runtime t
 - `delete_workflow_artifact`
 - `move_workflow_project_file`
 
-Tests must verify `set_workflow_values` appears only in Step 4 and only for `stories_index`.
+Tests must verify `set_workflow_values` appears only in Step 3 and Step 4, permits only `story_count` in Step 3, and permits only `stories_index` in Step 4.
 
 Runtime or handler tests must be added or updated for the foundational dependency that `plan_story_artifacts` sets the selected epic's `story-index-generated` value to `true` in `Epics.index.json`.
 
@@ -667,4 +679,4 @@ Add focused `rg` checks proving:
 
 - `Epic-{E}-delivery-spec.md`, `epic-delivery-spec`, and `BuildEpicDeliverySpecToolHandler` do not appear in pi-planning module runtime code or requirements.
 - `build_workflow_document`, `create_workflow_artifact`, `archive_workflow_artifact`, `delete_workflow_artifact`, and `move_workflow_project_file` are not present in pi-planning model-facing tool schemas.
-- `set_workflow_values` is absent from all pi-planning model-facing tool schemas except Step 4.
+- `set_workflow_values` is absent from all pi-planning model-facing tool schemas except Step 3 and Step 4, and each permitted schema exposes only its step-owned key.
