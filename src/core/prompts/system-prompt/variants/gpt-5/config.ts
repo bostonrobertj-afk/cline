@@ -1,4 +1,4 @@
-import { isGPT5ModelFamily, isNextGenModelProvider } from "@utils/model-utils"
+import { isGptPromptModel, isNextGenModelProvider } from "@utils/model-utils"
 import { ModelFamily } from "@/shared/prompts"
 import { Logger } from "@/shared/services/Logger"
 import { ClineDefaultTool } from "@/shared/tools"
@@ -22,7 +22,7 @@ export const config = createVariant(ModelFamily.GPT_5)
 		const providerInfo = context.providerInfo
 		const modelId = providerInfo.model.id
 		return (
-			isGPT5ModelFamily(modelId) &&
+			isGptPromptModel(modelId, providerInfo.providerId) &&
 			!modelId.includes("chat") &&
 			isNextGenModelProvider(providerInfo) &&
 			!context.enableNativeToolCalls

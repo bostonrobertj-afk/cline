@@ -7,7 +7,7 @@ import {
 	openRouterClaudeSonnet451mModelId,
 	openRouterClaudeSonnet461mModelId,
 } from "@shared/api"
-import { normalizeOpenaiReasoningEffort } from "@shared/storage/types"
+import { resolveModelReasoningEffort } from "@shared/utils/reasoning-support"
 import { shouldSkipReasoningForModel, supportsReasoningEffortForModel } from "@utils/model-utils"
 import OpenAI from "openai"
 import type { ChatCompletionTool as OpenAITool } from "openai/resources/chat/completions"
@@ -126,7 +126,8 @@ export async function createVercelAIGatewayStream(
 		reasoning = { max_tokens: thinkingBudgetTokens }
 	}
 
-	const normalizedReasoningEffort = reasoningEffort !== undefined ? normalizeOpenaiReasoningEffort(reasoningEffort) : undefined
+	const normalizedReasoningEffort =
+		reasoningEffort !== undefined ? resolveModelReasoningEffort(model.id, "vercel-ai-gateway", reasoningEffort) : undefined
 	const reasoningEffortValue = supportsReasoningEffort ? normalizedReasoningEffort : undefined
 	// Skip reasoning for models that don't support it (e.g., devstral, grok-4), or when effort explicitly disables it.
 	const includeReasoning = !shouldSkipReasoningForModel(model.id) && reasoningEffortValue !== "none"

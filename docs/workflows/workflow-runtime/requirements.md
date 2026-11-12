@@ -471,6 +471,9 @@ The functional requirements below are grouped by the primary implementation phas
 - `FR-24b`: Task execution must not instantiate `FocusChainManager` from global focus-chain settings when no runtime workflow session is active.
 - `FR-24c`: When no runtime workflow session is active, task execution must not route through focus-chain refresh, prompt-instruction, checklist-update, or completion-protection paths.
 - `FR-24d`: Child/subagent execution contexts must not instantiate or use `FocusChainManager`; child workflow prompt projection must come from `WorkflowRuntime.buildTurnProjection(...)`, and child workflow state must remain in the child runtime workflow session.
+- `FR-24e`: The canonical runtime-owned workflow-step status projection must sort `Object.values(definition.steps)` in ascending `stepNumber` order and render each line exactly as `{stepNumber}. {checklistLabel} - {statusLabel}`, where `statusLabel` is exactly `Complete` when the step number is less than `session.activeStepNumber`, `Active` when it equals `session.activeStepNumber`, and `Not Started` when it is greater than `session.activeStepNumber`.
+- `FR-24f`: Prompt assembly and every focus-chain UI surface, including webview and CLI surfaces, must consume the same canonical workflow-step status projection. A focus-chain path must not translate that projection into `[x]` / `[ ]` checkbox markdown or maintain a parallel textual workflow-step representation.
+- `FR-24g`: A focus-chain consumer must recognize only the exact numbered projection defined by `FR-24e`. It must ignore malformed or unrelated lines rather than infer workflow status from them; if no valid projected lines remain, it must render no focus-chain status surface.
 - `FR-25`: The system must support model-driven progression requests through `workflow_progress_request` only when the workflow runtime indicates that mechanism is permitted for the active step.
 - `FR-26`: A user approval returned through the `workflow_progress_request` flow must not progress a workflow directly; it must be handed to the workflow runtime for validation and canonical state mutation.
 - `FR-27`: The system must retire `task_progress` as a workflow progression mechanism.
@@ -533,7 +536,7 @@ The functional requirements below are grouped by the primary implementation phas
 - `FR-33`: Workflow modules must own the actual workflow-specific and step-specific prompt strings.
 - `FR-33a`: Workflow modules are the sole source of workflow-specific and step-specific prompt content used to build the runtime-owned input workflow blocks.
 - `FR-34`: For each turn, the workflow runtime must build both input workflow blocks from workflow-module prompting plus runtime-owned workflow/session state.
-- `FR-34a`: Both input workflow blocks must include workflow identity, description, and the current workflow step list with `Complete`, `Active`, and `Not Started` status labels.
+- `FR-34a`: Both input workflow blocks must include workflow identity, description, and the canonical numbered workflow-step status projection defined by `FR-24e` through `FR-24g`.
 - `FR-34b`: The full-turn input workflow block must include a workflow persona section only when the workflow is active on the task's first API request, defined by `TaskState.apiRequestCount === 1`. The continuation-turn input workflow block must omit the persona. Workflows are expected to be user-invoked in fresh task threads, so persona projection is task-first-turn gated rather than separately tracking a workflow-first-turn flag.
 - `FR-34c`: The full-turn input workflow block must include a `CURRENT STEP DETAILED INSTRUCTIONS` section containing the active step number, checklist label, and any current-step prompting returned by the workflow module.
 - `FR-34d`: The continuation-turn input workflow block must include the same `CURRENT STEP DETAILED INSTRUCTIONS` section and current-step prompting as the full-turn block.
@@ -962,6 +965,7 @@ This matrix is the approval inventory for legacy workflow surfaces touched by th
 ### 4.1 User Interfaces
 
 - `IR-1`: The system must project workflow step and status information to focus chain as a downstream UI surface.
+- `IR-1a`: Every focus-chain UI surface, including the webview and CLI, must display the canonical numbered workflow-step status projection with each step number, checklist label, and exact `Complete`, `Active`, or `Not Started` status. Each surface must count `Complete` lines as completed, identify the single `Active` line as the current item, and treat `Not Started` lines as pending.
 - `IR-2`: The system must support one mandatory shared pre-workflow entry `WorkflowForm` that runs for every workflow invocation.
 - `IR-3`: The system must support workflow-form payloads for both the mandatory shared pre-workflow entry `WorkflowForm` and any active-step workflow form, with all such payloads rendered by the existing workflow form capability.
 - `IR-3a`: For workflows that require user project choice, the user-facing mandatory shared pre-workflow entry `WorkflowForm` must provide an informational first panel plus a project-selection second panel that can choose `new` versus `existing`, select an existing project derived from per-project folder names beneath the visible project output root, and provide a new project title when needed.
@@ -983,7 +987,7 @@ This matrix is the approval inventory for legacy workflow surfaces touched by th
 
 - `IR-10`: The workflow runtime must integrate with `task/index.ts` for workflow activation and per-turn orchestration entry.
 - `IR-11`: The workflow runtime must integrate with the system prompt architecture by projecting workflow prompt data and workflow-owned native tool schema for final prompt assembly.
-- `IR-12`: The workflow runtime must integrate with focus chain by providing runtime-owned workflow step and status projections.
+- `IR-12`: The workflow runtime must integrate with focus chain by providing the same canonical numbered workflow-step status projection consumed by prompt assembly, without a checkbox-markdown compatibility projection.
 - `IR-13`: The workflow runtime must integrate with the workflow form capability by providing per-panel payloads and consuming returned results.
 - `IR-15`: The workflow runtime must integrate with the normal tool execution path for tool-backed deterministic operations, while keeping direct runtime-owned deterministic procedures inside `WorkflowRuntime` or shared runtime-owned seams.
 - `IR-16`: The workflow runtime must integrate with the persistence layer for workflow session save and resume behavior.

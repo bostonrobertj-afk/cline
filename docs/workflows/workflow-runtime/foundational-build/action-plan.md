@@ -12683,7 +12683,7 @@ Allowed files:
     Allowed files:
     - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
 
-    [x] Subtask 282.2. Run `git ls-files --others --exclude-standard`; confirm Phase 72 introduced only `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowPromptTemplates.ts` and `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts` as untracked files.
+[x] Subtask 282.2. Run `git ls-files --others --exclude-standard`; confirm Phase 72 introduced only `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/workflowPromptTemplates.ts` and `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/workflow-runtime/__tests__/workflowPromptTemplates.test.ts` as untracked files.
 
     Allowed files:
     - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
@@ -12692,3 +12692,209 @@ Allowed files:
 
     Allowed files:
     - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+## Phase 73 - Align Focus Chain With The Canonical Numbered Workflow-Step Projection
+
+### Phase 73 Scope
+
+This phase implements canonical requirements `FR-24e` through `FR-24g`, `FR-34a`, `IR-1a`, and `IR-12`. `WorkflowRuntime` already produces the approved numbered workflow-step projection in the exact shape `{stepNumber}. {checklistLabel} - {Complete|Active|Not Started}` for both prompt payloads and `taskState.currentFocusChainChecklist`. This phase updates the downstream focus-chain consumers to parse and display that existing projection directly.
+
+### Phase 73 Scope Boundary
+
+- Do not modify `WorkflowRuntime`, `TaskState`, controller or extension-state contracts, workflow modules, workflow session persistence, prompt construction, workflow progression, or workflow completion behavior.
+- Do not add a checkbox-markdown formatter, compatibility parser, parallel focus-chain projection, or second workflow-step representation.
+- Do not preserve the retired `- [x]` / `- [ ]` focus-chain grammar, complete-next-step sentinel, or checkbox-specific parser exports as compatibility aliases.
+- Preserve the existing webview and CLI Focus Chain containers, expansion interactions, completion messages, progress bars, webview auto-scroll behavior, and downstream-only ownership. Change only the parsed projection contract and the text/status data used by those behaviors.
+- Lines that do not exactly match the canonical numbered projection after surrounding whitespace is trimmed must be ignored. If no valid lines remain, Focus Chain must retain its existing empty behavior.
+
+### Phase 73 Known Issue
+
+The shared runtime currently projects numbered `Complete` / `Active` / `Not Started` lines, but `src/shared/focus-chain-utils.ts`, backend completion telemetry, and the webview and CLI Focus Chain surfaces still recognize only checkbox markdown. The mismatch causes a valid restored workflow session to retain its active step and values while downstream Focus Chain surfaces render nothing and completion telemetry counts zero projected items.
+
+[ ] Task 283. Replace the retired checkbox parser with the canonical numbered workflow-step status parser.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/shared/focus-chain-utils.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/shared/focus-chain-utils.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 283.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/shared/focus-chain-utils.ts`, delete `FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL`, `FOCUS_CHAIN_ITEM_REGEX`, `isFocusChainItem(...)`, `isCompletedFocusChainItem(...)`, `parseFocusChainItem(...)`, and `isFocusChainCompleteNextStepSentinel(...)`. Add exported type `WorkflowStepStatusLabel = "Complete" | "Active" | "Not Started"`, exported interface `ParsedWorkflowStepStatusLine` with exact readonly fields `stepNumber: number`, `checklistLabel: string`, and `status: WorkflowStepStatusLabel`, exported constant `WORKFLOW_STEP_STATUS_LINE_REGEX = /^([1-9]\d*)\. (.+) - (Complete|Active|Not Started)$/`, exported guard `isWorkflowStepStatusLabel(value: string): value is WorkflowStepStatusLabel`, and exported parser `parseWorkflowStepStatusLine(line: string): ParsedWorkflowStepStatusLine | null`. The guard must compare `value` directly against the three literals without a type assertion. The parser must match `line.trim()` against the regex, return `null` when the match is absent or the captured status fails the guard, and otherwise return `stepNumber: Number.parseInt(match[1], 10)`, `checklistLabel: match[2]`, and the narrowed `status`; do not use a cast or assertion.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/focus-chain-utils.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 283.2. Create `/Users/robertboston/Documents/Cline Extension/cline/src/shared/focus-chain-utils.test.ts` using `describe` and `it` from `mocha` and `expect` from `chai`. Add test `parses the canonical numbered workflow-step statuses` with literal rows for `1. Gather Inputs - Complete`, `2. Perform Work - Active`, and `3. Finalize - Not Started`, asserting the exact parsed `stepNumber`, `checklistLabel`, and status for each row. Add test `trims surrounding whitespace without accepting noncanonical line grammar` asserting that surrounding whitespace around `2. Perform Work - Active` is accepted while `0. Invalid - Active`, `1.Gather Inputs - Complete`, `1. Gather Inputs (Complete)`, `1. Gather Inputs - Pending`, `- [x] Gather Inputs`, an empty string, and unrelated prose each return `null`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/shared/focus-chain-utils.test.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Task 284. Update backend focus-chain counting and fixtures to the canonical status projection.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/focus-chain/utils.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/focus-chain/__tests__/focus-chain-checklist-update.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 284.1. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/focus-chain/utils.ts`, replace the `isCompletedFocusChainItem` and `isFocusChainItem` import with `parseWorkflowStepStatusLine`. In `parseFocusChainListCounts(...)`, parse each line through `parseWorkflowStepStatusLine(line)`; ignore `null` results, increment `totalItems` for each parsed result, and increment `completedItems` only when `parsed.status === "Complete"`. Keep `TodoListCounts`, the function name, signature, return shape, and line-order-independent counting behavior unchanged.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/focus-chain/utils.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 284.2. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/focus-chain/__tests__/focus-chain-checklist-update.test.ts`, replace the Step 1/Step 2 checkbox fixture and its trimmed expectation with exactly `1. Gather Project Info - Complete\n2. Draft Spec - Active`; replace the teardown fixture with exactly `1. Gather Project Info - Active`. Add `parseFocusChainListCounts` from `../utils` and assert the refreshed two-line projection produces exactly `{ totalItems: 2, completedItems: 1 }`. Preserve assertions that refresh trims surrounding whitespace, resets user-update/counter state, posts once, and clears after workflow teardown.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/focus-chain/__tests__/focus-chain-checklist-update.test.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 284.3. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts`, replace both exact `- [ ] Organize Ideas & Plan Next Actions` fixture/assertion strings with exactly `4. Organize Ideas & Plan Next Actions - Active`; leave the tested post-completion workflow-state preservation behavior unchanged.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 284.4. In `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`, replace the four parent checklist fixture/assertion strings `- [ ] Parent Step` with exactly `1. Parent Step - Active` and replace the callback-only argument `- [ ] Child Step` with exactly `1. Child Step - Active`. Preserve the assertions that child workflow activation does not mutate parent workflow state and subagent focus-chain callbacks do not call the parent callback.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Task 285. Update the webview and CLI Focus Chain surfaces to display the canonical numbered workflow-step projection.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/task-header/FocusChain.tsx`
+- `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/common/ChecklistRenderer.tsx`
+- `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/task-header/TaskHeader.stories.tsx`
+- `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/task-header/FocusChain.spec.tsx`
+- `/Users/robertboston/Documents/Cline Extension/cline/cli/src/components/FocusChain.tsx`
+- `/Users/robertboston/Documents/Cline Extension/cline/cli/src/components/FocusChain.test.tsx`
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 285.1. In `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/task-header/FocusChain.tsx`, replace imports `isCompletedFocusChainItem` and `isFocusChainItem` with `parseWorkflowStepStatusLine`. Keep `TodoInfo.currentTodo` structurally unchanged. In `parseCurrentTodoInfo(...)`, replace `firstIncompleteIndex` and `firstIncompleteText` with `let activeIndex = -1` and `let activeText: string | null = null`. Parse each line once through `parseWorkflowStepStatusLine(...)`; ignore `null`, increment `completedCount` only for status `Complete`, and, before incrementing `totalCount`, set `activeIndex = totalCount` and `activeText = `${parsed.stepNumber}. ${parsed.checklistLabel} - ${parsed.status}`` only when status is `Active` and `activeIndex === -1`. Increment `totalCount` for every parsed line. After the loop, construct `currentTodo` exactly as `activeText !== null ? { text: activeText, completed: false, index: activeIndex } : null`, and set `currentIndex` to `activeIndex >= 0 ? activeIndex + 1 : totalCount`. Preserve caching, cache eviction, completion calculation, progress percentage, empty behavior, expand/collapse behavior, and the existing header/completion copy. Do not treat the first non-complete line as active and do not infer status from line order.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/task-header/FocusChain.tsx`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 285.2. In `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/common/ChecklistRenderer.tsx`, replace the `parseFocusChainItem` import with exactly `import { parseWorkflowStepStatusLine, type WorkflowStepStatusLabel } from "@shared/focus-chain-utils"`. Replace local `ChecklistItem` fields with exact fields `stepNumber: number`, `checklistLabel: string`, and `status: WorkflowStepStatusLabel`. Parse each trimmed line once through `parseWorkflowStepStatusLine(...)`, ignore `null`, and push exactly `{ stepNumber: parsed.stepNumber, checklistLabel: parsed.checklistLabel, status: parsed.status }`. Treat `status === "Complete"` as completed for auto-scroll, success color, `CheckIcon`, and line-through styling; use `CircleIcon` and normal foreground styling for `Active` and `Not Started`. Render each valid row through `LightMarkdown` using exact text `${item.stepNumber}. ${item.checklistLabel} - ${item.status}`. Preserve the original-text fallback when no valid items exist, scrolling behavior, layout, and timeout cleanup.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/common/ChecklistRenderer.tsx`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 285.3. In `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/task-header/TaskHeader.stories.tsx`, replace the `WithProgressMessage` `lastProgressMessageText` value with exactly `1. Set up project structure - Complete\n2. Install dependencies - Complete\n3. Create API routes - Active\n4. Test endpoints - Not Started`; leave all other story arguments and descriptions unchanged.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/task-header/TaskHeader.stories.tsx`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 285.4. Create `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/task-header/FocusChain.spec.tsx` importing `fireEvent`, `render`, and `screen` from `@testing-library/react` and `describe`, `expect`, and `it` from `vitest`. Add test `renders the canonical active workflow step and expanded status list` using exactly `1. Gather Inputs - Complete\n2. Perform Work - Active\n3. Finalize - Not Started`; assert the collapsed surface has accessible label `Expand focus chain`, displays `2/3`, and displays exact current text `2. Perform Work - Active`; click the expand surface, assert accessible label `Collapse focus chain`, assert exact text `1. Gather Inputs - Complete` and `3. Finalize - Not Started` are visible, and assert `screen.getAllByText("2. Perform Work - Active")` has length `2` because the active line appears in both the header and expanded list. Add test `ignores malformed and checkbox lines` using unrelated prose plus `- [x] Legacy Step` and assert `Expand focus chain` is absent.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/webview-ui/src/components/chat/task-header/FocusChain.spec.tsx`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 285.5. In `/Users/robertboston/Documents/Cline Extension/cline/cli/src/components/FocusChain.tsx`, replace the shared utility import with exactly `import { parseWorkflowStepStatusLine, type WorkflowStepStatusLabel } from "@shared/focus-chain-utils"`. Keep `TodoInfo.currentTodo` structurally unchanged. Replace local `TodoItem` fields with exact fields `stepNumber: number`, `checklistLabel: string`, and `status: WorkflowStepStatusLabel`. In `parseCurrentTodoInfo(...)`, replace `firstIncompleteIndex` and `firstIncompleteText` with `let activeIndex = -1` and `let activeText: string | null = null`. Parse each line once through `parseWorkflowStepStatusLine(...)`; ignore `null`, increment `completedCount` only for status `Complete`, and, before incrementing `totalCount`, set `activeIndex = totalCount` and `activeText = `${parsed.stepNumber}. ${parsed.checklistLabel} - ${parsed.status}`` only when status is `Active` and `activeIndex === -1`. Increment `totalCount` for every parsed line. After the loop, construct `currentTodo` exactly as `activeText !== null ? { text: activeText, completed: false, index: activeIndex } : null`, and set `currentIndex` to `activeIndex >= 0 ? activeIndex + 1 : totalCount`. In `parseTodoItems(...)`, parse each trimmed line once, ignore `null`, and push exactly `{ stepNumber: parsed.stepNumber, checklistLabel: parsed.checklistLabel, status: parsed.status }`. In `ExpandedList`, treat only `status === "Complete"` as completed for the check glyph, color, and dimming, and render exact text `${item.stepNumber}. ${item.checklistLabel} - ${item.status}` for every valid row. Preserve the component props, memoization, containers, progress bar, 50-character header truncation, expansion behavior, and existing CLI completion messages. Do not treat the first non-complete line as active and do not infer status from line order.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/cli/src/components/FocusChain.tsx`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 285.6. Create `/Users/robertboston/Documents/Cline Extension/cline/cli/src/components/FocusChain.test.tsx` importing `render` from `ink-testing-library`, `React` from `react`, `describe`, `expect`, and `it` from `vitest`, and `FocusChain` from `./FocusChain`. Add test `renders the canonical active workflow step and expanded status list` by rendering `FocusChain` with `expanded={true}` and exact `focusChainChecklist` value `1. Gather Inputs - Complete\n2. Perform Work - Active\n3. Finalize - Not Started`; assert `lastFrame()` contains `[2/3]` and each exact numbered status line. Add test `ignores malformed and checkbox lines` by rendering `FocusChain` with unrelated prose plus `- [x] Legacy Step` and assert `lastFrame() ?? ""` is exactly the empty string.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/cli/src/components/FocusChain.test.tsx`
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+### Phase 73 Validation
+
+[ ] Task 286. Run Phase 73 focused validation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 286.1. Run `npm run test:unit -- src/shared/focus-chain-utils.test.ts src/core/task/focus-chain/__tests__/focus-chain-checklist-update.test.ts src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 286.2. Run `npm --prefix webview-ui run test -- src/components/chat/task-header/FocusChain.spec.tsx`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 286.3. Run `npm --prefix cli run test:run -- src/components/FocusChain.test.tsx`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Task 287. Run Phase 73 static and package validation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 287.1. Run `npm run check-types`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 287.2. Run `npm run lint`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 287.3. Run `npm run package`.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+[ ] Task 288. Run Phase 73 scope and retired-grammar validation.
+
+Allowed files:
+- `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 288.1. Run `git diff --check`, `git diff --name-only`, and `git ls-files --others --exclude-standard`. Compare against the pre-Phase 73 baseline and confirm the implementation introduced changes only to the files authorized by Tasks 283 through 285 plus the approved Phase 73 documentation revisions. Preserve unrelated existing changes.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+    [ ] Subtask 288.2. Run `grep -R -n -E 'FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL|FOCUS_CHAIN_ITEM_REGEX|isFocusChainItem|isCompletedFocusChainItem|parseFocusChainItem|isFocusChainCompleteNextStepSentinel' src/shared/focus-chain-utils.ts src/shared/focus-chain-utils.test.ts src/core/task/focus-chain/utils.ts src/core/task/focus-chain/__tests__/focus-chain-checklist-update.test.ts src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts webview-ui/src/components/chat/task-header/FocusChain.tsx webview-ui/src/components/common/ChecklistRenderer.tsx webview-ui/src/components/chat/task-header/TaskHeader.stories.tsx webview-ui/src/components/chat/task-header/FocusChain.spec.tsx cli/src/components/FocusChain.tsx cli/src/components/FocusChain.test.tsx`; confirm the command returns no matches so no retired sentinel or compatibility parser symbol remains. Then run `grep -R -n -E -- '- \[[ xX]\]' src/shared/focus-chain-utils.ts src/core/task/focus-chain/utils.ts src/core/task/focus-chain/__tests__/focus-chain-checklist-update.test.ts src/core/task/tools/handlers/__tests__/AttemptCompletionHandler.postCompletionFollowup.test.ts src/core/task/tools/subagent/__tests__/SubagentRunner.test.ts webview-ui/src/components/chat/task-header/FocusChain.tsx webview-ui/src/components/common/ChecklistRenderer.tsx webview-ui/src/components/chat/task-header/TaskHeader.stories.tsx cli/src/components/FocusChain.tsx`; confirm the command returns no matches so checkbox grammar remains only in the explicit parser-rejection tests and not in live consumers or ordinary fixtures.
+
+    Allowed files:
+    - `/Users/robertboston/Documents/Cline Extension/cline/docs/workflows/workflow-runtime/foundational-build/action-plan.md`
+
+### Phase 73 Compliance Matrix
+
+| Task/Subtask | Requirement Source | Target File | Symbols Verified | Live Contract Verified | Fallout Cleanup Prescribed | Validation Coverage |
+| --- | --- | --- | --- | --- | --- | --- |
+| 283 / 283.1 | FR-24e–FR-24g, IR-12 | `src/shared/focus-chain-utils.ts` | Existing checkbox parser exports and all live consumers inspected; new numbered parser symbols defined here | Yes; exact grammar, return shape, narrowing, and cleanup prescribed | Yes; all retired exports deleted without aliases | 283.2, 286, 287, 288 |
+| 283.2 | FR-24e–FR-24g | `src/shared/focus-chain-utils.test.ts` | New test file; repo Mocha/Chai contract verified | Yes; accepted and rejected literal rows prescribed | Yes; rejects checkbox and noncanonical grammar | 286.1, 287, 288 |
+| 284 / 284.1 | FR-24e–FR-24g, IR-12 | `src/core/task/focus-chain/utils.ts` | `parseFocusChainListCounts` and telemetry caller verified | Yes; exact completed/total semantics prescribed | Yes; obsolete imports removed | 284.2, 286.1, 287, 288 |
+| 284.2 | FR-24e–FR-24g | `focus-chain-checklist-update.test.ts` | Existing runtime-projection refresh/clear fixtures verified | Yes; exact numbered fixtures and counts prescribed | Yes; checkbox fixtures removed | 286.1, 287, 288 |
+| 284.3 | FR-24e–FR-24g | `AttemptCompletionHandler.postCompletionFollowup.test.ts` | Existing active-workflow preservation helper verified | Yes; exact active Step 4 fixture prescribed | Yes; checkbox fixture removed | 286.1, 287, 288 |
+| 284.4 | FR-24d–FR-24g | `SubagentRunner.test.ts` | Parent preservation and child callback tests verified | Yes; exact parent/child projection fixtures prescribed | Yes; checkbox fixtures removed | 286.1, 287, 288 |
+| 285 / 285.1 | FR-24e–FR-24g, IR-1a | `FocusChain.tsx` | `TodoInfo`, parser cache, header and expand/collapse behavior verified | Yes; exact active/completed/pending semantics prescribed | Yes; old imports and first-incomplete inference removed | 285.4, 286.2, 287, 288 |
+| 285.2 | FR-24e–FR-24g, IR-1a | `ChecklistRenderer.tsx` | Local item shape, parser, icons, styling, and auto-scroll verified | Yes; exact visible row and status styling prescribed | Yes; checkbox-specific item/parser logic removed | 285.4, 286.2, 287, 288 |
+| 285.3 | FR-24e–FR-24g, IR-1a | `TaskHeader.stories.tsx` | `WithProgressMessage` fixture verified | Yes; exact four-line projection prescribed | Yes; checkbox story fixture removed | 287, 288 |
+| 285.4 | FR-24e–FR-24g, IR-1a | `FocusChain.spec.tsx` | New Vitest/Testing Library file; neighboring test contract verified | Yes; collapsed, expanded, and invalid-input assertions prescribed | Yes; regression explicitly rejects checkbox grammar | 286.2, 287, 288 |
+| 285.5 | FR-24e–FR-24g, IR-1a | `cli/src/components/FocusChain.tsx` | CLI parser, summary, progress, and expanded-row contracts verified | Yes; exact active/completed/pending semantics prescribed | Yes; all three retired parser imports and checkbox item fields removed | 285.6, 286.3, 287, 288 |
+| 285.6 | FR-24e–FR-24g, IR-1a | `cli/src/components/FocusChain.test.tsx` | New Vitest/Ink test file; neighboring test contract verified | Yes; summary, expanded rows, and invalid-input assertions prescribed | Yes; regression explicitly rejects checkbox grammar | 286.3, 287, 288 |
+| 286 | FR-24e–FR-24g, IR-1a, IR-12 | Read-only validation | Exact test files and commands verified | Yes | Yes; failures are stop conditions | Focused backend/webview/CLI tests |
+| 287 | NFR-11–NFR-14 | Read-only validation | Existing check-types, lint, and package scripts verified | Yes | Yes; no unprescribed fixes authorized | Static/package gates |
+| 288 | NFR-11–NFR-14 | Read-only validation | Git/grep commands and allowed paths verified | Yes | Yes; scope and retired grammar checked | Scope/static guards |
+
+### Phase 73 Delta Fallout Audit
+
+- `WorkflowRuntime.buildWorkflowStepChecklist(...)`, its numbered output, prompt payload construction, runtime session state, persistence, and resume remain unchanged.
+- The shared parser export replacement is atomic across its four live consumers: backend counts, webview `FocusChain.tsx`, `ChecklistRenderer.tsx`, and CLI `FocusChain.tsx`. No compatibility export or checkbox grammar remains.
+- `FocusChainManager.checkIncompleteProgressOnCompletion(...)` keeps its existing call and receives corrected counts through `parseFocusChainListCounts(...)`; no telemetry API or event shape changes.
+- Webview and CLI Focus Chain surfaces preserve their existing containers and interaction behavior while deriving current state from explicit `Active` status instead of the first unchecked line.
+- `ChecklistRenderer` preserves completed-row icon/style and scrolling behavior while rendering exact step number, label, and status text.
+- Active-workflow and parent/subagent fixture strings are updated wherever the retired checkbox grammar survives in the Phase 73 affected contracts.
+- No workflow module, prompt wording, controller state field, protobuf, persisted metadata, or user credential surface changes in this phase.
+
+Phase 73 authoring audit: read the canonical architecture and requirements, the focused foundational requirements extract, every live parser/backend/webview/CLI consumer, all direct symbol call sites, affected fixtures, neighboring test conventions, and validation scripts. Tasks 283 through 288 define symbols before consumers, prescribe every import/export deletion and replacement, cover fixture fallout, retain existing UI behavior outside status parsing/rendering, and include focused, static, package, scope, and retired-grammar validation. Re-read this phase line by line against `docs/action-plan-guide.md` Steps 1 through 9 before implementation.

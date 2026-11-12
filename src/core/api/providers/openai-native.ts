@@ -5,22 +5,20 @@ import {
 	openAiNativeDefaultModelId,
 	openAiNativeModels,
 } from "@shared/api"
-import { normalizeOpenaiReasoningEffort, normalizeOpenaiReasoningSummary } from "@shared/storage/types"
+import { normalizeOpenaiReasoningSummary } from "@shared/storage/types"
 import { calculateApiCostOpenAI } from "@utils/cost"
 import OpenAI from "openai"
-import type {
-	ChatCompletionFunctionTool,
-	ChatCompletionReasoningEffort,
-	ChatCompletionTool,
-} from "openai/resources/chat/completions"
+import type { ChatCompletionFunctionTool, ChatCompletionTool } from "openai/resources/chat/completions"
 import { MessageEvent as UndiciMessageEvent, WebSocket as UndiciWebSocket } from "undici"
 import { buildExternalBasicHeaders } from "@/services/EnvUtils"
 import { featureFlagsService } from "@/services/feature-flags"
 import { ClineStorageMessage } from "@/shared/messages/content"
 import { createOpenAIClient } from "@/shared/net"
+import { getOpenAiNativeModelProfile } from "@/shared/openai-native-models"
 import { ApiFormat } from "@/shared/proto/cline/models"
 import { FeatureFlag } from "@/shared/services/feature-flags/feature-flags"
 import { Logger } from "@/shared/services/Logger"
+import { resolveModelReasoningEffort } from "@/shared/utils/reasoning-support"
 import { isGPT5ModelFamily } from "@/utils/model-utils"
 import { ApiHandler, CommonApiHandlerOptions } from "../"
 import { withRetry } from "../retry"
@@ -167,9 +165,8 @@ export class OpenAiNativeHandler implements ApiHandler {
 		const systemRole = model.info.systemRole ?? "system"
 		const includeReasoning = model.info.supportsReasoningEffort
 		const includeTools = model.info.supportsTools ?? true
-		const requestedEffort = normalizeOpenaiReasoningEffort(this.options.reasoningEffort)
-		const reasoningEffort =
-			includeReasoning && requestedEffort !== "none" ? (requestedEffort as ChatCompletionReasoningEffort) : undefined
+		const requestedEffort = resolveModelReasoningEffort(model.id, "openai-native", this.options.reasoningEffort)
+		const reasoningEffort = includeReasoning && requestedEffort !== "none" ? requestedEffort : undefined
 
 		const stream = await client.chat.completions.create({
 			model: model.id,
@@ -409,13 +406,14 @@ export class OpenAiNativeHandler implements ApiHandler {
 		previousResponseId?: string
 		store: boolean
 	}): OpenAI.Responses.ResponseCreateParamsStreaming {
-		const requestedEffort = normalizeOpenaiReasoningEffort(this.options.reasoningEffort)
+		const profile = getOpenAiNativeModelProfile(args.modelId, "openai-native")
+		const requestedEffort = resolveModelReasoningEffort(args.modelId, "openai-native", this.options.reasoningEffort)
 		const requestedSummary = normalizeOpenaiReasoningSummary(this.options.reasoningSummary)
 		const reasoning =
-			requestedEffort === "none"
+			!profile && requestedEffort === "none"
 				? undefined
 				: {
-						effort: requestedEffort as ChatCompletionReasoningEffort,
+						effort: requestedEffort,
 						...(requestedSummary !== "none" ? { summary: requestedSummary } : {}),
 					}
 
@@ -440,7 +438,7 @@ export class OpenAiNativeHandler implements ApiHandler {
 		modelId: string,
 		modelInfo: ModelInfo,
 	): OpenAI.Responses.ResponseCreateParamsStreaming["context_management"] | undefined {
-		if (!isGPT5ModelFamily(modelId)) {
+		if (!isGPT5ModelFamily(modelId) && !getOpenAiNativeModelProfile(modelId, "openai-native")?.gpt54Behavior) {
 			return undefined
 		}
 
@@ -928,23 +926,15 @@ export class OpenAiNativeHandler implements ApiHandler {
 				const inputTokens = usage.input_tokens || 0
 				const outputTokens = usage.output_tokens || 0
 				const cacheReadTokens = usage.input_tokens_details?.cached_tokens || 0
-				const cacheWriteTokens = 0
-				const reasoningTokens = usage.output_tokens_details?.reasoning_tokens || 0
-				const totalOutputTokens = outputTokens + reasoningTokens
+				const cacheWriteTokens = usage.input_tokens_details?.cache_write_tokens || 0
 				const totalTokens = usage.total_tokens || 0
 				Logger.info(`Total tokens from Responses API usage: ${totalTokens}`)
-				const totalCost = calculateApiCostOpenAI(
-					modelInfo,
-					inputTokens,
-					totalOutputTokens,
-					cacheWriteTokens,
-					cacheReadTokens,
-				)
+				const totalCost = calculateApiCostOpenAI(modelInfo, inputTokens, outputTokens, cacheWriteTokens, cacheReadTokens)
 				const nonCachedInputTokens = Math.max(0, inputTokens - cacheReadTokens - cacheWriteTokens)
 				yield {
 					type: "usage",
 					inputTokens: nonCachedInputTokens,
-					outputTokens: totalOutputTokens,
+					outputTokens,
 					cacheWriteTokens: cacheWriteTokens,
 					cacheReadTokens: cacheReadTokens,
 					totalCost: totalCost,

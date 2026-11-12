@@ -7,12 +7,13 @@ import {
 	openAiModelInfoSaneDefaults,
 	openAiNativeModels,
 } from "@shared/api"
-import { normalizeOpenaiReasoningEffort, normalizeOpenaiReasoningSummary } from "@shared/storage/types"
+import { normalizeOpenaiReasoningSummary } from "@shared/storage/types"
 import OpenAI, { AzureOpenAI } from "openai"
 import { buildExternalBasicHeaders } from "@/services/EnvUtils"
 import { ClineStorageMessage } from "@/shared/messages/content"
 import { createOpenAIClient, fetch } from "@/shared/net"
 import { Logger } from "@/shared/services/Logger"
+import { resolveModelReasoningEffort } from "@/shared/utils/reasoning-support"
 import { calculateApiCostOpenAI } from "@/utils/cost"
 import { ApiHandler, CommonApiHandlerOptions } from "../index"
 import { withRetry } from "../retry"
@@ -314,7 +315,7 @@ export class OpenAiHandler implements ApiHandler {
 			responseInput = buildResponsesInput(inputMessages, {
 				includeToolOutputs: !!previousResponseId,
 			})
-			const requestedEffort = normalizeOpenaiReasoningEffort(this.options.reasoningEffort)
+			const requestedEffort = resolveModelReasoningEffort(modelId, "openai", this.options.reasoningEffort)
 			reasoningEffort = requestedEffort === "none" ? undefined : requestedEffort
 			reasoningSummary = normalizeOpenaiReasoningSummary(this.options.reasoningSummary)
 

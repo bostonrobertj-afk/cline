@@ -24,7 +24,6 @@ import { HistoryItem } from "@/shared/HistoryItem"
 import { Logger } from "@/shared/services/Logger"
 import { Session } from "@/shared/services/Session"
 import { getProviderModelIdKey } from "@/shared/storage"
-import { isOpenaiReasoningEffort, OPENAI_REASONING_EFFORT_OPTIONS, type OpenaiReasoningEffort } from "@/shared/storage/types"
 import { version as CLI_VERSION } from "../package.json"
 import { runAcpMode } from "./acp/index.js"
 import { App } from "./components/App"
@@ -43,6 +42,7 @@ import { readStdinIfPiped } from "./utils/piped"
 import { runPlainTextTask } from "./utils/plain-text-task"
 import { applyProviderConfig } from "./utils/provider-config"
 import { getValidCliProviders, isValidCliProvider } from "./utils/providers"
+import { normalizeCliReasoningEffort } from "./utils/reasoning-effort"
 import { findMostRecentTaskForWorkspace } from "./utils/task-history"
 import { autoUpdateOnStartup, checkForUpdates } from "./utils/update"
 import { initializeCliContext } from "./vscode-context"
@@ -106,22 +106,6 @@ function setModeScopedState(currentMode: "act" | "plan", setter: (mode: "act" | 
 	}
 }
 
-function normalizeReasoningEffort(value?: string): OpenaiReasoningEffort | undefined {
-	if (value === undefined) {
-		return undefined
-	}
-
-	const normalized = value.toLowerCase()
-	if (isOpenaiReasoningEffort(normalized)) {
-		return normalized
-	}
-
-	printWarning(
-		`Invalid --reasoning-effort '${value}'. Using 'medium'. Valid values: ${OPENAI_REASONING_EFFORT_OPTIONS.join(", ")}.`,
-	)
-	return "medium"
-}
-
 function normalizeMaxConsecutiveMistakes(value?: string): number | undefined {
 	if (value === undefined) {
 		return undefined
@@ -183,7 +167,7 @@ function applyTaskOptions(options: TaskOptions): void {
 		telemetryService.captureHostEvent("thinking_flag", "true")
 	}
 
-	const reasoningEffort = normalizeReasoningEffort(options.reasoningEffort)
+	const reasoningEffort = normalizeCliReasoningEffort(options.reasoningEffort, printWarning)
 	if (reasoningEffort !== undefined) {
 		setModeScopedState(currentMode, (mode) => {
 			const reasoningKey = mode === "act" ? "actModeReasoningEffort" : "planModeReasoningEffort"
@@ -835,7 +819,7 @@ program
 	.option("-c, --cwd <path>", "Working directory for the task")
 	.option("--config <path>", "Path to Cline configuration directory")
 	.option("--thinking [tokens]", "Enable extended thinking (default: 1024 tokens)")
-	.option("--reasoning-effort <effort>", "Reasoning effort: none|low|medium|high|xhigh")
+	.option("--reasoning-effort <effort>", "Reasoning effort: none|low|medium|high|xhigh|max")
 	.option("--max-consecutive-mistakes <count>", "Maximum consecutive mistakes before halting in yolo mode")
 	.option("--json", "Output messages as JSON instead of styled text")
 	.option("--double-check-completion", "Reject first completion attempt to force re-verification")
@@ -1043,7 +1027,7 @@ program
 	.option("-c, --cwd <path>", "Working directory")
 	.option("--config <path>", "Configuration directory")
 	.option("--thinking [tokens]", "Enable extended thinking (default: 1024 tokens)")
-	.option("--reasoning-effort <effort>", "Reasoning effort: none|low|medium|high|xhigh")
+	.option("--reasoning-effort <effort>", "Reasoning effort: none|low|medium|high|xhigh|max")
 	.option("--max-consecutive-mistakes <count>", "Maximum consecutive mistakes before halting in yolo mode")
 	.option("--json", "Output messages as JSON instead of styled text")
 	.option("--double-check-completion", "Reject first completion attempt to force re-verification")

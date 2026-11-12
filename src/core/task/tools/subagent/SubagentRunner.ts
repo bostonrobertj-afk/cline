@@ -602,7 +602,12 @@ export class SubagentRunner {
 
 				if (
 					usageState.lastRequest &&
-					this.shouldCompactBeforeNextRequest(usageState.lastRequest.totalTokens, api, providerInfo.model.id)
+					this.shouldCompactBeforeNextRequest(
+						usageState.lastRequest.totalTokens,
+						api,
+						providerInfo.model.id,
+						providerInfo.providerId,
+					)
 				) {
 					const compactResult = this.compactConversationForContextWindow(
 						contextManager,
@@ -1197,10 +1202,11 @@ export class SubagentRunner {
 		requestTotalTokens: number,
 		api: ReturnType<typeof buildApiHandler>,
 		modelId: string,
+		providerId: string,
 	): boolean {
 		const { contextWindow, maxAllowedSize } = getContextWindowInfo(api)
 		const useAutoCondense = this.baseConfig.services.stateManager.getGlobalSettingsKey("useAutoCondense")
-		if (useAutoCondense && isNextGenModelFamily(modelId)) {
+		if (useAutoCondense && isNextGenModelFamily(modelId, providerId)) {
 			const autoCondenseThreshold = 0.75
 			const roundedThreshold = autoCondenseThreshold ? Math.floor(contextWindow * autoCondenseThreshold) : maxAllowedSize
 			const thresholdTokens = Math.min(roundedThreshold, maxAllowedSize)

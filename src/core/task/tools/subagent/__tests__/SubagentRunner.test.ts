@@ -93,6 +93,7 @@ type ShouldCompactBeforeNextRequest = (
 	requestTotalTokens: number,
 	api: ReturnType<typeof coreApi.buildApiHandler>,
 	modelId: string,
+	providerId: string,
 ) => boolean
 const shouldCompactBeforeNextRequest: ShouldCompactBeforeNextRequest = Reflect.get(
 	SubagentRunner.prototype,
@@ -1504,9 +1505,10 @@ describe("SubagentRunner", () => {
 			previousRequestTotalTokens: number,
 			api: ReturnType<typeof coreApi.buildApiHandler>,
 			modelId: string,
+			providerId: string,
 		): boolean {
 			assert.equal(previousRequestTotalTokens, 23)
-			return shouldCompactBeforeNextRequest.call(this, previousRequestTotalTokens, api, modelId)
+			return shouldCompactBeforeNextRequest.call(this, previousRequestTotalTokens, api, modelId, providerId)
 		})
 		Reflect.set(runner, "shouldCompactBeforeNextRequest", shouldCompactSpy)
 

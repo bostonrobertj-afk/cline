@@ -1,6 +1,6 @@
 import { ModelFamily } from "@/shared/prompts"
 import { ClineDefaultTool } from "@/shared/tools"
-import { isGPT5ModelFamily, isGptOssModelFamily } from "@/utils/model-utils"
+import { isGptOssModelFamily, isGptPromptModel } from "@/utils/model-utils"
 import type { ClineToolSpec } from "../spec"
 
 // {
@@ -81,7 +81,8 @@ const NATIVE_GPT_5: ClineToolSpec = {
 	name: "apply_patch",
 	description: APPLY_PATCH_TOOL_DESC,
 	contextRequirements: (context) =>
-		isGPT5ModelFamily(context.providerInfo.model.id) || isGptOssModelFamily(context.providerInfo.model.id),
+		isGptPromptModel(context.providerInfo.model.id, context.providerInfo.providerId) ||
+		isGptOssModelFamily(context.providerInfo.model.id),
 	parameters: [
 		{
 			name: "input",

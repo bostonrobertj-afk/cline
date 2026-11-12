@@ -33,7 +33,7 @@ export const config = createVariant(ModelFamily.GENERIC)
 			// Not a local model with compact prompt enabled
 			!(providerInfo.customPrompt === "compact" && isLocalModel(providerInfo)) &&
 			// Not a next-gen model
-			!(isNextGenModelProvider(providerInfo) && isNextGenModelFamily(modelId)) &&
+			!(isNextGenModelProvider(providerInfo) && isNextGenModelFamily(modelId, providerInfo.providerId)) &&
 			// Not a GLM model
 			!isGLMModelFamily(modelId) &&
 			// Not a Trinity model

@@ -194,6 +194,9 @@ Module Build requirements, Cleanup requirements, External Interface Requirements
 - `FR-24b`: Task execution must not instantiate `FocusChainManager` from global focus-chain settings when no runtime workflow session is active.
 - `FR-24c`: When no runtime workflow session is active, task execution must not route through focus-chain refresh, prompt-instruction, checklist-update, or completion-protection paths.
 - `FR-24d`: Child/subagent execution contexts must not instantiate or use `FocusChainManager`; child workflow prompt projection must come from `WorkflowRuntime.buildTurnProjection(...)`, and child workflow state must remain in the child runtime workflow session.
+- `FR-24e`: The canonical runtime-owned workflow-step status projection must sort `Object.values(definition.steps)` in ascending `stepNumber` order and render each line exactly as `{stepNumber}. {checklistLabel} - {statusLabel}`, where `statusLabel` is exactly `Complete` when the step number is less than `session.activeStepNumber`, `Active` when it equals `session.activeStepNumber`, and `Not Started` when it is greater than `session.activeStepNumber`.
+- `FR-24f`: Prompt assembly and every focus-chain UI surface, including webview and CLI surfaces, must consume the same canonical workflow-step status projection. A focus-chain path must not translate that projection into `[x]` / `[ ]` checkbox markdown or maintain a parallel textual workflow-step representation.
+- `FR-24g`: A focus-chain consumer must recognize only the exact numbered projection defined by `FR-24e`. It must ignore malformed or unrelated lines rather than infer workflow status from them; if no valid projected lines remain, it must render no focus-chain status surface.
 - `FR-25`: The system must support model-driven progression requests through `workflow_progress_request` only when the workflow runtime indicates that mechanism is permitted for the active step.
 - `FR-26`: A user approval returned through the `workflow_progress_request` flow must not progress a workflow directly; it must be handed to the workflow runtime for validation and canonical state mutation.
 - `FR-27`: The system must retire `task_progress` as a workflow progression mechanism.
@@ -247,17 +250,18 @@ Module Build requirements, Cleanup requirements, External Interface Requirements
 
 #### Foundational Build Requirements: Prompting and Native Tool Exposure
 
-- `FR-31`: The workflow runtime must assemble exactly three workflow-owned per-turn prompt/tool outputs for the active turn: a workflow instructions block for system instructions, a workflow instructions block for input, and any workflow-specific native tool schema override.
-- `FR-31a`: The workflow runtime must support both a full-turn variant and a continuation-turn variant for the system-instructions workflow block and for the input workflow block.
-- `FR-31b`: No workflow-specific prompt content may be projected through any prompt carrier other than the runtime-owned workflow instructions block for system instructions and the runtime-owned workflow instructions block for input.
+- `FR-31`: The workflow runtime must assemble exactly three workflow-owned per-turn prompt/tool outputs for the active turn: `workflowInputPayloadBlock`, `continuationWorkflowInputPayloadBlock`, and any workflow-specific native tool schema override.
+- `FR-31a`: The workflow runtime must support a full-turn input workflow block and a continuation-turn input workflow block. It must not create a separate workflow-specific system-instructions block.
+- `FR-31b`: No workflow-specific prompt content may be projected through any prompt carrier other than the runtime-owned full-turn or continuation-turn input workflow block.
 - `FR-32`: The system prompt architecture must remain the final assembler of the full system prompt.
 - `FR-33`: Workflow modules must own the actual workflow-specific and step-specific prompt strings.
-- `FR-33a`: Workflow modules are the sole source of workflow-specific and step-specific prompt content used to build the runtime-owned workflow instructions blocks.
-- `FR-34`: For each turn, the workflow runtime must build the workflow instructions blocks from workflow-module prompting plus runtime-owned workflow/session state.
-- `FR-34a`: The system-instructions workflow block must include the current workflow step list with `[x]` / `[ ]` indicators in both the full-turn and continuation-turn variants.
-- `FR-34b`: The system-instructions workflow block must include a workflow persona section only when the workflow is active on the task's first API request, defined by `TaskState.apiRequestCount === 1`. Workflows are expected to be user-invoked in fresh task threads, so persona projection is task-first-turn gated rather than separately tracking a workflow-first-turn flag.
-- `FR-34c`: The input workflow block full-turn variant must include a `Current Step` section containing the active step prompting from the workflow module.
-- `FR-34d`: The input workflow block continuation-turn variant must omit the `Current Step` section.
+- `FR-33a`: Workflow modules are the sole source of workflow-specific and step-specific prompt content used to build the runtime-owned input workflow blocks.
+- `FR-34`: For each turn, the workflow runtime must build both input workflow blocks from workflow-module prompting plus runtime-owned workflow/session state.
+- `FR-34a`: Both input workflow blocks must include workflow identity, description, and the canonical numbered workflow-step status projection defined by `FR-24e` through `FR-24g`.
+- `FR-34b`: The full-turn input workflow block must include a workflow persona section only when the workflow is active on the task's first API request, defined by `TaskState.apiRequestCount === 1`. The continuation-turn input workflow block must omit the persona. Workflows are expected to be user-invoked in fresh task threads, so persona projection is task-first-turn gated rather than separately tracking a workflow-first-turn flag.
+- `FR-34c`: The full-turn input workflow block must include a `CURRENT STEP DETAILED INSTRUCTIONS` section containing the active step number, checklist label, and any current-step prompting returned by the workflow module.
+- `FR-34d`: The continuation-turn input workflow block must include the same `CURRENT STEP DETAILED INSTRUCTIONS` section and current-step prompting as the full-turn block.
+- `FR-34e`: When a runtime-only step returns `{ kind: "none" }` from `buildPromptSource(...)`, both input workflow blocks must retain the shared current-step heading, step number, and checklist label while omitting module-owned instruction text.
 - `FR-35`: The workflow runtime must project the complete workflow-owned native tool schema that applies on the current turn from the active workflow module.
 - `FR-35a`: `set_workflow_values` is the canonical workflow-value persistence tool name/capability only when a workflow module exposes workflow-value writes for the active turn.
 - `FR-35b`: `set_workflow_values` must not have a static shared fallback prompt/native schema.

@@ -7,8 +7,9 @@ import type { AutoApprovalSettings } from "@shared/AutoApprovalSettings"
 import { DEFAULT_AUTO_APPROVAL_SETTINGS } from "@shared/AutoApprovalSettings"
 import type { ApiProvider, ModelInfo } from "@shared/api"
 import { getProviderModelIdKey, isSettingsKey, ProviderToApiKeyMap } from "@shared/storage"
-import { isOpenaiReasoningEffort, OPENAI_REASONING_EFFORT_OPTIONS, type OpenaiReasoningEffort } from "@shared/storage/types"
+import { isOpenaiReasoningEffort, type OpenaiReasoningEffort } from "@shared/storage/types"
 import type { TelemetrySetting } from "@shared/TelemetrySetting"
+import { resolveModelReasoningEffort } from "@shared/utils/reasoning-support"
 import { Box, Text, useInput } from "ink"
 import Spinner from "ink-spinner"
 import React, { useCallback, useEffect, useMemo, useState } from "react"
@@ -29,6 +30,7 @@ import { useClineFeaturedModels } from "../hooks/useClineFeaturedModels"
 import { useOcaAuth } from "../hooks/useOcaAuth"
 import { isMouseEscapeSequence } from "../utils/input"
 import { applyBedrockConfig, applyProviderConfig } from "../utils/provider-config"
+import { nextReasoningEffort } from "../utils/reasoning-effort"
 import { ApiKeyInput } from "./ApiKeyInput"
 import { BedrockCustomModelFlow } from "./BedrockCustomModelFlow"
 import { type BedrockConfig, BedrockSetup } from "./BedrockSetup"
@@ -70,11 +72,6 @@ function normalizeReasoningEffort(value: unknown): OpenaiReasoningEffort {
 		return value
 	}
 	return "low"
-}
-
-function nextReasoningEffort(current: OpenaiReasoningEffort): OpenaiReasoningEffort {
-	const idx = OPENAI_REASONING_EFFORT_OPTIONS.indexOf(current)
-	return OPENAI_REASONING_EFFORT_OPTIONS[(idx + 1) % OPENAI_REASONING_EFFORT_OPTIONS.length]
 }
 
 const TABS: PanelTab[] = [
@@ -262,20 +259,24 @@ export const SettingsPanelContent: React.FC<SettingsPanelContentProps> = ({
 	})
 
 	// Read model IDs from state (re-reads when refreshKey changes)
-	const { actModelId, planModelId } = useMemo(() => {
+	const { actModelId, planModelId, actReasoningProviderId, planReasoningProviderId } = useMemo(() => {
 		const apiConfig = stateManager.getApiConfiguration()
 		const actProvider = apiConfig.actModeApiProvider
 		const planProvider = apiConfig.planModeApiProvider || actProvider
 		if (!actProvider && !planProvider) {
-			return { actModelId: "", planModelId: "" }
+			return { actModelId: "", planModelId: "", actReasoningProviderId: "", planReasoningProviderId: "" }
 		}
 		const actKey = actProvider ? getProviderModelIdKey(actProvider, "act") : null
 		const planKey = planProvider ? getProviderModelIdKey(planProvider, "plan") : null
 		return {
 			actModelId: actKey ? (stateManager.getGlobalSettingsKey(actKey) as string) || "" : "",
 			planModelId: planKey ? (stateManager.getGlobalSettingsKey(planKey) as string) || "" : "",
+			actReasoningProviderId: actProvider ?? "",
+			planReasoningProviderId: planProvider ?? "",
 		}
 	}, [modelRefreshKey, stateManager])
+	const effectiveActReasoningEffort = resolveModelReasoningEffort(actModelId, actReasoningProviderId, actReasoningEffort)
+	const effectivePlanReasoningEffort = resolveModelReasoningEffort(planModelId, planReasoningProviderId, planReasoningEffort)
 
 	// Toggle a feature setting
 	const toggleFeature = useCallback(
@@ -484,7 +485,7 @@ export const SettingsPanelContent: React.FC<SettingsPanelContentProps> = ({
 												key: "actReasoningEffort",
 												label: "Reasoning effort",
 												type: "cycle" as const,
-												value: actReasoningEffort,
+												value: effectiveActReasoningEffort,
 											},
 										]
 									: []),
@@ -511,7 +512,7 @@ export const SettingsPanelContent: React.FC<SettingsPanelContentProps> = ({
 												key: "planReasoningEffort",
 												label: "Reasoning effort",
 												type: "cycle" as const,
-												value: planReasoningEffort,
+												value: effectivePlanReasoningEffort,
 											},
 										]
 									: []),
@@ -540,7 +541,7 @@ export const SettingsPanelContent: React.FC<SettingsPanelContentProps> = ({
 												key: "actReasoningEffort",
 												label: "Reasoning effort",
 												type: "cycle" as const,
-												value: actReasoningEffort,
+												value: effectiveActReasoningEffort,
 											},
 										]
 									: []),
@@ -706,8 +707,8 @@ export const SettingsPanelContent: React.FC<SettingsPanelContentProps> = ({
 		separateModels,
 		actThinkingEnabled,
 		planThinkingEnabled,
-		actReasoningEffort,
-		planReasoningEffort,
+		effectiveActReasoningEffort,
+		effectivePlanReasoningEffort,
 		autoApproveSettings,
 		features,
 		preferredLanguage,
@@ -795,7 +796,9 @@ export const SettingsPanelContent: React.FC<SettingsPanelContentProps> = ({
 			const targetMode = item.key === "actReasoningEffort" ? "act" : item.key === "planReasoningEffort" ? "plan" : undefined
 			if (targetMode) {
 				const currentEffort = targetMode === "act" ? actReasoningEffort : planReasoningEffort
-				setReasoningEffortForMode(targetMode, nextReasoningEffort(currentEffort))
+				const modelId = targetMode === "act" ? actModelId : planModelId
+				const providerId = targetMode === "act" ? actReasoningProviderId : planReasoningProviderId
+				setReasoningEffortForMode(targetMode, nextReasoningEffort(currentEffort, modelId, providerId))
 			}
 			return
 		}
@@ -946,6 +949,10 @@ export const SettingsPanelContent: React.FC<SettingsPanelContentProps> = ({
 		separateModels,
 		actReasoningEffort,
 		planReasoningEffort,
+		actModelId,
+		planModelId,
+		actReasoningProviderId,
+		planReasoningProviderId,
 		rebuildTaskApi,
 		setReasoningEffortForMode,
 	])

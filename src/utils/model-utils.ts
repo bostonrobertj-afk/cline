@@ -1,5 +1,6 @@
 import { ApiHandlerModel, ApiProviderInfo } from "@core/api"
 import { AnthropicModelId, anthropicModels } from "@/shared/api"
+import { getOpenAiNativeModelProfile } from "@/shared/openai-native-models"
 
 export { supportsReasoningEffortForModel } from "@shared/utils/reasoning-support"
 
@@ -89,6 +90,10 @@ export function isGPT5ModelFamily(id: string): boolean {
 	return modelId.includes("gpt-5") || modelId.includes("gpt5")
 }
 
+export function isGptPromptModel(id: string, providerId?: string): boolean {
+	return isGPT5ModelFamily(id) || getOpenAiNativeModelProfile(id, providerId ?? "")?.gpt54Behavior === true
+}
+
 export function isGptOssModelFamily(id: string): boolean {
 	const modelId = normalize(id)
 	return modelId.includes("gpt-oss") || modelId.includes("gpt_oss")
@@ -175,9 +180,10 @@ export function isDeepSeekNativeModelFamily(id: string): boolean {
 	return modelId.includes("deepseek-chat") || modelId.includes("deepseek-reasoner")
 }
 
-export function isNextGenModelFamily(id: string): boolean {
+export function isNextGenModelFamily(id: string, providerId?: string): boolean {
 	const modelId = normalize(id)
 	return (
+		getOpenAiNativeModelProfile(id, providerId ?? "")?.gpt54Behavior === true ||
 		isClaude4PlusModelFamily(modelId) ||
 		isGemini2dot5ModelFamily(modelId) ||
 		isGrok4ModelFamily(modelId) ||
@@ -228,7 +234,7 @@ export function isNativeToolCallingConfig(providerInfo: ApiProviderInfo, enableN
 		return false
 	}
 	const modelId = providerInfo.model.id.toLowerCase()
-	return isNextGenModelFamily(modelId)
+	return isNextGenModelFamily(modelId, providerInfo.providerId)
 }
 
 /**

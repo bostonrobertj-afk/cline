@@ -278,7 +278,8 @@ Responsibilities:
 Responsibilities:
 
 - build prompt-context payloads for the prompt architecture
-- build focus-chain projection from session state
+- build one canonical workflow-step status projection from session state by sorting steps by `stepNumber` and rendering each line as `{stepNumber}. {checklistLabel} - {Complete|Active|Not Started}`
+- provide that same canonical workflow-step status projection to prompt assembly and every focus-chain UI surface without translating it into checkbox markdown or maintaining a second textual workflow-step representation
 - build the mandatory shared pre-workflow entry workflow-form payload
 - build workflow-form payloads for the active step
 
@@ -346,7 +347,7 @@ Exact filenames beyond this level are deferred to requirements and implementatio
 4. Workflow runtime projects:
    - prompt-context data for the system prompt architecture
    - workflow-owned native tool schema for the active step
-   - focus-chain checklist/status derived from runtime state
+   - one canonical numbered workflow-step status projection derived from runtime state, where steps below the active step are `Complete`, the active step is `Active`, and later steps are `Not Started`
 5. `task/index.ts` continues normal turn execution using those runtime projections.
 
 ### 6.3 Scenario: Workflow Form Step
@@ -481,8 +482,8 @@ Other systems consume projected workflow state rather than owning it.
 
 Several existing systems become downstream consumers:
 
-- focus chain reflects runtime-owned step state
-- system prompt consumes runtime-owned workflow prompt data
+- webview and CLI focus-chain surfaces display the canonical numbered workflow-step status projection and derive their completed count and current item from the explicit `Complete` and `Active` statuses
+- prompt assembly consumes the same canonical numbered workflow-step status projection as part of runtime-owned workflow prompt data
 - workflow forms consume runtime-owned payloads
 
 ### 8.3 Code-Owned Workflow Content

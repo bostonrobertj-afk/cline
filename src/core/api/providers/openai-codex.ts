@@ -1,5 +1,5 @@
 import { ModelInfo, OpenAiCodexModelId, openAiCodexDefaultModelId, openAiCodexModels } from "@shared/api"
-import { normalizeOpenaiReasoningEffort, normalizeOpenaiReasoningSummary } from "@shared/storage/types"
+import { normalizeOpenaiReasoningSummary } from "@shared/storage/types"
 import OpenAI from "openai"
 import type { ChatCompletionTool } from "openai/resources/chat/completions"
 import * as os from "os"
@@ -13,6 +13,7 @@ import { fetch } from "@/shared/net"
 import { ApiFormat } from "@/shared/proto/cline/models"
 import { FeatureFlag } from "@/shared/services/feature-flags/feature-flags"
 import { Logger } from "@/shared/services/Logger"
+import { resolveModelReasoningEffort } from "@/shared/utils/reasoning-support"
 import { ApiHandler, CommonApiHandlerOptions } from "../"
 import { convertToOpenAIResponsesInput } from "../transform/openai-response-format"
 import { ApiStream, ApiStreamUsageChunk } from "../transform/stream"
@@ -164,7 +165,7 @@ export class OpenAiCodexHandler implements ApiHandler {
 		previousResponseId?: string,
 	): any {
 		// Determine reasoning effort
-		const reasoningEffort = normalizeOpenaiReasoningEffort(this.options.reasoningEffort)
+		const reasoningEffort = resolveModelReasoningEffort(model.id, "openai-codex", this.options.reasoningEffort)
 		const reasoningSummary = normalizeOpenaiReasoningSummary(this.options.reasoningSummary)
 		const includeReasoning = reasoningEffort !== "none"
 

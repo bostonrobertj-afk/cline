@@ -8,7 +8,7 @@ import {
 	openRouterClaudeSonnet451mModelId,
 	openRouterClaudeSonnet461mModelId,
 } from "@shared/api"
-import { normalizeOpenaiReasoningEffort } from "@shared/storage/types"
+import { resolveModelReasoningEffort } from "@shared/utils/reasoning-support"
 import {
 	GEMINI_FLASH_MAX_OUTPUT_TOKENS,
 	isGeminiFlashModel,
@@ -180,7 +180,8 @@ export async function createOpenRouterStream(
 		openRouterProviderSorting = undefined
 	}
 
-	const normalizedReasoningEffort = reasoningEffort !== undefined ? normalizeOpenaiReasoningEffort(reasoningEffort) : undefined
+	const normalizedReasoningEffort =
+		reasoningEffort !== undefined ? resolveModelReasoningEffort(model.id, "openrouter", reasoningEffort) : undefined
 	const reasoningEffortValue = supportsReasoningEffort ? normalizedReasoningEffort : undefined
 	// Skip reasoning for models that don't support it (e.g., devstral, grok-4), or when effort explicitly disables it.
 	const includeReasoning = !shouldSkipReasoningForModel(model.id) && reasoningEffortValue !== "none"

@@ -1,3 +1,4 @@
+import { extendedOpenAiNativeModels } from "./openai-native-models"
 import { ApiFormat } from "./proto/cline/models"
 import type { ApiHandlerSettings } from "./storage/state-keys"
 
@@ -1639,6 +1640,7 @@ export const geminiModels = {
 export type OpenAiNativeModelId = keyof typeof openAiNativeModels
 export const openAiNativeDefaultModelId: OpenAiNativeModelId = "gpt-5.2"
 export const openAiNativeModels = {
+	...extendedOpenAiNativeModels,
 	"gpt-5.4-2026-03-05": {
 		maxTokens: 128_000, // Capability ceiling, not the default per-turn request budget for long-running threads.
 		contextWindow: 1_000_000,

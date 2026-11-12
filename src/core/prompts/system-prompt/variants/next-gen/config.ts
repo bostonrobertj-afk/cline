@@ -1,4 +1,4 @@
-import { isGPT5ModelFamily, isLocalModel, isNextGenModelFamily, isNextGenModelProvider } from "@utils/model-utils"
+import { isGptPromptModel, isLocalModel, isNextGenModelFamily, isNextGenModelProvider } from "@utils/model-utils"
 import { ModelFamily } from "@/shared/prompts"
 import { Logger } from "@/shared/services/Logger"
 import { ClineDefaultTool } from "@/shared/tools"
@@ -20,15 +20,15 @@ export const config = createVariant(ModelFamily.NEXT_GEN)
 	.matcher((context) => {
 		// Match next-gen models
 		const providerInfo = context.providerInfo
-		if (isNextGenModelFamily(providerInfo.model.id) && !context.enableNativeToolCalls) {
+		if (isNextGenModelFamily(providerInfo.model.id, providerInfo.providerId) && !context.enableNativeToolCalls) {
 			return true
 		}
 		const modelId = providerInfo.model.id
 		return (
 			!(providerInfo.customPrompt === "compact" && isLocalModel(providerInfo)) &&
 			!isNextGenModelProvider(providerInfo) &&
-			isNextGenModelFamily(modelId) &&
-			!(isGPT5ModelFamily(modelId) && !modelId.includes("chat"))
+			isNextGenModelFamily(modelId, providerInfo.providerId) &&
+			!(isGptPromptModel(modelId, providerInfo.providerId) && !modelId.includes("chat"))
 		)
 	})
 	.template(baseTemplate)

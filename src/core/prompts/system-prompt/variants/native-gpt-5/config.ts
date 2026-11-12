@@ -1,4 +1,4 @@
-import { isGPT5ModelFamily, isGPT51Model, isGPT52Model, isGptOssModelFamily, isNextGenModelProvider } from "@utils/model-utils"
+import { isGPT51Model, isGPT52Model, isGptOssModelFamily, isGptPromptModel, isNextGenModelProvider } from "@utils/model-utils"
 import { ModelFamily } from "@/shared/prompts"
 import { Logger } from "@/shared/services/Logger"
 import { ClineDefaultTool } from "@/shared/tools"
@@ -32,7 +32,7 @@ export const config = createVariant(ModelFamily.NATIVE_GPT_5)
 			return true
 		}
 		return (
-			isGPT5ModelFamily(modelId) &&
+			isGptPromptModel(modelId, providerInfo.providerId) &&
 			// Exclude gpt-5.1 and gpt-5.2 models (including codex variants)
 			// GPT-5.1 and GPT-5.2 use extended reasoning and need the native-gpt-5-1 variant
 			!isGPT51Model(modelId) &&

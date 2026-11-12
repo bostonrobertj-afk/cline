@@ -76,7 +76,7 @@ import { convertClineMessageToProto } from "@shared/proto-conversions/cline-mess
 import type { SkillMetadata } from "@shared/skills"
 import { ClineDefaultTool, READ_ONLY_TOOLS } from "@shared/tools"
 import { ClineAskResponse } from "@shared/WebviewMessage"
-import { isGPT5ModelFamily, isLocalModel, isNextGenModelFamily, isParallelToolCallingEnabled } from "@utils/model-utils"
+import { isGptPromptModel, isLocalModel, isNextGenModelFamily, isParallelToolCallingEnabled } from "@utils/model-utils"
 import { filterExistingFiles } from "@utils/tabFiltering"
 import cloneDeep from "clone-deep"
 import fs from "fs/promises"
@@ -1784,7 +1784,7 @@ export class Task {
 	}
 
 	private shouldUseMinimalGptPrompt(providerInfo: ApiProviderInfo): boolean {
-		return isGPT5ModelFamily(providerInfo.model.id)
+		return isGptPromptModel(providerInfo.model.id, providerInfo.providerId)
 	}
 
 	private async restoreWorkflowRuntimeStateFromMetadata(metadata: TaskMetadata): Promise<void> {
@@ -2993,7 +2993,8 @@ export class Task {
 			this.taskState.conversationHistoryDeletedRange,
 			previousApiReqIndex,
 			taskDirectory,
-			this.stateManager.getGlobalSettingsKey("useAutoCondense") && isNextGenModelFamily(this.api.getModel().id),
+			this.stateManager.getGlobalSettingsKey("useAutoCondense") &&
+				isNextGenModelFamily(this.api.getModel().id, this.getCurrentProviderInfo().providerId),
 		)
 
 		if (contextManagementMetadata.updatedConversationHistoryDeletedRange) {
@@ -3519,7 +3520,10 @@ export class Task {
 		// Determine if we should compact context window
 		// Note: We delay context loading until we know if we're compacting (performance optimization)
 		const useCompactPrompt = customPrompt === "compact" && isLocalModel(this.getCurrentProviderInfo())
-		const useReducedEnvironmentDetails = isGPT5ModelFamily(this.getCurrentProviderInfo().model.id)
+		const useReducedEnvironmentDetails = isGptPromptModel(
+			this.getCurrentProviderInfo().model.id,
+			this.getCurrentProviderInfo().providerId,
+		)
 		let shouldCompact = false
 		const useAutoCondense = this.stateManager.getGlobalSettingsKey("useAutoCondense")
 
@@ -3530,7 +3534,7 @@ export class Task {
 			this.currentRequestHasHumanAuthoredInput,
 		)
 
-		if (useAutoCondense && isNextGenModelFamily(this.api.getModel().id)) {
+		if (useAutoCondense && isNextGenModelFamily(this.api.getModel().id, this.getCurrentProviderInfo().providerId)) {
 			// When we initially trigger context cleanup, we increase the context window size, so we need state `currentlySummarizing`
 			// to track if we've already started the context summarization flow. After summarizing, we increment
 			// conversationHistoryDeletedRange to mask out the summarization-trigger user & assistant response messages
