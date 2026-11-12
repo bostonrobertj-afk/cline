@@ -3,7 +3,7 @@
  * Displays a progress-tracked checklist of tasks
  */
 
-import { isCompletedFocusChainItem, isFocusChainItem, parseFocusChainItem } from "@shared/focus-chain-utils"
+import { parseWorkflowStepStatusLine, type WorkflowStepStatusLabel } from "@shared/focus-chain-utils"
 import { Box, Text } from "ink"
 import React, { useMemo } from "react"
 
@@ -16,8 +16,9 @@ interface TodoInfo {
 }
 
 interface TodoItem {
-	text: string
-	checked: boolean
+	stepNumber: number
+	checklistLabel: string
+	status: WorkflowStepStatusLabel
 }
 
 interface FocusChainProps {
@@ -35,21 +36,20 @@ function parseCurrentTodoInfo(text: string): TodoInfo | null {
 
 	let completedCount = 0
 	let totalCount = 0
-	let firstIncompleteIndex = -1
-	let firstIncompleteText: string | null = null
+	let activeIndex = -1
+	let activeText: string | null = null
 
 	const lines = text.split("\n")
 	for (const rawLine of lines) {
 		const line = rawLine.trim()
-		if (isFocusChainItem(line)) {
-			const isCompleted = isCompletedFocusChainItem(line)
-
-			if (isCompleted) {
+		const parsed = parseWorkflowStepStatusLine(line)
+		if (parsed) {
+			if (parsed.status === "Complete") {
 				completedCount++
-			} else if (firstIncompleteIndex === -1) {
-				firstIncompleteIndex = totalCount
-				// Extract text after "- [ ] "
-				firstIncompleteText = line.substring(5).trim()
+			}
+			if (parsed.status === "Active" && activeIndex === -1) {
+				activeIndex = totalCount
+				activeText = `${parsed.stepNumber}. ${parsed.checklistLabel} - ${parsed.status}`
 			}
 
 			totalCount++
@@ -60,11 +60,11 @@ function parseCurrentTodoInfo(text: string): TodoInfo | null {
 		return null
 	}
 
-	const currentTodo = firstIncompleteText ? { text: firstIncompleteText, completed: false, index: firstIncompleteIndex } : null
+	const currentTodo = activeText !== null ? { text: activeText, completed: false, index: activeIndex } : null
 
 	return {
 		currentTodo,
-		currentIndex: firstIncompleteIndex >= 0 ? firstIncompleteIndex + 1 : totalCount,
+		currentIndex: activeIndex >= 0 ? activeIndex + 1 : totalCount,
 		completedCount,
 		totalCount,
 		progressPercentage: (completedCount / totalCount) * 100,
@@ -80,9 +80,9 @@ function parseTodoItems(text: string): TodoItem[] {
 
 	for (const rawLine of lines) {
 		const line = rawLine.trim()
-		const parsed = parseFocusChainItem(line)
+		const parsed = parseWorkflowStepStatusLine(line)
 		if (parsed) {
-			items.push(parsed)
+			items.push({ stepNumber: parsed.stepNumber, checklistLabel: parsed.checklistLabel, status: parsed.status })
 		}
 	}
 
@@ -138,9 +138,9 @@ const ExpandedList: React.FC<{
 		<Box flexDirection="column" marginLeft={2} marginTop={1}>
 			{items.map((item, index) => (
 				<Box key={index}>
-					<Text color={item.checked ? "green" : "gray"}>{item.checked ? "✓" : "○"} </Text>
-					<Text color={item.checked ? "green" : undefined} dimColor={item.checked}>
-						{item.text}
+					<Text color={item.status === "Complete" ? "green" : "gray"}>{item.status === "Complete" ? "✓" : "○"} </Text>
+					<Text color={item.status === "Complete" ? "green" : undefined} dimColor={item.status === "Complete"}>
+						{`${item.stepNumber}. ${item.checklistLabel} - ${item.status}`}
 					</Text>
 				</Box>
 			))}

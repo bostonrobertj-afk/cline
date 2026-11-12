@@ -2421,7 +2421,7 @@ describe("SubagentRunner", () => {
 			},
 		}
 		config.taskState.activeWorkflowSession = parentWorkflowSession
-		config.taskState.currentFocusChainChecklist = "- [ ] Parent Step"
+		config.taskState.currentFocusChainChecklist = "1. Parent Step - Active"
 
 		const runner = new SubagentRunner(config)
 		const state = new TaskState()
@@ -2454,7 +2454,7 @@ describe("SubagentRunner", () => {
 		assert.equal(config.taskState.activeWorkflowSession?.workflowValues.review_input, "/tmp/review-input.md")
 		assert.equal(config.taskState.activeWorkflowSession?.projectSelection.projectTitle, "Parent Project")
 		assert.equal(config.taskState.activeWorkflowName, "parent-workflow")
-		assert.equal(config.taskState.currentFocusChainChecklist, "- [ ] Parent Step")
+		assert.equal(config.taskState.currentFocusChainChecklist, "1. Parent Step - Active")
 	})
 
 	it("does not auto-activate a second workflow when child state is already active", async () => {
@@ -2490,17 +2490,17 @@ describe("SubagentRunner", () => {
 
 	it("accepts subagent focus-chain callback updates without calling the parent callback", async () => {
 		const config = createTaskConfig(false)
-		config.taskState.currentFocusChainChecklist = "- [ ] Parent Step"
+		config.taskState.currentFocusChainChecklist = "1. Parent Step - Active"
 		const runner = new SubagentRunner(config)
 		const subagentState = new TaskState()
 		const subagentConfig = createSubagentTaskConfig.call(runner, subagentState)
 
-		const result = await subagentConfig.callbacks.updateFCListFromToolResponse("- [ ] Child Step")
+		const result = await subagentConfig.callbacks.updateFCListFromToolResponse("1. Child Step - Active")
 		const parentUpdate = config.callbacks.updateFCListFromToolResponse
 
 		assert.deepEqual(result, { accepted: true })
 		assert.equal("callCount" in parentUpdate ? parentUpdate.callCount : undefined, 0)
-		assert.equal(config.taskState.currentFocusChainChecklist, "- [ ] Parent Step")
+		assert.equal(config.taskState.currentFocusChainChecklist, "1. Parent Step - Active")
 	})
 
 	it("does not narrow visible skills from an explicit use_skill assignment in the delegated prompt", async () => {

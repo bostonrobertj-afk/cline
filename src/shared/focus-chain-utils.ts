@@ -1,49 +1,31 @@
-/**
- * Shared utility functions for focus chain pattern matching
- * Used by both extension and webview
- *  */
+export type WorkflowStepStatusLabel = "Complete" | "Active" | "Not Started"
 
-export const FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL = "__COMPLETE_NEXT_STEP__"
-
-/**
- * Checks if a trimmed line matches focus chain item patterns
- * @param line The trimmed line to check
- * @returns true if the line is a focus chain item (- [ ], - [x], or - [X])
- */
-export function isFocusChainItem(line: string): boolean {
-	return line.startsWith("- [ ]") || line.startsWith("- [x]") || line.startsWith("- [X]")
+export interface ParsedWorkflowStepStatusLine {
+	readonly stepNumber: number
+	readonly checklistLabel: string
+	readonly status: WorkflowStepStatusLabel
 }
 
-/**
- * Checks if a trimmed line is a completed focus chain item
- * @param line The trimmed line to check
- * @returns true if the line is a completed focus chain item (- [x] or - [X])
- */
-export function isCompletedFocusChainItem(line: string): boolean {
-	return line.startsWith("- [x]") || line.startsWith("- [X]")
+export const WORKFLOW_STEP_STATUS_LINE_REGEX = /^([1-9]\d*)\. (.+) - (Complete|Active|Not Started)$/
+
+export function isWorkflowStepStatusLabel(value: string): value is WorkflowStepStatusLabel {
+	return value === "Complete" || value === "Active" || value === "Not Started"
 }
 
-/**
- * Flexible regex pattern for matching focus chain items with spacing variations
- * Matches patterns like "- [x] text", "- [X] text", "- [ ] text", "-  [ ]  text", etc.
- */
-export const FOCUS_CHAIN_ITEM_REGEX = /^-\s*\[([ xX])\]\s*(.+)$/
-
-/**
- * Parse focus chain item using flexible regex (allows spacing variations)
- * @param line The trimmed line to parse
- * @returns Object with checked status and text, or null if not a focus chain item
- */
-export function parseFocusChainItem(line: string): { checked: boolean; text: string } | null {
-	const match = line.match(FOCUS_CHAIN_ITEM_REGEX)
-	if (match) {
-		const checked = match[1] === "x" || match[1] === "X"
-		const text = match[2].trim()
-		return { checked, text }
+export function parseWorkflowStepStatusLine(line: string): ParsedWorkflowStepStatusLine | null {
+	const match = line.trim().match(WORKFLOW_STEP_STATUS_LINE_REGEX)
+	if (!match) {
+		return null
 	}
-	return null
-}
 
-export function isFocusChainCompleteNextStepSentinel(value: string): boolean {
-	return value.trim() === FOCUS_CHAIN_COMPLETE_NEXT_STEP_SENTINEL
+	const status = match[3]
+	if (!isWorkflowStepStatusLabel(status)) {
+		return null
+	}
+
+	return {
+		stepNumber: Number.parseInt(match[1], 10),
+		checklistLabel: match[2],
+		status,
+	}
 }

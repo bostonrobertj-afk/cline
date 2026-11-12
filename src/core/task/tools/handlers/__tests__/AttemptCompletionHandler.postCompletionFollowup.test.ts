@@ -153,14 +153,14 @@ function setActiveWorkflowState(taskState: TaskState): ActiveWorkflowSession {
 	const session = createActiveWorkflowSession()
 	taskState.activeWorkflowName = "brainstorming"
 	taskState.activeWorkflowSession = session
-	taskState.currentFocusChainChecklist = "- [ ] Organize Ideas & Plan Next Actions"
+	taskState.currentFocusChainChecklist = "4. Organize Ideas & Plan Next Actions - Active"
 	return session
 }
 
 function assertActiveWorkflowStatePreserved(taskState: TaskState, session: ActiveWorkflowSession): void {
 	assert.equal(taskState.activeWorkflowName, "brainstorming")
 	assert.equal(taskState.activeWorkflowSession, session)
-	assert.equal(taskState.currentFocusChainChecklist, "- [ ] Organize Ideas & Plan Next Actions")
+	assert.equal(taskState.currentFocusChainChecklist, "4. Organize Ideas & Plan Next Actions - Active")
 }
 
 describe("AttemptCompletionHandler post-completion follow-up", () => {

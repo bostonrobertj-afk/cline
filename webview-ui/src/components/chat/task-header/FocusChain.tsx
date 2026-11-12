@@ -1,5 +1,5 @@
 import { cn } from "@heroui/react"
-import { isCompletedFocusChainItem, isFocusChainItem } from "@shared/focus-chain-utils"
+import { parseWorkflowStepStatusLine } from "@shared/focus-chain-utils"
 import { ChevronDownIcon, ChevronRightIcon } from "lucide-react"
 import React, { memo, useCallback, useMemo, useState } from "react"
 import ChecklistRenderer from "@/components/common/ChecklistRenderer"
@@ -95,8 +95,8 @@ const parseCurrentTodoInfo = (text: string): TodoInfo | null => {
 
 	let completedCount = 0
 	let totalCount = 0
-	let firstIncompleteIndex = -1
-	let firstIncompleteText: string | null = null
+	let activeIndex = -1
+	let activeText: string | null = null
 
 	// Process text line by line without creating intermediate arrays
 	let lineStart = 0
@@ -105,15 +105,14 @@ const parseCurrentTodoInfo = (text: string): TodoInfo | null => {
 	while (lineStart < text.length) {
 		const line = lineEnd === -1 ? text.substring(lineStart).trim() : text.substring(lineStart, lineEnd).trim()
 
-		if (isFocusChainItem(line)) {
-			const isCompleted = isCompletedFocusChainItem(line)
-
-			if (isCompleted) {
+		const parsed = parseWorkflowStepStatusLine(line)
+		if (parsed) {
+			if (parsed.status === "Complete") {
 				completedCount++
-			} else if (firstIncompleteIndex === -1) {
-				firstIncompleteIndex = totalCount
-				// Extract text only for the first incomplete item
-				firstIncompleteText = line.substring(5).trim()
+			}
+			if (parsed.status === "Active" && activeIndex === -1) {
+				activeIndex = totalCount
+				activeText = `${parsed.stepNumber}. ${parsed.checklistLabel} - ${parsed.status}`
 			}
 
 			totalCount++
@@ -131,11 +130,11 @@ const parseCurrentTodoInfo = (text: string): TodoInfo | null => {
 		return null
 	}
 
-	const currentTodo = firstIncompleteText ? { text: firstIncompleteText, completed: false, index: firstIncompleteIndex } : null
+	const currentTodo = activeText !== null ? { text: activeText, completed: false, index: activeIndex } : null
 
 	const result: TodoInfo = {
 		currentTodo,
-		currentIndex: firstIncompleteIndex >= 0 ? firstIncompleteIndex + 1 : totalCount,
+		currentIndex: activeIndex >= 0 ? activeIndex + 1 : totalCount,
 		completedCount,
 		totalCount,
 		progressPercentage: (completedCount / totalCount) * 100,

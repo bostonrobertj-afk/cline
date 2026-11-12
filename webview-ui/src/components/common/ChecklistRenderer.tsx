@@ -1,5 +1,5 @@
 import { cn } from "@heroui/react"
-import { parseFocusChainItem } from "@shared/focus-chain-utils"
+import { parseWorkflowStepStatusLine, type WorkflowStepStatusLabel } from "@shared/focus-chain-utils"
 import { CheckIcon, CircleIcon } from "lucide-react"
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import LightMarkdown from "./LightMarkdown"
@@ -9,8 +9,9 @@ interface ChecklistRendererProps {
 }
 
 interface ChecklistItem {
-	checked: boolean
-	text: string
+	stepNumber: number
+	checklistLabel: string
+	status: WorkflowStepStatusLabel
 }
 
 const ChecklistRenderer: React.FC<ChecklistRendererProps> = ({ text }) => {
@@ -25,9 +26,9 @@ const ChecklistRenderer: React.FC<ChecklistRendererProps> = ({ text }) => {
 
 		for (const line of lines) {
 			const trimmedLine = line.trim()
-			const parsed = parseFocusChainItem(trimmedLine)
+			const parsed = parseWorkflowStepStatusLine(trimmedLine)
 			if (parsed) {
-				items.push({ checked: parsed.checked, text: parsed.text })
+				items.push({ stepNumber: parsed.stepNumber, checklistLabel: parsed.checklistLabel, status: parsed.status })
 			}
 		}
 
@@ -54,7 +55,7 @@ const ChecklistRenderer: React.FC<ChecklistRendererProps> = ({ text }) => {
 			// Find the last completed item
 			let currentLastCompletedIndex = -1
 			for (let i = items.length - 1; i >= 0; i--) {
-				if (items[i].checked) {
+				if (items[i].status === "Complete") {
 					currentLastCompletedIndex = i
 					break
 				}
@@ -102,15 +103,19 @@ const ChecklistRenderer: React.FC<ChecklistRendererProps> = ({ text }) => {
 			{items.map((item, index) => (
 				// biome-ignore lint/suspicious/noArrayIndexKey: Using index as key for checklist items
 				<div className="flex items-start gap-1.5 p-0.5" key={`checklist-item-${index}`}>
-					<span className={cn("text-sm shrink-0 mt-0.5", item.checked ? "text-success" : "text-foreground")}>
-						{item.checked ? <CheckIcon size={10} /> : <CircleIcon size={10} />}
+					<span
+						className={cn(
+							"text-sm shrink-0 mt-0.5",
+							item.status === "Complete" ? "text-success" : "text-foreground",
+						)}>
+						{item.status === "Complete" ? <CheckIcon size={10} /> : <CircleIcon size={10} />}
 					</span>
 					<div
 						className={cn(
 							"text-sm break-words flex-1 leading-5",
-							item.checked ? "text-description line-through" : "text-foreground",
+							item.status === "Complete" ? "text-description line-through" : "text-foreground",
 						)}>
-						<LightMarkdown compact text={item.text} />
+						<LightMarkdown compact text={`${item.stepNumber}. ${item.checklistLabel} - ${item.status}`} />
 					</div>
 				</div>
 			))}

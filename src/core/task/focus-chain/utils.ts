@@ -1,4 +1,4 @@
-import { isCompletedFocusChainItem, isFocusChainItem } from "@shared/focus-chain-utils"
+import { parseWorkflowStepStatusLine } from "@shared/focus-chain-utils"
 
 export interface TodoListCounts {
 	totalItems: number
@@ -16,10 +16,10 @@ export function parseFocusChainListCounts(todoList: string): TodoListCounts {
 	let completedItems = 0
 
 	for (const line of lines) {
-		const trimmed = line.trim()
-		if (isFocusChainItem(trimmed)) {
+		const parsed = parseWorkflowStepStatusLine(line)
+		if (parsed) {
 			totalItems++
-			if (isCompletedFocusChainItem(trimmed)) {
+			if (parsed.status === "Complete") {
 				completedItems++
 			}
 		}

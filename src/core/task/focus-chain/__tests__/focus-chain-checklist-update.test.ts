@@ -3,6 +3,7 @@ import { describe, it } from "mocha"
 import sinon from "sinon"
 import { TaskState } from "../../TaskState"
 import { type FocusChainDependencies, FocusChainManager } from "../index"
+import { parseFocusChainListCounts } from "../utils"
 
 interface FocusChainTestDependencies {
 	dependencies: FocusChainDependencies
@@ -29,13 +30,17 @@ describe("FocusChainManager workflow checklist projection", () => {
 		taskState.activeWorkflowName = "quick-spec"
 		taskState.todoListWasUpdatedByUser = true
 		taskState.apiRequestsSinceLastTodoUpdate = 3
-		taskState.currentFocusChainChecklist = "\n- [x] Step 1: Gather Project Info\n- [ ] Step 2: Draft Spec\n"
+		taskState.currentFocusChainChecklist = "\n1. Gather Project Info - Complete\n2. Draft Spec - Active\n"
 		const { dependencies, postStateToWebview } = createDependencies(taskState)
 		const manager = new FocusChainManager(dependencies)
 
 		await manager.refreshActiveWorkflowChecklistProjection()
 
-		expect(taskState.currentFocusChainChecklist).to.equal("- [x] Step 1: Gather Project Info\n- [ ] Step 2: Draft Spec")
+		expect(taskState.currentFocusChainChecklist).to.equal("1. Gather Project Info - Complete\n2. Draft Spec - Active")
+		expect(parseFocusChainListCounts(taskState.currentFocusChainChecklist)).to.deep.equal({
+			totalItems: 2,
+			completedItems: 1,
+		})
 		expect(taskState.todoListWasUpdatedByUser).to.equal(false)
 		expect(taskState.apiRequestsSinceLastTodoUpdate).to.equal(0)
 		expect(postStateToWebview.callCount).to.equal(1)
@@ -44,7 +49,7 @@ describe("FocusChainManager workflow checklist projection", () => {
 	it("clears the workflow-owned checklist projection after workflow teardown", async () => {
 		const taskState = new TaskState()
 		taskState.activeWorkflowName = "quick-spec"
-		taskState.currentFocusChainChecklist = "- [ ] Step 1: Gather Project Info"
+		taskState.currentFocusChainChecklist = "1. Gather Project Info - Active"
 		const { dependencies, postStateToWebview } = createDependencies(taskState)
 		const manager = new FocusChainManager(dependencies)
 		await manager.refreshActiveWorkflowChecklistProjectionIfActive()

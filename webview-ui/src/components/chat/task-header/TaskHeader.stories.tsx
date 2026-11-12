@@ -330,7 +330,7 @@ export const WithProgressMessage: Story = {
 		cacheReads: 280,
 		totalCost: 0.145,
 		lastProgressMessageText:
-			"- [x] Set up project structure\n- [x] Install dependencies\n- [ ] Create API routes\n- [ ] Test endpoints",
+			"1. Set up project structure - Complete\n2. Install dependencies - Complete\n3. Create API routes - Active\n4. Test endpoints - Not Started",
 		doesModelSupportPromptCache: true,
 		onClose: () => console.log("Close clicked"),
 	},
